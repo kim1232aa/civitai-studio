@@ -24,6 +24,7 @@
     --font: "Outfit", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; }
   html { color-scheme: dark; }
   body {
@@ -70,6 +71,9 @@
     font-weight: 600;
     letter-spacing: .18em;
     margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text);
   }
@@ -126,6 +130,7 @@
 
   .recipes {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     margin: 0 18px 14px;
     padding: 4px;
@@ -135,7 +140,7 @@
     flex-shrink: 0;
   }
   .recipes button {
-    flex: 1;
+    flex: 1 1 3.2em;
     min-width: 0;
     background: transparent;
     color: var(--muted);
@@ -144,6 +149,9 @@
     padding: 8px 6px;
     font: 500 13px/1.2 var(--font);
     cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .recipes button:hover { color: var(--text); }
   .recipes button.on {
@@ -560,7 +568,7 @@
     transition: border-color .15s;
   }
   .card:hover { border-color: color-mix(in srgb, var(--buzz) 40%, var(--line)); }
-  .card img, .card video { width: 100%; display: block; background: #000; }
+  .card img, .card video { width: 100%; max-height: 420px; object-fit: contain; display: block; background: #000; }
   .card .meta { padding: 8px 10px; color: var(--muted); font-size: 12px; }
 
 
@@ -702,6 +710,9 @@
   .svc-other[open] > summary { border-bottom: 1px solid var(--line); }
   .svc-empty { color: var(--muted); font-size: 12px; padding: 10px 8px; }
 
+  .air-table { width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+  .air-table th, .air-table td { text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); word-break:break-all; vertical-align:top; }
+  .air-table th { color:var(--muted); font-weight:600; }
   .wf-air {
     margin-top: 8px;
     font-size: 12px;
@@ -738,7 +749,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0733</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0734</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -760,7 +771,7 @@
 
   <div class="form">
     <section class="block">
-      <h2 class="block-title">服务</h2>
+      <h2 class="block-title" id="svcTitle">服务</h2>
       <input id="svcFilter" placeholder="搜索 / 筛选模型" style="margin-bottom:8px">
       <div id="serviceList" class="svc-list"></div>
       <div id="svcPicked" class="svc-picked">未选模型</div>
@@ -776,7 +787,7 @@
       </div>
     </section>
 
-    <section class="block">
+    <section class="block" id="importBlock">
       <label class="lbl" for="imgId" id="importLbl">导入</label>
       <div class="import-row">
         <input id="imgId" placeholder="Civitai 图 id / 链接，或 Fal request id">
@@ -941,9 +952,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0733" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0734" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0733</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0734</div>
   </div>
 </aside>
 
@@ -1365,7 +1376,12 @@ function renderServiceList(opts) {
   const other = list.filter(x => x.status !== 'available' && x.status !== 'degraded');
   const tags = svcDisambigTags(list);
   const CAP = 60;
-  const liveShow = live.slice(0, CAP);
+  const wantId = userPickedId || (selected && selected.id) || '';
+  const wantItem = wantId ? (list.find(x => x.id === wantId) || findCatalogItem(wantId)) : null;
+  let liveShow = live.slice(0, CAP);
+  if (wantItem && !liveShow.some(x => x.id === wantItem.id)) {
+    liveShow = [wantItem].concat(liveShow.filter(x => x.id !== wantItem.id)).slice(0, CAP);
+  }
   let html = liveShow.map(it => svcRow(it, tags)).join('');
   if (live.length > CAP) {
     html += `<div class="svc-empty">只显示前 ${CAP} 个，共 ${live.length}。用上面搜索看其余</div>`;
@@ -1376,11 +1392,7 @@ function renderServiceList(opts) {
   if (!list.length) html = '<div class="svc-empty">这个配方下还没有服务</div>';
   $('serviceList').innerHTML = html;
   bindRows($('serviceList'));
-  let pick = null;
-  const wantId = userPickedId || (selected && selected.id) || '';
-  if (wantId) {
-    pick = list.find(x => x.id === wantId) || findCatalogItem(wantId);
-  }
+  let pick = wantItem || null;
   if (!pick && pickDefault && !userPickedId) {
     const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image']}[backend] || [];
     for (let i = 0; i < prefs.length; i++) {
@@ -1426,9 +1438,19 @@ function setRecipe(r) {
   selected = null;
   userPickedId = null;
   const wf = r === 'workflow';
-  if ($('serviceList')) $('serviceList').hidden = wf;
-  if ($('svcFilter')) $('svcFilter').hidden = wf;
-  if ($('wfPanel')) $('wfPanel').hidden = !wf;
+  try { sessionStorage.setItem('civitai-studio-recipe', r); } catch (e) {}
+  const hide = (id, on) => { const el = $(id); if (!el) return; el.hidden = on; el.classList.toggle('hidden', !!on); };
+  hide('serviceList', wf);
+  hide('svcFilter', wf);
+  hide('svcPicked', wf);
+  hide('importBlock', wf);
+  hide('wfPanel', !wf);
+  if ($('svcTitle')) $('svcTitle').textContent = wf ? '工作流' : '服务';
+  try {
+    const extra = wf ? '&recipe=workflow' : '';
+    const want = '#' + backend + extra;
+    if (location.hash !== want) history.replaceState(null, '', want);
+  } catch (e) {}
   if (wf) loadWorkflows();
   else renderServiceList({ pickDefault: true });
 }
@@ -2038,10 +2060,14 @@ if ($('tabAudio')) $('tabAudio').onclick = () => setRecipe('audio');
     const un = am.unmatchedNodes || [];
     const nOk = files.filter(f => f.status === 'matched').length + packs.reduce((n, pk) => n + (pk.nodes || []).length, 0);
     const nMiss = uf.length + un.length;
-    let html = `<div class="air-row air-ok">${nOk} matched / ${nMiss} unmatched</div>`;
-    html += `<div class="air-row">files ${files.filter(f => f.status === 'matched').length}/${files.length} · packs ${packs.length}</div>`;
-    if (uf.length) html += `<div class="air-row air-bad">unmatched files: ${esc(uf.join(', '))}</div>`;
-    if (un.length) html += `<div class="air-row air-bad">unmatched nodes: ${esc(un.join(', '))}</div>`;
+    let html = `<div class="air-row air-ok">${nOk} 已匹配 / ${nMiss} 未匹配</div>`;
+    html += '<table class="air-table"><thead><tr><th>文件 / 节点</th><th>状态</th><th>AIR</th></tr></thead><tbody>';
+    files.forEach(f => {
+      html += `<tr><td>${esc(f.name || f.file || '')}</td><td class="${f.status==='matched'?'air-ok':'air-bad'}">${esc(f.status || '')}</td><td>${esc(f.air || '')}</td></tr>`;
+    });
+    uf.forEach(name => { html += `<tr><td>${esc(name)}</td><td class="air-bad">未匹配</td><td></td></tr>`; });
+    un.forEach(name => { html += `<tr><td>${esc(name)}</td><td class="air-bad">节点未匹配</td><td></td></tr>`; });
+    html += '</tbody></table>';
     box.innerHTML = html;
   }
   async function loadWorkflows() {
@@ -2065,6 +2091,7 @@ if ($('tabAudio')) $('tabAudio').onclick = () => setRecipe('audio');
     try {
       const r = await api('/api/workflows/import?url=' + encodeURIComponent(url));
       wfState = r;
+      try { sessionStorage.setItem('civitai-studio-wf', JSON.stringify({url, state: r})); } catch (e) {}
       if (btn) {
         $('wfList') && $('wfList').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === btn));
       }
@@ -2182,6 +2209,11 @@ async function runGenerate() {
   try {
     if (recipe === 'workflow') {
       if (!(wfState && wfState.workflowApi)) { fail('先导入工作流'); return; }
+      const am = wfState.airMap || {};
+      const miss = (am.unmatchedFiles || []).length + (am.unmatchedNodes || []).length;
+      const nRes = (wfState.resources || []).length;
+      if (!nRes && miss) { fail('工作流文件都对不上，先补 AIR 再生成'); return; }
+      if (miss) setDock('还有 ' + miss + ' 个未匹配，生成可能缺模型', 'bad');
     } else {
       if (!currentServiceId() && userPickedId) {
         const keep = findCatalogItem(userPickedId);
@@ -2377,7 +2409,7 @@ renderGallery();
     const dockEl = $('dockStatus');
     const hasBad = (statusEl && statusEl.classList.contains('bad')) || (dockEl && dockEl.classList.contains('bad'));
     if (goBusy || hasBad) return;
-    if (!n) setStatus(label + ' 目录为空', 'bad');
+    if (!n) setDock(label + ' 目录为空', 'bad');
     else setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
   }
   let hubSearchTimer = null;
@@ -2414,7 +2446,9 @@ renderGallery();
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.backend = p.id;
-      b.textContent = p.label || p.id;
+      const short = { huggingface: 'HF', 'modelscope-ai': '魔搭 AI', 'modelscope-cn': '魔搭 CN' }[p.id];
+      b.textContent = short || p.label || p.id;
+      b.title = p.label || p.id;
       if ((p.id === backend) || (!backend && i === 0)) b.classList.add('on');
       b.onclick = async () => {
         backend = p.id;
@@ -2487,10 +2521,29 @@ renderGallery();
     syncImportChrome();
     await loadCatalog();
     await loadOuts();
+    let wantWf = false;
+    try { wantWf = /recipe=workflow/.test(location.hash || '') || sessionStorage.getItem('civitai-studio-recipe') === 'workflow'; } catch (e) {}
+    if (wantWf) {
+      setRecipe('workflow');
+      try {
+        const bag = JSON.parse(sessionStorage.getItem('civitai-studio-wf') || '');
+        if (bag && bag.state && bag.state.workflowApi) {
+          wfState = bag.state;
+          wfState.resources = bag.state.resources || (bag.state.airMap && bag.state.airMap.resources) || [];
+          const meta = bag.state.meta || {};
+          if ($('wfMeta')) $('wfMeta').textContent = (meta.name||'工作流') + ' · ' + (bag.state.nodes||0) + ' 节点' + (bag.state.warning ? ' · ' + bag.state.warning : '');
+          renderAirMap(bag.state);
+          const prompts = bag.state.prompts || [];
+          if ($('wfPrompts')) $('wfPrompts').innerHTML = prompts.map((pr,i) => '<label class="lbl">'+esc(pr.title||pr.type||('提示 '+i))+'</label><textarea class="wfPrompt" data-id="'+esc(pr.id)+'">'+esc(pr.text||'')+'</textarea>').join('');
+          picked.serviceId = 'utility/customComfy';
+          picked.engine = 'comfy';
+        }
+      } catch (e2) {}
+    }
   } catch (e) {
     catalog = [];
     setRecipe('image');
-    setStatus('无法加载服务目录，请刷新', 'bad');
+    setDock('无法加载服务目录，请刷新', 'bad');
   }
   const go = $('go');
   if (go) {
