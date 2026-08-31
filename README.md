@@ -9,7 +9,8 @@
 - **Civitai**：编排配方（图 / 视频 / customComfy）。导入图片会抽参数；Comfy 工作流会按文件名和节点类型查 AIR，查不到就空着，不编 URN。
 - **Fal.ai**：图、视频、放大、3D、音频。字段按 OpenAPI 推断（Kling o3、Hailuo、Runway `ratio`、LTX `audio_url` 等）。
 - **Hugging Face**：FLUX、Qwen Image、HunyuanVideo。同步返回文件。
-- **魔搭**：Qwen Image / Edit（异步）。`api.modelscope.ai` 不通时走 `api-inference.modelscope.cn`。
+- **魔搭 AI**：`api.modelscope.ai`（异步）。密钥 `~/.config/modelscope/token`。
+- **魔搭 CN**：`api-inference.modelscope.cn`（异步）。密钥 `~/.config/modelscope-cn/token`。两套接口不互相顶替。
 
 界面是 Night Lab。生成按钮不会自动点。
 
@@ -37,7 +38,8 @@ chmod +x run.sh
 | Civitai | `~/.config/civitai/token` | Bearer token |
 | Fal | `~/.config/fal/token` | `KEY_ID:KEY_SECRET` |
 | Hugging Face | `~/.config/huggingface/token` | `hf_…` |
-| 魔搭 | `~/.config/modelscope/token` | ModelScope token |
+| 魔搭 AI | `~/.config/modelscope/token` | ModelScope AI token（`api.modelscope.ai`） |
+| 魔搭 CN | `~/.config/modelscope-cn/token` | ModelScope CN token（`api-inference.modelscope.cn`） |
 
 可选：`~/.config/modelscope/base_url` 覆盖推理地址。
 

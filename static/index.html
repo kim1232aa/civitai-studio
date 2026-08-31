@@ -761,11 +761,12 @@
     </section>
 
     <section class="block">
-      <label class="lbl" for="imgId">导入 Civitai 图/视频</label>
+      <label class="lbl" for="imgId" id="importLbl">导入</label>
       <div class="import-row">
-        <input id="imgId" placeholder="图 ID 或整段网址">
+        <input id="imgId" placeholder="Civitai 图 id / 链接，或 Fal request id">
         <button class="ghost" id="importImg" type="button">导入</button>
       </div>
+      <input id="importFile" type="file" accept="image/png,image/jpeg,.png,.jpg,.json" style="margin-top:8px">
     </section>
 
     <section class="block">
@@ -940,6 +941,11 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+function isModelscope(b) {
+  b = b || backend;
+  return b === 'modelscope' || b === 'modelscope-ai' || b === 'modelscope-cn' || b === 'ms';
+}
+
 let loras = [];
 let kind = 'image';
 let recipe = 'image';
@@ -1196,7 +1202,14 @@ function renderServiceList(opts) {
   bindRows($('serviceList'));
   let pick = selected && list.some(x => x.id === selected.id) ? selected : null;
   if (pickDefault || !pick) {
-    pick = list.find(x => x.status === 'available') || list.find(x => x.status === 'degraded') || null;
+    const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Qwen/Qwen-Image','Tongyi-MAI/Z-Image-Turbo'], 'modelscope-cn':['Qwen/Qwen-Image','Tongyi-MAI/Z-Image-Turbo'], modelscope:['Qwen/Qwen-Image','Tongyi-MAI/Z-Image-Turbo']}[backend] || [];
+    pick = null;
+    for (let i = 0; i < prefs.length; i++) {
+      const hit = list.find(x => x.id === prefs[i]);
+      if (hit) { pick = hit; break; }
+    }
+    if (!pick) pick = list.find(x => (x.status === 'available' || !x.status) && !x.needsSource && !x.needsFirstFrame);
+    if (!pick) pick = list.find(x => x.status === 'available') || list.find(x => x.status === 'degraded') || null;
   }
   selected = pick;
   copyPicked(pick);
@@ -1327,7 +1340,86 @@ function slimPayload(base) {
   delete base.loras;
   delete base.sampler;
   delete base.scheduler;
+  delete base.engine;
+  delete base.operation;
+  delete base.ecosystem;
+  delete base.version;
+  delete base.provider;
+  if (looksCivitaiId(base.serviceId)) {
+    const sid = selected && selected.id;
+    base.serviceId = (sid && !looksCivitaiId(sid)) ? sid : '';
+  }
+  if (base.model === 'turbo' || base.model === 'raw' || looksCivitaiId(base.model)) delete base.model;
   return base;
+}
+let lastImport = null;
+function looksCivitaiId(id) {
+  const s = String(id || '');
+  return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
+}
+function importedLooksKrea(imp) {
+  const blob = [imp && imp.serviceId, imp && imp.ecosystem, imp && imp.checkpointName, imp && imp.diffusionModel, selected && selected.id].join(' ').toLowerCase();
+  return /krea/.test(blob);
+}
+function hasSourceNow() {
+  return !!((($('sourceImage') && $('sourceImage').value.trim()) || ($('firstFrame') && $('firstFrame').value.trim())));
+}
+function syncImportChrome() {
+  const lbl = $('importLbl');
+  const inp = $('imgId');
+  if (!lbl || !inp) return;
+  if (backend === 'fal') {
+    lbl.textContent = '导入 Fal 任务 / 本地 PNG';
+    inp.placeholder = 'Fal request id，或 fal|endpoint|uuid';
+  } else if (backend === 'huggingface') {
+    lbl.textContent = '导入本地 PNG / 成片 sidecar';
+    inp.placeholder = '本台成片文件名，或上传 PNG';
+  } else if (isModelscope()) {
+    lbl.textContent = '导入本地 PNG / 成片 sidecar';
+    inp.placeholder = '本台成片文件名，或上传 PNG';
+  } else {
+    lbl.textContent = '导入 Civitai 图/视频';
+    inp.placeholder = 'Civitai 图 id / 链接，或 Fal request id';
+  }
+}
+function pickForBackend() {
+  const ids = catalog.map(x => x.id);
+  const has = (id) => ids.includes(id);
+  const krea = importedLooksKrea(lastImport);
+  const src = hasSourceNow();
+  const vid = recipe === 'video' || (lastImport && lastImport.kind === 'video');
+  let want = [];
+  if (backend === 'fal') {
+    if (vid) {
+      want = src
+        ? ['fal-ai/ltx-2.3/image-to-video/fast', 'lightricks/ltx-2.5/image-to-video/fast', 'fal-ai/wan/v2.2-a14b/image-to-video/turbo']
+        : ['fal-ai/ltx-2.3/text-to-video/fast', 'fal-ai/wan/v2.2-a14b/text-to-video'];
+    } else if (src) {
+      want = ['fal-ai/flux/dev/image-to-image', 'fal-ai/flux-pro/kontext', 'fal-ai/flux/krea/image-to-image'];
+    } else if (krea) {
+      want = ['krea/v2/medium/text-to-image', 'fal-ai/flux/krea', 'fal-ai/flux/schnell'];
+    } else {
+      want = ['fal-ai/flux/schnell'];
+    }
+  } else if (backend === 'huggingface') {
+    if (vid) want = ['tencent/HunyuanVideo'];
+    else if (krea) want = ['black-forest-labs/FLUX.1-Krea-dev', 'black-forest-labs/FLUX.1-schnell'];
+    else want = ['black-forest-labs/FLUX.1-schnell'];
+  } else if (isModelscope()) {
+    if (src) want = ['Qwen/Qwen-Image-Edit', 'MusePublic/Qwen-Image-Edit'];
+    else want = ['Tongyi-MAI/Z-Image-Turbo', 'Qwen/Qwen-Image'];
+  } else {
+    return false;
+  }
+  for (const id of want) {
+    if (has(id) && selectServiceById(id)) return true;
+  }
+  renderServiceList({ pickDefault: true });
+  if (looksCivitaiId(currentServiceId())) {
+    selected = null;
+    copyPicked(null);
+  }
+  return false;
 }
 async function api(path, opts) {
   opts = opts || {};
@@ -1413,12 +1505,12 @@ function stopWait() {
   if (pane) pane.classList.add('hidden');
   const bar = $('waitBar');
   if (bar) { bar.classList.add('indet'); bar.style.width = '40%'; }
-  const dock = $('dockStatus');
-  if (dock) { dock.className = ''; dock.textContent = DOCK_HINT; }
 }
 
 function setStatus(msg, cls='') {
   const el = $('status'); if (el) { el.className = 'status ' + cls; el.textContent = msg; }
+  const dock = $('dockStatus');
+  if (dock) { dock.className = cls || ''; dock.textContent = msg; }
 }
 const GAL_KEY = 'civitai-studio-gallery';
 let galleryItems = [];
@@ -1586,26 +1678,37 @@ function selectServiceById(id) {
   return true;
 }
 function applyImport(j) {
-  if (j.serviceId) selectServiceById(j.serviceId);
-  else if (j.kind) setKind(j.kind);
+  lastImport = j || lastImport;
+  const civitaiSid = looksCivitaiId(j.serviceId);
+  if (j.serviceId && !(backend !== 'civitai' && civitaiSid)) {
+    selectServiceById(j.serviceId);
+  } else if (j.kind) {
+    setKind(j.kind);
+  }
   if (j.prompt != null) $('prompt').value = j.prompt;
   if (j.negativePrompt != null) $('negative').value = j.negativePrompt || '';
   if (j.width) { $('width').value = j.width; $('vWidth').value = Math.min(1344, j.width); }
   if (j.height) { $('height').value = j.height; $('vHeight').value = Math.min(1344, j.height); }
   if (j.steps) { $('steps').value = j.steps; $('vSteps').value = j.steps; }
   if (j.cfgScale != null) $('cfg').value = j.cfgScale;
-  if (j.sampler) $('sampler').value = j.sampler;
-  if (j.scheduler) $('scheduler').value = j.scheduler;
-  if (j.seed != null) { $('seed').value = j.seed; $('vSeed').value = j.seed; }
-  if (j.model && (j.model === 'turbo' || j.model === 'raw')) $('model').value = j.model;
-  if ('diffusionModel' in j || j.checkpointName) {
-    setCheckpoint(j.checkpointName || '', ('diffusionModel' in j) ? (j.diffusionModel || '') : $('diffusion').value);
+  if (backend === 'civitai') {
+    if (j.sampler) $('sampler').value = j.sampler;
+    if (j.scheduler) $('scheduler').value = j.scheduler;
+    if (j.model && (j.model === 'turbo' || j.model === 'raw')) $('model').value = j.model;
+    if ('diffusionModel' in j || j.checkpointName) {
+      setCheckpoint(j.checkpointName || '', ('diffusionModel' in j) ? (j.diffusionModel || '') : $('diffusion').value);
+    }
+    loras = Array.isArray(j.loras) ? j.loras : []; renderLoras();
+  } else {
+    clearCivitaiFields();
   }
-  loras = Array.isArray(j.loras) ? j.loras : []; renderLoras();
+  if (j.seed != null) { $('seed').value = j.seed; $('vSeed').value = j.seed; }
   if (j.duration) $('duration').value = j.duration;
   if (j.firstFrame) $('firstFrame').value = j.firstFrame;
   if (j.sourceImage) $('sourceImage').value = j.sourceImage;
-  setStatus(j.kind === 'video' ? '已导入视频参数。图生视频还要首帧：出一张图或上传。然后自己点生成。' : '已导入图片参数，自己点生成。');
+  if (backend !== 'civitai') pickForBackend();
+  if (j.empty && j.error) setStatus(j.error, 'bad');
+  else setStatus(j.kind === 'video' ? '已导入视频参数。图生视频还要首帧：出一张图或上传。然后自己点生成。' : '已导入参数，自己点生成。');
   syncGo();
 }
 function readDataURL(file, cb) {
@@ -1683,17 +1786,12 @@ if ($('tabAudio')) $('tabAudio').onclick = () => setRecipe('audio');
   if ($('wfImport')) $('wfImport').onclick = () => importWorkflow(($('wfUrl') && $('wfUrl').value.trim()) || '');
 
 
-$('importImg').onclick = async () => {
-  if ($('importImg').disabled) return;
-  let q = $('imgId').value.trim();
-  const m = q.match(/\/images\/(\d+)/i) || q.match(/[?&](?:imageId|id)=(\d+)/i) || q.match(/^(\d+)$/);
-  q = m ? m[1] : '';
-  if (!q) { setStatus('请填图片数字 ID 或完整网址', 'bad'); return; }
+async function runImport(body) {
   $('importImg').disabled = true;
   $('importImg').textContent = '导入中';
   await startWait('正在导入参数');
   try {
-    const j = await api('/api/import-image/' + encodeURIComponent(q));
+    const j = await api('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     await holdWait(500);
     stopWait();
     applyImport(j);
@@ -1704,6 +1802,26 @@ $('importImg').onclick = async () => {
     $('importImg').disabled = false;
     $('importImg').textContent = '导入';
   }
+}
+$('importImg').onclick = async () => {
+  if ($('importImg').disabled) return;
+  const raw = $('imgId').value.trim();
+  if (!raw) { setStatus(backend === 'civitai' ? '请填图片数字 ID 或完整网址' : '请填 Fal request id，或上传 PNG', 'bad'); return; }
+  const body = { backend, q: raw, endpoint: currentServiceId() };
+  if (backend === 'civitai') {
+    const m = raw.match(/\/images\/(\d+)/i) || raw.match(/[?&](?:imageId|id)=(\d+)/i) || raw.match(/^(\d+)$/);
+    if (m) body.q = m[1];
+  }
+  await runImport(body);
+};
+if ($('importFile')) $('importFile').onchange = async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    await runImport({ backend, q: f.name, fileName: f.name, fileB64: r.result, endpoint: currentServiceId() });
+  };
+  r.readAsDataURL(f);
 };
 $('firstFile').onchange = (e) => {
   const f = e.target.files && e.target.files[0];
@@ -1722,7 +1840,7 @@ $('refs').onchange = (e) => {
 $('whatif').onclick = async () => {
   if (recipe === 'workflow') {
     if (!(wfState && wfState.workflowApi)) { setStatus('先导入工作流', 'bad'); return; }
-  } else if (!picked.serviceId) { setStatus('先选一个服务', 'bad'); return; }
+  } else if (!currentServiceId()) { setStatus('先选一个服务', 'bad'); return; }
   setStatus('预估中…');
   try {
     const j = await api('/api/whatif', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) });
@@ -1731,28 +1849,40 @@ $('whatif').onclick = async () => {
     setStatus('预估完成');
   } catch (e) { setStatus('预估失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 200) : e.message), 'bad'); }
 };
-$('go').onclick = async () => {
-  if (goBusy) return;
+let goClickLock = false;
+async function onGenerate(ev) {
+  if (ev) { try { ev.preventDefault(); } catch (e) {} }
+  if (goClickLock || goBusy) return;
+  goClickLock = true;
+  try {
+    await runGenerate();
+  } finally {
+    goClickLock = false;
+  }
+}
+async function runGenerate() {
+  const keys = window._hasKeys || {};
+  const label = (window._providerLabel && window._providerLabel[backend]) || backend;
+  if (recipe === 'workflow') {
+    if (!(wfState && wfState.workflowApi)) { setStatus('先导入工作流', 'bad'); return; }
+  } else if (!currentServiceId()) { setStatus('先选一个服务', 'bad'); return; }
+  else if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
+  if (backend && keys[backend] === false) { setStatus('还没有 ' + label + ' API Key', 'bad'); return; }
+  const step = selected && selected.step;
+  const gen = recipe !== 'workflow' && (step === 'imageGen' || step === 'videoGen' || !step);
+  if (gen && !$('prompt').value.trim()) { setStatus('先写提示词', 'bad'); return; }
+  if (needsSource(selected) && !$('sourceImage').value.trim()) { setStatus('这个服务需要源图', 'bad'); return; }
+  if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { setStatus('这个服务需要首帧图', 'bad'); return; }
   goBusy = true;
   $('go').disabled = true;
   $('go').textContent = '提交中…';
-  setDock('正在提交…');
-  try {
-  if (recipe === 'workflow') {
-    if (!(wfState && wfState.workflowApi)) { setDock('先导入工作流', 'bad'); return; }
-  } else if (!currentServiceId()) { setDock('先选一个服务', 'bad'); return; }
-  else if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
-  const step = selected && selected.step;
-  const gen = recipe !== 'workflow' && (step === 'imageGen' || step === 'videoGen' || !step);
-  if (gen && !$('prompt').value.trim()) { setDock('先写提示词', 'bad'); return; }
-  if (needsSource(selected) && !$('sourceImage').value.trim()) { setDock('这个服务需要源图', 'bad'); return; }
-  if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { setDock('这个服务需要首帧图', 'bad'); return; }
   const pl = payload();
   const syncGen = pl.backend === 'huggingface';
+  setStatus(syncGen ? '正在生成…' : '正在提交到队列…');
   await startWait(syncGen ? '正在生成' : '正在提交到队列');
   if (syncGen) tickWait('同步等待模型返回，请稍候');
   try {
-    const j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl), timeoutMs: 240000 });
+    const j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl), timeoutMs: syncGen ? 300000 : 180000 });
     const jobId = j.id || j.workflowId || j.token;
     const saved = j.saved || [];
     if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video' || /\.(mp4|webm)$/i.test(s.file || s.url || '')));
@@ -1765,9 +1895,17 @@ $('go').onclick = async () => {
     setStatus('已进队列 ' + jobId);
     $('go').textContent = '排队中…';
     await poll(jobId);
-  } catch (e) { setDock('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad'); stopWait(); }
-  } finally { goBusy = false; $('go').textContent = '生成'; syncGo(); }
-};
+  } catch (e) {
+    setStatus('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad');
+    stopWait();
+  } finally {
+    goBusy = false;
+    $('go').textContent = '生成';
+    syncGo();
+  }
+}
+$('go').onclick = onGenerate;
+$('go').addEventListener('click', onGenerate);
 $('searchLora').onclick = async () => {
   const q = $('loraQ').value.trim();
   if (!q) return;
@@ -1830,7 +1968,7 @@ renderGallery();
     if ('allowMatureContent' in d) $('mature').checked = !!d.allowMatureContent;
     else $('mature').checked = true;
     loras = (d.loras || []).map(x => Object.assign({}, x)); renderLoras();
-    window._hasKeys = j.hasKeys || {};
+    window._hasKeys = j.hasKeys || window._hasKeys || {};
     if (j.hasToken === false) {
       tokenMsg = '还没有 Civitai API Key';
       noToken = true;
@@ -1848,10 +1986,12 @@ renderGallery();
   async function loadCatalog(q) {
     if (q == null) q = (($('svcFilter') && $('svcFilter').value) || '').trim();
     let url = '/api/catalog?backend=' + encodeURIComponent(backend);
-    if (q) url += '&q=' + encodeURIComponent(q);
+    // Fal keeps the full local catalog (~1492). Leftover filter-as-q collapsed it to 1.
+    if (q && (isModelscope() || backend === 'huggingface')) url += '&q=' + encodeURIComponent(q);
     const cat = await api(url);
     catalog = cat.items || [];
     setRecipe(recipe || 'image');
+    if (backend !== 'civitai') pickForBackend();
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
     if (!n) setStatus(label + ' 目录为空', 'bad');
@@ -1859,8 +1999,7 @@ renderGallery();
   }
   let hubSearchTimer = null;
   function onSvcFilter() {
-    const live = backend === 'modelscope' || backend === 'huggingface' || backend === 'fal';
-    if (live) {
+    if (isModelscope() || backend === 'huggingface') {
       clearTimeout(hubSearchTimer);
       hubSearchTimer = setTimeout(async () => {
         try {
@@ -1887,6 +2026,8 @@ renderGallery();
     box.innerHTML = '';
     items.forEach((p, i) => {
       window._providerLabel[p.id] = p.label || p.id;
+      window._hasKeys = window._hasKeys || {};
+      if ('hasKey' in p) window._hasKeys[p.id] = !!p.hasKey;
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.backend = p.id;
@@ -1895,10 +2036,15 @@ renderGallery();
       b.onclick = async () => {
         backend = p.id;
         box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        if ($('svcFilter')) $('svcFilter').value = '';
         clearCivitaiFields();
         syncBackendChrome();
+        syncImportChrome();
         setStatus('正在加载 ' + (p.label || p.id) + '…');
-        try { await loadCatalog(); } catch (e) { setStatus((p.label || p.id) + ' 目录失败', 'bad'); }
+        try {
+          await loadCatalog();
+          if (backend !== 'civitai') pickForBackend();
+        } catch (e) { setStatus((p.label || p.id) + ' 目录失败', 'bad'); }
       };
       box.appendChild(b);
     });
@@ -1936,6 +2082,7 @@ renderGallery();
   }
   try {
     await loadProviders();
+    syncImportChrome();
     await loadCatalog();
     await loadOuts();
   } catch (e) {
