@@ -108,5 +108,170 @@
     "fileId": null,
     "status": "unmatched",
     "ambiguous": false
+  },
+  "seedvr2_ema_7b-Q4_K_M.gguf": {
+    "filename": "seedvr2_ema_7b-Q4_K_M.gguf",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "ae.safetensors": {
+    "filename": "ae.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "qwen_3_4b.safetensors": {
+    "filename": "qwen_3_4b.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "moody-porn-v12.6_00001_.safetensors": {
+    "filename": "moody-porn-v12.6_00001_.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "zit_sda_v1.safetensors": {
+    "filename": "zit_sda_v1.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "Salttaro ZIB - Better Pussy Spread V1.0.safetensors": {
+    "filename": "Salttaro ZIB - Better Pussy Spread V1.0.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "salttaro_zit_better_pussy_v1.0_15000.safetensors": {
+    "filename": "salttaro_zit_better_pussy_v1.0_15000.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "4xNomos8k_atd_jpg.safetensors": {
+    "filename": "4xNomos8k_atd_jpg.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "moody-real-v6.4_00001_.safetensors": {
+    "filename": "moody-real-v6.4_00001_.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "Salttaro ZIB - Better Pussy v1.0.safetensors": {
+    "filename": "Salttaro ZIB - Better Pussy v1.0.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "Mystic-XXX-ZIT-V5.safetensors": {
+    "filename": "Mystic-XXX-ZIT-V5.safetensors",
+    "air": "urn:air:zimageturbo:lora:civitai:2206377@2581135",
+    "modelId": 2206377,
+    "versionId": 2581135,
+    "fileId": 2468374,
+    "status": "matched",
+    "ambiguous": false,
+    "modelType": "LORA",
+    "name": "[ZIT] Mystic XXX",
+    "via": "search+version"
+  },
+  "moody-wild-v4-undistilled-40steps-cfg4_00001__clean.safetensors": {
+    "filename": "moody-wild-v4-undistilled-40steps-cfg4_00001__clean.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "sam_vit_b_01ec64.pth": {
+    "filename": "sam_vit_b_01ec64.pth",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "rife49.pth": {
+    "filename": "rife49.pth",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "seedvr2_ema_7b_sharp_fp16.safetensors": {
+    "filename": "seedvr2_ema_7b_sharp_fp16.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "qwen_3_8b_fp8mixed.safetensors": {
+    "filename": "qwen_3_8b_fp8mixed.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "flux2-vae.safetensors": {
+    "filename": "flux2-vae.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "mood-desire-v2-pro_00001_.safetensors": {
+    "filename": "mood-desire-v2-pro_00001_.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
   }
 }

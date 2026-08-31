@@ -79,6 +79,48 @@ assert "ratio" in rw and "aspect_ratio" not in rw, rw
 h = fal_api.build_fal_input(dict(payload, serviceId="fal-ai/minimax/hailuo-2.3/standard/image-to-video"))
 assert "end_image_url" not in h, h
 
+# LoRA: /lora endpoints get loras[{path,scale}], AIR is dropped, scale clipped 0-2
+lora_pl = dict(payload, serviceId="fal-ai/z-image/turbo/lora", loras=[
+    {"path": "https://civitai.com/api/download/models/3184845", "strength": 0.8, "name": "Kroma"},
+    {"air": "urn:air:krea2:lora:civitai:2823254@3184845", "strength": 0.8, "name": "AIR only"},
+    {"path": "XLabs-AI/flux-lora-collection", "scale": 5},
+])
+lz = fal_api.build_fal_input(lora_pl)
+assert "loras" in lz, lz
+assert lz["loras"] == [
+    {"path": "https://civitai.com/api/download/models/3184845", "scale": 0.8},
+    {"path": "XLabs-AI/flux-lora-collection", "scale": 2.0},
+], lz["loras"]
+# flux-lora uses optional loras
+lf = fal_api.build_fal_input(dict(lora_pl, serviceId="fal-ai/flux-lora"))
+assert lf.get("loras") == lz["loras"], lf
+# schnell must not grow a loras field from leftover payload
+ls = fal_api.build_fal_input(dict(lora_pl, serviceId="fal-ai/flux/schnell"))
+assert "loras" not in ls, ls
+# AIR-only must not become path
+air_only = fal_api.build_fal_input({
+    "serviceId": "fal-ai/z-image/turbo/lora",
+    "prompt": "x",
+    "loras": [{"air": "urn:air:sdxl:lora:civitai:1@2", "strength": 1}],
+})
+assert "loras" not in air_only, air_only
+
+from providers.fal import overlay_image_fields, infer_image_fields
+ov = overlay_image_fields({"id": "fal-ai/kling-video/v3/pro/image-to-video", "category": "video", "falCategory": "image-to-video"})
+assert ov.get("needsSource") is False, ov
+assert ov.get("needsFirstFrame") is True, ov
+assert "end_image_url" in (ov.get("imageFields") or []), ov
+ov2 = overlay_image_fields({"id": "fal-ai/kling-video/o3/pro/reference-to-video", "category": "video", "falCategory": "reference-to-video"})
+assert ov2.get("needsSource") is False, ov2
+assert "image_urls" in (ov2.get("imageFields") or []), ov2
+assert "end_image_url" in (ov2.get("imageFields") or []), ov2
+ov3 = overlay_image_fields({"id": "fal-ai/z-image/turbo/lora", "category": "image", "falCategory": "text-to-image", "tags": ["lora"]})
+assert ov3.get("supportsLora") is True, ov3
+assert ov3.get("needsSource") in (False, None) or ov3.get("needsSource") is False
+ov4 = overlay_image_fields({"id": "fal-ai/flux-2/edit", "category": "image", "falCategory": "image-to-image"})
+assert "image_urls" in (ov4.get("imageFields") or infer_image_fields("fal-ai/flux-2/edit")), ov4
+assert ov4.get("needsSource") is False, ov4
+
 print("catalog", len(fal_api.load_catalog()))
 print("FAIL" if fail else "PASS", fail)
 sys.exit(1 if fail else 0)

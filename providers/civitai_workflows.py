@@ -113,6 +113,78 @@ CUSTOM_HINTS = (
 )
 
 
+
+def pick_workflow_file(files: list) -> dict | None:
+    """Prefer JSON, then zip archives. Never pick weights as the graph."""
+    ranked = []
+    for f in files or []:
+        name = (f.get("name") or "").lower()
+        typ = str(f.get("type") or "")
+        if name.endswith(".json") or typ in ("Config", "Workflow"):
+            ranked.append((3, f))
+        elif name.endswith(".zip") or typ == "Archive":
+            ranked.append((2, f))
+        elif name.endswith((".png", ".webp")):
+            ranked.append((1, f))
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return ranked[0][1] if ranked else None
+
+
+def _looks_comfy(obj) -> bool:
+    if not isinstance(obj, dict):
+        return False
+    if isinstance(obj.get("nodes"), list):
+        return True
+    return any(isinstance(v, dict) and "class_type" in v for v in obj.values())
+
+
+def parse_workflow_bytes(raw: bytes) -> dict:
+    """Accept raw JSON, gzip JSON, or a zip that contains a Comfy graph."""
+    if not raw:
+        raise ValueError("工作流文件是空的")
+    head = raw[:8]
+    # zip
+    if head.startswith(b"PK"):
+        import io, zipfile
+        try:
+            z = zipfile.ZipFile(io.BytesIO(raw))
+        except zipfile.BadZipFile as e:
+            raise ValueError("工作流 zip 打不开") from e
+        candidates = []
+        for info in z.infolist():
+            name = info.filename.replace("\\", "/")
+            base = name.rsplit("/", 1)[-1]
+            if info.is_dir() or base.startswith(".") or "/__MACOSX/" in ("/" + name):
+                continue
+            if not base.lower().endswith(".json"):
+                continue
+            try:
+                obj = json.loads(z.read(info).decode("utf-8"))
+            except Exception:
+                continue
+            if _looks_comfy(obj):
+                candidates.append((info.file_size, obj, base))
+        if not candidates:
+            names = [i.filename for i in z.infolist() if not i.is_dir()]
+            raise ValueError("这个 zip 里没有 Comfy JSON 工作流（文件: " + ", ".join(names[:8]) + ")")
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1]
+    # gzip
+    if head.startswith(b"\x1f\x8b"):
+        import gzip
+        raw = gzip.decompress(raw)
+    text = raw.decode("utf-8", errors="replace").strip()
+    if text.startswith("<") or text.startswith("<!DOCTYPE"):
+        raise ValueError("下载到的是网页，不是工作流。可能要登录或换文件。")
+    try:
+        obj = json.loads(text)
+    except Exception as e:
+        raise ValueError("工作流文件不是合法 JSON") from e
+    if not _looks_comfy(obj):
+        raise ValueError("JSON 不是 Comfy 工作流（没有 nodes / class_type）")
+    return obj
+
+
 def parse_workflow_ref(raw: str) -> dict:
     s = (raw or "").strip()
     out = {"modelId": None, "versionId": None}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import mimetypes
 import os
 import threading
@@ -649,6 +650,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        if "html" in (ctype or "") or "javascript" in (ctype or ""):
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Pragma", "no-cache")
         self.end_headers()
         self.wfile.write(data)
 
@@ -766,6 +770,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "blobId required"})
             code, data = civitai(f"{ORCH}/v2/consumer/blobs?blobId={urllib.parse.quote(blob)}")
             return self._json(code, data)
+        if path == "/api/go":
+            print("[web] GO_CLICK", flush=True)
+            return self._json(200, {"ok": True})
         if path == "/api/health":
             code, data = civitai(f"{ORCH}/health")
             return self._json(code, data if isinstance(data, dict) else {"status": data})
@@ -790,6 +797,20 @@ class Handler(BaseHTTPRequestHandler):
             vid = urllib.parse.unquote(path.split("/api/model-version/", 1)[1])
             code, data = civitai(f"{SITE}/model-versions/{vid}")
             if isinstance(data, dict):
+                files = []
+                for f in (data.get("files") or []):
+                    if not isinstance(f, dict):
+                        continue
+                    files.append({
+                        "id": f.get("id"),
+                        "name": f.get("name"),
+                        "type": f.get("type"),
+                        "downloadUrl": f.get("downloadUrl") or f.get("download_url"),
+                    })
+                download = next((x.get("downloadUrl") for x in files if x.get("downloadUrl")), None)
+                vid = data.get("id")
+                if not download and vid:
+                    download = f"https://civitai.com/api/download/models/{vid}"
                 return self._json(code, {
                     "id": data.get("id"),
                     "name": data.get("name"),
@@ -798,6 +819,8 @@ class Handler(BaseHTTPRequestHandler):
                     "model": (data.get("model") or {}).get("name"),
                     "type": (data.get("model") or {}).get("type"),
                     "trainedWords": data.get("trainedWords") or [],
+                    "files": files,
+                    "downloadUrl": download,
                 })
             return self._json(code, data)
         if path == "/api/search":

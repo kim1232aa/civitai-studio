@@ -129,14 +129,146 @@ def infer_image_fields(eid: str) -> list:
     return []
 
 
+FIRST_IMAGE_FIELDS = {"image_url", "start_image_url", "first_frame_url", "image"}
+LAST_IMAGE_FIELDS = {"end_image_url", "tail_image_url", "last_frame_url"}
+LORA_INPUT_KEYS = ("loras", "lora", "lora_url", "lora_path")
+
+
+def fal_supports_lora(item) -> bool:
+    """True when this Fal endpoint actually takes user LoRAs."""
+    if isinstance(item, str):
+        item = {"id": item}
+    item = item or {}
+    eid = (item.get("id") or "").lower()
+    name = (item.get("name") or "").lower()
+    fcat = (item.get("falCategory") or "").lower()
+    tags = [str(t).lower() for t in (item.get("tags") or [])]
+    fields = [str(x).lower() for x in list(item.get("required") or []) + list(item.get("optional") or [])]
+    if "lora" in eid or "lora" in name:
+        return True
+    if any(k in fields for k in LORA_INPUT_KEYS):
+        return True
+    if "lora" in fcat or any("lora" in t for t in tags):
+        return True
+    return False
+
+
 def overlay_image_fields(item: dict) -> dict:
-    """Keep catalog imageFields; fill from infer_image_fields when missing."""
+    """Keep catalog imageFields; fill from infer_image_fields when missing.
+
+    Fal i2v uses first-frame slots, never the image source slot.
+    """
     out = dict(item)
     out.setdefault("backend", "fal")
-    fields = out.get("imageFields") or infer_image_fields(out.get("id") or "")
+    eid = out.get("id") or ""
+    fields = list(out.get("imageFields") or infer_image_fields(eid))
     if fields:
         out["imageFields"] = fields
+    recipe = (out.get("category") or "").lower()
+    fcat = (out.get("falCategory") or "").lower()
+    blob = f"{eid} {fcat} {recipe}".lower()
+    is_video = (
+        recipe == "video"
+        or "video" in fcat
+        or "image-to-video" in blob
+        or "first-last" in blob
+        or "reference-to-video" in blob
+        or "start-end-to-video" in blob
+    )
+    has_first = any(f in FIRST_IMAGE_FIELDS for f in fields)
+    has_many = "image_urls" in fields
+    if is_video:
+        out["needsSource"] = False
+        out["needsFirstFrame"] = bool(
+            has_first or "image-to-video" in blob or "first-last" in blob or "reference-to-video" in blob
+        )
+    elif has_many and not has_first:
+        out["needsSource"] = False
+    elif has_first:
+        out["needsSource"] = True
+        out["needsFirstFrame"] = False
+    if fal_supports_lora(out):
+        out["supportsLora"] = True
     return out
+
+
+def _is_civitai_air(s: str) -> bool:
+    t = (s or "").strip()
+    if not t:
+        return True
+    low = t.lower()
+    if low.startswith("urn:air:") or low.startswith("urn:"):
+        return True
+    if ":lora:" in low and "civitai" in low:
+        return True
+    return False
+
+
+def _fal_lora_path(item: dict) -> str:
+    if not isinstance(item, dict):
+        return ""
+    for k in ("path", "url", "downloadUrl", "download_url"):
+        v = item.get(k)
+        if isinstance(v, str):
+            v = v.strip()
+            if v and not _is_civitai_air(v):
+                return v
+    return ""
+
+
+def _clip_lora_scale(v, default=1.0) -> float:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        x = default
+    return max(0.0, min(2.0, x))
+
+
+def _lora_field_shape(spec: dict, eid: str):
+    req_opt = [str(x).lower() for x in list(spec.get("required") or []) + list(spec.get("optional") or [])]
+    if "loras" in req_opt:
+        return "loras"
+    if "lora_url" in req_opt:
+        return "lora_url"
+    if "lora_path" in req_opt:
+        return "lora_path"
+    if "lora" in req_opt:
+        return "lora"
+    e = (eid or "").lower()
+    if "/lora" in e or "lora" in e:
+        return "loras"
+    return None
+
+
+def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
+    shape = _lora_field_shape(spec, eid)
+    if not shape:
+        return
+    cleaned = []
+    for it in payload.get("loras") or []:
+        if not isinstance(it, dict):
+            continue
+        path = _fal_lora_path(it)
+        if not path:
+            continue
+        scale_raw = it.get("scale")
+        if scale_raw in (None, ""):
+            scale_raw = it.get("strength")
+        cleaned.append({"path": path, "scale": _clip_lora_scale(scale_raw, 1.0)})
+    if not cleaned:
+        return
+    if shape == "loras":
+        inp["loras"] = cleaned
+    elif shape == "lora_url":
+        inp["lora_url"] = cleaned[0]["path"]
+        inp["lora_scale"] = cleaned[0]["scale"]
+    elif shape == "lora_path":
+        inp["lora_path"] = cleaned[0]["path"]
+        inp["lora_scale"] = cleaned[0]["scale"]
+    elif shape == "lora":
+        inp["lora"] = cleaned[0]["path"]
+        if "lora_scale" in [str(x).lower() for x in list(spec.get("required") or []) + list(spec.get("optional") or [])]:
+            inp["lora_scale"] = cleaned[0]["scale"]
 
 
 def build_fal_input(payload: dict) -> dict:
@@ -208,6 +340,7 @@ def build_fal_input(payload: dict) -> dict:
         inp["aspect_ratio"] = payload["aspectRatio"]
     if payload.get("width") and payload.get("height") and spec.get("optional") and "image_size" in (spec.get("optional") or []):
         inp["image_size"] = {"width": int(payload["width"]), "height": int(payload["height"])}
+    apply_fal_loras(inp, payload, spec, eid)
     return {k: v for k, v in inp.items() if v not in (None, "", [])}
 
 
@@ -603,8 +736,10 @@ def row_from_fal_api(it):
         "step": step,
         "backend": "fal",
         "tags": md.get("tags") or [],
-        "needsSource": bool(fields) or fcat in ("image-to-image", "image-to-video", "image-to-3d") or "/edit" in eid,
-        "needsFirstFrame": "image-to-video" in fcat or "image-to-video" in eid,
+        "needsSource": recipe in ("image", "bg", "upscale", "3d") and (
+            fcat in ("image-to-image", "image-to-3d") or "/edit" in eid
+        ),
+        "needsFirstFrame": "image-to-video" in fcat or "image-to-video" in eid or "first-last" in eid,
         "imageFields": fields,
         "promptField": "prompt",
     })

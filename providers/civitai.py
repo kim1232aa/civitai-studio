@@ -526,11 +526,24 @@ def import_image(image_id: str) -> dict:
             continue
         typ = (r.get("modelType") or (ver.get("model") or {}).get("type") or "").upper()
         if typ == "LORA":
-            loras.append({
+            item = {
                 "air": air,
                 "strength": float(r["strength"]) if r.get("strength") is not None else 0.8,
                 "name": r.get("modelName") or ver.get("name"),
-            })
+            }
+            if vid:
+                item["versionId"] = vid
+            path = ""
+            for f in (ver.get("files") or []):
+                if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
+                    path = f.get("downloadUrl") or f.get("download_url")
+                    break
+            if not path and vid:
+                path = f"https://civitai.com/api/download/models/{vid}"
+            if path:
+                item["path"] = path
+                item["downloadUrl"] = path
+            loras.append(item)
         else:
             checkpoint_air = air
             checkpoint_name = r.get("modelName") or ver.get("name") or ""
@@ -881,16 +894,9 @@ class CivitaiProvider(Provider):
         if code != 200 or not isinstance(ver, dict):
             return code if code >= 400 else 404, {"error": "找不到工作流版本"}
         files = ver.get("files") or []
-        json_file = None
-        for f in files:
-            name = (f.get("name") or "").lower()
-            if name.endswith(".json") or f.get("type") in ("Config", "Workflow"):
-                json_file = f
-                break
-        if not json_file and files:
-            json_file = files[0]
+        json_file = cw.pick_workflow_file(files)
         if not json_file:
-            return 404, {"error": "这个版本没有 JSON 工作流文件"}
+            return 404, {"error": "这个版本没有 JSON / zip 工作流文件"}
         fid = json_file.get("id")
         dl = f"https://civitai.com/api/download/models/{vid}" + (f"?fileId={fid}" if fid else "")
         tok = token()
@@ -907,11 +913,11 @@ class CivitaiProvider(Provider):
         with opener.open(req, timeout=90) as r:
             raw_bytes = r.read()
         try:
-            wf = json.loads(raw_bytes.decode("utf-8"))
-        except Exception:
-            return 400, {"error": "工作流文件不是合法 JSON"}
+            wf = cw.parse_workflow_bytes(raw_bytes)
+        except ValueError as e:
+            return 400, {"error": str(e)}
         cache = cw.CACHE / f"{vid}.json"
-        cache.write_bytes(raw_bytes)
+        cache.write_text(json.dumps(wf, ensure_ascii=False), encoding="utf-8")
         api_wf = cw.ui_to_api(wf)
         summary = cw.summarize(wf, meta={
             "modelId": ver.get("modelId") or mid,
