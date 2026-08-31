@@ -8,7 +8,7 @@ import time
 from urllib.parse import urlparse, quote
 
 from .base import Provider
-from .http import collect_urls, json_call, parse_job_id, save_media_urls
+from .http import collect_urls, extract_error, json_call, parse_job_id, save_media_urls
 
 TOKEN_PATH = Path.home() / ".config/modelscope/token"
 BASE_PATH = Path.home() / ".config/modelscope/base_url"
@@ -184,12 +184,15 @@ class ModelScopeProvider(Provider):
                 _HUB_CACHE["at"] = now
                 _HUB_CACHE["totals"] = totals
         qnl = qn.lower()
+        def _alnum(s):
+            return "".join(ch for ch in (s or "").lower() if ch.isalnum())
         if category:
             items = [x for x in items if x.get("category") == category]
         if status:
             items = [x for x in items if x.get("status") == status]
         if qnl:
-            items = [x for x in items if qnl in (x.get("name") or "").lower() or qnl in (x.get("id") or "").lower()]
+            needle = _alnum(qnl)
+            items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
         return {
             "total": len(items),
             "count": len(items),
@@ -260,12 +263,17 @@ class ModelScopeProvider(Provider):
         if is_edit(mid) and extra:
             body["image_url"] = extra[:9]
         headers = auth_headers({"X-ModelScope-Async-Mode": "true"})
-        code, data = json_call(f"{base_url()}/images/generations", method="POST", headers=headers, body=body, timeout=90)
+        url = f"{base_url()}/images/generations"
+        code, data = json_call(url, method="POST", headers=headers, body=body, timeout=90)
+        # Preferred host api.modelscope.ai is NXDOMAIN; base_url() already falls back.
         if not isinstance(data, dict):
             return code, {"error": "魔搭响应无效"}
-        tid = data.get("task_id") or data.get("taskId") or data.get("id")
+        if code >= 400:
+            data.setdefault("error", extract_error(data, f"HTTP {code}"))
+            return code, data
+        tid = data.get("task_id") or data.get("taskId") or ((data.get("data") or {}) if isinstance(data.get("data"), dict) else {}).get("task_id") or data.get("id")
         if not tid:
-            data.setdefault("error", data.get("message") or data.get("errors") or "魔搭未返回 task_id")
+            data.setdefault("error", extract_error(data, "魔搭未返回 task_id"))
             return code if code >= 400 else 502, data
         data["id"] = f"ms|{tid}"
         data["status"] = "pending"
@@ -293,7 +301,8 @@ class ModelScopeProvider(Provider):
         data["id"] = job_id
         data["wait"] = {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None}
         if data["status"] == "succeeded":
-            urls = collect_urls(data) + collect_urls(data.get("output") or {})
+            nested = data.get("data") if isinstance(data.get("data"), dict) else {}
+            urls = collect_urls(data) + collect_urls(data.get("output") or {}) + collect_urls(nested)
             for u in data.get("output_images") or []:
                 if isinstance(u, str) and u.startswith("http"):
                     urls.append(u)

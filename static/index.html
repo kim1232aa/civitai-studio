@@ -1168,13 +1168,17 @@ function bindRows(root) {
     };
   });
 }
+function alnum(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
+}
 function renderServiceList(opts) {
   const pickDefault = !opts || opts.pickDefault !== false;
   const qf = (($('svcFilter') && $('svcFilter').value) || '').toLowerCase();
+  const qn = alnum(qf);
   const list = catalog.filter(it => matchRecipe(it, recipe)).filter(it => {
-    if (!qf) return true;
-    const blob = ((it.name||'')+' '+(it.id||'')+' '+(it.engine||'')+' '+(it.operation||'')).toLowerCase();
-    return blob.includes(qf);
+    if (!qn) return true;
+    const blob = alnum((it.name||'')+' '+(it.id||'')+' '+(it.engine||'')+' '+(it.operation||'')+' '+((it.tags||[]).join(' ')));
+    return blob.includes(qn);
   }).sort((a, b) => {
     const ra = STATUS_RANK[a.status] ?? 9;
     const rb = STATUS_RANK[b.status] ?? 9;
@@ -1289,7 +1293,13 @@ function payload() {
       scheduler: $('scheduler').value,
     });
     if (picked.model == null) base.model = $('model').value;
-    if (srcImg) { base.sourceImage = srcImg; base.firstFrame = srcImg; }
+    if (srcImg) {
+      base.sourceImage = srcImg;
+      base.firstFrame = srcImg;
+      base.image_url = srcImg;
+      if (!base.images) base.images = [srcImg];
+      else if (!base.images.includes(srcImg)) base.images.unshift(srcImg);
+    }
     return base;
   }
   Object.assign(base, {
@@ -1311,11 +1321,30 @@ function payload() {
   return base;
 }
 async function api(path, opts) {
-  const r = await fetch(path, opts);
-  const t = await r.text();
-  let j; try { j = JSON.parse(t); } catch { j = { raw: t }; }
-  if (!r.ok) throw Object.assign(new Error(j.error || j.title || r.statusText), { data: j, status: r.status });
-  return j;
+  opts = opts || {};
+  const timeoutMs = opts.timeoutMs;
+  const fetchOpts = Object.assign({}, opts);
+  delete fetchOpts.timeoutMs;
+  let timer = null;
+  if (timeoutMs) {
+    const ctrl = new AbortController();
+    fetchOpts.signal = ctrl.signal;
+    timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  }
+  try {
+    const r = await fetch(path, fetchOpts);
+    const t = await r.text();
+    let j; try { j = JSON.parse(t); } catch { j = { raw: t }; }
+    if (!r.ok) throw Object.assign(new Error(j.error || j.title || r.statusText), { data: j, status: r.status });
+    return j;
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      throw Object.assign(new Error('请求超时'), { status: 0, data: { error: '请求超时' } });
+    }
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 let waitTimer = null;
@@ -1514,7 +1543,11 @@ async function poll(id) {
     updateWait(st === 'processing' || st === 'preparing' ? '生成中' : '排队中', extra, pct);
     if (st === 'succeeded') {
       const saved = j.saved || [];
-      if (!saved.length) { setStatus('成功但没拿到文件', 'bad'); stopWait(); return; }
+      if (!saved.length) {
+        setStatus('成功但没拿到文件' + (j.saveError ? (' · ' + j.saveError) : ''), 'bad');
+        stopWait();
+        return;
+      }
       saved.forEach(s => addCard(s.url, id, s.kind === 'video' || (s.file || '').endsWith('.mp4')));
       updateWait('完成', null, 100);
       setStatus('好了', 'ok');
@@ -1699,12 +1732,15 @@ $('go').onclick = async () => {
   if (needsSource(selected) && !$('sourceImage').value.trim()) { setStatus('这个服务需要源图', 'bad'); return; }
   if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { setStatus('这个服务需要首帧图', 'bad'); return; }
   goBusy = true; $('go').disabled = true; $('go').textContent = '提交中…';
-  await startWait('正在提交到队列');
+  const pl = payload();
+  const syncGen = pl.backend === 'huggingface';
+  await startWait(syncGen ? '正在生成' : '正在提交到队列');
+  if (syncGen) tickWait('同步等待模型返回，请稍候');
   try {
-    const j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) });
+    const j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl), timeoutMs: 240000 });
     const jobId = j.id || j.workflowId || j.token;
     const saved = j.saved || [];
-    if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video'));
+    if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video' || /\.(mp4|webm)$/i.test(s.file || s.url || '')));
     if ((j.status || '').toLowerCase() === 'succeeded' && saved.length) {
       stopWait();
       setStatus('好了', 'ok');
@@ -1792,17 +1828,35 @@ renderGallery();
     const el = $('ckptName');
     if (el) el.title = $('diffusion').value.trim();
   });
-  if ($('svcFilter')) $('svcFilter').oninput = () => renderServiceList({ pickDefault: false });
+  if ($('svcFilter')) $('svcFilter').oninput = onSvcFilter;
   if ($('prompt')) $('prompt').addEventListener('input', syncGo);
   syncGo();
-  async function loadCatalog() {
-    const cat = await api('/api/catalog?backend=' + encodeURIComponent(backend));
+  async function loadCatalog(q) {
+    if (q == null) q = (($('svcFilter') && $('svcFilter').value) || '').trim();
+    let url = '/api/catalog?backend=' + encodeURIComponent(backend);
+    if (backend === 'modelscope' && q) url += '&q=' + encodeURIComponent(q);
+    const cat = await api(url);
     catalog = cat.items || [];
     setRecipe(recipe || 'image');
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
     if (!n) setStatus(label + ' 目录为空', 'bad');
     else setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
+  }
+  let hubSearchTimer = null;
+  function onSvcFilter() {
+    if (backend === 'modelscope') {
+      clearTimeout(hubSearchTimer);
+      hubSearchTimer = setTimeout(async () => {
+        try {
+          await loadCatalog();
+        } catch (e) {
+          setStatus('魔搭搜索失败', 'bad');
+        }
+      }, 280);
+      return;
+    }
+    renderServiceList({ pickDefault: false });
   }
   async function loadProviders() {
     const box = $('backendSwitch');

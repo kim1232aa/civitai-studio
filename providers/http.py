@@ -8,6 +8,35 @@ from pathlib import Path
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "out"
 
 
+def extract_error(parsed, fallback="请求失败"):
+    """Pull a human error string out of nested provider JSON."""
+    if not isinstance(parsed, dict):
+        return fallback
+    for key in ("error", "message", "msg", "title", "detail"):
+        v = parsed.get(key)
+        if isinstance(v, str) and v.strip() and v.strip().upper() != f"HTTP {fallback}".upper():
+            if not (v.startswith("HTTP ") and len(v) < 12):
+                return v.strip()
+        if isinstance(v, dict):
+            m = v.get("message") or v.get("msg") or v.get("detail")
+            if m:
+                return str(m)
+    errors = parsed.get("errors")
+    if isinstance(errors, dict):
+        m = errors.get("message") or errors.get("msg") or errors.get("detail")
+        if m:
+            return str(m)
+    if isinstance(errors, str) and errors.strip():
+        return errors.strip()
+    if isinstance(errors, list) and errors:
+        first = errors[0]
+        if isinstance(first, str):
+            return first
+        if isinstance(first, dict):
+            return str(first.get("message") or first.get("msg") or first)
+    return fallback
+
+
 def json_call(url: str, method="GET", headers=None, body=None, timeout=90):
     """Shared JSON HTTP. Callers pass Authorization; this helper never adds it."""
     hdrs = {
@@ -35,10 +64,7 @@ def json_call(url: str, method="GET", headers=None, body=None, timeout=90):
             parsed = {"raw": raw[:2000]}
         if isinstance(parsed, dict):
             parsed = dict(parsed)
-            parsed.setdefault(
-                "error",
-                parsed.get("title") or parsed.get("detail") or parsed.get("msg") or f"HTTP {e.code}",
-            )
+            parsed.setdefault("error", extract_error(parsed, f"HTTP {e.code}"))
         return e.code, parsed
     except urllib.error.URLError as e:
         return 502, {"error": "网络错误", "detail": str(getattr(e, "reason", e))}
@@ -63,8 +89,9 @@ def sniff_media(raw: bytes) -> tuple[str, str]:
     return ".bin", "image"
 
 
-def save_media_urls(urls, stem, out_dir=None):
+def save_media_urls(urls, stem, out_dir=None, meta=None):
     """Download URLs, sniff png/jpg/mp4/webp/riff, write out_dir, return [{file,url,bytes,kind}]."""
+    from .io_meta import decode_data_url, write_sidecar
     out = Path(out_dir or DEFAULT_OUT)
     out.mkdir(parents=True, exist_ok=True)
     saved = []
@@ -72,13 +99,23 @@ def save_media_urls(urls, stem, out_dir=None):
     for i, url in enumerate(urls or []):
         if not url or not isinstance(url, str):
             continue
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            raw = r.read()
+        raw = None
+        if url.startswith("data:"):
+            raw = decode_data_url(url)
+            if not raw:
+                continue
+        elif url.startswith("http"):
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                raw = r.read()
+        else:
+            continue
         ext, kind = sniff_media(raw)
         name = f"{stem}_{i}{ext}"
         (out / name).write_bytes(raw)
         saved.append({"file": name, "url": f"/out/{name}", "bytes": len(raw), "kind": kind})
+    if meta:
+        write_sidecar(saved, meta, out)
     return saved
 
 
@@ -98,25 +135,39 @@ def collect_urls(obj) -> list[str]:
     urls = []
 
     def add(val):
-        if isinstance(val, str) and val.startswith("http"):
+        if isinstance(val, str) and (val.startswith("http") or val.startswith("data:image") or val.startswith("data:video")):
             urls.append(val)
-        elif isinstance(val, dict) and val.get("url"):
+        elif isinstance(val, dict):
             if val.get("available") is False:
                 return
-            u = val.get("url")
-            if isinstance(u, str) and u.startswith("http"):
-                urls.append(u)
+            for k in ("url", "image_url", "video_url", "audio_url"):
+                u = val.get(k)
+                if isinstance(u, str) and (u.startswith("http") or u.startswith("data:")):
+                    urls.append(u)
+            for nested in ("images", "image", "videos", "video"):
+                if nested in val and nested != "url":
+                    add(val.get(nested))
         elif isinstance(val, list):
             for item in val:
                 add(item)
 
     if isinstance(obj, dict):
-        for key in ("images", "image", "videos", "video", "blobs", "audio", "audios"):
+        for key in (
+            "images", "image", "videos", "video", "blobs", "audio", "audios",
+            "image_url", "video_url", "audio_url", "output", "output_images",
+            "result", "json_output", "data",
+        ):
             if key in obj:
                 add(obj.get(key))
+        add(obj)
     elif isinstance(obj, list):
         add(obj)
-    return urls
+    # unique, preserve order
+    seen = []
+    for u in urls:
+        if u not in seen:
+            seen.append(u)
+    return seen
 
 
 def raw_call(url: str, method="POST", headers=None, body=None, timeout=120):
@@ -147,7 +198,8 @@ def raw_call(url: str, method="POST", headers=None, body=None, timeout=120):
         return 502, str(e).encode(), "text/plain"
 
 
-def save_bytes(raw: bytes, stem, out_dir=None):
+def save_bytes(raw: bytes, stem, out_dir=None, meta=None):
+    from .io_meta import write_sidecar
     out = Path(out_dir or DEFAULT_OUT)
     out.mkdir(parents=True, exist_ok=True)
     ext, kind = sniff_media(raw)
@@ -155,4 +207,7 @@ def save_bytes(raw: bytes, stem, out_dir=None):
         ext, kind = ".webp", "image"
     name = f"{str(stem or 'media').replace('|', '_').replace('/', '_')}_0{ext}"
     (out / name).write_bytes(raw)
-    return [{"file": name, "url": f"/out/{name}", "bytes": len(raw), "kind": kind}]
+    saved = [{"file": name, "url": f"/out/{name}", "bytes": len(raw), "kind": kind}]
+    if meta:
+        write_sidecar(saved, meta, out)
+    return saved

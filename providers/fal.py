@@ -203,6 +203,86 @@ def build_fal_input(payload: dict) -> dict:
     return {k: v for k, v in inp.items() if v not in (None, "", [])}
 
 
+# rid -> {endpoint, status_url, response_url}. Submit response is source of truth:
+# nested endpoints like fal-ai/flux/schnell status under fal-ai/flux (first two segments).
+_FAL_JOBS = {}
+_FAL_JOBS_MAX = 200
+
+
+def queue_app(endpoint_id: str) -> str:
+    parts = [p for p in (endpoint_id or "").strip("/").split("/") if p]
+    if len(parts) >= 2:
+        return "/".join(parts[:2])
+    return "/".join(parts)
+
+
+def _remember_job(rid: str, meta: dict):
+    if not rid:
+        return
+    _FAL_JOBS[rid] = meta
+    extra = len(_FAL_JOBS) - _FAL_JOBS_MAX
+    if extra > 0:
+        for k in list(_FAL_JOBS.keys())[:extra]:
+            _FAL_JOBS.pop(k, None)
+
+
+def _with_logs(url: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return u
+    if "logs=" in u:
+        return u
+    return u + ("&" if "?" in u else "?") + "logs=1"
+
+
+def _unique(seq):
+    seen = []
+    for x in seq:
+        if x and x not in seen:
+            seen.append(x)
+    return seen
+
+
+def status_urls(eid: str, rid: str, meta=None):
+    out = []
+    if meta and meta.get("status_url"):
+        out.append(_with_logs(meta["status_url"]))
+    app = queue_app(eid)
+    for base in (app, eid):
+        if base:
+            out.append(f"{QUEUE}/{base}/requests/{rid}/status?logs=1")
+    return _unique(out)
+
+
+def result_urls(eid: str, rid: str, meta=None, status_data=None):
+    out = []
+    for src in (status_data, meta):
+        if src and src.get("response_url"):
+            out.append(str(src["response_url"]).rstrip("/"))
+    app = queue_app(eid)
+    for base in (app, eid):
+        if base:
+            out.append(f"{QUEUE}/{base}/requests/{rid}")
+    return _unique(out)
+
+
+def _try_get(urls):
+    last_code, last_data = 502, {"error": "Fal 状态请求失败"}
+    for url in urls:
+        code, data = fal_call(url)
+        last_code, last_data = code, data
+        if code == 200 and isinstance(data, dict) and data.get("raw") != "":
+            # 405/empty still 200? no. 405 is not 200.
+            if data.get("error") and not (data.get("status") or data.get("images") or data.get("image") or data.get("request_id")):
+                continue
+            return code, data
+        if code in (404, 405, 422):
+            continue
+        if isinstance(data, dict) and data.get("status"):
+            return code, data
+    return last_code, last_data
+
+
 def submit(payload: dict):
     eid = (payload.get("serviceId") or payload.get("endpoint") or "").strip().lstrip("/")
     if not eid:
@@ -215,6 +295,12 @@ def submit(payload: dict):
         data["backend"] = "fal"
         data["endpoint"] = eid
         data["submittedInput"] = inp
+        if rid:
+            _remember_job(rid, {
+                "endpoint": eid,
+                "status_url": data.get("status_url"),
+                "response_url": data.get("response_url"),
+            })
     return code, data
 
 
@@ -224,9 +310,19 @@ def job_status(job_id: str):
     if len(parts) != 3:
         return 400, {"error": "无效 Fal 任务 id"}
     _, eid, rid = parts
-    code, data = fal_call(f"{QUEUE}/{eid}/requests/{rid}/status?logs=1")
+    meta = _FAL_JOBS.get(rid) or {}
+    code, data = _try_get(status_urls(eid, rid, meta))
     if not isinstance(data, dict):
-        return code, data
+        return 502, {"error": "Fal 状态响应无效", "id": job_id, "backend": "fal", "status": "failed"}
+    # Recover from hitting the full nested path (HTTP 405) without aborting the UI poll.
+    if code in (404, 405) or (code >= 400 and not data.get("status")):
+        return 200, {
+            "id": job_id,
+            "backend": "fal",
+            "status": "failed",
+            "error": data.get("error") or f"Fal 状态 HTTP {code}",
+            "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
+        }
     st = (data.get("status") or "").upper()
     mapped = {
         "IN_QUEUE": "pending",
@@ -234,6 +330,7 @@ def job_status(job_id: str):
         "COMPLETED": "succeeded",
         "FAILED": "failed",
         "CANCELLED": "canceled",
+        "CANCELED": "canceled",
     }
     data["status"] = mapped.get(st, (data.get("status") or "pending").lower())
     data["backend"] = "fal"
@@ -252,15 +349,20 @@ def job_status(job_id: str):
         "log": last,
     }
     if data["status"] == "succeeded":
-        rc, result = fal_call(f"{QUEUE}/{eid}/requests/{rid}")
+        rc, result = _try_get(result_urls(eid, rid, meta, data))
         if rc == 200 and isinstance(result, dict):
-            data["result"] = result
+            data["result"] = {k: result[k] for k in result if k != "raw"}
             urls = collect_urls(result)
             try:
                 data["saved"] = save_media_urls(urls, job_id)
             except Exception as e:
                 data["saveError"] = str(e)
-    return code, data
+            if not data.get("saved"):
+                data.setdefault("saveError", data.get("saveError") or "Fal 完成但没有媒体 URL")
+        else:
+            data["saveError"] = (result or {}).get("error") if isinstance(result, dict) else f"Fal 结果 HTTP {rc}"
+    # Always 200 so the browser poll does not throw on provider 405 leftovers.
+    return 200, data
 
 
 class FalProvider(Provider):
