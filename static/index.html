@@ -1116,14 +1116,43 @@ function updateTabClasses() {
     el.setAttribute('aria-selected', on ? 'true' : 'false');
   });
 }
-function svcRow(it, nameCounts) {
+function svcDisambigTags(list) {
+  const groups = {};
+  (list || []).forEach(it => {
+    const n = it.name || it.id || '';
+    (groups[n] || (groups[n] = [])).push(it);
+  });
+  const out = {};
+  Object.keys(groups).forEach(n => {
+    const g = groups[n];
+    if (g.length < 2) return;
+    const parts = g.map(it => String(it.id || '').split('/').filter(Boolean));
+    const tags = g.map(() => []);
+    const maxLen = Math.max(0, ...parts.map(p => p.length));
+    for (let i = 0; i < maxLen; i++) {
+      const col = parts.map(p => p[i] || '');
+      if (new Set(col).size <= 1) continue;
+      col.forEach((v, idx) => { if (v) tags[idx].push(v); });
+      const joined = tags.map(t => t.join('/'));
+      if (new Set(joined).size === g.length) break;
+    }
+    g.forEach((it, idx) => {
+      let tag = tags[idx].join(' · ');
+      if (!tag) {
+        const src = paramSrc(it);
+        tag = src.engine || src.operation || '';
+      }
+      if (tag) out[it.id] = tag;
+    });
+  });
+  return out;
+}
+function svcRow(it, tags) {
   const src = paramSrc(it);
   let name = it.name || it.id || '未命名';
+  const extra = tags && tags[it.id];
+  if (extra) name = name + ' · ' + extra;
   const meta = [src.engine, src.operation, src.provider || src.version].filter(Boolean).join(' · ');
-  if (nameCounts && nameCounts[it.name || it.id || ''] > 1) {
-    const tag = src.engine || String(it.id || '').split('/')[1] || '';
-    if (tag) name = name + ' · ' + tag;
-  }
   const on = selected && selected.id === it.id;
   const badge = it.status === 'degraded' ? '<span class="badge-deg">降级</span>' : '';
   const tip = [name, meta, it.id].filter(Boolean).join(' · ');
@@ -1154,11 +1183,10 @@ function renderServiceList(opts) {
   });
   const live = list.filter(x => x.status === 'available' || x.status === 'degraded');
   const other = list.filter(x => x.status !== 'available' && x.status !== 'degraded');
-  const nameCounts = {};
-  list.forEach(it => { const n = it.name || it.id || ''; nameCounts[n] = (nameCounts[n] || 0) + 1; });
-  let html = live.map(it => svcRow(it, nameCounts)).join('');
+  const tags = svcDisambigTags(list);
+  let html = live.map(it => svcRow(it, tags)).join('');
   if (other.length) {
-    html += `<details class="svc-other"><summary>其它 / 未上线</summary>${other.map(it => svcRow(it, nameCounts)).join('')}</details>`;
+    html += `<details class="svc-other"><summary>其它 / 未上线</summary>${other.map(it => svcRow(it, tags)).join('')}</details>`;
   }
   if (!list.length) html = '<div class="svc-empty">这个配方下还没有服务</div>';
   $('serviceList').innerHTML = html;
