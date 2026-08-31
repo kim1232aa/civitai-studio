@@ -1,0 +1,238 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - ageClassification Recipe
+  description: OpenAPI specification for the ageClassification built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/ageClassification:
+    post:
+      tags:
+        - Recipes
+      summary: Age classification
+      description: Detects minors in media content. Returns a boolean value indicating whether the content contains minors as well as details on where minors are detected.
+      operationId: InvokeAgeClassificationStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgeClassificationInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AgeClassificationInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AgeClassificationInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgeClassificationOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AgeClassificationInput:
+      required:
+        - mediaUrl
+      type: object
+      properties:
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: 'An optional model to use for age classification. If not provided, the default model will determined by the worker'
+        mediaUrl:
+          type: string
+          description: The URL of the media to classify. This can either be a URL to an image or a video or a ZIP containing multiple images
+          format: uri
+        faceDetectionThreshold:
+          type:
+            - 'null'
+            - number
+          description: Optional face detection confidence threshold. Defaults to 0.25 if not provided.
+          format: double
+        personDetectionThreshold:
+          type:
+            - 'null'
+            - number
+          description: Optional person detection confidence threshold. Defaults to 0.35 if not provided.
+          format: double
+      additionalProperties: false
+    AgeClassificationOutput:
+      required:
+        - faceRecognitionAvailable
+        - hasMinor
+        - labels
+        - numFlagged
+        - numPredictions
+      type: object
+      properties:
+        labels:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/AgeClassifierLabel'
+          description: Age classification results per image
+        hasMinor:
+          type: boolean
+          description: Whether any minor was detected in the dataset
+        numPredictions:
+          type: integer
+          description: Total number of age predictions made
+          format: int32
+        numFlagged:
+          type: integer
+          description: Number of flagged predictions (minors)
+          format: int32
+        faceRecognitionFaces:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/FaceDetectionInfo'
+          description: Face recognition results per image (if available)
+        faceRecognitionNumFaces:
+          type:
+            - 'null'
+            - integer
+          description: Total number of faces detected across all images
+          format: int32
+        faceRecognitionNumUniquePeople:
+          type:
+            - 'null'
+            - integer
+          description: Estimated number of unique people in the dataset (based on similarity clustering)
+          format: int32
+        faceRecognitionAvailable:
+          type: boolean
+          description: Whether face recognition data is available for this result
+      additionalProperties: false
+    AgeClassifierLabel:
+      required:
+        - age
+        - boundingBox
+        - isMinor
+      type: object
+      properties:
+        age:
+          type: string
+        isMinor:
+          type: boolean
+        boundingBox:
+          type: array
+          items:
+            type: integer
+            format: int32
+        topK:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: number
+            format: double
+        faceDetectionConfidence:
+          type:
+            - 'null'
+            - number
+          format: double
+        personDetectionConfidence:
+          type:
+            - 'null'
+            - number
+          format: double
+      additionalProperties: false
+    FaceDetectionInfo:
+      required:
+        - boundingBox
+        - hasEmbedding
+      type: object
+      properties:
+        boundingBox:
+          type: array
+          items:
+            type: number
+            format: double
+          description: 'Bounding box coordinates [x1, y1, x2, y2]'
+        landmarks:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: array
+            items:
+              type: number
+              format: double
+          description: 'Facial landmarks (e.g., eyes, nose, mouth positions)'
+        hasEmbedding:
+          type: boolean
+          description: Whether this face has an embedding (for similarity comparison)
+      additionalProperties: false
+      description: Information about a detected face in an image
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

@@ -1,0 +1,328 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - miniMaxMusic3 Recipe
+  description: OpenAPI specification for the miniMaxMusic3 built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/miniMaxMusic3:
+    post:
+      tags:
+        - Recipes
+      summary: Generate a complete song from a structured caption and lyrics with MiniMax Music 3.
+      operationId: InvokeMiniMaxMusic3StepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiniMaxMusic3Input'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/MiniMaxMusic3Input'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/MiniMaxMusic3Input'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiniMaxMusic3Output'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    MiniMaxMusic3Input:
+      required:
+        - caption
+        - lyrics
+        - seed
+      type: object
+      properties:
+        caption:
+          type: string
+          description: "Structured music description. For best results use Global Metadata, Vocal Details,\nand Arrangement sections."
+        lyrics:
+          type: string
+          description: 'Lyrics with section markers such as [Intro], [Verse], [Chorus], and [Outro].'
+        seed:
+          type: integer
+          description: Random seed for reproducible generation.
+          format: int32
+        maxDuration:
+          maximum: 360
+          minimum: 0.03999999910593033
+          type: number
+          description: "Maximum generated song duration in seconds. The model may end the song earlier when\nthe requested lyric structure is complete."
+          format: float
+          default: 120
+        steps:
+          maximum: 100
+          minimum: 1
+          type: integer
+          description: Number of diffusion sampling steps.
+          format: int32
+          default: 30
+        cfg:
+          maximum: 100
+          minimum: 0
+          type: number
+          description: Classifier-free guidance scale used by both text encoding and sampling.
+          format: float
+          default: 1.7
+        topK:
+          maximum: 16384
+          minimum: 1
+          type: integer
+          description: Top-k sampling limit used by the MiniMax music text encoder.
+          format: int32
+          default: 50
+        diffusionModel:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional diffusion model override.
+        textEncoder:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional MiniMax text encoder override.
+        vae:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional audio VAE override.
+        loras:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: "Optional LoRAs to apply to both the diffusion model and MiniMax text encoder.\nCompatibility with the selected base resources is the caller's responsibility."
+      additionalProperties: false
+      description: Input parameters for MiniMax Music 3 text-to-music generation.
+    MiniMaxMusic3Output:
+      required:
+        - blob
+      type: object
+      properties:
+        blob:
+          $ref: '#/components/schemas/AudioBlob'
+      additionalProperties: false
+      description: Output from MiniMax Music 3 generation.
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

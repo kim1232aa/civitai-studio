@@ -1,0 +1,1073 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - preprocessImage Recipe
+  description: OpenAPI specification for the preprocessImage built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/preprocessImage:
+    post:
+      tags:
+        - Recipes
+      operationId: InvokePreprocessImageStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreprocessImageInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/PreprocessImageInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/PreprocessImageInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessImageOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AnimalPoseBboxDetector:
+      enum:
+        - yolox_l.torchscript.pt
+        - yolox_l.onnx
+        - yolo_nas_l_fp16.onnx
+        - yolo_nas_m_fp16.onnx
+        - yolo_nas_s_fp16.onnx
+      type: string
+    AnimalPoseEstimator:
+      enum:
+        - rtmpose-m_ap10k_256_bs5.torchscript.pt
+        - rtmpose-m_ap10k_256.onnx
+      type: string
+    AnylineMergeWith:
+      enum:
+        - lineart_standard
+        - lineart_realistic
+        - lineart_anime
+        - manga_line
+      type: string
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    CoarseMode:
+      enum:
+        - disable
+        - enable
+      type: string
+    DensePoseColormap:
+      enum:
+        - Viridis (MagicAnimate)
+        - Parula (CivitAI)
+      type: string
+    DensePoseModel:
+      enum:
+        - densepose_r50_fpn_dl.torchscript
+        - densepose_r101_fpn_dl.torchscript
+      type: string
+    DepthAnythingCheckpoint:
+      enum:
+        - depth_anything_vitl14.pth
+        - depth_anything_vitb14.pth
+        - depth_anything_vits14.pth
+      type: string
+    DepthAnythingV2Checkpoint:
+      enum:
+        - depth_anything_v2_vitg.pth
+        - depth_anything_v2_vitl.pth
+        - depth_anything_v2_vitb.pth
+        - depth_anything_v2_vits.pth
+      type: string
+    DwPoseBboxDetector:
+      enum:
+        - yolox_l.onnx
+        - yolox_l.torchscript.pt
+        - yolo_nas_l_fp16.onnx
+        - yolo_nas_m_fp16.onnx
+        - yolo_nas_s_fp16.onnx
+      type: string
+    DwPoseEstimator:
+      enum:
+        - dw-ll_ucoco_384_bs5.torchscript.pt
+        - dw-ll_ucoco_384.onnx
+        - dw-ll_ucoco.onnx
+      type: string
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    LeresBoost:
+      enum:
+        - disable
+        - enable
+      type: string
+    Metric3dBackbone:
+      enum:
+        - vit-small
+        - vit-large
+        - vit-giant2
+      type: string
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    PreprocessImageAnimalPoseInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            bboxDetector:
+              $ref: '#/components/schemas/AnimalPoseBboxDetector'
+            poseEstimator:
+              $ref: '#/components/schemas/AnimalPoseEstimator'
+            kind:
+              enum:
+                - animal-pose
+              type: string
+          additionalProperties: false
+    PreprocessImageAnimeLineartInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - lineart-anime
+              type: string
+          additionalProperties: false
+    PreprocessImageAnylineInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            mergeWithLineart:
+              $ref: '#/components/schemas/AnylineMergeWith'
+            lineartLowerBound:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 0
+            lineartUpperBound:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 1
+            objectMinSize:
+              maximum: 1000
+              minimum: 1
+              type: integer
+              format: int32
+              default: 36
+            objectConnectivity:
+              maximum: 10
+              minimum: 1
+              type: integer
+              format: int32
+              default: 1
+            kind:
+              enum:
+                - anyline
+              type: string
+          additionalProperties: false
+    PreprocessImageBaeNormalInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - bae-normal
+              type: string
+          additionalProperties: false
+    PreprocessImageBinaryInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            binThreshold:
+              maximum: 255
+              minimum: 0
+              type: integer
+              format: int32
+              default: 100
+            kind:
+              enum:
+                - binary
+              type: string
+          additionalProperties: false
+    PreprocessImageCannyInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            lowThreshold:
+              maximum: 255
+              minimum: 0
+              type: integer
+              format: int32
+              default: 100
+            highThreshold:
+              maximum: 255
+              minimum: 0
+              type: integer
+              format: int32
+              default: 200
+            kind:
+              enum:
+                - canny
+              type: string
+          additionalProperties: false
+    PreprocessImageColorInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - color
+              type: string
+          additionalProperties: false
+    PreprocessImageDensePoseInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            model:
+              $ref: '#/components/schemas/DensePoseModel'
+            colormap:
+              $ref: '#/components/schemas/DensePoseColormap'
+            kind:
+              enum:
+                - densepose
+              type: string
+          additionalProperties: false
+    PreprocessImageDepthAnythingInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            checkpoint:
+              $ref: '#/components/schemas/DepthAnythingCheckpoint'
+            kind:
+              enum:
+                - depth-anything
+              type: string
+          additionalProperties: false
+    PreprocessImageDepthAnythingV2Input:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            checkpoint:
+              $ref: '#/components/schemas/DepthAnythingV2Checkpoint'
+            kind:
+              enum:
+                - depth-anything-v2
+              type: string
+          additionalProperties: false
+    PreprocessImageDsineNormalInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            fov:
+              maximum: 365
+              minimum: 0
+              type: number
+              format: double
+              default: 60
+            iterations:
+              maximum: 20
+              minimum: 1
+              type: integer
+              format: int32
+              default: 5
+            kind:
+              enum:
+                - dsine-normal
+              type: string
+          additionalProperties: false
+    PreprocessImageDwPoseInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            detectHand:
+              type: boolean
+              default: true
+            detectBody:
+              type: boolean
+              default: true
+            detectFace:
+              type: boolean
+              default: true
+            bboxDetector:
+              $ref: '#/components/schemas/DwPoseBboxDetector'
+            poseEstimator:
+              $ref: '#/components/schemas/DwPoseEstimator'
+            kind:
+              enum:
+                - dwpose
+              type: string
+          additionalProperties: false
+    PreprocessImageFakeScribbleInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            safe:
+              $ref: '#/components/schemas/SafeMode'
+            kind:
+              enum:
+                - fake-scribble
+              type: string
+          additionalProperties: false
+    PreprocessImageHedInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            safe:
+              $ref: '#/components/schemas/SafeMode'
+            kind:
+              enum:
+                - hed
+              type: string
+          additionalProperties: false
+    PreprocessImageInput:
+      required:
+        - image
+        - kind
+        - preprocessorType
+      type: object
+      properties:
+        kind:
+          type: string
+        image:
+          type: string
+          description: 'Either A URL, A DataURL or a Base64 string'
+        resolution:
+          maximum: 4096
+          minimum: 64
+          type: integer
+          format: int32
+          default: 512
+        preprocessorType:
+          type: string
+          description: "Gets the preprocessor type identifier used to map to ComfyUI nodes.\nThis is derived from the JsonDerivedType discriminator."
+          readOnly: true
+      additionalProperties: false
+      discriminator:
+        propertyName: kind
+        mapping:
+          canny: '#/components/schemas/PreprocessImageCannyInput'
+          binary: '#/components/schemas/PreprocessImageBinaryInput'
+          mlsd: '#/components/schemas/PreprocessImageMlsdInput'
+          depth-anything: '#/components/schemas/PreprocessImageDepthAnythingInput'
+          depth-anything-v2: '#/components/schemas/PreprocessImageDepthAnythingV2Input'
+          zoe-depth-anything: '#/components/schemas/PreprocessImageZoeDepthAnythingInput'
+          zoe-depth: '#/components/schemas/PreprocessImageZoeDepthInput'
+          midas-depth: '#/components/schemas/PreprocessImageMidasDepthInput'
+          leres-depth: '#/components/schemas/PreprocessImageLeresDepthInput'
+          metric3d-depth: '#/components/schemas/PreprocessImageMetric3dDepthInput'
+          midas-normal: '#/components/schemas/PreprocessImageMidasNormalInput'
+          bae-normal: '#/components/schemas/PreprocessImageBaeNormalInput'
+          dsine-normal: '#/components/schemas/PreprocessImageDsineNormalInput'
+          metric3d-normal: '#/components/schemas/PreprocessImageMetric3dNormalInput'
+          hed: '#/components/schemas/PreprocessImageHedInput'
+          pidinet: '#/components/schemas/PreprocessImagePidinetInput'
+          teed: '#/components/schemas/PreprocessImageTeedInput'
+          fake-scribble: '#/components/schemas/PreprocessImageFakeScribbleInput'
+          lineart-realistic: '#/components/schemas/PreprocessImageRealisticLineartInput'
+          lineart-standard: '#/components/schemas/PreprocessImageStandardLineartInput'
+          lineart-anime: '#/components/schemas/PreprocessImageAnimeLineartInput'
+          lineart-manga: '#/components/schemas/PreprocessImageMangaLineartInput'
+          anyline: '#/components/schemas/PreprocessImageAnylineInput'
+          scribble: '#/components/schemas/PreprocessImageScribbleInput'
+          scribble-xdog: '#/components/schemas/PreprocessImageScribbleXdogInput'
+          scribble-pidinet: '#/components/schemas/PreprocessImageScribblePidinetInput'
+          openpose: '#/components/schemas/PreprocessImageOpenPoseInput'
+          dwpose: '#/components/schemas/PreprocessImageDwPoseInput'
+          animal-pose: '#/components/schemas/PreprocessImageAnimalPoseInput'
+          densepose: '#/components/schemas/PreprocessImageDensePoseInput'
+          mediapipe-face: '#/components/schemas/PreprocessImageMediaPipeFaceInput'
+          oneformer-coco: '#/components/schemas/PreprocessImageOneFormerCocoInput'
+          oneformer-ade20k: '#/components/schemas/PreprocessImageOneFormerAde20kInput'
+          uniformer: '#/components/schemas/PreprocessImageUniFormerInput'
+          color: '#/components/schemas/PreprocessImageColorInput'
+          shuffle: '#/components/schemas/PreprocessImageShuffleInput'
+          tile: '#/components/schemas/PreprocessImageTileInput'
+    PreprocessImageLeresDepthInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            removeNearest:
+              maximum: 100
+              minimum: 0
+              type: number
+              format: double
+              default: 0
+            removeBackground:
+              maximum: 100
+              minimum: 0
+              type: number
+              format: double
+              default: 0
+            boost:
+              $ref: '#/components/schemas/LeresBoost'
+            kind:
+              enum:
+                - leres-depth
+              type: string
+          additionalProperties: false
+    PreprocessImageMangaLineartInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - lineart-manga
+              type: string
+          additionalProperties: false
+    PreprocessImageMediaPipeFaceInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            maxFaces:
+              maximum: 50
+              minimum: 1
+              type: integer
+              format: int32
+              default: 10
+            minConfidence:
+              maximum: 1
+              minimum: 0.1
+              type: number
+              format: double
+              default: 0.5
+            kind:
+              enum:
+                - mediapipe-face
+              type: string
+          additionalProperties: false
+    PreprocessImageMetric3dDepthInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            backbone:
+              $ref: '#/components/schemas/Metric3dBackbone'
+            fx:
+              maximum: 4096
+              minimum: 1
+              type: integer
+              format: int32
+              default: 1000
+            fy:
+              maximum: 4096
+              minimum: 1
+              type: integer
+              format: int32
+              default: 1000
+            kind:
+              enum:
+                - metric3d-depth
+              type: string
+          additionalProperties: false
+    PreprocessImageMetric3dNormalInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            backbone:
+              $ref: '#/components/schemas/Metric3dBackbone'
+            fx:
+              maximum: 4096
+              minimum: 1
+              type: integer
+              format: int32
+              default: 1000
+            fy:
+              maximum: 4096
+              minimum: 1
+              type: integer
+              format: int32
+              default: 1000
+            kind:
+              enum:
+                - metric3d-normal
+              type: string
+          additionalProperties: false
+    PreprocessImageMidasDepthInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            a:
+              maximum: 15.71
+              minimum: 0
+              type: number
+              format: double
+              default: 6.28
+            backgroundThreshold:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 0.1
+            kind:
+              enum:
+                - midas-depth
+              type: string
+          additionalProperties: false
+    PreprocessImageMidasNormalInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            a:
+              maximum: 15.71
+              minimum: 0
+              type: number
+              format: double
+              default: 6.28
+            backgroundThreshold:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 0.1
+            kind:
+              enum:
+                - midas-normal
+              type: string
+          additionalProperties: false
+    PreprocessImageMlsdInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            scoreThreshold:
+              maximum: 2
+              minimum: 0.01
+              type: number
+              format: double
+              default: 0.1
+            distanceThreshold:
+              maximum: 20
+              minimum: 0.01
+              type: number
+              format: double
+              default: 0.1
+            kind:
+              enum:
+                - mlsd
+              type: string
+          additionalProperties: false
+    PreprocessImageOneFormerAde20kInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - oneformer-ade20k
+              type: string
+          additionalProperties: false
+    PreprocessImageOneFormerCocoInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - oneformer-coco
+              type: string
+          additionalProperties: false
+    PreprocessImageOpenPoseInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            detectHand:
+              type: boolean
+              default: true
+            detectBody:
+              type: boolean
+              default: true
+            detectFace:
+              type: boolean
+              default: false
+            kind:
+              enum:
+                - openpose
+              type: string
+          additionalProperties: false
+    PreprocessImageOutput:
+      required:
+        - blob
+      type: object
+      properties:
+        blob:
+          $ref: '#/components/schemas/ImageBlob'
+      additionalProperties: false
+    PreprocessImagePidinetInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            safe:
+              $ref: '#/components/schemas/SafeMode'
+            kind:
+              enum:
+                - pidinet
+              type: string
+          additionalProperties: false
+    PreprocessImageRealisticLineartInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            coarse:
+              $ref: '#/components/schemas/CoarseMode'
+            kind:
+              enum:
+                - lineart-realistic
+              type: string
+          additionalProperties: false
+    PreprocessImageScribbleInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - scribble
+              type: string
+          additionalProperties: false
+    PreprocessImageScribblePidinetInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            safe:
+              $ref: '#/components/schemas/SafeMode'
+            kind:
+              enum:
+                - scribble-pidinet
+              type: string
+          additionalProperties: false
+    PreprocessImageScribbleXdogInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            threshold:
+              maximum: 64
+              minimum: 1
+              type: integer
+              format: int32
+              default: 32
+            kind:
+              enum:
+                - scribble-xdog
+              type: string
+          additionalProperties: false
+    PreprocessImageShuffleInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            seed:
+              maximum: 2147483647
+              minimum: 0
+              type: integer
+              format: int32
+              default: 0
+            kind:
+              enum:
+                - shuffle
+              type: string
+          additionalProperties: false
+    PreprocessImageStandardLineartInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            gaussianSigma:
+              maximum: 100
+              minimum: 0
+              type: number
+              format: double
+              default: 6
+            intensityThreshold:
+              maximum: 16
+              minimum: 0
+              type: integer
+              format: int32
+              default: 8
+            kind:
+              enum:
+                - lineart-standard
+              type: string
+          additionalProperties: false
+    PreprocessImageTeedInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            safeSteps:
+              maximum: 10
+              minimum: 0
+              type: integer
+              format: int32
+              default: 2
+            kind:
+              enum:
+                - teed
+              type: string
+          additionalProperties: false
+    PreprocessImageTileInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            pyrUpIterations:
+              maximum: 10
+              minimum: 1
+              type: integer
+              format: int32
+              default: 3
+            kind:
+              enum:
+                - tile
+              type: string
+          additionalProperties: false
+    PreprocessImageUniFormerInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - uniformer
+              type: string
+          additionalProperties: false
+    PreprocessImageZoeDepthAnythingInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            environment:
+              $ref: '#/components/schemas/ZoeDepthEnvironment'
+            kind:
+              enum:
+                - zoe-depth-anything
+              type: string
+          additionalProperties: false
+    PreprocessImageZoeDepthInput:
+      allOf:
+        - $ref: '#/components/schemas/PreprocessImageInput'
+        - required:
+            - kind
+          type: object
+          properties:
+            kind:
+              enum:
+                - zoe-depth
+              type: string
+          additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    SafeMode:
+      enum:
+        - enable
+        - disable
+      type: string
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+    ZoeDepthEnvironment:
+      enum:
+        - indoor
+        - outdoor
+      type: string
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

@@ -1,0 +1,360 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - customComfy Recipe
+  description: OpenAPI specification for the customComfy built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/customComfy:
+    post:
+      tags:
+        - Recipes
+      summary: CustomComfy
+      description: "Submit a raw ComfyUI workflow graph for execution. Every resource the\n/// workflow uses (checkpoints, loras, AND <c>comfy:nodepack</c> URNs for\n/// runtime-installable custom nodes) must be declared in <c>Resources</c> —\n/// the orchestrator does not scan the workflow. Billing happens after\n/// execution based on actual ComfyUI runtime; infra failures don't charge."
+      operationId: InvokeCustomComfyStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomComfyInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CustomComfyInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CustomComfyInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomComfyOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    CustomComfyInput:
+      required:
+        - resources
+        - trace
+        - workflow
+      type: object
+      properties:
+        resources:
+          minItems: 1
+          type: array
+          items:
+            type: string
+          description: "All resources the workflow needs, declared explicitly as AIR URNs.\nIncludes checkpoint/lora/vae models AND `comfy:nodepack` URNs\nfor runtime-installable custom nodes\n(e.g. `urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.4.0`).\nAnything the workflow references that isn't listed here will fail at\nload time inside ComfyUI."
+        workflow:
+          description: "The raw ComfyUI workflow graph. Forwarded opaquely to the worker;\nthe orchestrator does not inspect or validate node contents."
+        trace:
+          $ref: '#/components/schemas/TraceMode'
+        sessionId:
+          type:
+            - 'null'
+            - string
+          description: "Optional session identifier. When set, the scheduler prefers a\nworker that already holds this session's ComfyUI container (P5\nsession affinity). Null = no preference, treated as a fresh session."
+        comfyImage:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: "Optional custom comfy container image, declared as an\n`urn:air:oci:image:<source>:<repo>@<version|sha256:…>` AIR\n(e.g. `urn:air:oci:image:ghcr:civitai/civitai-spine-comfy@v2.5.5`).\nWhen set, the worker pulls and runs this image instead of its default\ncomfy image. Null = worker default."
+        sessionOwnerApiToken:
+          type:
+            - 'null'
+            - string
+          description: "Optional Civitai API token belonging to the session owner. When set,\nthe worker exposes it to the ComfyUI container as the\n`CIVITAI_API_TOKEN` environment variable, so custom-pack recipe\nnodes (e.g. civitai-comfy-nodes) can call the orchestrator and bill the\nuser. Sensitive: persisted on the workflow/job and forwarded to the\nclaiming worker — never log it. Null = no token exposed."
+        minVramGb:
+          type:
+            - 'null'
+            - integer
+          description: "Optional minimum GPU VRAM (in GB) the claiming worker must have. The\nscheduler only offers the job to workers whose reported host VRAM\n(`WorkerCapabilities.HostResources.MaxVramGb`) is at least this.\nNull = no requirement (any comfy-capable worker). Lets a session\nrequest a higher-VRAM tier (e.g. 48) for heavy workflows."
+          format: int32
+        useSageAttention:
+          type:
+            - 'null'
+            - boolean
+          description: "Optional toggle for ComfyUI's Sage Attention. When true, the worker\nlaunches ComfyUI with `--use-sage-attention`. Null/false = the\nimage's default (off for the cloud/slim images). The SageAttention\nwheel is baked into the comfy images; this only flips the flag."
+        minimumDurationSeconds:
+          type:
+            - 'null'
+            - integer
+          description: "Optional submit-time affordability gate (seconds). When set, the workflow is rejected at\nsubmit (→ 400) unless the user can afford at least this many seconds of generation — the\ncheck lives in `CustomComfyHandler.InitializeAsync`. The consumer (comfy-cloud)\ndefaults it to e.g. 300 and, when rejected, warns the user how much generation they have\nleft; choosing \"run anyway\" resubmits with this omitted to skip the gate. The live-balance\nguard still cancels mid-run if the balance later goes negative. Null = no gate."
+          format: int32
+      additionalProperties: false
+      description: Input for a CustomComfy step.
+    CustomComfyOutput:
+      required:
+        - blobs
+        - tempBlobs
+      type: object
+      properties:
+        blobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Blob'
+        traceUrl:
+          type:
+            - 'null'
+            - string
+          description: "Consumer URL for the recorded ComfyUI `/ws` trace (plain-text\n`.txt` log or framed binary `.bin` recording, per the requested\n`trace` mode), tailable live while the job runs. Null when tracing\nwasn't requested."
+          format: uri
+        tempBlobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Blob'
+        usage:
+          $ref: '#/components/schemas/CustomComfyUsage'
+      additionalProperties: false
+      description: Output from a CustomComfy step.
+    CustomComfyUsage:
+      required:
+        - buzzPerSecond
+        - computedAt
+        - estimatedCost
+        - runtimeSeconds
+      type: object
+      properties:
+        buzzPerSecond:
+          type: number
+          format: double
+        runtimeSeconds:
+          type: number
+          format: double
+        estimatedCost:
+          type: number
+          description: 'Estimate as of Civitai.Orchestration.Grains.Workflows.Steps.CustomComfy.CustomComfyUsage.ComputedAt: `Max(1, RuntimeSeconds × BuzzPerSecond)` (mirrors the billing floor).'
+          format: double
+        startedAt:
+          type:
+            - 'null'
+            - string
+          description: "When GPU runtime began accruing, or null before the worker reports. Distinct\nfrom `WorkflowStep.StartedAt`, which is the earlier (unbilled) claim time."
+          format: date-time
+        computedAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    TraceMode:
+      enum:
+        - none
+        - logs
+        - binary
+      type: string
+      description: "How much of a custom-comfy job's ComfyUI `/ws` activity to record to a\nstreaming blob the consumer can tail live."
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

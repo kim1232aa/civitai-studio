@@ -1,0 +1,181 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - promptEnhancement Recipe
+  description: OpenAPI specification for the promptEnhancement built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/promptEnhancement:
+    post:
+      tags:
+        - Recipes
+      summary: PromptEnhancement
+      description: "Analyzes and enhances user prompts for a specific AI ecosystem.\n/// Returns detected issues, recommendations, and improved prompt variants."
+      operationId: InvokePromptEnhancementStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptEnhancementInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/PromptEnhancementInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/PromptEnhancementInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptEnhancementOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    PromptEnhancementInput:
+      required:
+        - ecosystem
+        - prompt
+      type: object
+      properties:
+        ecosystem:
+          minLength: 1
+          type: string
+          description: 'The target ecosystem (e.g., "sd1", "sdxl", "flux", "ltx2").'
+        prompt:
+          minLength: 1
+          type: string
+          description: The user's prompt to analyze and enhance.
+        negativePrompt:
+          type:
+            - 'null'
+            - string
+          description: Optional negative prompt to analyze and enhance.
+        temperature:
+          maximum: 1
+          minimum: 0
+          type:
+            - 'null'
+            - number
+          description: LLM temperature for enhancement creativity (0.0–1.0). Defaults to 0.7.
+          format: double
+        instruction:
+          type:
+            - 'null'
+            - string
+          description: 'Optional instruction to guide how the prompt is enhanced (e.g., "expand to 77 tokens", "keep it under 20 words").'
+        images:
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+            description: 'Either A URL, A DataURL or a Base64 string'
+          description: "Optional reference images for the prompt enhancement model to consider when enhancing the prompt\n(subject, style, lighting, composition, color palette). Accepts URLs, data URIs, raw base64, or AIR strings.\nRequires the per-ecosystem prompt-analysis model to be a vision-capable LLM (configured via\nIPromptAnalysisGrain.SetConfigurationAsync) — non-VLM models will silently ignore the images."
+      additionalProperties: false
+      description: Input for a prompt enhancement step.
+    PromptEnhancementOutput:
+      required:
+        - enhancedPrompt
+        - issues
+        - recommendations
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromptIssue'
+          description: Detected issues with the original prompt.
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: Actionable recommendations for improving the prompt.
+        enhancedPrompt:
+          type: string
+          description: Enhanced version of the original prompt.
+        enhancedNegativePrompt:
+          type:
+            - 'null'
+            - string
+          description: 'Enhanced version of the negative prompt, if one was provided.'
+      additionalProperties: false
+      description: Output from prompt enhancement analysis.
+    PromptIssue:
+      required:
+        - description
+      type: object
+      properties:
+        description:
+          type: string
+          description: Description of the issue.
+        severity:
+          type:
+            - 'null'
+            - string
+          description: 'Severity level: "info", "warning", or "error".'
+      additionalProperties: false
+      description: A detected issue with the user's prompt.
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

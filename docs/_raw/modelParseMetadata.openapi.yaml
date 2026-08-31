@@ -1,0 +1,118 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - modelParseMetadata Recipe
+  description: OpenAPI specification for the modelParseMetadata built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/modelParseMetadata:
+    post:
+      tags:
+        - Recipes
+      summary: ModelParseMetadata
+      description: Extracts the embedded JSON metadata header from a safetensors model file.
+      operationId: InvokeModelParseMetadataStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelParseMetadataInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModelParseMetadataInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModelParseMetadataInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelParseMetadataOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ModelParseMetadataInput:
+      required:
+        - model
+      type: object
+      properties:
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type: string
+          description: The AIR of the model file to read metadata from.
+      additionalProperties: false
+      description: Represents the input information needed for the ModelParseMetadata workflow step.
+    ModelParseMetadataOutput:
+      type: object
+      properties:
+        metadata:
+          type:
+            - 'null'
+            - string
+          description: "The `__metadata__` object from the safetensors header as a JSON string,\nor null when the model is not a safetensors file, the header could not be\nparsed, or no `__metadata__` object is present."
+      additionalProperties: false
+      description: Represents the output information returned from the ModelParseMetadata workflow step.
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

@@ -1,0 +1,160 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - transcode Recipe
+  description: OpenAPI specification for the transcode built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/transcode:
+    post:
+      tags:
+        - Recipes
+      summary: Transcoding
+      operationId: InvokeTranscodeStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscodeInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TranscodeInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TranscodeInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscodeOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ContainerFormat:
+      enum:
+        - mp4
+        - webM
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    TranscodeInput:
+      required:
+        - sourceUrl
+        - width
+      type: object
+      properties:
+        sourceUrl:
+          type: string
+          format: uri
+        containerFormat:
+          $ref: '#/components/schemas/ContainerFormat'
+        width:
+          type: integer
+          format: int32
+        destinationUrl:
+          type:
+            - 'null'
+            - string
+          format: uri
+        public:
+          type:
+            - 'null'
+            - boolean
+          description: "Serves the result at a stable unsigned url. Privileged callers only: nothing gates a read of\nit, so a block decided after the fact cannot take it back."
+      additionalProperties: false
+    TranscodeOutput:
+      required:
+        - available
+        - id
+        - jobId
+      type: object
+      properties:
+        id:
+          type: string
+          description: Gets the id of the blob that contains the media.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the media is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the media.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type: string
+          description: Get the id of the job that is associated with this media.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: Storage tier holding the blob; null means the default tier.
+      additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

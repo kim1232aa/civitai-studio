@@ -1,0 +1,310 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - comfyNodepackSnapshot Recipe
+  description: OpenAPI specification for the comfyNodepackSnapshot built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/comfyNodepackSnapshot:
+    post:
+      tags:
+        - Recipes
+      operationId: InvokeComfyNodepackSnapshotStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComfyNodepackSnapshotInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ComfyNodepackSnapshotInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ComfyNodepackSnapshotInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComfyNodepackSnapshotOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ComfyNodepackSnapshotInput:
+      required:
+        - nodepacks
+      type: object
+      properties:
+        comfyImage:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: "The comfy container image to install against, as an `oci:image` AIR\n(e.g. `urn:air:oci:image:ghcr:civitai/civitai-spine-comfy-cloud@v2.7.0`).\nThe captured layer is only valid for this exact image, so it is part of\nthe artifact's identity (hashed into the blob key). Optional: when omitted\n(e.g. a caller with no managed image of its own, like civitai-comfy-nodes\noffload) the handler resolves the configured default/\"latest\" comfy image\n(!:CustomComfy.ComfyImageOptions.DefaultComfyImage)."
+        nodepacks:
+          minItems: 1
+          type: array
+          items:
+            type: string
+          description: "The `comfy:nodepack` AIRs to install and snapshot, e.g.\n`urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.4.0`.\nOne snapshot job is produced per pack (per-pack cache granularity)."
+        minVramGb:
+          type:
+            - 'null'
+            - integer
+          description: "Optional minimum GPU VRAM (GB) the capturing worker must report, gated in\nM:Civitai.Orchestration.Grains.Jobs.ComfyNodepackSnapshotJob.GetWorkerSupport(Civitai.Orchestration.Workers.WorkerRegistration). Mirrors the\nsession's tier so the install happens on representative hardware."
+          format: int32
+        useSageAttention:
+          type:
+            - 'null'
+            - boolean
+          description: "Optional Sage Attention toggle, forwarded to the worker's launch so the\ncaptured environment matches how the consumer runs the image."
+      additionalProperties: false
+      description: "Input for a ComfyNodepackSnapshot step: install one or more ComfyUI custom\nnodepacks on a given comfy image (and hardware tier) and capture the\nresolved install + editor metadata as reusable blobs. Runs on a real worker\nso compiled/arch-specific deps match the fleet the consumer will run on."
+    ComfyNodepackSnapshotOutput:
+      required:
+        - results
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComfyNodepackSnapshotResult'
+      additionalProperties: false
+      description: "Output of a ComfyNodepackSnapshot step: one result per installed pack, each\ncarrying the three captured blobs (install layer, full /object_info, web\nassets). Consumers read these directly from orchestrator blob storage."
+    ComfyNodepackSnapshotResult:
+      required:
+        - layer
+        - layerAir
+        - nodepack
+        - objectInfo
+        - web
+      type: object
+      properties:
+        nodepack:
+          type: string
+          description: The pack AIR this result is for.
+        layerAir:
+          type: string
+          description: "The complete install-layer AIR — `urn:air:comfy:nodepacklayer:…@<ver>+<hex(image)>`,\nthe (pack, comfy image) pair as a single self-describing resource. Consumers declare THIS on a\ncustomComfy step's `resources` (not the bare pack URN) so the worker resolves the layer through\nthe normal resource pipeline."
+        layer:
+          $ref: '#/components/schemas/Blob'
+        objectInfo:
+          $ref: '#/components/schemas/Blob'
+        web:
+          $ref: '#/components/schemas/Blob'
+      additionalProperties: false
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

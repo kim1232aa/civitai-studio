@@ -1,0 +1,140 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - mediaCaptioning Recipe
+  description: OpenAPI specification for the mediaCaptioning built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/mediaCaptioning:
+    post:
+      tags:
+        - Recipes
+      summary: Media Captioning
+      description: Generates a descriptive caption for a single media item using the JoyCaption model.
+      operationId: InvokeMediaCaptioningStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaCaptioningInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/MediaCaptioningInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/MediaCaptioningInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaCaptioningOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    MediaCaptioningInput:
+      required:
+        - mediaUrl
+      type: object
+      properties:
+        model:
+          enum:
+            - joy-caption
+            - ideogram4
+          type: string
+          description: "Captioning model and output contract. Use `ideogram4` for structured\nIdeogram 4 JSON captions with normalized bounding boxes."
+          default: joy-caption
+        mediaUrl:
+          type: string
+          description: The URL of the media to caption (single image or video).
+          format: uri
+        temperature:
+          type: number
+          description: "Sampling temperature for caption generation. Ideogram 4 uses the Qwen model's\nfixed sampling defaults to match AI Toolkit."
+          format: double
+          default: 0.5
+        maxNewTokens:
+          type: integer
+          description: Maximum number of tokens to generate. Ideogram 4 enforces a 3072-token floor.
+          format: int32
+          default: 300
+        customInstructions:
+          type:
+            - 'null'
+            - string
+          description: "Optional extra instructions appended to the captioning prompt to steer\ntone, structure, or formatting. Leave unset for the default caption."
+      additionalProperties: false
+      description: Represents the input information needed for the MediaCaptioning workflow step.
+    MediaCaptioningOutput:
+      required:
+        - caption
+      type: object
+      properties:
+        caption:
+          type: string
+          description: The generated caption text for the media.
+      additionalProperties: false
+      description: Represents the output information returned from the MediaCaptioning workflow step.
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

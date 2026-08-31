@@ -1,0 +1,304 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - videoBackgroundRemoval Recipe
+  description: OpenAPI specification for the videoBackgroundRemoval built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/videoBackgroundRemoval:
+    post:
+      tags:
+        - Recipes
+      summary: Tracks a prompted foreground object across a video and returns a lossless animated WebP with transparency.
+      operationId: InvokeVideoBackgroundRemovalStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoBackgroundRemovalInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/VideoBackgroundRemovalInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/VideoBackgroundRemovalInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoBackgroundRemovalOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    VideoBackgroundRemovalInput:
+      required:
+        - video
+      type: object
+      properties:
+        video:
+          type: string
+          format: uri
+        foregroundPoints:
+          type:
+            - 'null'
+            - array
+          items:
+            $ref: '#/components/schemas/VideoBackgroundRemovalPoint'
+        backgroundPoints:
+          type:
+            - 'null'
+            - array
+          items:
+            $ref: '#/components/schemas/VideoBackgroundRemovalPoint'
+        maskExpansion:
+          maximum: 32
+          minimum: -32
+          type: integer
+          format: int32
+          default: 0
+        maskFeather:
+          maximum: 32
+          minimum: 0
+          type: number
+          format: double
+          default: 2
+      additionalProperties: false
+    VideoBackgroundRemovalOutput:
+      type: object
+      properties:
+        video:
+          $ref: '#/components/schemas/VideoBlob'
+      additionalProperties: false
+    VideoBackgroundRemovalPoint:
+      required:
+        - x
+        - y
+      type: object
+      properties:
+        x:
+          maximum: 1
+          minimum: 0
+          type: number
+          format: double
+        y:
+          maximum: 1
+          minimum: 0
+          type: number
+          format: double
+      additionalProperties: false
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

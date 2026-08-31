@@ -1,0 +1,185 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - modelPickleScan Recipe
+  description: OpenAPI specification for the modelPickleScan built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/modelPickleScan:
+    post:
+      tags:
+        - Recipes
+      summary: ModelPickleScan
+      description: Runs picklescan against a model file to detect dangerous pickle imports.
+      operationId: InvokeModelPickleScanStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPickleScanInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModelPickleScanInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModelPickleScanInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPickleScanOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ModelPickleScanInput:
+      required:
+        - model
+      type: object
+      properties:
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type: string
+          description: The AIR of the model file to scan.
+      additionalProperties: false
+      description: Represents the input information needed for the ModelPickleScan workflow step.
+    ModelPickleScanOutput:
+      type: object
+      properties:
+        exitCode:
+          type:
+            - 'null'
+            - integer
+          description: The picklescan exit code.
+          format: int32
+        output:
+          type:
+            - 'null'
+            - string
+          description: The raw picklescan output.
+        globalImports:
+          uniqueItems: true
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+          description: Global imports discovered during pickle scanning.
+        dangerousImports:
+          uniqueItems: true
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+          description: Dangerous imports discovered during pickle scanning.
+        status:
+          $ref: '#/components/schemas/ModelPickleScanStatus'
+        dangerousImportsFound:
+          type:
+            - 'null'
+            - boolean
+          description: True when one or more dangerous imports were detected.
+        skipped:
+          type:
+            - 'null'
+            - boolean
+          description: True when picklescan was skipped (e.g. file is safetensors and cannot contain pickled code).
+        skipReason:
+          type:
+            - 'null'
+            - string
+          description: 'Reason picklescan was skipped, if applicable. Examples: "safetensors", "safetensors-extension".'
+        scannedFileCount:
+          type:
+            - 'null'
+            - integer
+          description: 'Number of files scanned, parsed from the picklescan summary.'
+          format: int32
+        infectedFileCount:
+          type:
+            - 'null'
+            - integer
+          description: Number of infected files reported by picklescan.
+          format: int32
+        dangerousGlobalCount:
+          type:
+            - 'null'
+            - integer
+          description: Number of dangerous globals reported by picklescan.
+          format: int32
+      additionalProperties: false
+      description: Represents the output information returned from the ModelPickleScan workflow step.
+    ModelPickleScanStatus:
+      enum:
+        - clean
+        - dangerousImportsFound
+        - skippedSafetensors
+        - skippedGguf
+        - skipped
+        - parseError
+        - error
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

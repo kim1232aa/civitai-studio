@@ -1,0 +1,1795 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - training Recipe
+  description: OpenAPI specification for the training built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/training:
+    post:
+      tags:
+        - Recipes
+      summary: Training
+      description: "A workflow step for training machine learning models (LoRAs, checkpoints, etc.)\n/// on various types of data (images, videos, audio). This replaces ImageResourceTraining\n/// with a cleaner architecture that creates one job per epoch instead of a single monolithic job."
+      operationId: InvokeTrainingStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TrainingInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TrainingInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/TrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+            - maxBatchSize
+            - storageBuzzPerEpoch
+            - usesStepPricing
+          type: object
+          properties:
+            ecosystem:
+              type: string
+            epochs:
+              maximum: 200
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "Number of training epochs — the number of saved checkpoints produced (each epoch\nyields one downloadable model). When omitted it is derived from Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps;\nwhen both are supplied, both are honored (epochs = checkpoint count, steps = total)."
+              format: int32
+            steps:
+              maximum: 10000
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "Total number of training steps. This is the primary control over training length and\ndetermines pricing. When supplied, Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs (the number of saved\ncheckpoints) is derived from it; when omitted, steps are derived from epochs."
+              format: int32
+            batchSize:
+              maximum: 4
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "Training batch size. Defaults to 1; raise it (up to the ecosystem's maximum) to train faster at the\ncost of more GPU memory. A larger batch sees more images per step, so fewer steps are needed for a\ncomparable result. Values above the ecosystem maximum are clamped down."
+              format: int32
+            lr:
+              maximum: 1
+              minimum: 0
+              type: number
+              description: Sets the learning rate for the model. This is the learning rate when performing additional learning on each attention block (and other blocks depending on the setting).
+              format: double
+              default: 0.0001
+            textEncoderLr:
+              maximum: 1
+              minimum: 0
+              type:
+                - 'null'
+                - number
+              description: 'Sets the learning rate for the text encoder. Only used when TrainTextEncoder is true. For models with multiple text encoders, this applies to all of them.'
+              format: double
+            trainTextEncoder:
+              type:
+                - 'null'
+                - boolean
+              description: Whether to train the text encoder(s) alongside the model. Enabling this can improve prompt understanding but increases training time and memory usage.
+            lrScheduler:
+              enum:
+                - constant
+                - constant_with_warmup
+                - cosine
+                - linear
+                - step
+              type:
+                - 'null'
+                - string
+              description: You can change the learning rate in the middle of learning. A scheduler is a setting for how to change the learning rate.
+            optimizerType:
+              enum:
+                - adamw
+                - adamw8bit
+                - adam8bit
+                - lion
+                - lion8bit
+                - adafactor
+                - adagrad
+                - prodigy
+                - prodigy8bit
+                - automagic
+              type:
+                - 'null'
+                - string
+              description: "The optimizer determines how to update the neural net weights during training.\nVarious methods have been proposed for smart learning, but the most commonly used in LoRA learning is \"adamw8bit\"."
+            networkDim:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: 'The larger the Dim setting, the more learning information can be stored, but the possibility of learning unnecessary information other than the learning target increases. A larger Dim also increases LoRA file size.'
+              format: int32
+            networkAlpha:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "The smaller the Network alpha value, the larger the stored LoRA neural net weights.\nFor example, with an Alpha of 16 and a Dim of 32, the strength of the weight used is 16/32 = 0.5,\nmeaning that the learning rate is only half as powerful as the Learning Rate setting.\n            \nIf Alpha and Dim are the same number, the strength used will be 1 and will have no effect on the learning rate."
+              format: int32
+            noiseOffset:
+              maximum: 1
+              minimum: 0
+              type:
+                - 'null'
+                - number
+              description: Adds noise to training images. 0 adds no noise at all. A value of 1 adds strong noise.
+              format: double
+            flipAugmentation:
+              type: boolean
+              description: 'If this option is turned on, the image will be horizontally flipped randomly. It can learn left and right angles, which is useful when you want to learn symmetrical people and objects.'
+              default: false
+            shuffleTokens:
+              type: boolean
+              description: 'Randomly changes the order of your tags during training. The intent of shuffling is to improve learning. If you are using captions (sentences), this option has no meaning.'
+              default: false
+            keepTokens:
+              maximum: 10
+              minimum: 0
+              type: integer
+              description: "If your training images have tags, you can randomly shuffle them.\nHowever, if you have words that you want to keep at the beginning, you can use this option to specify \"Keep the first 0 words at the beginning\".\nThis option does nothing if the Shuffle Tokens option is off."
+              format: int32
+              default: 0
+            triggerWord:
+              type:
+                - 'null'
+                - string
+              description: "A trigger word that activates the trained LoRA when used in prompts.\nOnly applicable to certain ecosystems (sd1, sdxl, flux1, chroma, zimagebase, zimageturbo, flux2klein)."
+            continueFrom:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type:
+                - 'null'
+                - string
+              description: "Optional previously-trained LoRA to continue training from (\"train further\"). When set, the first\nepoch resumes from this model instead of the base model, and the new epochs build on top of it."
+            storageBuzzPerEpoch:
+              type: number
+              description: "Per-epoch surcharge (buzz). Each epoch is a delivered checkpoint plus its preview samples, billed on\ntop of the per-step training cost — so raising the epoch count raises the price by this much each.\nOverride per ecosystem where per-epoch samples are expensive to compute (e.g. video)."
+              format: double
+              readOnly: true
+            defaultSteps:
+              type: integer
+              description: "Default total step budget when neither Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps nor Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs is supplied.\nOverride per ecosystem where the default training length differs (e.g. video needs more steps,\nquickly-overtrained models need fewer)."
+              format: int32
+              readOnly: true
+            usesStepPricing:
+              type: boolean
+              description: "True when billing uses the per-step model. This is the default; the only exception is the legacy\npath where the caller supplied Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs but no Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps (existing consumers),\nwhich keeps the historical flat per-epoch price."
+              readOnly: true
+            maxBatchSize:
+              type: integer
+              description: "Ecosystem-specific maximum training batch size — the upper bound the user's\nCivitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.BatchSize is clamped to. Most ecosystems cap at 1."
+              format: int32
+              readOnly: true
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: ecosystem
+            mapping:
+              flux1: '#/components/schemas/Flux1AIToolkitTrainingInput'
+              sdxl: '#/components/schemas/SdxlAIToolkitTrainingInput'
+              sd1: '#/components/schemas/SD1AIToolkitTrainingInput'
+              chroma: '#/components/schemas/ChromaAIToolkitTrainingInput'
+              ernie: '#/components/schemas/ErnieAIToolkitTrainingInput'
+              qwen: '#/components/schemas/QwenAIToolkitTrainingInput'
+              zimageturbo: '#/components/schemas/ZImageTurboAIToolkitTrainingInput'
+              zimagebase: '#/components/schemas/ZImageBaseAIToolkitTrainingInput'
+              flux2klein: '#/components/schemas/Flux2KleinAIToolkitTrainingInput'
+              ltx2: '#/components/schemas/Ltx2AIToolkitTrainingInput'
+              ltx23: '#/components/schemas/Ltx23AIToolkitTrainingInput'
+              ltx25: '#/components/schemas/Ltx25AIToolkitTrainingInput'
+              ace_step_15: '#/components/schemas/AceStep15AIToolkitTrainingInput'
+              ace_step_15_xl: '#/components/schemas/AceStep15XlAIToolkitTrainingInput'
+              hidream-o1: '#/components/schemas/HiDreamO1AIToolkitTrainingInput'
+              anima: '#/components/schemas/AnimaAIToolkitTrainingInput'
+              boogu: '#/components/schemas/BooguAIToolkitTrainingInput'
+              krea2: '#/components/schemas/Krea2AIToolkitTrainingInput'
+              ideogram4: '#/components/schemas/Ideogram4AIToolkitTrainingInput'
+              mageflow: '#/components/schemas/MageFlowAIToolkitTrainingInput'
+              minimaxh3: '#/components/schemas/MiniMaxH3AIToolkitTrainingInput'
+      description: Base input for AI Toolkit training across all ecosystems
+    AceStep15AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            samplesOverrides:
+              type: array
+              items:
+                $ref: '#/components/schemas/AceStepSampleOverride'
+            ecosystem:
+              enum:
+                - ace_step_15
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for ACE-Step 1.5 base models.
+    AceStep15XlAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              type: string
+            samplesOverrides:
+              type: array
+              items:
+                $ref: '#/components/schemas/AceStepSampleOverride'
+            ecosystem:
+              enum:
+                - ace_step_15_xl
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: modelVariant
+            mapping:
+              base: '#/components/schemas/AceStep15XlBaseAIToolkitTrainingInput'
+              sft: '#/components/schemas/AceStep15XlSftAIToolkitTrainingInput'
+      description: AI Toolkit training for ACE-Step 1.5 XL models.
+    AceStep15XlBaseAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AceStep15XlAIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              enum:
+                - base
+              type: string
+            ecosystem:
+              enum:
+                - ace_step_15_xl
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for ACE-Step 1.5 XL base models.
+    AceStep15XlSftAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AceStep15XlAIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              enum:
+                - sft
+              type: string
+            ecosystem:
+              enum:
+                - ace_step_15_xl
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for ACE-Step 1.5 XL SFT models.
+    AceStepSampleOverride:
+      type: object
+      properties:
+        lyrics:
+          type:
+            - 'null'
+            - string
+        duration:
+          type:
+            - 'null'
+            - number
+          format: float
+        bpm:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        timeSignature:
+          type:
+            - 'null'
+            - string
+        language:
+          type:
+            - 'null'
+            - string
+        key:
+          type:
+            - 'null'
+            - string
+        instrumentalWeight:
+          type:
+            - 'null'
+            - number
+          format: float
+        vocalWeight:
+          type:
+            - 'null'
+            - number
+          format: float
+        steps:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        cfg:
+          type:
+            - 'null'
+            - number
+          format: float
+      additionalProperties: false
+      description: "Optional per-prompt overrides for AceStep training sample generation.\nIndex-aligned with `Samples.Prompts`: entry `[i]` overrides the\ndefaults for the sample produced for prompt `[i]`. Any field left\nnull falls back to the hardcoded sample default."
+    AnimaAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            model:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type: string
+              description: The primary Anima model to train upon. Custom checkpoints use the base Anima repository as extras.
+              default: urn:air:anima:repository:huggingface:circlestone-labs/Anima-Base-v1.0-Diffusers@main.tar
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - anima
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Anima models.
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    BlobTrainingDataItem:
+      required:
+        - air
+      type: object
+      properties:
+        air:
+          type: string
+          description: "The blob reference. Accepts an AIR urn (urn:air:other:other:orchestrator:blob@{blobKey}),\na /v2/consumer/blobs/{blobKey} URL, or a bare blob key; normalized to the AIR urn form at submission."
+        caption:
+          type:
+            - 'null'
+            - string
+          description: 'Optional caption for this item, written as the trainer''s sidecar caption file.'
+      additionalProperties: false
+      description: 'A single training item: a consumer-uploaded blob plus an optional caption.'
+    BlobsTrainingData:
+      allOf:
+        - $ref: '#/components/schemas/TrainingData'
+        - required:
+            - items
+            - type
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/BlobTrainingDataItem'
+              description: 'The training items, in dataset order. Each references a consumer-uploaded blob.'
+            type:
+              enum:
+                - blobs
+              type: string
+          additionalProperties: false
+      description: "Training data supplied as individually uploaded blobs (via POST /v2/consumer/blobs),\nso each item passed through per-asset moderation on upload."
+    BooguAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - boogu
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Boogu Image models.
+    ChromaAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            ecosystem:
+              enum:
+                - chroma
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Chroma models
+    ComfyTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/TrainingInput'
+        - required:
+            - defaultSteps
+            - engine
+            - maxBatchSize
+            - storageBuzzPerEpoch
+            - usesStepPricing
+          type: object
+          properties:
+            ecosystem:
+              type: string
+            epochs:
+              maximum: 200
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "Number of training epochs — the number of saved checkpoints produced (each epoch\nyields one downloadable model). When omitted it is derived from Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps;\nwhen both are supplied, both are honored (epochs = checkpoint count, steps = total)."
+              format: int32
+            steps:
+              maximum: 10000
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "Total number of training steps. This is the primary control over training length and\ndetermines pricing. When supplied, Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs (the number of saved\ncheckpoints) is derived from it; when omitted, steps are derived from epochs."
+              format: int32
+            batchSize:
+              maximum: 4
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 4 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+            lr:
+              maximum: 1
+              minimum: 0
+              type: number
+              description: Sets the learning rate for the model. This is the learning rate when performing additional learning on each attention block (and other blocks depending on the setting).
+              format: double
+              default: 0.0001
+            textEncoderLr:
+              maximum: 1
+              minimum: 0
+              type:
+                - 'null'
+                - number
+              description: 'Sets the learning rate for the text encoder. Only used when TrainTextEncoder is true. For models with multiple text encoders, this applies to all of them.'
+              format: double
+            trainTextEncoder:
+              type:
+                - 'null'
+                - boolean
+              description: Whether to train the text encoder(s) alongside the model. Enabling this can improve prompt understanding but increases training time and memory usage.
+            lrScheduler:
+              enum:
+                - constant
+                - constant_with_warmup
+                - cosine
+                - linear
+                - step
+              type:
+                - 'null'
+                - string
+              description: You can change the learning rate in the middle of learning. A scheduler is a setting for how to change the learning rate.
+            optimizerType:
+              enum:
+                - adamw
+                - adamw8bit
+                - adam8bit
+                - lion
+                - lion8bit
+                - adafactor
+                - adagrad
+                - prodigy
+                - prodigy8bit
+                - automagic
+              type:
+                - 'null'
+                - string
+              description: "The optimizer determines how to update the neural net weights during training.\nVarious methods have been proposed for smart learning, but the most commonly used in LoRA learning is \"adamw8bit\"."
+            networkDim:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: 'The larger the Dim setting, the more learning information can be stored, but the possibility of learning unnecessary information other than the learning target increases. A larger Dim also increases LoRA file size.'
+              format: int32
+            networkAlpha:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "The smaller the Network alpha value, the larger the stored LoRA neural net weights.\nFor example, with an Alpha of 16 and a Dim of 32, the strength of the weight used is 16/32 = 0.5,\nmeaning that the learning rate is only half as powerful as the Learning Rate setting.\n            \nIf Alpha and Dim are the same number, the strength used will be 1 and will have no effect on the learning rate."
+              format: int32
+            noiseOffset:
+              maximum: 1
+              minimum: 0
+              type:
+                - 'null'
+                - number
+              description: Adds noise to training images. 0 adds no noise at all. A value of 1 adds strong noise.
+              format: double
+            flipAugmentation:
+              type: boolean
+              description: 'If this option is turned on, the image will be horizontally flipped randomly. It can learn left and right angles, which is useful when you want to learn symmetrical people and objects.'
+              default: false
+            shuffleTokens:
+              type: boolean
+              description: 'Randomly changes the order of your tags during training. The intent of shuffling is to improve learning. If you are using captions (sentences), this option has no meaning.'
+              default: false
+            keepTokens:
+              maximum: 10
+              minimum: 0
+              type: integer
+              description: "If your training images have tags, you can randomly shuffle them.\nHowever, if you have words that you want to keep at the beginning, you can use this option to specify \"Keep the first 0 words at the beginning\".\nThis option does nothing if the Shuffle Tokens option is off."
+              format: int32
+              default: 0
+            triggerWord:
+              type:
+                - 'null'
+                - string
+              description: "A trigger word that activates the trained LoRA when used in prompts.\nOnly applicable to certain ecosystems (sd1, sdxl, flux1, chroma, zimagebase, zimageturbo, flux2klein)."
+            continueFrom:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type:
+                - 'null'
+                - string
+              description: "Optional previously-trained LoRA to continue training from (\"train further\"). When set, the first\nepoch resumes from this model instead of the base model, and the new epochs build on top of it."
+            storageBuzzPerEpoch:
+              type: number
+              description: "Per-epoch surcharge (buzz). Each epoch is a delivered checkpoint plus its preview samples, billed on\ntop of the per-step training cost — so raising the epoch count raises the price by this much each.\nOverride per ecosystem where per-epoch samples are expensive to compute (e.g. video)."
+              format: double
+              readOnly: true
+            defaultSteps:
+              type: integer
+              description: "Default total step budget when neither Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps nor Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs is supplied.\nOverride per ecosystem where the default training length differs (e.g. video needs more steps,\nquickly-overtrained models need fewer)."
+              format: int32
+              readOnly: true
+            usesStepPricing:
+              type: boolean
+              description: "True when billing uses the per-step model. This is the default; the only exception is the legacy\npath where the caller supplied Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Epochs but no Civitai.Orchestration.Grains.Workflows.Steps.Training.AIToolkit.AIToolkitTrainingInput.Steps (existing consumers),\nwhich keeps the historical flat per-epoch price."
+              readOnly: true
+            resolution:
+              maximum: 1024
+              minimum: 256
+              type: integer
+              format: int32
+              default: 1024
+            noHalfVae:
+              type: boolean
+              default: false
+            minSnrGamma:
+              maximum: 20
+              minimum: 0
+              type:
+                - 'null'
+                - integer
+              description: Min-SNR gamma passed through to compatible training backends.
+              format: int32
+            model:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type: string
+              description: The primary checkpoint to train upon. The model ecosystem drives Comfy training behavior.
+              default: urn:air:sdxl:checkpoint:civitai:101055@128078
+            diffusionModel:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type:
+                - 'null'
+                - string
+              description: 'Split diffusion model used by native Comfy training nodes. When omitted, checkpoint-backed families load Civitai.Orchestration.Grains.Workflows.Steps.Training.Comfy.ComfyTrainingInput.Model.'
+            textEncoderModel:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type:
+                - 'null'
+                - string
+              description: Split text encoder used by native Comfy training nodes.
+            vaeModel:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type:
+                - 'null'
+                - string
+              description: Split VAE used by native Comfy training nodes.
+            trainingDtype:
+              type:
+                - 'null'
+                - string
+            loraDtype:
+              type:
+                - 'null'
+                - string
+            quantizedBackward:
+              type:
+                - 'null'
+                - boolean
+            bypassMode:
+              type:
+                - 'null'
+                - boolean
+            gradAccumulationSteps:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            lossFunction:
+              type:
+                - 'null'
+                - string
+            algorithm:
+              type:
+                - 'null'
+                - string
+            checkpointDepth:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            offloading:
+              type:
+                - 'null'
+                - boolean
+            clipType:
+              type:
+                - 'null'
+                - string
+            unetWeightDtype:
+              type:
+                - 'null'
+                - string
+            modelSamplingShift:
+              type:
+                - 'null'
+                - number
+              format: double
+            datasetCaching:
+              type:
+                - 'null'
+                - boolean
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            engine:
+              enum:
+                - comfy
+              type: string
+          additionalProperties: false
+      description: Input for model-family-driven Comfy-backed LoRA training.
+    ErnieAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+          type: object
+          properties:
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - ernie
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 2
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 2 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for ERNIE-Image models
+    Flux1AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+            - storageBuzzPerEpoch
+          type: object
+          properties:
+            modelVariant:
+              type: string
+            storageBuzzPerEpoch:
+              type: number
+              format: double
+              readOnly: true
+            ecosystem:
+              enum:
+                - flux1
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: modelVariant
+            mapping:
+              dev: '#/components/schemas/Flux1DevAIToolkitTrainingInput'
+              schnell: '#/components/schemas/Flux1SchnellAIToolkitTrainingInput'
+      description: AI Toolkit training for Flux.1 models
+    Flux1DevAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/Flux1AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              enum:
+                - dev
+              type: string
+            ecosystem:
+              enum:
+                - flux1
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Flux.1 Dev models
+    Flux1SchnellAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/Flux1AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              enum:
+                - schnell
+              type: string
+            ecosystem:
+              enum:
+                - flux1
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Flux.1 Schnell models
+    Flux2Klein4bAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/Flux2KleinAIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+            - modelVariant
+          type: object
+          properties:
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            modelVariant:
+              enum:
+                - 4b
+              type: string
+            ecosystem:
+              enum:
+                - flux2klein
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 2
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 2 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Flux2 Klein 4b-base models
+    Flux2Klein9bAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/Flux2KleinAIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              enum:
+                - 9b
+              type: string
+            ecosystem:
+              enum:
+                - flux2klein
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Flux2 Klein 9b-base models
+    Flux2KleinAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - modelVariant
+          type: object
+          properties:
+            modelVariant:
+              type: string
+            isEditTraining:
+              type: boolean
+              description: "Whether this is image-edit training (uses control paths for reference images).\nWhen true, the training data zip should contain subfolders: main/, control_1/, control_2/, control_3/."
+              default: false
+            ecosystem:
+              enum:
+                - flux2klein
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: modelVariant
+            mapping:
+              4b: '#/components/schemas/Flux2Klein4bAIToolkitTrainingInput'
+              9b: '#/components/schemas/Flux2Klein9bAIToolkitTrainingInput'
+      description: AI Toolkit training for Flux2 Klein models (image training)
+    HiDreamO1AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            ecosystem:
+              enum:
+                - hidream-o1
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for HiDream O1 Image models.
+    Ideogram4AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - ideogram4
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Ideogram 4 models.
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Krea2AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - krea2
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Krea 2 models.
+    Ltx23AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+            - storageBuzzPerEpoch
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            storageBuzzPerEpoch:
+              type: number
+              format: double
+              readOnly: true
+            ecosystem:
+              enum:
+                - ltx23
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for LTX 2.3 video models
+    Ltx25AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+            - storageBuzzPerEpoch
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            storageBuzzPerEpoch:
+              type: number
+              format: double
+              readOnly: true
+            ecosystem:
+              enum:
+                - ltx25
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for LTX 2.5 video models.
+    Ltx2AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+            - storageBuzzPerEpoch
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            storageBuzzPerEpoch:
+              type: number
+              format: double
+              readOnly: true
+            ecosystem:
+              enum:
+                - ltx2
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for LTX2 video models
+    MageFlowAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - mageflow
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for the Mage-Flow Base model.
+    MiniMaxH3AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - defaultSteps
+            - ecosystem
+            - engine
+            - storageBuzzPerEpoch
+          type: object
+          properties:
+            defaultSteps:
+              type: integer
+              format: int32
+              readOnly: true
+            storageBuzzPerEpoch:
+              type: number
+              format: double
+              readOnly: true
+            ecosystem:
+              enum:
+                - minimaxh3
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for the MiniMax H3 base (FL2VA) model.
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    QwenAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            version:
+              enum:
+                - latest
+                - '2509'
+                - '2512'
+              type: string
+              default: latest
+            ecosystem:
+              enum:
+                - qwen
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 1
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Fixed at 1 for this ecosystem.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Qwen Image models
+    SD1AIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+          type: object
+          properties:
+            minSnrGamma:
+              maximum: 20
+              minimum: 0
+              type:
+                - 'null'
+                - integer
+              description: "Learning is performed by putting noise of various strengths on the training image,\nbut depending on the difference in strength of the noise on which it is placed, learning will be\nstable by moving closer to or farther from the learning target.\n            \nMin SNR gamma was introduced to compensate for that. When learning images have little noise,\nit may deviate greatly from the target, so try to suppress this jump."
+              format: int32
+            model:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type: string
+              description: The primary model to train upon.
+              default: urn:air:sd1:checkpoint:civitai:127227@139180
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - sd1
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 4
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 4 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Stable Diffusion 1.5 models
+    SdxlAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+          type: object
+          properties:
+            minSnrGamma:
+              maximum: 20
+              minimum: 0
+              type:
+                - 'null'
+                - integer
+              description: "Learning is performed by putting noise of various strengths on the training image,\nbut depending on the difference in strength of the noise on which it is placed, learning will be\nstable by moving closer to or farther from the learning target.\n            \nMin SNR gamma was introduced to compensate for that. When learning images have little noise,\nit may deviate greatly from the target, so try to suppress this jump."
+              format: int32
+            model:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type: string
+              description: The primary model to train upon.
+              default: urn:air:sdxl:checkpoint:civitai:101055@128078
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - sdxl
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 4
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 4 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Stable Diffusion XL models
+    TrainingData:
+      required:
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+      additionalProperties: false
+      description: Represents training data in various formats
+      discriminator:
+        propertyName: type
+        mapping:
+          zip: '#/components/schemas/ZipTrainingData'
+          blobs: '#/components/schemas/BlobsTrainingData'
+    TrainingInput:
+      required:
+        - engine
+        - requiresAgeClassification
+        - trainingData
+        - usesStepPricing
+      type: object
+      properties:
+        engine:
+          type: string
+        trainingData:
+          $ref: '#/components/schemas/TrainingData'
+        samples:
+          $ref: '#/components/schemas/TrainingInputSamples'
+        usesStepPricing:
+          type: boolean
+          description: Whether this run uses step-based pricing rather than the legacy flat per-epoch price.
+          readOnly: true
+        requiresAgeClassification:
+          type: boolean
+          description: Whether age classification should run on this training type's dataset.
+          readOnly: true
+      additionalProperties: false
+      description: Input for a training step.
+      discriminator:
+        propertyName: engine
+        mapping:
+          ai-toolkit: '#/components/schemas/AIToolkitTrainingInput'
+          comfy: '#/components/schemas/ComfyTrainingInput'
+    TrainingInputSamples:
+      type: object
+      properties:
+        prompts:
+          type: array
+          items:
+            type: string
+          description: A selection of sample prompts to generate preview outputs during training.
+        negativePrompt:
+          type:
+            - 'null'
+            - string
+          description: An optional negative prompt that will be applied when generating samples
+        sourceImages:
+          type: array
+          items:
+            type: string
+            description: 'Either A URL, A DataURL or a Base64 string'
+          description: "Source images for edit training sample generation.\nProcessed by ISourceImageProcessor during initialization, then TryGetUri() yields URLs\nthat are passed as ReferenceImageUrls when generating samples with edit LoRAs."
+        cfgScale:
+          type:
+            - 'null'
+            - number
+          description: 'CFG (guidance) scale for sample generation. When unset, each ecosystem uses its own default.'
+          format: double
+        strength:
+          type:
+            - 'null'
+            - number
+          description: Strength of the trained LoRA when generating samples. Defaults to 1.0 when unset.
+          format: double
+      additionalProperties: false
+      description: Sample generation configuration for training workflows
+    TrainingModerationStatus:
+      enum:
+        - evaluating
+        - underReview
+        - approved
+        - rejected
+      type: string
+      description: The moderation status of the training data
+    TrainingOutput:
+      required:
+        - epochs
+        - moderationStatus
+      type: object
+      properties:
+        moderationStatus:
+          $ref: '#/components/schemas/TrainingModerationStatus'
+        epochs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingOutputEpochResult'
+          description: The trained model artifacts for each epoch
+      additionalProperties: false
+      description: Output from a training step.
+    TrainingOutputEpochResult:
+      required:
+        - epochNumber
+        - model
+        - samples
+      type: object
+      properties:
+        epochNumber:
+          type: integer
+          description: The epoch number (1-based)
+          format: int32
+        model:
+          $ref: '#/components/schemas/Blob'
+        samples:
+          type: array
+          items:
+            $ref: '#/components/schemas/Blob'
+          description: Sample outputs (images/videos/audio) generated with this epoch's model
+      additionalProperties: false
+      description: Represents the output of a single training epoch
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+    ZImageBaseAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+          type: object
+          properties:
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - zimagebase
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 2
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 2 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Z Image Turbo models
+    ZImageTurboAIToolkitTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/AIToolkitTrainingInput'
+        - required:
+            - ecosystem
+            - engine
+            - maxBatchSize
+          type: object
+          properties:
+            maxBatchSize:
+              type: integer
+              format: int32
+              readOnly: true
+            ecosystem:
+              enum:
+                - zimageturbo
+              type: string
+            engine:
+              enum:
+                - ai-toolkit
+              type: string
+            batchSize:
+              maximum: 2
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Training batch size. Defaults to 1; raise it up to 2 for this ecosystem to train faster at the cost of more GPU memory.
+              default: 1
+          additionalProperties: false
+      description: AI Toolkit training for Z Image Turbo models
+    ZipTrainingData:
+      allOf:
+        - $ref: '#/components/schemas/TrainingData'
+        - required:
+            - count
+            - sourceUrl
+            - type
+          type: object
+          properties:
+            sourceUrl:
+              pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+              type: string
+              description: AIR pointing to the zip file containing training data
+            count:
+              type: integer
+              description: The number of images/frames/items in this training data
+              format: int32
+            type:
+              enum:
+                - zip
+              type: string
+          additionalProperties: false
+      description: Training data packaged as a zip file
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

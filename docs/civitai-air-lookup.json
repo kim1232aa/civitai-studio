@@ -1,0 +1,522 @@
+{
+  "fetchedAt": "2026-09-01T06:15:00+08:00",
+  "timezone": "Asia/Shanghai",
+  "scope": "GET-only AIR / nodepack lookup for customComfy import. No POST generation. No secrets.",
+  "auth": {
+    "header": "Authorization: Bearer <token>",
+    "tokenPath": "/home/box/.config/civitai/token",
+    "notes": "Same as fetch_openapi.py and server.py civitai(). Site REST model-version GETs work without auth. GET /v2/resources/{air} returns 401 empty body without Bearer. GET /v2/services is public (200 unauthenticated)."
+  },
+  "customComfy": {
+    "catalogId": "utility/customComfy",
+    "catalogStatus": "degraded",
+    "submit": "POST /v2/consumer/recipes/customComfy  (NOT CALLED)",
+    "openapi": {
+      "local": "/workspace/civitai-studio/docs/_raw/customComfy.openapi.yaml",
+      "liveGet": "GET https://orchestration.civitai.com/v2/consumer/recipes/customComfy/openapi.yaml",
+      "liveStatus": 200
+    },
+    "getRecipeWithoutBody": {
+      "url": "GET https://orchestration.civitai.com/v2/consumer/recipes/customComfy",
+      "status": 405
+    },
+    "inputSchema": {
+      "name": "CustomComfyInput",
+      "required": [
+        "resources",
+        "trace",
+        "workflow"
+      ],
+      "optional": [
+        "sessionId",
+        "comfyImage",
+        "sessionOwnerApiToken",
+        "minVramGb",
+        "useSageAttention",
+        "minimumDurationSeconds"
+      ],
+      "resources": {
+        "type": "array",
+        "minItems": 1,
+        "items": "string",
+        "notObjects": true,
+        "description": "AIR URNs. Checkpoints/loras/vae AND comfy:nodepack. Orchestrator does not scan the workflow.",
+        "example": "urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.4.0"
+      },
+      "workflow": "opaque ComfyUI graph",
+      "trace": {
+        "enum": [
+          "none",
+          "logs",
+          "binary"
+        ]
+      },
+      "comfyImageExample": "urn:air:oci:image:ghcr:civitai/civitai-spine-comfy@v2.5.5",
+      "airPattern": "^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\\-\\/]+):)?(?:(?<type>[a-zA-Z0-9_\\-\\/]+):)?(?<source>[a-zA-Z0-9_\\-\\/]+):(?<id>[a-zA-Z0-9_\\-\\/\\.]+)(?:@(?<version>[a-zA-Z0-9_\\-\\/.=,%+:]+))?(?:\\.(?<format>[a-zA-Z0-9_\\-]+))?$",
+      "sessionOwnerApiToken": "sensitive — never log"
+    },
+    "snapshotNote": "comfyNodepackSnapshot output.layerAir is urn:air:comfy:nodepacklayer:…@<ver>+<hex(image)>. That recipe OpenAPI says declare layerAir on customComfy resources. Snapshot submit is POST and was not called."
+  },
+  "airFormat": {
+    "docs": "https://developer.civitai.com/site/guide/air",
+    "canonical": "urn:air:{ecosystem}:{type}:{source}:{id}[@{version}][+{fileId}][.{format}]",
+    "prefixesOptional": true,
+    "preferFullUrnInRequests": true,
+    "liveCanonicalization": {
+      "sent": "urn:air:sdxl:lora:civitai:82098@87153",
+      "getResourceReturned": "urn:air:sd1:lora:civitai:82098@87153",
+      "status": 200
+    },
+    "nodepackPattern": "urn:air:comfy:nodepack:comfyregistry:{publisherId}/{nodeId}@{version}",
+    "ociImagePattern": "urn:air:oci:image:{registry}:{repo}@{tag-or-digest}",
+    "typesFromDocs": [
+      "checkpoint",
+      "lora",
+      "embedding",
+      "vae",
+      "controlnet",
+      "upscaler",
+      "diffusionmodel",
+      "unet",
+      "other",
+      "nodepack",
+      "image"
+    ]
+  },
+  "filenameToAir": {
+    "dedicatedByFilenameEndpoint": false,
+    "reliableKey": "file hash or modelVersionId, not filename",
+    "workingGets": [
+      {
+        "method": "GET",
+        "url": "https://civitai.com/api/v1/model-versions/{id}",
+        "example": "https://civitai.com/api/v1/model-versions/2514310",
+        "auth": "none",
+        "status": 200,
+        "airPath": "air",
+        "airExample": "urn:air:sdxl:checkpoint:civitai:827184@2514310",
+        "keys": [
+          "id",
+          "modelId",
+          "name",
+          "nsfwLevel",
+          "createdAt",
+          "updatedAt",
+          "status",
+          "publishedAt",
+          "trainedWords",
+          "baseModel",
+          "baseModelType",
+          "air",
+          "stats",
+          "model",
+          "files",
+          "images",
+          "downloadUrl"
+        ],
+        "fileNamePath": "files[].name",
+        "fileIdPath": "files[].id",
+        "hashesPath": "files[].hashes.{SHA256,AutoV1,AutoV2,AutoV3,BLAKE3,CRC32,SHA256_12}",
+        "note": "Nested GET /models/{id} modelVersions[] omit air."
+      },
+      {
+        "method": "GET",
+        "url": "https://civitai.com/api/v1/model-versions/mini/{id}",
+        "example": "https://civitai.com/api/v1/model-versions/mini/2514310",
+        "auth": "none",
+        "status": 200,
+        "airPath": "air",
+        "keys": [
+          "air",
+          "versionName",
+          "modelName",
+          "userId",
+          "baseModel",
+          "availability",
+          "publishedAt",
+          "size",
+          "fileType",
+          "fileName",
+          "hashes",
+          "downloadUrls",
+          "format",
+          "canGenerate",
+          "isFeatured",
+          "requireAuth",
+          "checkPermission",
+          "additionalResourceCharge",
+          "minor",
+          "sfwOnly",
+          "fees",
+          "payoutEnabled"
+        ],
+        "fileNameNote": "mini.fileName can differ from full files[].name (mini=WAI-Nsfw-Illustrious-16.safetensors vs files[0].name=waiIllustriousSDXL_v160.safetensors)"
+      },
+      {
+        "method": "GET",
+        "url": "https://civitai.com/api/v1/model-versions/by-hash/{hash}",
+        "exampleSha256": "https://civitai.com/api/v1/model-versions/by-hash/A5F58EB1C33616C4F06BCA55AF39876A7B817913CD829CAA8ACB111B770C85CC",
+        "exampleAutoV2": "https://civitai.com/api/v1/model-versions/by-hash/A5F58EB1C3",
+        "auth": "none (Bearer also 200)",
+        "status": 200,
+        "airPath": "air",
+        "sameShapeAs": "GET /api/v1/model-versions/{id}",
+        "acceptedHashTypes": [
+          "AutoV1",
+          "AutoV2",
+          "AutoV3",
+          "SHA256",
+          "BLAKE3",
+          "CRC32"
+        ],
+        "docs": "https://developer.civitai.com/site/reference/model-versions"
+      },
+      {
+        "method": "GET",
+        "url": "https://civitai.com/api/v1/models/{id}",
+        "example": "https://civitai.com/api/v1/models/827184",
+        "auth": "none",
+        "status": 200,
+        "airPath": null,
+        "keys": [
+          "id",
+          "name",
+          "type",
+          "modelVersions",
+          "creator",
+          "tags",
+          "stats"
+        ],
+        "modelVersionsKeys": [
+          "id",
+          "name",
+          "baseModel",
+          "files",
+          "images",
+          "downloadUrl"
+        ],
+        "followUp": "GET /api/v1/model-versions/{modelVersions[].id} for air"
+      },
+      {
+        "method": "GET",
+        "url": "https://civitai.com/api/v1/models?limit=&query=",
+        "auth": "none",
+        "status": 200,
+        "airPath": null,
+        "keys": [
+          "items",
+          "metadata"
+        ],
+        "queryIsMeilisearch": true,
+        "notExactFilename": true,
+        "probes": [
+          {
+            "query": "moodyKrea2",
+            "status": 200,
+            "hitTypes": "Workflows JSON, not safetensors checkpoint"
+          },
+          {
+            "query": "moodyKrea2.safetensors",
+            "status": 200,
+            "note": "same fuzzy workflow hits"
+          },
+          {
+            "query": "MysticXXX_KREA2",
+            "status": 200,
+            "items": []
+          },
+          {
+            "query": "waiIllustriousSDXL_v160.safetensors",
+            "status": 503,
+            "error": "Model search is temporarily overloaded — please retry."
+          },
+          {
+            "query": "waiIllustriousSDXL_v160",
+            "status": 200,
+            "hit": "unrelated LoRA, not the WAI checkpoint file"
+          }
+        ]
+      },
+      {
+        "method": "GET",
+        "url": "https://orchestration.civitai.com/v2/resources/{air}",
+        "docs": "https://developer.civitai.com/orchestration/reference/operations/GetResource",
+        "auth": "Authorization: Bearer <token>",
+        "unauthStatus": 401,
+        "status": 200,
+        "requiresAirAlready": true,
+        "notFilenameSearch": true,
+        "encoding": "Do not percent-encode slash in nodepack id. quote(air, safe='/:@'). Fully encoded %2F → 400 AIR is in an invalid format.",
+        "airPath": "air",
+        "keys": [
+          "air",
+          "size",
+          "hashes",
+          "downloadUrls",
+          "modelName",
+          "resourceName",
+          "versionName",
+          "checkPermission",
+          "canGenerate",
+          "fileFormat",
+          "hasMatureContentRestriction",
+          "popularityRank",
+          "isFeatured",
+          "publishedAt",
+          "hasNSFWContentRestriction",
+          "payoutEnabled",
+          "fees",
+          "userId",
+          "availability"
+        ],
+        "resourceNameIsNotFilename": true,
+        "checkpointExample": {
+          "requestAir": "urn:air:sdxl:checkpoint:civitai:827184@2514310",
+          "availability": {
+            "status": "available",
+            "workers": 294
+          },
+          "hashesPresent": true
+        },
+        "loraExample": {
+          "requestAir": "urn:air:sdxl:lora:civitai:82098@87153",
+          "returnedAir": "urn:air:sd1:lora:civitai:82098@87153",
+          "availability": {
+            "status": "available",
+            "workers": 197
+          }
+        },
+        "nodepackExample": {
+          "requestAir": "urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.4.0",
+          "downloadUrls": [
+            "https://cdn.comfy.org/kijai/comfyui-kjnodes/1.4.0/node.zip"
+          ],
+          "hashes": {},
+          "availability": {
+            "status": "unavailable"
+          },
+          "canGenerate": true,
+          "fileFormat": "unknown"
+        },
+        "shortFormAlso200": [
+          "sdxl:checkpoint:civitai:827184@2514310",
+          "air:sdxl:checkpoint:civitai:827184@2514310"
+        ]
+      }
+    ],
+    "bulkHashPostExistsInDocs": {
+      "called": false,
+      "reason": "GET-only research",
+      "urls": [
+        "POST https://civitai.com/api/v1/model-versions/by-hash",
+        "POST https://civitai.com/api/v1/model-versions/by-hash/ids"
+      ]
+    },
+    "serverPy": {
+      "modelVersionProxy": "GET /api/model-version/{vid} → GET civitai.com/api/v1/model-versions/{vid} copies air",
+      "search": "GET /api/search?q= → GET /models?query= ; versions only id/name/baseModel, no air"
+    }
+  },
+  "classTypeToNodepack": {
+    "civitaiCatalogExists": false,
+    "mustShipLocalMap": true,
+    "localMapFor": [
+      "core nodes (registry 404 — skip pack)",
+      "ambiguous names (SeedVR2 vs SeedVR2VideoUpscaler)",
+      "spaces/parens titles"
+    ],
+    "resolver": "Comfy Registry, not Civitai",
+    "construct": "urn:air:comfy:nodepack:comfyregistry:{publisher.id}/{id}@{latest_version.version}",
+    "workingGets": [
+      {
+        "method": "GET",
+        "url": "https://api.comfy.org/comfy-nodes/{class_type}/node",
+        "auth": "none",
+        "status200Example": {
+          "class_type": "Power Lora Loader (rgthree)",
+          "id": "rgthree-comfy",
+          "publisher.id": "rgthree",
+          "latest_version.version": "1.0.2608210019",
+          "air": "urn:air:comfy:nodepack:comfyregistry:rgthree/rgthree-comfy@1.0.2608210019"
+        },
+        "status404Examples": [
+          "KSamplerAdvanced",
+          "SeedVR2LoadDiTModel"
+        ],
+        "keys": [
+          "id",
+          "publisher",
+          "latest_version",
+          "name",
+          "repository",
+          "status"
+        ]
+      },
+      {
+        "method": "GET",
+        "url": "https://api.comfy.org/nodes/{nodeId}",
+        "example": "https://api.comfy.org/nodes/comfyui-kjnodes",
+        "status": 200,
+        "publisher.id": "kijai",
+        "latest_version.version": "1.5.0"
+      },
+      {
+        "method": "GET",
+        "url": "https://orchestration.civitai.com/v2/resources/{nodepackAir}",
+        "status": 200,
+        "note": "Validates URN / returns cdn.comfy.org zip. availability.status was unavailable for all nodepack probes."
+      }
+    ],
+    "liveMappings": [
+      {
+        "class_type": "Power Lora Loader (rgthree)",
+        "air": "urn:air:comfy:nodepack:comfyregistry:rgthree/rgthree-comfy@1.0.2608210019",
+        "getResource": 200
+      },
+      {
+        "class_type": "UltralyticsDetectorProvider",
+        "air": "urn:air:comfy:nodepack:comfyregistry:drltdata/comfyui-impact-subpack@1.3.5",
+        "registryOnly": true
+      },
+      {
+        "class_type": "SeedVR2VideoUpscaler",
+        "air": "urn:air:comfy:nodepack:comfyregistry:ainvfx/seedvr2_videoupscaler@2.5.24",
+        "getResource": 200
+      },
+      {
+        "class_type": "SeedVR2",
+        "air": "urn:air:comfy:nodepack:comfyregistry:assa/alex-seedvr-node@1.0.1",
+        "warning": "Different pack than SeedVR2VideoUpscaler — do not trust short names without a local map"
+      },
+      {
+        "openapiExample": "urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.4.0",
+        "getResource": 200,
+        "latestAlso200": "urn:air:comfy:nodepack:comfyregistry:kijai/comfyui-kjnodes@1.5.0"
+      }
+    ]
+  },
+  "gaps": [
+    {
+      "url": "GET https://civitai.com/api/v1/model-versions/by-filename/{name}",
+      "status": 404
+    },
+    {
+      "url": "GET https://civitai.com/api/v1/models/by-filename/{name}",
+      "status": 404
+    },
+    {
+      "url": "GET https://civitai.com/api/v1/model-versions?filename=",
+      "status": 404
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/nodepacks",
+      "status": 404
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/consumer/nodepacks",
+      "status": 404
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/consumer/resources",
+      "status": 404
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/resources",
+      "status": 400,
+      "error": "The view field is required."
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/resources?filename=",
+      "status": 400,
+      "error": "The view field is required."
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/resources?air=",
+      "status": 400,
+      "error": "The view field is required."
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/resources/{fully-encoded-nodepack-with-%2F}",
+      "status": 400,
+      "error": "AIR is in an invalid format."
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/resources/{air}",
+      "status": 401,
+      "auth": "none",
+      "error": "empty body"
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/consumer/recipes/customComfy",
+      "status": 405
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/openapi.json",
+      "status": 404
+    },
+    {
+      "url": "GET https://orchestration.civitai.com/v2/consumer/openapi.json",
+      "status": 404
+    },
+    {
+      "url": "GET https://developer.civitai.com/orchestration/openapi.json",
+      "status": 404
+    },
+    {
+      "url": "GET /api/v1/models list/detail air field",
+      "status": 200,
+      "missing": "air not present; only version-by-id/hash/mini"
+    },
+    {
+      "url": "Civitai GET class_type → nodepack catalog",
+      "exists": false
+    }
+  ],
+  "enumsGet": {
+    "url": "GET https://civitai.com/api/v1/enums",
+    "status": 200,
+    "keys": [
+      "ModelType",
+      "ModelFileType",
+      "ActiveBaseModel",
+      "BaseModel",
+      "BaseModelType"
+    ],
+    "ModelTypeSample": [
+      "Checkpoint",
+      "LORA",
+      "VAE",
+      "Controlnet",
+      "Upscaler",
+      "UNet",
+      "TextEncoder",
+      "Workflows",
+      "ComfyWorkflows"
+    ]
+  },
+  "orchestrationServices": {
+    "customComfy": {
+      "query": "GET /v2/services?query=customComfy",
+      "status": 200,
+      "id": "utility/customComfy",
+      "step": "customComfy",
+      "serviceStatus": "degraded"
+    },
+    "nodepackQuery": {
+      "query": "GET /v2/services?query=nodepack",
+      "status": 200,
+      "totalCount": 2,
+      "ids": [
+        "utility/customComfy",
+        "model/comfyNodepackSnapshot"
+      ]
+    }
+  },
+  "notCalled": [
+    "POST /v2/consumer/workflows",
+    "POST /v2/consumer/recipes/customComfy",
+    "POST /v2/consumer/recipes/comfyNodepackSnapshot",
+    "POST /v2/consumer/recipes/prepareResource",
+    "POST /api/v1/model-versions/by-hash"
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "probedAt": "2026-09-01T05:47:00+08:00",
+  "studioHfCount": 8,
+  "studioHfImageCount": 6,
+  "studioHfVideoCount": 2,
+  "studioMsCount": 4,
+  "studioMsImageCount": 4,
+  "studioMsVideoCount": 0,
+  "liveHfCount": 109222,
+  "liveHfTextToImage": 109222,
+  "liveHfTextToVideo": 2546,
+  "liveHfImageToVideo": 1544,
+  "liveHfImageToImage": 3532,
+  "liveHfHfInferenceProviderT2i": 1,
+  "liveHfRouterV1Models": 136,
+  "liveMsCount": 94189,
+  "liveMsTextToImageSynthesis": 94189,
+  "liveMsImageToImage": 824,
+  "liveMsTextToVideoSynthesis": 3069,
+  "liveMsImageToVideo": 552,
+  "liveMsDiffusers": 14523,
+  "liveMsUnfilteredHub": 248740,
+  "liveMsInferenceOpenaiList": 50,
+  "studioMsLiveMergeAdded": 0,
+  "auth": {
+    "hfTokenPresent": true,
+    "msTokenPresent": true,
+    "hfTokenMode": "0600",
+    "msTokenMode": "0600",
+    "studioHfHasKey": true,
+    "studioMsHasKey": true,
+    "not401Fallback": true
+  },
+  "rootCause": "HF catalog is a hardcoded 8-id JSON whitelist with no Hub API call. ModelScope starts from a 4-id JSON whitelist and merges the OpenAI-compatible inference /v1/models chat list (50 rows, no pagination, wrong host api.modelscope.ai NXDOMAIN) instead of Hub GET /openapi/v1/models?filter.task=text-to-image-synthesis (94189). Tokens work; not a 401 stub.",
+  "endpoints": {
+    "studioHfCatalog": "GET /api/catalog?backend=huggingface  (reads docs/hf-models.json)",
+    "studioMsCatalog": "GET /api/catalog?backend=modelscope  (docs/ms-models.json + GET {base_url}/models)",
+    "studioMsPreferredBase": "https://api.modelscope.ai/v1  (DNS NXDOMAIN)",
+    "studioMsFallbackBase": "https://api-inference.modelscope.cn/v1  (used; OpenAI list of 50)",
+    "hfHub": "GET https://huggingface.co/api/models?pipeline_tag=text-to-image&sort=downloads&limit=100  (paginate Link cursor; no X-Total-Count; default/max page 1000)",
+    "hfHubT2v": "GET https://huggingface.co/api/models?pipeline_tag=text-to-video&sort=downloads&limit=100",
+    "hfHubI2v": "GET https://huggingface.co/api/models?pipeline_tag=image-to-video&sort=downloads&limit=100",
+    "hfRouter": "GET https://router.huggingface.co/v1/models  (LLM router, 136; not t2i catalog)",
+    "msHubOpenapi": "GET https://www.modelscope.cn/openapi/v1/models?filter.task=text-to-image-synthesis&sort=downloads&page_size=50&page_number=1",
+    "msApiV1ModelsGet": "GET https://www.modelscope.cn/api/v1/models → 404",
+    "msDolphinGet": "GET https://www.modelscope.cn/api/v1/dolphin/models → 404 (search is historically PUT)",
+    "msWrongTask": "filter.task=text-to-image → 0; use text-to-image-synthesis"
+  },
+  "codeLocations": {
+    "hfLoad": "providers/huggingface.py:27-34 load_items() reads docs/hf-models.json",
+    "hfCatalog": "providers/huggingface.py:56-71 catalog() filters that list only",
+    "msLoad": "providers/modelscope.py:62-69 load_disk() reads docs/ms-models.json",
+    "msCatalog": "providers/modelscope.py:95-132 catalog() stub + wrong live merge",
+    "msBaseUrl": "providers/modelscope.py:16-17,41-51 PREFERRED/FALLBACK + DNS check",
+    "msKeywordFilter": "providers/modelscope.py:105 image|flux|kolors|z-image|sdxl",
+    "msCategories": "providers/modelscope.py:92-93 return ['image']",
+    "serverRoute": "server.py:695-706 /api/catalog; refresh=1 is pass for non-civitai",
+    "ui": "static/index.html:1276-1310 loadCatalog / backend switch; 850-853 matchRecipe by category"
+  },
+  "hardcodedIds": [
+    "black-forest-labs/FLUX.1-schnell",
+    "black-forest-labs/FLUX.1-dev",
+    "black-forest-labs/FLUX.1-Krea-dev",
+    "Qwen/Qwen-Image",
+    "Tongyi-MAI/Z-Image-Turbo",
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "tencent/HunyuanVideo",
+    "Lightricks/LTX-Video-0.9.8-13B-distilled",
+    "Qwen/Qwen-Image-Edit",
+    "MusePublic/Qwen-Image-Edit"
+  ],
+  "hardcodedHfIds": [
+    "black-forest-labs/FLUX.1-schnell",
+    "black-forest-labs/FLUX.1-dev",
+    "black-forest-labs/FLUX.1-Krea-dev",
+    "Qwen/Qwen-Image",
+    "Tongyi-MAI/Z-Image-Turbo",
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "tencent/HunyuanVideo",
+    "Lightricks/LTX-Video-0.9.8-13B-distilled"
+  ],
+  "hardcodedMsIds": [
+    "Qwen/Qwen-Image",
+    "Qwen/Qwen-Image-Edit",
+    "MusePublic/Qwen-Image-Edit",
+    "Tongyi-MAI/Z-Image-Turbo"
+  ],
+  "liveApiSamples": {
+    "hfT2iLimit100": {
+      "status": 200,
+      "pageHits": 100,
+      "websiteTotal": 109222
+    },
+    "hfT2vLimit100": {
+      "status": 200,
+      "pageHits": 100,
+      "websiteTotal": 2546
+    },
+    "hfI2vLimit100": {
+      "status": 200,
+      "pageHits": 100,
+      "websiteTotal": 1544
+    },
+    "msOpenapiT2iSynthesis": {
+      "status": 200,
+      "total_count": 94189,
+      "page_size": 50
+    },
+    "msInferenceV1Models": {
+      "status": 200,
+      "hits": 50,
+      "keywordHitsAlreadyInStub": 2
+    },
+    "msPreferredDns": {
+      "host": "api.modelscope.ai",
+      "ok": false
+    }
+  },
+  "serverPyModified": false
+}

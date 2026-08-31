@@ -1,0 +1,499 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - textToImage Recipe
+  description: OpenAPI specification for the textToImage built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/textToImage:
+    post:
+      tags:
+        - Recipes
+      summary: TextToImage
+      description: Generate images using text as input
+      operationId: InvokeTextToImageStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextToImageInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TextToImageInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TextToImageInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextToImageOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    ImageJobControlNet:
+      required:
+        - endStep
+        - preprocessor
+        - startStep
+        - weight
+      type: object
+      properties:
+        preprocessor:
+          $ref: '#/components/schemas/ImageTransformer'
+        weight:
+          type: number
+          description: A value representing the weight applied to the ControlNet.
+          format: double
+        startStep:
+          type: number
+          description: A value representing the start step selected for the ControlNet.
+          format: double
+        endStep:
+          type: number
+          description: A value representing the end step selected for the ControlNet.
+          format: double
+        image:
+          type:
+            - 'null'
+            - string
+          description: "The preprocessed control image. Accepts an AIR URN, a URL, or a base64 data URL; the\norchestrator processes it into a stored blob before the job is dispatched."
+        mask:
+          type:
+            - 'null'
+            - string
+          description: The inpaint mask image. Required when the preprocessor is Inpaint.
+      additionalProperties: false
+      description: Information for a controlnet provided for a text to image input.
+    ImageJobNetworkParams:
+      type: object
+      properties:
+        strength:
+          type:
+            - 'null'
+            - number
+          description: 'In case of Lora and LoCon, set the strength of the network'
+          format: double
+        triggerWord:
+          type:
+            - 'null'
+            - string
+          description: 'In case of a TextualInversion, set the trigger word of the network'
+        type:
+          type:
+            - 'null'
+            - string
+          description: A legacy type set by the consumer
+      additionalProperties: false
+    ImageTransformer:
+      enum:
+        - canny
+        - mlsd
+        - depthZoe
+        - depthAnything
+        - depthAnythingV2
+        - zoeDepthAnything
+        - zoeDepth
+        - midasDepth
+        - leresDepth
+        - metric3dDepth
+        - softedgePidinet
+        - hed
+        - teed
+        - midasNormal
+        - baeNormal
+        - dsineNormal
+        - metric3dNormal
+        - lineartRealistic
+        - lineartStandard
+        - lineartAnime
+        - lineartManga
+        - anyline
+        - scribble
+        - scribbleXdog
+        - scribblePidinet
+        - fakeScribble
+        - openpose
+        - dwpose
+        - oneformerCoco
+        - oneformerAde20k
+        - uniformer
+        - shuffle
+        - tile
+        - gray
+        - rembg
+        - inpaint
+      type: string
+      description: Available image transformers.
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    OutputFormat:
+      enum:
+        - png
+        - jpeg
+        - webP
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    Scheduler:
+      enum:
+        - eulerA
+        - euler
+        - lms
+        - heun
+        - dpM2
+        - dpM2A
+        - dpM2SA
+        - dpM2M
+        - dpmsde
+        - dpmFast
+        - dpmAdaptive
+        - lmsKarras
+        - dpM2Karras
+        - dpM2AKarras
+        - dpM2SAKarras
+        - dpM2MKarras
+        - dpmsdeKarras
+        - ddim
+        - plms
+        - uniPC
+        - undefined
+        - lcm
+        - ddpm
+        - deis
+        - dpM3MSDE
+      type: string
+      description: The available options for schedulers used in image generation.
+    TextToImageInput:
+      required:
+        - cfgScale
+        - prompt
+        - seed
+      type: object
+      properties:
+        quantity:
+          maximum: 100
+          minimum: 1
+          type: integer
+          description: The number of batches to run.
+          format: int32
+          default: 1
+        batchSize:
+          maximum: 100
+          minimum: 1
+          type: integer
+          description: The size of each batch
+          format: int32
+          default: 1
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type: string
+          description: The AIR of the checkpoint model to use for generation.
+          default: urn:air:sd1:checkpoint:civitai:4384@128713
+        additionalNetworks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ImageJobNetworkParams'
+          description: Get or set a associative list of additional networks. Use the AIR of the network as the key.
+        controlNets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageJobControlNet'
+          description: Get or set a associative list of ControlNets.
+        prompt:
+          type: string
+          description: The provided text prompt.
+        negativePrompt:
+          type:
+            - 'null'
+            - string
+          description: The provided negative text prompt.
+        scheduler:
+          $ref: '#/components/schemas/Scheduler'
+        steps:
+          maximum: 150
+          minimum: 1
+          type: integer
+          description: The number of steps for image generation.
+          format: int32
+          default: 30
+        cfgScale:
+          maximum: 30
+          minimum: 1
+          type: number
+          description: The CFG scale value for image generation.
+          format: double
+          default: 7.5
+        width:
+          maximum: 4084
+          minimum: 64
+          type: integer
+          description: The desired image width in pixels.
+          format: int32
+          default: 512
+        height:
+          maximum: 4084
+          minimum: 64
+          type: integer
+          description: The desired image height in pixels.
+          format: int32
+          default: 512
+        seed:
+          maximum: 4294967295
+          minimum: 0
+          type: integer
+          description: The seed to use in image generation. Defaults to a random value if left unpopulated.
+          format: int64
+        clipSkip:
+          type: integer
+          description: The clip skip value for image generation.
+          format: int32
+          default: 2
+        imageMetadata:
+          type:
+            - 'null'
+            - string
+          description: External metadata that will be stored with the image
+        engine:
+          type:
+            - 'null'
+            - string
+          description: An optional engine to use for generation.
+        outputFormat:
+          $ref: '#/components/schemas/OutputFormat'
+        sourceImage:
+          type:
+            - 'null'
+            - string
+          description: An optional source image to trigger img-to-img
+        sourceImageDenoiseStrenght:
+          type: number
+          description: The strength/denoise factor for img2img (0.0-1.0). Lower values preserve more of the source image.
+          format: double
+          default: 0.8
+      additionalProperties: false
+      description: Input for an text to image step.
+    TextToImageOutput:
+      required:
+        - images
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageBlob'
+          description: A collection of output images.
+      additionalProperties: false
+      description: Represents the output of a TextToImage workflow step.
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

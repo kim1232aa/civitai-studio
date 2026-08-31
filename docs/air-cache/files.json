@@ -1,0 +1,112 @@
+{
+  "definitely-not-a-real-civitai-weight-xyz123.safetensors": {
+    "filename": "definitely-not-a-real-civitai-weight-xyz123.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "face_yolov8m.pt": {
+    "filename": "face_yolov8m.pt",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "qwen_image_vae.safetensors": {
+    "filename": "qwen_image_vae.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "1xSkinContrast-High-SuperUltraCompact.pth": {
+    "filename": "1xSkinContrast-High-SuperUltraCompact.pth",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "4xNomosWebPhoto_RealPLKSR.pth": {
+    "filename": "4xNomosWebPhoto_RealPLKSR.pth",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors": {
+    "filename": "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "ema_vae_fp16.safetensors": {
+    "filename": "ema_vae_fp16.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "MysticXXX_KREA2_v3.safetensors": {
+    "filename": "MysticXXX_KREA2_v3.safetensors",
+    "air": "urn:air:krea2:lora:civitai:2728644@3116175",
+    "modelId": 2728644,
+    "versionId": 3116175,
+    "fileId": 2996388,
+    "status": "matched",
+    "ambiguous": false,
+    "modelType": "LORA",
+    "name": "[KREA 2] Mystic XXX"
+  },
+  "moody_girl_krea2_v4_000002500.safetensors": {
+    "filename": "moody_girl_krea2_v4_000002500.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "Moody-Krea-Mix-v7_00002__clean_fp8.safetensors": {
+    "filename": "Moody-Krea-Mix-v7_00002__clean_fp8.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "qwen3vl_4b_fp8_scaled.safetensors": {
+    "filename": "qwen3vl_4b_fp8_scaled.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  },
+  "zzzx_not_a_civitai_file_9f3aabb.safetensors": {
+    "filename": "zzzx_not_a_civitai_file_9f3aabb.safetensors",
+    "air": null,
+    "modelId": null,
+    "versionId": null,
+    "fileId": null,
+    "status": "unmatched",
+    "ambiguous": false
+  }
+}

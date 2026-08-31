@@ -1,0 +1,150 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - modelClamScan Recipe
+  description: OpenAPI specification for the modelClamScan built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/modelClamScan:
+    post:
+      tags:
+        - Recipes
+      summary: ModelClamScan
+      description: Runs ClamAV malware scanning against a model file.
+      operationId: InvokeModelClamScanStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelClamScanInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModelClamScanInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModelClamScanInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelClamScanOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ModelClamScanInput:
+      required:
+        - model
+      type: object
+      properties:
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type: string
+          description: The AIR of the model file to scan.
+      additionalProperties: false
+      description: Represents the input information needed for the ModelClamScan workflow step.
+    ModelClamScanOutput:
+      type: object
+      properties:
+        exitCode:
+          type:
+            - 'null'
+            - integer
+          description: The ClamAV scan exit code.
+          format: int32
+        output:
+          type:
+            - 'null'
+            - string
+          description: The raw ClamAV scan output.
+        status:
+          $ref: '#/components/schemas/ModelClamScanStatus'
+        infected:
+          type:
+            - 'null'
+            - boolean
+          description: True when ClamAV reported one or more infected files (exit code 1).
+        infectedFileCount:
+          type:
+            - 'null'
+            - integer
+          description: Number of infected files parsed from the ClamAV scan summary.
+          format: int32
+        scannedFileCount:
+          type:
+            - 'null'
+            - integer
+          description: 'Number of files scanned, parsed from the ClamAV scan summary.'
+          format: int32
+      additionalProperties: false
+      description: Represents the output information returned from the ModelClamScan workflow step.
+    ModelClamScanStatus:
+      enum:
+        - clean
+        - infected
+        - timeout
+        - error
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

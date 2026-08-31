@@ -1,0 +1,117 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - echo Recipe
+  description: OpenAPI specification for the echo built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/echo:
+    post:
+      tags:
+        - Recipes
+      summary: Echo
+      description: "A workflow step that takes a message string and retuns it.\n/// This step is intended for testing purposes."
+      operationId: InvokeEchoStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EchoInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/EchoInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/EchoInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EchoOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    EchoInput:
+      required:
+        - message
+      type: object
+      properties:
+        message:
+          type: string
+          description: The message to be returned in the output.
+      additionalProperties: false
+      description: Represents the input information needed for the Echo workflow step.
+    EchoOutput:
+      required:
+        - message
+      type: object
+      properties:
+        message:
+          type: string
+          description: The message to be returned.
+      additionalProperties: false
+      description: Represents the output information returned from the Echo workflow step.
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

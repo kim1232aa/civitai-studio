@@ -1,0 +1,642 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - mediaRating Recipe
+  description: OpenAPI specification for the mediaRating built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/mediaRating:
+    post:
+      tags:
+        - Recipes
+      summary: MediaRating
+      description: Performs NSFW level detection and content safety classification on media content.
+      operationId: InvokeMediaRatingStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaRatingInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/MediaRatingInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/MediaRatingInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaRatingOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AIRecognitionResult:
+      required:
+        - confidence
+        - label
+      type: object
+      properties:
+        label:
+          type: string
+          description: "Classification label, taken from the model's own id2label — AIorNot-SigLIP2 emits\n\"AI\"/\"Real\". Casing varies per model, so compare case-insensitively."
+        confidence:
+          type: number
+          description: Confidence in the classification given by Label (0.0 to 1.0) — not the probability of being AI.
+          format: double
+      additionalProperties: false
+      description: Represents AI vs real image recognition results.
+    AgeClassificationResult:
+      required:
+        - detections
+      type: object
+      properties:
+        detections:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgeDetection'
+          description: Array of detected people with age classifications.
+        status:
+          type:
+            - 'null'
+            - string
+        ran:
+          type:
+            - 'null'
+            - boolean
+        detector:
+          type:
+            - 'null'
+            - string
+        minorDetected:
+          type:
+            - 'null'
+            - boolean
+        error:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: Represents age classification results for media content.
+    AgeDetection:
+      required:
+        - ageLabel
+        - boundingBox
+        - confidence
+        - detectorType
+        - isMinor
+      type: object
+      properties:
+        detectorType:
+          type: string
+          description: 'The detector type used (e.g., "yolo", "mediapipe", "ensemble").'
+        boundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        ageLabel:
+          type: string
+          description: 'The age label (e.g., "adult", "child", "teen").'
+        confidence:
+          type: number
+          description: Confidence score for the age classification (0.0 to 1.0).
+          format: double
+        isMinor:
+          type: boolean
+          description: Whether the detected person is classified as a minor.
+        topK:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            type: number
+            format: double
+          description: "Full probability distribution across all age labels.\nKeys are age labels (e.g., \"Child 0-12\", \"Adult 21-44\"), values are confidence scores (0.0 to 1.0)."
+      additionalProperties: false
+      description: Represents a single age detection in an image.
+    AnimeBodyAgeClassificationResult:
+      required:
+        - ageBand
+        - apparentAge
+        - childDetected
+        - minorDetected
+        - oodDetected
+        - oodProbability
+        - ordinalCutpointProbabilities
+        - under13Probability
+        - under18Probability
+      type: object
+      properties:
+        apparentAge:
+          type: number
+          format: double
+        ageBand:
+          type: string
+        under13Probability:
+          type: number
+          format: double
+        under18Probability:
+          type: number
+          format: double
+        oodProbability:
+          type: number
+          format: double
+        ordinalCutpointProbabilities:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        childDetected:
+          type: boolean
+        minorDetected:
+          type: boolean
+        oodDetected:
+          type: boolean
+        status:
+          type:
+            - 'null'
+            - string
+        ran:
+          type:
+            - 'null'
+            - boolean
+        warning:
+          type:
+            - 'null'
+            - string
+        error:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: "Represents anime apparent-age and child-risk results for a complete image.\nThe model is an additional risk signal, not a verified chronological-age claim."
+    AnimeRecognitionResult:
+      required:
+        - confidence
+        - label
+      type: object
+      properties:
+        label:
+          type: string
+          description: 'Classification label: "anime" or "real".'
+        confidence:
+          type: number
+          description: Confidence score for the classification (0.0 to 1.0).
+          format: double
+      additionalProperties: false
+      description: Represents anime vs real image recognition results.
+    BodyAgeClassificationResult:
+      required:
+        - detections
+      type: object
+      properties:
+        detections:
+          type: array
+          items:
+            $ref: '#/components/schemas/BodyAgeDetection'
+        status:
+          type:
+            - 'null'
+            - string
+        ran:
+          type:
+            - 'null'
+            - boolean
+        childDetected:
+          type:
+            - 'null'
+            - boolean
+        minorDetected:
+          type:
+            - 'null'
+            - boolean
+        oodDetected:
+          type:
+            - 'null'
+            - boolean
+        error:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: "Represents body-only apparent-age and child-risk results for media content.\nThe model is an additional risk signal, not a verified chronological-age claim."
+    BodyAgeDetection:
+      required:
+        - ageBand
+        - apparentAge
+        - boundingBox
+        - headGeometrySource
+        - isChild
+        - isMinor
+        - isOod
+        - oodProbability
+        - personDetected
+        - personDetectionConfidence
+        - under13Probability
+        - under13ViewProbabilities
+        - under18Probability
+      type: object
+      properties:
+        boundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        personDetected:
+          type: boolean
+        personDetectionConfidence:
+          type: number
+          format: double
+        faceBoundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        faceDetectionConfidence:
+          type:
+            - 'null'
+            - number
+          format: double
+        headGeometrySource:
+          type: string
+        apparentAge:
+          type: number
+          format: double
+        ageBand:
+          type: string
+        under13Probability:
+          type: number
+          format: double
+        under18Probability:
+          type: number
+          format: double
+        oodProbability:
+          type: number
+          format: double
+        under13ViewProbabilities:
+          type: array
+          items:
+            type: number
+            format: double
+        isChild:
+          type: boolean
+        isMinor:
+          type: boolean
+        isOod:
+          type: boolean
+      additionalProperties: false
+      description: Represents one body-only age estimate for a detected person.
+    BoundingBox:
+      required:
+        - x1
+        - x2
+        - y1
+        - y2
+      type: object
+      properties:
+        x1:
+          type: number
+          format: double
+        y1:
+          type: number
+          format: double
+        x2:
+          type: number
+          format: double
+        y2:
+          type: number
+          format: double
+      additionalProperties: false
+      description: Represents a bounding box with coordinates.
+    FaceDetection:
+      required:
+        - boundingBox
+      type: object
+      properties:
+        boundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        landmarks:
+          type:
+            - 'null'
+            - object
+          additionalProperties:
+            $ref: '#/components/schemas/ValueTupleOfDoubleAndDouble'
+          description: "Facial landmarks (e.g., eyes, nose, mouth positions).\nDictionary keys are landmark names, values are (x, y) coordinates."
+        embedding:
+          type:
+            - 'null'
+            - array
+          items:
+            type: number
+            format: double
+          description: Face embedding vector for similarity comparison.
+      additionalProperties: false
+      description: Represents a single face detection with embeddings and landmarks.
+    FaceRecognitionResult:
+      required:
+        - faces
+      type: object
+      properties:
+        faces:
+          type: array
+          items:
+            $ref: '#/components/schemas/FaceDetection'
+          description: Array of detected faces with embeddings and landmarks.
+        similarityMatrix:
+          type:
+            - 'null'
+            - array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+          description: "Pairwise cosine similarity matrix between detected faces.\nMatrix[i][j] represents similarity between face i and face j."
+      additionalProperties: false
+      description: Represents face recognition results for media content.
+    HumanRecognitionResult:
+      required:
+        - confidence
+        - humanScore
+        - label
+        - noHumanScore
+      type: object
+      properties:
+        label:
+          type: string
+          description: 'Classification label: "human" or "no_human".'
+        confidence:
+          type: number
+          description: Confidence score for the selected classification (0.0 to 1.0).
+          format: double
+        humanScore:
+          type: number
+          description: Aggregated probability that the image contains a human.
+          format: double
+        noHumanScore:
+          type: number
+          description: Aggregated probability that the image does not contain a human.
+          format: double
+      additionalProperties: false
+      description: Represents human vs non-human image recognition results.
+    JointAgeClassificationResult:
+      required:
+        - detections
+      type: object
+      properties:
+        detections:
+          type: array
+          items:
+            $ref: '#/components/schemas/JointAgeDetection'
+        status:
+          type:
+            - 'null'
+            - string
+        ran:
+          type:
+            - 'null'
+            - boolean
+        childDetected:
+          type:
+            - 'null'
+            - boolean
+        minorDetected:
+          type:
+            - 'null'
+            - boolean
+        oodDetected:
+          type:
+            - 'null'
+            - boolean
+        error:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: Represents joint face-and-body apparent-age results for photo and anime content.
+    JointAgeDetection:
+      required:
+        - ageBand
+        - animeProbability
+        - apparentAge
+        - boundingBox
+        - domain
+        - isChild
+        - isMinor
+        - isOod
+        - oodProbability
+        - ordinalCutpointProbabilities
+        - personDetected
+        - personDetectionConfidence
+        - under13Probability
+        - under18Probability
+      type: object
+      properties:
+        boundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        personDetected:
+          type: boolean
+        personDetectionConfidence:
+          type: number
+          format: double
+        faceBoundingBox:
+          $ref: '#/components/schemas/BoundingBox'
+        faceDetectionConfidence:
+          type:
+            - 'null'
+            - number
+          format: double
+        domain:
+          type: string
+        animeProbability:
+          type: number
+          format: double
+        apparentAge:
+          type: number
+          format: double
+        ageBand:
+          type: string
+        under13Probability:
+          type: number
+          format: double
+        under18Probability:
+          type: number
+          format: double
+        oodProbability:
+          type: number
+          format: double
+        ordinalCutpointProbabilities:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        isChild:
+          type: boolean
+        isMinor:
+          type: boolean
+        isOod:
+          type: boolean
+        warning:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: Represents one photo-or-anime age estimate for a detected person.
+    MediaRatingInput:
+      required:
+        - includeAgeClassification
+        - includeAIRecognition
+        - includeAnimeBodyAgeClassification
+        - includeAnimeRecognition
+        - includeBodyAgeClassification
+        - includeFaceRecognition
+        - includeHumanRecognition
+        - includeJointAgeClassification
+      type: object
+      properties:
+        image:
+          type:
+            - 'null'
+            - string
+          description: "The image to rate. Pre-processed in the API layer — imported into blob storage so the\nworker can pre-fetch it as a declared resource. After processing, contains the blob AIR URL."
+        includeAgeClassification:
+          type: boolean
+          description: "Include conditional age-classification details for R-or-higher content in the results.\nThe top-level CSAM signal is evaluated regardless of this setting."
+        includeFaceRecognition:
+          type: boolean
+          description: Include face recognition and similarity analysis in the results
+        includeAIRecognition:
+          type: boolean
+          description: Include AI vs real image detection in the results
+        includeAnimeRecognition:
+          type: boolean
+          description: Include anime vs real image detection in the results
+        includeHumanRecognition:
+          type: boolean
+          description: Include human vs non-human detection in the results
+        includeBodyAgeClassification:
+          type: boolean
+          description: Include body-only apparent-age and child-risk classification in the results.
+        includeAnimeBodyAgeClassification:
+          type: boolean
+          description: Include anime apparent-age and child-risk classification in the results.
+        includeJointAgeClassification:
+          type: boolean
+          description: Include joint face-and-body apparent-age classification for photo and anime content.
+      additionalProperties: false
+      description: Represents the input information needed for the MediaRating workflow step.
+    MediaRatingOutput:
+      required:
+        - isBlocked
+        - nsfwLevel
+      type: object
+      properties:
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: 'The reason the content was blocked, if any.'
+        isBlocked:
+          type: boolean
+          description: Whether the content is blocked.
+        labels:
+          uniqueItems: true
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+          description: 'Detected content labels (e.g., "Animal", "Child", etc.).'
+        ageClassification:
+          $ref: '#/components/schemas/AgeClassificationResult'
+        faceRecognition:
+          $ref: '#/components/schemas/FaceRecognitionResult'
+        aiRecognition:
+          $ref: '#/components/schemas/AIRecognitionResult'
+        animeRecognition:
+          $ref: '#/components/schemas/AnimeRecognitionResult'
+        csam:
+          type:
+            - 'null'
+            - boolean
+          description: "Potential CSAM signal from conditional age classification on R-or-higher content.\nNull means the image was below R or age classification failed."
+        humanRecognition:
+          $ref: '#/components/schemas/HumanRecognitionResult'
+        bodyAgeClassification:
+          $ref: '#/components/schemas/BodyAgeClassificationResult'
+        animeBodyAgeClassification:
+          $ref: '#/components/schemas/AnimeBodyAgeClassificationResult'
+        jointAgeClassification:
+          $ref: '#/components/schemas/JointAgeClassificationResult'
+      additionalProperties: false
+      description: Represents the output information returned from the MediaRating workflow step.
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    ValueTupleOfDoubleAndDouble:
+      type: object
+      additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

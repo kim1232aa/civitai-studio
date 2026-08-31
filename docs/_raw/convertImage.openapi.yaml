@@ -1,0 +1,475 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - convertImage Recipe
+  description: OpenAPI specification for the convertImage built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/convertImage:
+    post:
+      tags:
+        - Recipes
+      summary: A workflow step that converts images to different formats and applies optional transforms.
+      operationId: InvokeConvertImageStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertImageInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ConvertImageInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ConvertImageInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConvertImageOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    BlurRegion:
+      required:
+        - x1
+        - x2
+        - y1
+        - y2
+      type: object
+      properties:
+        x1:
+          type: integer
+          description: Left edge X coordinate in pixels.
+          format: int32
+        y1:
+          type: integer
+          description: Top edge Y coordinate in pixels.
+          format: int32
+        x2:
+          type: integer
+          description: Right edge X coordinate in pixels.
+          format: int32
+        y2:
+          type: integer
+          description: Bottom edge Y coordinate in pixels.
+          format: int32
+      additionalProperties: false
+      description: A rectangular region defined by pixel coordinates.
+    BlurRegionMode:
+      enum:
+        - include
+        - exclude
+      type: string
+      description: Determines how regions are applied to the blur operation.
+    BlurTransform:
+      allOf:
+        - $ref: '#/components/schemas/ImageTransform'
+        - required:
+            - blur
+            - mode
+            - type
+          type: object
+          properties:
+            blur:
+              maximum: 100
+              minimum: 1
+              type: integer
+              description: The blur intensity (1-100).
+              format: int32
+            mode:
+              $ref: '#/components/schemas/BlurRegionMode'
+            regions:
+              type: array
+              items:
+                $ref: '#/components/schemas/BlurRegion'
+              description: Rectangular regions that define the blur mask.
+            type:
+              enum:
+                - blur
+              type: string
+          additionalProperties: false
+      description: Applies a Gaussian blur with optional region-based masking.
+    ConvertImageInput:
+      required:
+        - image
+        - output
+      type: object
+      properties:
+        image:
+          type: string
+          description: The source image to convert.
+        transforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageTransform'
+          description: "Optional list of transforms to apply to the image before conversion.\nTransforms are applied in order."
+        output:
+          $ref: '#/components/schemas/ImageOutputFormat'
+        public:
+          type:
+            - 'null'
+            - boolean
+          description: "Stores the result in a bucket that serves it directly, so the returned url is stable and\nunsigned rather than presigned — a CDN can cache it, and reading it never touches the\norchestrator. Restricted to privileged callers: nothing gates a read of that url, so no NSFW\nlevel, blocked reason or mature-content restriction applies to it, and a block decided after\nthe fact cannot take it back."
+      additionalProperties: false
+      description: Input configuration for the ConvertImage workflow step.
+    ConvertImageOutput:
+      type: object
+      properties:
+        blob:
+          $ref: '#/components/schemas/ImageBlob'
+      additionalProperties: false
+      description: Output from the ConvertImage workflow step.
+    GifOutputFormat:
+      allOf:
+        - $ref: '#/components/schemas/ImageOutputFormat'
+        - required:
+            - format
+          type: object
+          properties:
+            maxFrames:
+              type:
+                - 'null'
+                - integer
+              description: "Maximum number of frames to include in the output. Set to 1 to extract only the first frame from animated images.\nWhen null, all frames are preserved."
+              format: int32
+            format:
+              enum:
+                - gif
+              type: string
+          additionalProperties: false
+      description: GIF output format configuration.
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    ImageOutputFormat:
+      required:
+        - format
+        - hideMetadata
+      type: object
+      properties:
+        format:
+          type: string
+        hideMetadata:
+          type: boolean
+          description: "When true, metadata such as EXIF data will be stripped from the output image. Defaults to false.\nNote that some formats like JPEG may still include minimal metadata even when this is false, due to encoder behavior.\nSetting this to true will attempt to remove all metadata, but results may vary by format and encoder implementation."
+      additionalProperties: false
+      description: Base class for image output formats. Uses "format" as the type discriminator.
+      discriminator:
+        propertyName: format
+        mapping:
+          jpeg: '#/components/schemas/JpegOutputFormat'
+          png: '#/components/schemas/PngOutputFormat'
+          webp: '#/components/schemas/WebpOutputFormat'
+          gif: '#/components/schemas/GifOutputFormat'
+    ImageTransform:
+      required:
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+      additionalProperties: false
+      description: Base class for image transforms that can be applied during image conversion.
+      discriminator:
+        propertyName: type
+        mapping:
+          resize: '#/components/schemas/ResizeTransform'
+          blur: '#/components/schemas/BlurTransform'
+    JpegOutputFormat:
+      allOf:
+        - $ref: '#/components/schemas/ImageOutputFormat'
+        - required:
+            - format
+          type: object
+          properties:
+            quality:
+              maximum: 100
+              minimum: 1
+              type: integer
+              description: Quality setting for JPEG compression (1-100). Higher values produce better quality but larger files.
+              format: int32
+              default: 85
+            format:
+              enum:
+                - jpeg
+              type: string
+          additionalProperties: false
+      description: JPEG output format configuration.
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    PngOutputFormat:
+      allOf:
+        - $ref: '#/components/schemas/ImageOutputFormat'
+        - required:
+            - format
+          type: object
+          properties:
+            format:
+              enum:
+                - png
+              type: string
+          additionalProperties: false
+      description: PNG output format configuration.
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    ResizeTransform:
+      allOf:
+        - $ref: '#/components/schemas/ImageTransform'
+        - required:
+            - type
+          type: object
+          properties:
+            targetWidth:
+              maximum: 4096
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: Target width in pixels. Height is calculated to maintain aspect ratio.
+              format: int32
+            type:
+              enum:
+                - resize
+              type: string
+          additionalProperties: false
+      description: Resizes an image to a target width while maintaining aspect ratio.
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+    WebpOutputFormat:
+      allOf:
+        - $ref: '#/components/schemas/ImageOutputFormat'
+        - required:
+            - format
+          type: object
+          properties:
+            quality:
+              maximum: 100
+              minimum: 1
+              type: integer
+              description: Quality setting for WebP compression (1-100). Only applies when Lossless is false.
+              format: int32
+              default: 85
+            lossless:
+              type: boolean
+              description: 'When true, uses lossless compression. When false, uses lossy compression with the Quality setting.'
+              default: false
+            maxFrames:
+              type:
+                - 'null'
+                - integer
+              description: "Maximum number of frames to include in the output. Set to 1 to extract only the first frame from animated images.\nWhen null, all frames are preserved."
+              format: int32
+            format:
+              enum:
+                - webp
+              type: string
+          additionalProperties: false
+      description: WebP output format configuration.
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

@@ -1,0 +1,221 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - qwenImageBench Recipe
+  description: OpenAPI specification for the qwenImageBench built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/qwenImageBench:
+    post:
+      tags:
+        - Recipes
+      summary: Qwen Image Bench
+      description: Scores generated images against their prompts using Qwen-Image-Bench.
+      operationId: InvokeQwenImageBenchStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QwenImageBenchInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/QwenImageBenchInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/QwenImageBenchInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QwenImageBenchOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    QwenImageBenchInput:
+      required:
+        - dimensions
+        - items
+      type: object
+      properties:
+        items:
+          minItems: 1
+          type: array
+          items:
+            $ref: '#/components/schemas/QwenImageBenchItem'
+          description: Prompt/image pairs to score. Each item is evaluated independently.
+        model:
+          type: string
+          description: The AIR model to use for the benchmark judge.
+          default: urn:air:qwen3:repository:huggingface:Civitai/Qwen-Image-Bench-AutoRound-AWQ-INT4@main.tar
+        maxTokens:
+          maximum: 128000
+          minimum: 1
+          type: integer
+          description: Maximum number of tokens to generate.
+          format: int32
+          default: 2048
+        seed:
+          type: integer
+          description: Deterministic seed. The model card recommends 42.
+          format: int64
+          default: 42
+        dimensions:
+          type: array
+          items:
+            type: string
+          description: Top-level benchmark dimensions to evaluate. Leave empty to evaluate all dimensions.
+      additionalProperties: false
+      description: Input for evaluating generated images with Qwen-Image-Bench.
+    QwenImageBenchItem:
+      required:
+        - id
+        - image
+        - prompt
+      type: object
+      properties:
+        id:
+          minLength: 1
+          type: string
+          description: Stable caller-provided identifier used as the output key.
+        prompt:
+          minLength: 1
+          type: string
+          description: The text prompt used to generate the image.
+        image:
+          type: string
+          description: The generated image to evaluate.
+      additionalProperties: false
+      description: A single generated image and the prompt it should be judged against.
+    QwenImageBenchItemResult:
+      required:
+        - errors
+        - fieldScores
+        - scores
+      type: object
+      properties:
+        fieldScores:
+          type: object
+          additionalProperties:
+            type:
+              - 'null'
+              - number
+            format: double
+          description: 'Top-level benchmark dimension scores, mapped to the benchmark 0/60/100 scale.'
+        totalScore:
+          type:
+            - 'null'
+            - number
+          description: Average of the available top-level field scores.
+          format: double
+        scores:
+          type: array
+          items:
+            $ref: '#/components/schemas/QwenImageBenchScoreNode'
+          description: Recursive score tree derived from the model output.
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Parse errors keyed by benchmark dimension.
+        error:
+          type:
+            - 'null'
+            - string
+          description: 'Parse or retrieval error, if the score could not be read.'
+      additionalProperties: false
+      description: Score output for one evaluated image.
+    QwenImageBenchOutput:
+      required:
+        - results
+      type: object
+      properties:
+        results:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/QwenImageBenchItemResult'
+          description: Results keyed by the caller-provided item id.
+      additionalProperties: false
+      description: Scores returned by Qwen-Image-Bench.
+    QwenImageBenchScoreNode:
+      required:
+        - children
+        - name
+      type: object
+      properties:
+        name:
+          type: string
+        score:
+          type:
+            - 'null'
+            - number
+          format: double
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/QwenImageBenchScoreNode'
+      additionalProperties: false
+      description: A benchmark dimension or sub-dimension score.
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

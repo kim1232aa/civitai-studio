@@ -1,0 +1,524 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - imageResourceTraining Recipe
+  description: OpenAPI specification for the imageResourceTraining built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/imageResourceTraining:
+    post:
+      tags:
+        - Recipes
+      summary: LORA Training
+      description: Train LORA's
+      operationId: InvokeImageResourceTrainingStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageResourceTrainingInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ImageResourceTrainingInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ImageResourceTrainingInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageResourceTrainingOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    EpochResult:
+      required:
+        - blobName
+        - blobUrl
+        - epochNumber
+        - sampleImages
+      type: object
+      properties:
+        epochNumber:
+          type: integer
+          format: int32
+        blobName:
+          type: string
+          description: Get the name of the generated epoch assets
+        blobSize:
+          type:
+            - 'null'
+            - integer
+          description: Get the total size in bytes of the asset
+          format: int64
+        sampleImages:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Get a list of the names of the blobs that represent sample images
+        blobUrl:
+          type: string
+          description: A presigned url that points to the epoch file
+          format: uri
+      additionalProperties: false
+      description: An epock result.
+    Flux2DevEditImageResourceTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageResourceTrainingInput'
+        - required:
+            - engine
+          type: object
+          properties:
+            steps:
+              maximum: 10000
+              minimum: 100
+              type: integer
+              description: Number of training steps. Must be in increments of 100.
+              format: int32
+              default: 1000
+            learningRate:
+              type: number
+              description: Learning rate for training.
+              format: double
+              default: 0.00005
+            defaultCaption:
+              type:
+                - 'null'
+                - string
+              description: Default caption to use if caption files are missing from training data.
+            referenceImageCount:
+              maximum: 4
+              minimum: 1
+              type: integer
+              description: "Number of reference images per training pair (1-4).\nAffects cost calculation via reference multiplier."
+              format: int32
+              default: 1
+            engine:
+              enum:
+                - flux2-dev-edit
+              type: string
+          additionalProperties: false
+      description: Input for Flux 2 Dev image editing LoRA training via FAL.
+    Flux2DevImageResourceTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageResourceTrainingInput'
+        - required:
+            - engine
+          type: object
+          properties:
+            steps:
+              maximum: 10000
+              minimum: 100
+              type: integer
+              description: Number of training steps. Must be in increments of 100.
+              format: int32
+              default: 1000
+            learningRate:
+              type: number
+              description: Learning rate for training.
+              format: double
+              default: 0.00005
+            defaultCaption:
+              type:
+                - 'null'
+                - string
+              description: Default caption to use if caption files are missing from training data.
+            engine:
+              enum:
+                - flux2-dev
+              type: string
+          additionalProperties: false
+      description: Input for Flux 2 Dev text-to-image LoRA training via FAL.
+    FluxDevFastImageResourceTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageResourceTrainingInput'
+        - required:
+            - engine
+          type: object
+          properties:
+            engine:
+              enum:
+                - flux-dev-fast
+              type: string
+          additionalProperties: false
+    ImageResouceTrainingModerationStatus:
+      enum:
+        - evaluating
+        - underReview
+        - approved
+        - rejected
+      type: string
+    ImageResourceTrainingInput:
+      required:
+        - engine
+        - model
+        - trainingData
+        - trainingDataImagesCount
+      type: object
+      properties:
+        engine:
+          type: string
+        model:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type: string
+          description: The primary model to train upon.
+        trainingData:
+          type: string
+          description: A url referring data to use in training.
+          format: uri
+        trainingDataImagesCount:
+          type: integer
+          description: The number of images embedded in this training data. This is used to calculate the cost of training.
+          format: int32
+        loraName:
+          type: string
+          description: The desired lora name.
+          default: my-lora
+        samplePrompts:
+          type: array
+          items:
+            type: string
+          description: A selection of sample prompts.
+        negativePrompt:
+          type:
+            - 'null'
+            - string
+          description: An optional negative prompt that will get applied when generating samples
+      additionalProperties: false
+      description: Input for an image resource training step.
+      discriminator:
+        propertyName: engine
+        mapping:
+          kohya: '#/components/schemas/KohyaImageResourceTrainingInput'
+          flux-dev-fast: '#/components/schemas/FluxDevFastImageResourceTrainingInput'
+          musubi: '#/components/schemas/MusubiImageResourceTrainingInput'
+          flux2-dev: '#/components/schemas/Flux2DevImageResourceTrainingInput'
+          flux2-dev-edit: '#/components/schemas/Flux2DevEditImageResourceTrainingInput'
+    ImageResourceTrainingOutput:
+      required:
+        - epochs
+        - moderationStatus
+        - sampleImagesPrompts
+      type: object
+      properties:
+        moderationStatus:
+          $ref: '#/components/schemas/ImageResouceTrainingModerationStatus'
+        epochs:
+          type: array
+          items:
+            $ref: '#/components/schemas/EpochResult'
+          description: An array of epochs.
+        sampleImagesPrompts:
+          type: array
+          items:
+            type: string
+          description: The selected prompts for sample images
+        sampleInputImages:
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+            format: uri
+          description: The selected images for sample images
+        storedAsAssets:
+          type:
+            - 'null'
+            - boolean
+          description: "Get wether the blobs are actually stored as assets\nAssets are deprecated and require a different retrieval mechanism"
+        eta:
+          type:
+            - 'null'
+            - number
+          description: Get an estimate in minutes on how long the work is expected to take
+          format: double
+      additionalProperties: false
+    KohyaImageResourceTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageResourceTrainingInput'
+        - required:
+            - engine
+          type: object
+          properties:
+            maxTrainEpochs:
+              maximum: 20
+              minimum: 0
+              type: integer
+              description: 'An epoch is one set of learning. By default, we will save a maximum of 20 epochs (evenly distributed), and they are all available for download.'
+              format: int32
+              default: 5
+            numRepeats:
+              maximum: 5000
+              minimum: 1
+              type: integer
+              description: 'Num Repeats defines how many times each individual image gets put into VRAM. As opposed to batch size, which is how many images are placed into VRAM at once.'
+              format: int32
+              default: 8
+            trainBatchSize:
+              maximum: 9
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: 'Batch size is the number of images that will be placed into VRAM at once. A batch size of 2 will train two images at a time, simultaneously.'
+              format: int32
+            resolution:
+              maximum: 1024
+              minimum: 512
+              type:
+                - 'null'
+                - integer
+              description: 'Specify the maximum resolution of training images. If the training images exceed the resolution specified here, they will be scaled down to this resolution'
+              format: int32
+            enableBucket:
+              type: boolean
+              description: 'Sorts images into buckets by size for the purposes of training. If your training images are all the same size, you can turn this option off, but leaving it on has no effect.'
+              default: true
+            shuffleCaption:
+              type: boolean
+              description: 'Randomly changes the order of your tags during training. The intent of shuffling is to improve learning. If you are using captions (sentences), this option has no meaning.'
+              default: false
+            keepTokens:
+              maximum: 3
+              minimum: 0
+              type: integer
+              description: "If your training images have tags, you can randomly shuffle them.\nHowever, if you have words that you want to keep at the beginning, you can use this option to specify \"Keep the first 0 words at the beginning\".\nThis option does nothing if the Shuffle Tags option is off."
+              format: int32
+              default: 0
+            clipSkip:
+              maximum: 4
+              minimum: 1
+              type: integer
+              description: 'Determines which layer''s vector output will be used. There are 12 layers, and setting the skip will select "xth from the end" of the total layers. For anime, we use 2. For everything else, 1.'
+              format: int32
+              default: 1
+            flipAugmentation:
+              type: boolean
+              description: 'If this option is turned on, the image will be horizontally flipped randomly. It can learn left and right angles, which is useful when you want to learn symmetrical people and objects.'
+              default: false
+            unetLR:
+              maximum: 1
+              minimum: 0
+              type: number
+              description: Sets the learning rate for U-Net. This is the learning rate when performing additional learning on each attention block (and other blocks depending on the setting) in U-Net
+              format: double
+              default: 0.00005
+            textEncoderLR:
+              maximum: 1
+              minimum: 0
+              type: number
+              description: Sets the learning rate for the text encoder. The effect of additional training on text encoders affects the entire U-Net.
+              format: double
+              default: 0.00005
+            lrScheduler:
+              enum:
+                - constant
+                - cosine
+                - cosine_with_restarts
+                - linear
+              type:
+                - 'null'
+                - string
+              description: You can change the learning rate in the middle of learning. A scheduler is a setting for how to change the learning rate.
+            lrSchedulerNumCycles:
+              maximum: 4
+              minimum: 1
+              type: integer
+              description: This option specifies how many cycles the scheduler runs during training. It is only used when "cosine_with_restarts" or "polynomial" is used as the scheduler.
+              format: int32
+              default: 3
+            minSnrGamma:
+              maximum: 20
+              minimum: 0
+              type:
+                - 'null'
+                - integer
+              description: "Learning is performed by putting noise of various strengths on the training image,\nbut depending on the difference in strength of the noise on which it is placed, learning will be\nstable by moving closer to or farther from the learning target.\n            \nMin SNR gamma was introduced to compensate for that. When learning images have little noise,\nit may deviate greatly from the target, so try to suppress this jump."
+              format: int32
+            networkDim:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: 'The larger the Dim setting, the more learning information can be stored, but the possibility of learning unnecessary information other than the learning target increases. A larger Dim also increases LoRA file size.'
+              format: int32
+            networkAlpha:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "The smaller the Network alpha value, the larger the stored LoRA neural net weights.\nFor example, with an Alpha of 16 and a Dim of 32, the strength of the weight used is 16/32 = 0.5,\nmeaning that the learning rate is only half as powerful as the Learning Rate setting.\n            \nIf Alpha and Dim are the same number, the strength used will be 1 and will have no effect on the learning rate."
+              format: int32
+            noiseOffset:
+              maximum: 1
+              minimum: 0
+              type:
+                - 'null'
+                - number
+              description: Adds noise to training images. 0 adds no noise at all. A value of 1 adds strong noise.
+              format: double
+            optimizerType:
+              type:
+                - 'null'
+                - string
+              description: "The optimizer determines how to update the neural net weights during training.\nVarious methods have been proposed for smart learning, but the most commonly used in LoRA learning\nis \"AdamW8bit\" or \"Adafactor\" for SDXL."
+            targetSteps:
+              type:
+                - 'null'
+                - integer
+              format: int32
+              readOnly: true
+            engine:
+              enum:
+                - kohya
+              type: string
+          additionalProperties: false
+    MusubiImageResourceTrainingInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageResourceTrainingInput'
+        - required:
+            - engine
+          type: object
+          properties:
+            epochs:
+              maximum: 20
+              minimum: 0
+              type: integer
+              description: "Number of training epochs. An epoch is one complete pass through the training dataset.\nMaximum of 20 epochs can be specified."
+              format: int32
+              default: 5
+            resolution:
+              maximum: 1024
+              minimum: 512
+              type:
+                - 'null'
+                - integer
+              description: 'Specify the maximum resolution of training images. If the training images exceed the resolution specified here, they will be scaled down to this resolution'
+              format: int32
+            enableBucket:
+              type: boolean
+              description: 'Sorts images into buckets by size for the purposes of training. If your training images are all the same size, you can turn this option off, but leaving it on has no effect.'
+              default: true
+            unetLR:
+              maximum: 1
+              minimum: 0
+              type: number
+              description: Sets the learning rate for U-Net. This is the learning rate when performing additional learning on each attention block (and other blocks depending on the setting) in U-Net
+              format: double
+              default: 0.00005
+            lrScheduler:
+              enum:
+                - constant
+                - cosine
+                - cosine_with_restarts
+                - linear
+              type:
+                - 'null'
+                - string
+              description: You can change the learning rate in the middle of learning. A scheduler is a setting for how to change the learning rate.
+            lrSchedulerNumCycles:
+              maximum: 4
+              minimum: 1
+              type: integer
+              description: This option specifies how many cycles the scheduler runs during training. It is only used when "cosine_with_restarts" or "polynomial" is used as the scheduler.
+              format: int32
+              default: 3
+            networkDim:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: 'The larger the Dim setting, the more learning information can be stored, but the possibility of learning unnecessary information other than the learning target increases. A larger Dim also increases LoRA file size.'
+              format: int32
+            networkAlpha:
+              maximum: 256
+              minimum: 1
+              type:
+                - 'null'
+                - integer
+              description: "The smaller the Network alpha value, the larger the stored LoRA neural net weights.\nFor example, with an Alpha of 16 and a Dim of 32, the strength of the weight used is 16/32 = 0.5,\nmeaning that the learning rate is only half as powerful as the Learning Rate setting.\n            \nIf Alpha and Dim are the same number, the strength used will be 1 and will have no effect on the learning rate."
+              format: int32
+            optimizerType:
+              type:
+                - 'null'
+                - string
+              description: "The optimizer determines how to update the neural net weights during training.\nVarious methods have been proposed for smart learning, but the most commonly used in LoRA learning\nis \"AdamW8bit\" or \"Adafactor\" for SDXL."
+            targetSteps:
+              type:
+                - 'null'
+                - integer
+              format: int32
+              readOnly: true
+            engine:
+              enum:
+                - musubi
+              type: string
+          additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

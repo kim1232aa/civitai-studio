@@ -1,0 +1,535 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - textToSpeech Recipe
+  description: OpenAPI specification for the textToSpeech built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/textToSpeech:
+    post:
+      tags:
+        - Recipes
+      summary: Text-to-Speech
+      description: 'Synthesizes speech from text, supporting both voice cloning (Base mode with reference audio) and built-in speakers (CustomVoice mode).'
+      operationId: InvokeTextToSpeechStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextToSpeechInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TextToSpeechInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TextToSpeechInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextToSpeechOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    CustomTextToSpeechInput:
+      allOf:
+        - $ref: '#/components/schemas/TextToSpeechInput'
+        - required:
+            - engine
+            - xVectorOnlyMode
+          type: object
+          properties:
+            refAudioUrl:
+              type:
+                - 'null'
+                - string
+              description: "Reference audio URL for Base voice-cloning mode.\nAccepts AIR URNs (existing resources) or HTTP(S) URLs."
+              format: uri
+            refText:
+              type:
+                - 'null'
+                - string
+              description: "Transcript of the reference audio.\nRequired for Base mode unless XVectorOnlyMode is true."
+            xVectorOnlyMode:
+              type: boolean
+              description: 'If true, uses only speaker embedding for Base mode (ref_text not required).'
+            speaker:
+              enum:
+                - aiden
+                - dylan
+                - eric
+                - ono_anna
+                - ryan
+                - serena
+                - sohee
+                - uncle_fu
+                - vivian
+              type:
+                - 'null'
+                - string
+              description: Built-in speaker name for CustomVoice mode.
+            instruct:
+              type:
+                - 'null'
+                - string
+              description: Optional style instruction for CustomVoice mode.
+            maxNewTokens:
+              type:
+                - 'null'
+                - integer
+              description: Optional generation cap for max tokens.
+              format: int32
+            engine:
+              enum:
+                - custom
+              type: string
+          additionalProperties: false
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    OmniVoiceTextToSpeechInput:
+      allOf:
+        - $ref: '#/components/schemas/VllmOmniTextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            refAudioUrl:
+              type:
+                - 'null'
+                - string
+              description: Reference audio AIR URN or external URL for voice cloning.
+              format: uri
+            refText:
+              type:
+                - 'null'
+                - string
+              description: Transcript of the reference audio.
+            instruct:
+              type:
+                - 'null'
+                - string
+              description: Optional voice/style instruction.
+            ecosystem:
+              enum:
+                - omnivoice
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    Qwen3BaseTTSInput:
+      allOf:
+        - $ref: '#/components/schemas/Qwen3TextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+            - operation
+            - xVectorOnlyMode
+          type: object
+          properties:
+            refAudioUrl:
+              type:
+                - 'null'
+                - string
+              description: "Reference audio AIR URN or external URL for voice cloning.\nAccepts AIR URNs (existing resources) or HTTP(S) URLs."
+              format: uri
+            refText:
+              type:
+                - 'null'
+                - string
+              description: "Transcript of the reference audio.\nRequired for Base mode unless XVectorOnlyMode is true."
+            xVectorOnlyMode:
+              type: boolean
+              description: 'If true, uses only speaker embedding (ref_text not required).'
+            operation:
+              enum:
+                - base
+              type: string
+            ecosystem:
+              enum:
+                - qwen3
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+    Qwen3CustomVoiceTTSInput:
+      allOf:
+        - $ref: '#/components/schemas/Qwen3TextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+            - operation
+            - speaker
+          type: object
+          properties:
+            speaker:
+              enum:
+                - aiden
+                - dylan
+                - eric
+                - ono_anna
+                - ryan
+                - serena
+                - sohee
+                - uncle_fu
+                - vivian
+              type: string
+              description: Built-in speaker name for CustomVoice mode.
+            instruct:
+              type:
+                - 'null'
+                - string
+              description: 'Optional style instruction (e.g., "speak slowly and clearly").'
+            operation:
+              enum:
+                - customVoice
+              type: string
+            ecosystem:
+              enum:
+                - qwen3
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+    Qwen3TextToSpeechInput:
+      allOf:
+        - $ref: '#/components/schemas/VllmOmniTextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+            - operation
+          type: object
+          properties:
+            operation:
+              type: string
+            maxNewTokens:
+              type:
+                - 'null'
+                - integer
+              description: Optional generation cap for max tokens.
+              format: int32
+            ecosystem:
+              enum:
+                - qwen3
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: operation
+            mapping:
+              base: '#/components/schemas/Qwen3BaseTTSInput'
+              customVoice: '#/components/schemas/Qwen3CustomVoiceTTSInput'
+              voiceDesign: '#/components/schemas/Qwen3VoiceDesignTTSInput'
+    Qwen3VoiceDesignTTSInput:
+      allOf:
+        - $ref: '#/components/schemas/Qwen3TextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+            - instruct
+            - operation
+          type: object
+          properties:
+            instruct:
+              type: string
+              description: "Natural-language description of the desired voice\n(e.g., \"a calm middle-aged male narrator with a slight British accent\")."
+            operation:
+              enum:
+                - voiceDesign
+              type: string
+            ecosystem:
+              enum:
+                - qwen3
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+    TextToSpeechInput:
+      required:
+        - engine
+        - text
+      type: object
+      properties:
+        engine:
+          type:
+            - 'null'
+            - string
+          default: custom
+        text:
+          type: string
+          description: The text to synthesize into speech.
+        language:
+          type:
+            - 'null'
+            - string
+          description: 'Target language (e.g., "English", "Chinese"). Defaults to "Auto".'
+      additionalProperties: false
+      discriminator:
+        propertyName: engine
+        mapping:
+          custom: '#/components/schemas/CustomTextToSpeechInput'
+          vllm-omni: '#/components/schemas/VllmOmniTextToSpeechInput'
+    TextToSpeechOutput:
+      required:
+        - audioBlob
+      type: object
+      properties:
+        audioBlob:
+          $ref: '#/components/schemas/AudioBlob'
+        modelType:
+          type:
+            - 'null'
+            - string
+          description: Whether the TTS used "base" (voice cloning) or "custom_voice" (built-in speaker) mode.
+        speaker:
+          type:
+            - 'null'
+            - string
+          description: 'The speaker name used (set for CustomVoice mode, null for Base mode).'
+      additionalProperties: false
+      description: Output from text-to-speech workflow step.
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+    VllmOmniTextToSpeechInput:
+      allOf:
+        - $ref: '#/components/schemas/TextToSpeechInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            ecosystem:
+              type: string
+            engine:
+              enum:
+                - vllm-omni
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: ecosystem
+            mapping:
+              qwen3: '#/components/schemas/Qwen3TextToSpeechInput'
+              omnivoice: '#/components/schemas/OmniVoiceTextToSpeechInput'
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

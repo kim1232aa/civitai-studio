@@ -1,0 +1,161 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - blobArchive Recipe
+  description: OpenAPI specification for the blobArchive built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/blobArchive:
+    post:
+      tags:
+        - Recipes
+      summary: "Bundles a set of blobs into a single archive (zip or tar) that callers can\n/// download from a signed streaming URL. Runs in-process in the orchestrator;\n/// no worker job is dispatched."
+      operationId: InvokeBlobArchiveStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlobArchiveInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/BlobArchiveInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/BlobArchiveInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlobArchiveOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ArchiveFormat:
+      enum:
+        - zip
+        - tar
+      type: string
+      description: Container format for a Civitai.Orchestration.Grains.Workflows.Steps.BlobArchive.BlobArchiveStep output.
+    BlobArchiveEntry:
+      required:
+        - blobId
+      type: object
+      properties:
+        blobId:
+          minLength: 1
+          type: string
+          description: The blob ID to include in the archive.
+        fileName:
+          type:
+            - 'null'
+            - string
+          description: "Optional filename to use inside the archive. When omitted, the blob ID is used.\nPath components and control characters are stripped."
+      additionalProperties: false
+      description: A single entry within a Civitai.Orchestration.Grains.Workflows.Steps.BlobArchive.BlobArchiveStep.
+    BlobArchiveInput:
+      required:
+        - entries
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlobArchiveEntry'
+          description: The blobs to include in the archive. Must contain at least 1 and at most 1000 entries.
+        archiveName:
+          type:
+            - 'null'
+            - string
+          description: "Optional filename for the archive itself (used in the Content-Disposition header).\nDefaults to \"archive.zip\" or \"archive.tar\" based on Civitai.Orchestration.Grains.Workflows.Steps.BlobArchive.BlobArchiveInput.Format."
+        format:
+          $ref: '#/components/schemas/ArchiveFormat'
+      additionalProperties: false
+      description: Input configuration for the BlobArchive workflow step.
+    BlobArchiveOutput:
+      required:
+        - entryCount
+        - expiresAt
+        - format
+        - url
+      type: object
+      properties:
+        url:
+          type: string
+          description: The signed URL that streams the archive when requested.
+          format: uri
+        entryCount:
+          type: integer
+          description: The number of entries included in the archive.
+          format: int32
+        format:
+          $ref: '#/components/schemas/ArchiveFormat'
+        expiresAt:
+          type: string
+          description: The UTC time at which this URL expires.
+          format: date-time
+      additionalProperties: false
+      description: Output produced by the BlobArchive workflow step.
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

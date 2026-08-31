@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.bak
+*.pre-catalog
+.DS_Store
+.env
+.env.*
+out/
+docs/review-shots/
+docs/air-cache/manager/
+docs/_ui_findings.md
+docs/_ui_findings_*.md
+docs/_code_findings.md
+docs/review.md
+docs/hf-modelscope-listing.proposed.patch
+patch_*.py

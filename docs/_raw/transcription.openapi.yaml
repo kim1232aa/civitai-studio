@@ -1,0 +1,161 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - transcription Recipe
+  description: OpenAPI specification for the transcription built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/transcription:
+    post:
+      tags:
+        - Recipes
+      summary: Transcription
+      description: 'Performs automatic speech recognition (ASR) on audio media, returning transcribed text with optional timestamps.'
+      operationId: InvokeTranscriptionStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscriptionInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/TranscriptionInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/TranscriptionInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    TranscriptionInput:
+      required:
+        - mediaUrl
+      type: object
+      properties:
+        mediaUrl:
+          type: string
+          description: The URL of the audio media to transcribe.
+          format: uri
+        language:
+          type:
+            - 'null'
+            - string
+          description: 'Optional language hint (e.g., "en", "zh") to guide transcription.'
+        context:
+          type:
+            - 'null'
+            - string
+          description: Optional context prompt to improve transcription accuracy.
+        returnTimeStamps:
+          type: boolean
+          description: Whether to return word-level timestamps. Defaults to true.
+          default: true
+      additionalProperties: false
+    TranscriptionOutput:
+      required:
+        - elapsedSeconds
+        - language
+        - text
+        - timeStamps
+      type: object
+      properties:
+        text:
+          type: string
+          description: The full transcribed text.
+        language:
+          type: string
+          description: The detected language of the audio.
+        timeStamps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionTimeStamp'
+          description: Word-level timestamps (if requested).
+        elapsedSeconds:
+          type: number
+          description: Total processing time in seconds.
+          format: double
+      additionalProperties: false
+    TranscriptionTimeStamp:
+      required:
+        - endTime
+        - startTime
+        - text
+      type: object
+      properties:
+        text:
+          type: string
+        startTime:
+          type: number
+          format: double
+        endTime:
+          type: number
+          format: double
+      additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

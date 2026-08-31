@@ -1,0 +1,255 @@
+{
+  "probedAt": "2026-09-01T06:31:03+08:00",
+  "noPost": true,
+  "studioWaitPane": {
+    "file": "static/index.html",
+    "ids": ["waitPane", "waitTitle", "waitBar", "waitMeta"],
+    "elapsed": "client waitElapsed() = (Date.now()-waitStart)/1000 — always",
+    "queue": "job.queuePosition.precedingJobs where job = ((steps||[])[0].jobs||[])[0]",
+    "eta": "job.estimatedDurationSeconds || job.etaSeconds || queuePosition.estimatedWaitTime — none of these names exist on Civitai OpenAPI or live GetWorkflow",
+    "bar": "client-fake: processing→70 else 88-7*min(ahead,10); not an API percent",
+    "poll": "GET /api/jobs/{id} every 3s"
+  },
+  "providers": [
+    {
+      "id": "civitai",
+      "statusUrl": "GET https://orchestration.civitai.com/v2/consumer/workflows/{workflowId}",
+      "listUrl": "GET https://orchestration.civitai.com/v2/consumer/workflows?take={n}",
+      "listNote": "Official QueryWorkflows param is take (default 100), plus cursor/next. Query param limit is not documented; live GET ?limit=5 ignored (32 items). providers/civitai.py list_jobs GETs /v2/consumer/workflows with no take.",
+      "auth": "Authorization: Bearer",
+      "authHeader": "Bearer",
+      "statusEnum": ["unassigned", "preparing", "scheduled", "processing", "succeeded", "failed", "expired", "canceled"],
+      "progressPercent": null,
+      "progressPercentField": null,
+      "progress01": {
+        "path": "steps[].jobs[].estimatedProgressRate",
+        "also": "steps[].estimatedProgressRate",
+        "type": "number|null 0.0-1.0",
+        "note": "Not named percent. Derived elapsed*throughput/job.cost, clamped. Null at terminal. Wait bar = rate*100 when non-null."
+      },
+      "queuePosition": {
+        "path": "steps[].jobs[].queuePosition",
+        "precedingJobs": "steps[].jobs[].queuePosition.precedingJobs",
+        "fields": {
+          "support": "unsupported|unavailable|available (JobSupport, required in OpenAPI)",
+          "precedingJobs": "integer|null — jobs ahead",
+          "startAt": "date-time|null estimated start",
+          "completeAt": "date-time|null estimated complete"
+        }
+      },
+      "queuePositionField": "steps[].jobs[].queuePosition.precedingJobs",
+      "eta": {
+        "estimatedDuration": null,
+        "estimatedDurationSeconds": null,
+        "etaSeconds": null,
+        "estimatedWaitTime": null,
+        "queuePosition.completeAt": "date-time|null",
+        "queuePosition.startAt": "date-time|null"
+      },
+      "remainingSeconds": null,
+      "remainingSecondsField": null,
+      "preparation": {
+        "path": "steps[].preparation",
+        "queuePosition": "integer downloads ahead (0 = transferring now)",
+        "progress": "number 0.0-1.0 or null",
+        "etaSeconds": "integer|null download remaining only"
+      },
+      "logs": null,
+      "logsUrl": null,
+      "metrics": null,
+      "metricsUrl": null,
+      "http": [200, 202, 401, 404],
+      "sampleValues": {
+        "source": "live GET",
+        "listTake50": {"n": 33, "statuses": {"preparing": 1, "succeeded": 28, "canceled": 3, "failed": 1}},
+        "inFlight": {
+          "http": 200,
+          "id": "12100372-20260831222942861",
+          "status": "preparing",
+          "steps[0].estimatedProgressRate": 1,
+          "steps[0].jobs[0].status": "preparing",
+          "steps[0].jobs[0].estimatedProgressRate": 1,
+          "steps[0].jobs[0].cost": 20,
+          "steps[0].jobs[0].queuePosition": {
+            "support": "unavailable",
+            "precedingJobs": 4,
+            "startAt": "2026-08-31T22:32:31.7038805Z",
+            "completeAt": "2026-08-31T22:32:56.3952385Z"
+          },
+          "steps[0].preparation": null
+        },
+        "succeeded": {
+          "http": 200,
+          "id": "12100372-20260831222239992",
+          "status": "succeeded",
+          "jobKeys": ["id", "status", "startedAt", "completedAt", "cost"],
+          "queuePosition": null,
+          "estimatedProgressRate": null,
+          "hasPercent": false,
+          "hasEstimatedDuration": false
+        },
+        "notFound": {"http": 404, "title": "Not Found", "keys": ["type", "title", "status", "traceId"]}
+      },
+      "notes": "customComfy uses the same GetWorkflow. cost on the job is relative complexity, not Buzz. WaitPane already reads precedingJobs; remaining ETA fields it looks for do not exist — use completeAt or preparation.etaSeconds only. No logs/metrics URLs on GetWorkflow.",
+      "schemaSource": "docs/_raw/repeat.openapi.yaml WorkflowStepJob + WorkflowStepJobQueuePosition + WorkflowStepPreparation + WorkflowStatus; https://developer.civitai.com/orchestration/guide/workflows; GetWorkflow 200/202/401/404; live GET list+status"
+    },
+    {
+      "id": "fal",
+      "statusUrl": "GET https://queue.fal.run/{model}/requests/{request_id}/status",
+      "statusUrlWithLogs": "GET https://queue.fal.run/{model}/requests/{request_id}/status?logs=1",
+      "resultUrl": "GET https://queue.fal.run/{model}/requests/{request_id}",
+      "streamUrl": "GET https://queue.fal.run/{model}/requests/{request_id}/status/stream?logs=1",
+      "auth": "Authorization: Key {id}:{secret}",
+      "authHeader": "Key",
+      "statusEnum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED", "FAILED", "CANCELED"],
+      "progressPercent": null,
+      "progressPercentField": null,
+      "queuePosition": {
+        "path": "queue_position",
+        "type": "integer",
+        "when": "IN_QUEUE only — number of requests ahead"
+      },
+      "queuePositionField": "queue_position",
+      "eta": null,
+      "remainingSeconds": null,
+      "remainingSecondsField": null,
+      "logs": {
+        "url": null,
+        "path": "logs[] on status when ?logs=1",
+        "item": {"timestamp": "date-time", "message": "string", "level": "DEBUG|INFO|WARN|ERROR optional"}
+      },
+      "logsUrl": null,
+      "metrics": {
+        "url": null,
+        "path": "metrics.inference_time",
+        "type": "number seconds",
+        "when": "COMPLETED only — elapsed inference, not remaining"
+      },
+      "metricsUrl": null,
+      "http": {
+        "status": [200, 401, 404, 405],
+        "result": [200, 202, 401, 404],
+        "openapiAlso": [402, 422, 429, 500],
+        "dedicatedLogsPath": 405,
+        "dedicatedMetricsPath": 405,
+        "platformMetrics": {"url": "GET https://api.fal.ai/v1/serverless/metrics", "http": 403, "note": "Prometheus account metrics, not per-request"}
+      },
+      "sampleValues": {
+        "source": "live GET dummy UUID on fal-ai/fast-sdxl (no Studio-saved Fal request ids on disk)",
+        "status": {
+          "http": 200,
+          "status": "COMPLETED",
+          "request_id": "00000000-0000-0000-0000-000000000000",
+          "logs": null,
+          "metrics": {"inference_time": 0.049886},
+          "keys": ["status", "request_id", "response_url", "status_url", "cancel_url", "logs", "metrics"],
+          "hasQueuePosition": false,
+          "hasProgress": false
+        },
+        "statusLogs1": {"http": 200, "logs": []},
+        "result": {"http": 404, "detail": "Request not found"},
+        "fluxSchnellDummyStatus": {"http": 405}
+      },
+      "notes": "Official queue docs + fal_client Status types have no progress field. Studio fal job_status does not forward queue_position into queuePosition.precedingJobs. GET .../logs and GET .../metrics are not queue endpoints (405). Cancel is PUT not GET.",
+      "schemaSource": "https://fal.ai/docs/documentation/model-apis/inference/queue ; fal_client Queued/InProgress/Completed; live GET status/result"
+    },
+    {
+      "id": "huggingface",
+      "statusUrl": null,
+      "auth": "Authorization: Bearer",
+      "authHeader": "Bearer",
+      "statusEnum": ["succeeded"],
+      "progressPercent": null,
+      "progressPercentField": null,
+      "queuePosition": null,
+      "queuePositionField": null,
+      "eta": null,
+      "remainingSeconds": null,
+      "remainingSecondsField": null,
+      "logs": null,
+      "logsUrl": null,
+      "metrics": null,
+      "metricsUrl": null,
+      "http": {
+        "poll": null,
+        "GET router.huggingface.co/v1/models": 200,
+        "GET router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell": 410
+      },
+      "sampleValues": null,
+      "notes": "Synchronous. Studio generate() POSTs router.huggingface.co/hf-inference/models/{id} and returns image/video bytes. job_status always {status: succeeded}. Official text-to-image spec: response is image bytes, no job id. No poll URL.",
+      "schemaSource": "providers/huggingface.py job_status; https://huggingface.co/docs/inference-providers/tasks/text-to-image ; live GET /v1/models 200 and hf-inference 410"
+    },
+    {
+      "id": "modelscope",
+      "statusUrl": "GET {base}/tasks/{task_id}",
+      "basePreferredDisk": "https://api.modelscope.ai/v1",
+      "baseFallback": "https://api-inference.modelscope.cn/v1",
+      "baseAfterDns": "https://api-inference.modelscope.cn/v1",
+      "dns": {"api.modelscope.ai": false, "api-inference.modelscope.cn": true},
+      "auth": "Authorization: Bearer",
+      "authHeader": "Bearer",
+      "extraHeader": "X-ModelScope-Task-Type: image_generation",
+      "statusEnum": ["PENDING", "QUEUED", "RUNNING", "SUCCEED", "SUCCEEDED", "SUCCESS", "FAILED", "FAIL"],
+      "statusEnumStudioMap": {
+        "SUCCEED": "succeeded",
+        "SUCCEEDED": "succeeded",
+        "SUCCESS": "succeeded",
+        "FAILED": "failed",
+        "FAIL": "failed",
+        "PENDING": "pending",
+        "QUEUED": "pending",
+        "RUNNING": "processing"
+      },
+      "progressPercent": null,
+      "progressPercentField": null,
+      "queuePosition": null,
+      "queuePositionField": null,
+      "eta": null,
+      "remainingSeconds": null,
+      "remainingSecondsField": null,
+      "logs": null,
+      "logsUrl": null,
+      "metrics": null,
+      "metricsUrl": null,
+      "http": {"dummyTaskGet": 401, "hubListGet": 200},
+      "sampleValues": null,
+      "notes": "No stored task_id under /workspace. Did not POST images/generations. Dummy GET {base}/tasks/does-not-exist-probe → 401 errors.message authentication failed (same token Hub GET 200). Poll examples + Studio code expose task_status and output_images; no progress/percent/queue/ETA field. Official AIGC doc pages returned empty JS this run.",
+      "schemaSource": "providers/modelscope.py job_status; community poll examples (task_status PENDING|RUNNING|SUCCEED|FAILED, output_images); live DNS + dummy GET 401"
+    },
+    {
+      "id": "comfy-cloud",
+      "wired": false,
+      "statusUrl": "GET https://cloud.comfy.org/api/v2/jobs/{id}",
+      "auth": "Authorization: Bearer",
+      "authHeader": "Bearer",
+      "statusEnum": ["queued", "running", "succeeded", "canceling", "canceled", "failed", "expired"],
+      "progressPercent": null,
+      "progressPercentField": null,
+      "progress01": {
+        "path": "progress.value",
+        "type": "number 0-1",
+        "also": ["progress.nodes_done", "progress.nodes_total", "progress.step", "progress.steps", "progress.current_node", "progress.message"]
+      },
+      "queuePosition": {"path": "queue_position", "type": "integer|null"},
+      "queuePositionField": "queue_position",
+      "eta": null,
+      "remainingSeconds": null,
+      "remainingSecondsField": null,
+      "logs": {
+        "path": "logs",
+        "note": "JobLogs {text, truncated, captured_at}. Only serverless {deployment}.run.comfy.app. Absent on Comfy Cloud."
+      },
+      "logsUrl": null,
+      "metrics": {
+        "path": "metrics",
+        "fields": {"queue_ms": "integer|null", "execution_ms": "integer|null"},
+        "note": "elapsed ms, not remaining"
+      },
+      "metricsUrl": null,
+      "http": [200, 401, 403, 404, 429, 500],
+      "sampleValues": null,
+      "notes": "Fifth provider NOT being added. Schema from official OpenAPI only; no Cloud API key / job id on this box. Civitai customComfy is the Civitai workflow GET, not this API.",
+      "schemaSource": "https://docs.comfy.org/api-reference/v2/jobs/job-status-the-polling-workhorse OpenAPI Job/Progress/JobStatus (fetched 200); docs/comfy-cloud.md"
+    }
+  ]
+}

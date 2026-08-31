@@ -1,0 +1,163 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - audioCaptioning Recipe
+  description: OpenAPI specification for the audioCaptioning built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/audioCaptioning:
+    post:
+      tags:
+        - Recipes
+      summary: Audio Captioning
+      description: 'Generates music captions, lyrics, and metadata by running the ACE-Step captioner and transcriber models.'
+      operationId: InvokeAudioCaptioningStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioCaptioningInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AudioCaptioningInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AudioCaptioningInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioCaptioningOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioCaptioningInput:
+      required:
+        - maxNewTokens
+        - mediaUrl
+        - temperature
+      type: object
+      properties:
+        mediaUrl:
+          type: string
+          description: The URL of the audio file or zip archive to caption.
+          format: uri
+        temperature:
+          type: number
+          description: Sampling temperature for both ACE-Step requests.
+          format: double
+        maxNewTokens:
+          type: integer
+          description: Maximum number of tokens to generate for each ACE-Step request.
+          format: int32
+      additionalProperties: false
+    AudioCaptioningOutput:
+      required:
+        - results
+      type: object
+      properties:
+        results:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AudioCaptioningOutputItem'
+      additionalProperties: false
+    AudioCaptioningOutputItem:
+      required:
+        - text
+      type: object
+      properties:
+        text:
+          type: string
+        caption:
+          type:
+            - 'null'
+            - string
+        lyrics:
+          type:
+            - 'null'
+            - string
+        bpm:
+          type:
+            - 'null'
+            - string
+        keyScale:
+          type:
+            - 'null'
+            - string
+        timeSignature:
+          type:
+            - 'null'
+            - string
+        duration:
+          type:
+            - 'null'
+            - string
+        language:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

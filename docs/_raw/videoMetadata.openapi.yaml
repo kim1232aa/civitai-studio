@@ -1,0 +1,133 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - videoMetadata Recipe
+  description: OpenAPI specification for the videoMetadata built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/videoMetadata:
+    post:
+      tags:
+        - Recipes
+      summary: 'Extract metadata from videos including width, height, FPS, and duration'
+      operationId: InvokeVideoMetadataStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoMetadataInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/VideoMetadataInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/VideoMetadataInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoMetadataOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    VideoMetadataInput:
+      required:
+        - video
+      type: object
+      properties:
+        video:
+          type: string
+          description: The video file to extract metadata from.
+          format: uri
+      additionalProperties: false
+      description: Represents the input information needed for the VideoMetadata workflow step.
+    VideoMetadataOutput:
+      required:
+        - duration
+        - fps
+        - height
+        - width
+      type: object
+      properties:
+        width:
+          type: integer
+          description: The width of the video in pixels.
+          format: int32
+        height:
+          type: integer
+          description: The height of the video in pixels.
+          format: int32
+        fps:
+          type: number
+          description: The frame rate of the video in frames per second.
+          format: double
+        duration:
+          type: string
+          description: The duration of the video.
+          format: date-span
+      additionalProperties: false
+      description: Represents the output information returned from the VideoMetadata workflow step.
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

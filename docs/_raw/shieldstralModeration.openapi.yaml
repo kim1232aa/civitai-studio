@@ -1,0 +1,254 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - shieldstralModeration Recipe
+  description: OpenAPI specification for the shieldstralModeration built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/shieldstralModeration:
+    post:
+      tags:
+        - Recipes
+      summary: ShieldstralModeration
+      description: "Evaluate text or generation prompts against configurable natural-language Shieldstral policies.\n/// Generates one single-token yes/no ChatCompletion job per policy and returns normalized policy scores."
+      operationId: InvokeShieldstralModerationStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShieldstralModerationInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ShieldstralModerationInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ShieldstralModerationInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShieldstralModerationOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    ShieldstralModerationInput:
+      required:
+        - mode
+      type: object
+      properties:
+        mode:
+          type: string
+        policies:
+          type:
+            - 'null'
+            - array
+          items:
+            type: string
+          description: 'Optional policy filter. When omitted, every configured policy for the selected mode is evaluated.'
+        policyOverrides:
+          type:
+            - 'null'
+            - array
+          items:
+            $ref: '#/components/schemas/ShieldstralPolicyConfiguration'
+          description: "Per-request policy overrides. Existing policies are merged by name and new names create custom policies.\nPolicy is free-form natural language; Query, when supplied, must be a single yes/no question."
+      additionalProperties: false
+      discriminator:
+        propertyName: mode
+        mapping:
+          prompt: '#/components/schemas/ShieldstralPromptModerationInput'
+          text: '#/components/schemas/ShieldstralTextModerationInput'
+    ShieldstralModerationOutput:
+      required:
+        - blocked
+        - results
+        - triggeredPolicies
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShieldstralPolicyResult'
+        blocked:
+          type: boolean
+        triggeredPolicies:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    ShieldstralPolicyConfiguration:
+      required:
+        - name
+      type: object
+      properties:
+        name:
+          type: string
+        action:
+          type:
+            - 'null'
+            - string
+        threshold:
+          type:
+            - 'null'
+            - number
+          format: double
+        policy:
+          type:
+            - 'null'
+            - string
+        query:
+          type:
+            - 'null'
+            - string
+        instruction:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+      description: "A per-request policy override. For a custom policy, Name and Policy are required; Action defaults to\nScan/Review by mode, Threshold defaults to 0.5, and Query defaults to a mode-appropriate yes/no question."
+    ShieldstralPolicyResult:
+      required:
+        - action
+        - policy
+        - score
+        - threshold
+        - topToken
+        - triggered
+      type: object
+      properties:
+        policy:
+          type: string
+        action:
+          type: string
+        threshold:
+          type: number
+          format: double
+        score:
+          type: number
+          format: double
+        triggered:
+          type: boolean
+        topToken:
+          type: string
+        finishReason:
+          type:
+            - 'null'
+            - string
+        responseId:
+          type:
+            - 'null'
+            - string
+        error:
+          type:
+            - 'null'
+            - string
+        policyHash:
+          type:
+            - 'null'
+            - string
+      additionalProperties: false
+    ShieldstralPromptModerationInput:
+      allOf:
+        - $ref: '#/components/schemas/ShieldstralModerationInput'
+        - required:
+            - mode
+            - positivePrompt
+          type: object
+          properties:
+            positivePrompt:
+              type: string
+            negativePrompt:
+              type:
+                - 'null'
+                - string
+            context:
+              type:
+                - 'null'
+                - string
+              description: Optional product-specific context included in the document being moderated.
+            mode:
+              enum:
+                - prompt
+              type: string
+          additionalProperties: false
+      description: Input for evaluating an image-generation prompt with Shieldstral.
+    ShieldstralTextModerationInput:
+      allOf:
+        - $ref: '#/components/schemas/ShieldstralModerationInput'
+        - required:
+            - mode
+            - text
+          type: object
+          properties:
+            text:
+              type: string
+            mode:
+              enum:
+                - text
+              type: string
+          additionalProperties: false
+      description: Input for evaluating arbitrary site text with Shieldstral.
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

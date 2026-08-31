@@ -1,0 +1,50 @@
+{
+  "items": [
+    {
+      "id": "Qwen/Qwen-Image",
+      "name": "Qwen Image",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "Qwen/Qwen-Image-Edit",
+      "name": "Qwen Image Edit",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "image-to-image",
+      "needsSource": true,
+      "tags": [
+        "i2i"
+      ]
+    },
+    {
+      "id": "MusePublic/Qwen-Image-Edit",
+      "name": "Qwen Image Edit (MusePublic)",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "image-to-image",
+      "needsSource": true,
+      "tags": [
+        "i2i"
+      ]
+    },
+    {
+      "id": "Tongyi-MAI/Z-Image-Turbo",
+      "name": "Z-Image Turbo",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,432 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - aceStepAudio Recipe
+  description: OpenAPI specification for the aceStepAudio built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/aceStepAudio:
+    post:
+      tags:
+        - Recipes
+      summary: "Workflow step for generating music using ACE Step 1.5.\n/// Produces full songs from text descriptions and structured lyrics."
+      operationId: InvokeAceStepAudioStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AceStepAudioInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AceStepAudioInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AceStepAudioInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AceStepAudioOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AceStepAudioCover:
+      required:
+        - imageUrl
+      type: object
+      properties:
+        imageUrl:
+          type: string
+          description: The cover image source.
+      additionalProperties: false
+      description: "Cover image configuration for ACE Step audio output.\nWhen present, the output is a WebM video with this image as the visual."
+    AceStepAudioInput:
+      required:
+        - lyrics
+        - musicDescription
+        - seed
+      type: object
+      properties:
+        musicDescription:
+          type: string
+          description: 'Music style/genre description (e.g., "Neo-Soul: A warm, organic neo-soul track...")'
+        lyrics:
+          type: string
+          description: 'Structured lyrics with section markers like [Verse], [Chorus], [Bridge], etc.'
+        seed:
+          type: integer
+          description: Random seed for reproducible generation
+          format: int32
+        duration:
+          maximum: 190
+          minimum: 1
+          type: number
+          description: Duration in seconds (1-190)
+          format: float
+          default: 60
+        bpm:
+          maximum: 200
+          minimum: 40
+          type: integer
+          description: Beats per minute (40-200)
+          format: int32
+          default: 120
+        timeSignature:
+          enum:
+            - '2'
+            - '3'
+            - '4'
+            - '6'
+          type: string
+          description: 'Time signature (e.g., "4" for 4/4 time)'
+          default: '4'
+        language:
+          enum:
+            - en
+            - ja
+            - zh
+            - es
+            - de
+            - fr
+            - pt
+            - ru
+            - it
+            - nl
+            - pl
+            - tr
+            - vi
+            - cs
+            - fa
+            - id
+            - ko
+            - uk
+            - hu
+            - ar
+            - sv
+            - ro
+            - el
+          type: string
+          description: 'Language code (e.g., "en", "zh", "ja", "ko")'
+          default: en
+        key:
+          enum:
+            - C major
+            - C# major
+            - Db major
+            - D major
+            - D# major
+            - Eb major
+            - E major
+            - F major
+            - F# major
+            - Gb major
+            - G major
+            - G# major
+            - Ab major
+            - A major
+            - A# major
+            - Bb major
+            - B major
+            - C minor
+            - C# minor
+            - Db minor
+            - D minor
+            - D# minor
+            - Eb minor
+            - E minor
+            - F minor
+            - F# minor
+            - Gb minor
+            - G minor
+            - G# minor
+            - Ab minor
+            - A minor
+            - A# minor
+            - Bb minor
+            - B minor
+          type: string
+          description: "Musical key (e.g., \"C major\", \"E minor\"). Mirrors ComfyUI's\nTextEncodeAceStepAudio1.5 keyscale combo: 17 roots × {major, minor}."
+          default: C major
+        instrumentalWeight:
+          type: number
+          description: Weight for instrumental elements (0.0-1.0)
+          format: float
+          default: 0.85
+        vocalWeight:
+          type: number
+          description: Weight for vocal elements (0.0-1.0)
+          format: float
+          default: 0.9
+        diffusionModel:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional diffusion model (unet) override. Defaults to ACE-Step 1.5 turbo 2B.
+        cover:
+          $ref: '#/components/schemas/AceStepAudioCover'
+        clipModel:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional text encoder (CLIP) override. Defaults to qwen_4b_ace15.
+        vaeModel:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional VAE override. Defaults to ace_1.5_vae.
+        languageModel:
+          pattern: '^(?:urn:)?(?:air:)?(?:(?<ecosystem>[a-zA-Z0-9_\-\/]+):)?(?:(?<type>[a-zA-Z0-9_\-\/]+):)?(?<source>[a-zA-Z0-9_\-\/]+):(?<id>[a-zA-Z0-9_\-\/\.]+)(?:@(?<version>[a-zA-Z0-9_\-\/.=,%+:]+))?(?:\.(?<format>[a-zA-Z0-9_\-]+))?$'
+          type:
+            - 'null'
+            - string
+          description: Optional language model override for audio code generation. Defaults to qwen_0.6b_ace15.
+        steps:
+          maximum: 200
+          minimum: 1
+          type: integer
+          description: "Number of sampling steps. Turbo variants converge at 8; non-turbo base / sft\nvariants expect the full 50-step schedule."
+          format: int32
+          default: 8
+        cfg:
+          maximum: 30
+          minimum: 0
+          type: number
+          description: "Classifier-free guidance scale. Turbo variants run CFG-off at 1.0;\nnon-turbo base / sft variants expect CFG on (around 4)."
+          format: float
+          default: 1
+        loras:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: "Optional LoRAs to apply. Each entry's strength is applied to both the\ndiffusion model (UNET) and the dual CLIP via ComfyUI's LoraLoader.\nCompatibility with non-default base models is the caller's responsibility."
+      additionalProperties: false
+      description: Input parameters for ACE Step 1.5 audio generation workflow step
+    AceStepAudioOutput:
+      required:
+        - blob
+      type: object
+      properties:
+        blob:
+          $ref: '#/components/schemas/Blob'
+      additionalProperties: false
+      description: "Output from ACE Step 1.5 audio generation workflow step.\nReturns a VideoBlob (when a background image is provided) or an AudioBlob (audio only)."
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes

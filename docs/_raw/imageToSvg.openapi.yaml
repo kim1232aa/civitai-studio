@@ -1,0 +1,472 @@
+openapi: '3.1.1'
+info:
+  title: Civitai Orchestration - imageToSvg Recipe
+  description: OpenAPI specification for the imageToSvg built-in recipe endpoint.
+  version: v2
+paths:
+  /v2/consumer/recipes/imageToSvg:
+    post:
+      tags:
+        - Recipes
+      summary: Converts a raster image to an SVG using a local StarVector or OmniSVG model.
+      operationId: InvokeImageToSvgStepTemplate
+      parameters:
+        - name: experimental
+          in: query
+          schema:
+            type: boolean
+        - name: allowMatureContent
+          in: query
+          schema:
+            type: boolean
+        - name: whatif
+          in: query
+          schema:
+            type: boolean
+        - name: ephemeral
+          in: query
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageToSvgInput'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ImageToSvgInput'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ImageToSvgInput'
+      responses:
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageToSvgOutput'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    AudioBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            duration:
+              type:
+                - 'null'
+                - number
+              description: Duration of the audio in seconds
+              format: float
+            type:
+              enum:
+                - audio
+              type: string
+          additionalProperties: false
+    Blob:
+      required:
+        - available
+        - id
+        - type
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          description: Gets the id of the blob that contains this image.
+        available:
+          type: boolean
+          description: Gets a value indicating whether the blob is available.
+        url:
+          type:
+            - 'null'
+            - string
+          description: Gets a url that can be used to preview the blob.
+          format: uri
+        urlExpiresAt:
+          type:
+            - 'null'
+            - string
+          description: Get when the url is set to expire
+          format: date-time
+        jobId:
+          type:
+            - 'null'
+            - string
+          description: Get the id of the job that is associated with this blob.
+        nsfwLevel:
+          $ref: '#/components/schemas/NSFWLevel'
+        blockedReason:
+          type:
+            - 'null'
+            - string
+          description: Get an optional reason for why the blob was blocked. This is only set if the blob was blocked.
+        tier:
+          type:
+            - 'null'
+            - string
+          description: "Get the storage tier holding this blob, when it is not the default one. Null means the default\ntier, which is what every blob produced before the managed tier existed deserializes as.\nCarried so a downstream step or consumer resolves the right grain directly rather than\nprobing each tier for the key."
+      additionalProperties: false
+      description: Represents a blob that gets produced as part of a specific job
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageBlob'
+          video: '#/components/schemas/VideoBlob'
+          audio: '#/components/schemas/AudioBlob'
+          model3d: '#/components/schemas/Model3DBlob'
+    ComfyImageToSvgInput:
+      allOf:
+        - $ref: '#/components/schemas/ImageToSvgInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            ecosystem:
+              type: string
+            engine:
+              enum:
+                - comfy
+              type: string
+          additionalProperties: false
+          discriminator:
+            propertyName: ecosystem
+            mapping:
+              starvector: '#/components/schemas/StarVectorImageToSvgInput'
+              omnisvg: '#/components/schemas/OmniSvgImageToSvgInput'
+              vtracer: '#/components/schemas/VTracerImageToSvgInput'
+    ImageBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            previewUrl:
+              type:
+                - 'null'
+                - string
+              description: Gets a url that can be used to preview a resized version of the image.
+              format: uri
+            previewUrlExpiresAt:
+              type:
+                - 'null'
+                - string
+              description: Gets when the preview url is set to expire.
+              format: date-time
+            type:
+              enum:
+                - image
+              type: string
+          additionalProperties: false
+    ImageToSvgInput:
+      required:
+        - engine
+        - image
+      type: object
+      properties:
+        engine:
+          type: string
+        image:
+          type: string
+          description: 'Either A URL, A DataURL or a Base64 string'
+      additionalProperties: false
+      discriminator:
+        propertyName: engine
+        mapping:
+          comfy: '#/components/schemas/ComfyImageToSvgInput'
+    ImageToSvgOutput:
+      required:
+        - svg
+      type: object
+      properties:
+        svg:
+          $ref: '#/components/schemas/Blob'
+      additionalProperties: false
+    Model3DBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - format
+            - type
+          type: object
+          properties:
+            format:
+              type: string
+              description: 'File format of the 3D model (e.g. "glb", "fbx", "obj", "usdz").'
+            type:
+              enum:
+                - model3d
+              type: string
+          additionalProperties: false
+    NSFWLevel:
+      enum:
+        - pg
+        - pg13
+        - r
+        - x
+        - xxx
+        - na
+      type: string
+    OmniSvgImageToSvgInput:
+      allOf:
+        - $ref: '#/components/schemas/ComfyImageToSvgInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            model:
+              enum:
+                - omnisvg-4b
+                - omnisvg-8b
+              type: string
+              default: omnisvg-4b
+            maxLength:
+              maximum: 2048
+              minimum: 256
+              type: integer
+              format: int32
+              default: 1536
+            seed:
+              maximum: 2147483647
+              minimum: 0
+              type:
+                - 'null'
+                - integer
+              format: int64
+            topP:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 0.9
+            topK:
+              maximum: 1000
+              minimum: 1
+              type: integer
+              format: int32
+              default: 50
+            temperature:
+              maximum: 1
+              minimum: 0
+              type: number
+              format: double
+              default: 0.3
+            repetitionPenalty:
+              maximum: 10
+              minimum: 0
+              type: number
+              format: double
+              default: 1.05
+            prompt:
+              maxLength: 1000
+              minLength: 0
+              type:
+                - 'null'
+                - string
+            ecosystem:
+              enum:
+                - omnisvg
+              type: string
+            engine:
+              enum:
+                - comfy
+              type: string
+          additionalProperties: false
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type:
+            - 'null'
+            - string
+        title:
+          type:
+            - 'null'
+            - string
+        status:
+          type:
+            - 'null'
+            - integer
+          format: int32
+        detail:
+          type:
+            - 'null'
+            - string
+        instance:
+          type:
+            - 'null'
+            - string
+      additionalProperties: { }
+    StarVectorImageToSvgInput:
+      allOf:
+        - $ref: '#/components/schemas/ComfyImageToSvgInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            model:
+              enum:
+                - starvector-1b
+                - starvector-8b
+              type: string
+              default: starvector-1b
+            precision:
+              enum:
+                - fp16
+                - bf16
+              type: string
+              default: fp16
+            maxLength:
+              maximum: 16000
+              minimum: 100
+              type: integer
+              format: int32
+              default: 4000
+            ecosystem:
+              enum:
+                - starvector
+              type: string
+            engine:
+              enum:
+                - comfy
+              type: string
+          additionalProperties: false
+    VTracerImageToSvgInput:
+      allOf:
+        - $ref: '#/components/schemas/ComfyImageToSvgInput'
+        - required:
+            - ecosystem
+            - engine
+          type: object
+          properties:
+            hierarchical:
+              enum:
+                - stacked
+                - cutout
+              type: string
+              default: stacked
+            mode:
+              enum:
+                - spline
+                - polygon
+                - none
+              type: string
+              default: spline
+            filterSpeckle:
+              maximum: 100
+              minimum: 0
+              type: integer
+              format: int32
+              default: 8
+            colorPrecision:
+              maximum: 10
+              minimum: 0
+              type: integer
+              format: int32
+              default: 6
+            layerDifference:
+              maximum: 256
+              minimum: 0
+              type: integer
+              format: int32
+              default: 24
+            cornerThreshold:
+              maximum: 180
+              minimum: 0
+              type: integer
+              format: int32
+              default: 65
+            lengthThreshold:
+              maximum: 10
+              minimum: 3.5
+              type: number
+              format: double
+              default: 5
+            maxIterations:
+              maximum: 70
+              minimum: 1
+              type: integer
+              format: int32
+              default: 10
+            spliceThreshold:
+              maximum: 180
+              minimum: 0
+              type: integer
+              format: int32
+              default: 50
+            pathPrecision:
+              maximum: 10
+              minimum: 0
+              type: integer
+              format: int32
+              default: 2
+            ecosystem:
+              enum:
+                - vtracer
+              type: string
+            engine:
+              enum:
+                - comfy
+              type: string
+          additionalProperties: false
+    VideoBlob:
+      allOf:
+        - $ref: '#/components/schemas/Blob'
+        - required:
+            - type
+          type: object
+          properties:
+            width:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            height:
+              type:
+                - 'null'
+                - integer
+              format: int32
+            type:
+              enum:
+                - video
+              type: string
+          additionalProperties: false
+  securitySchemes:
+    ApiKey:
+      type: http
+      description: Copy valid authorization token into field
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - { }
+tags:
+  - name: Recipes
