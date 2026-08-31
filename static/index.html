@@ -1368,19 +1368,10 @@ function syncImportChrome() {
   const lbl = $('importLbl');
   const inp = $('imgId');
   if (!lbl || !inp) return;
-  if (backend === 'fal') {
-    lbl.textContent = '导入 Fal 任务 / 本地 PNG';
-    inp.placeholder = 'Fal request id，或 fal|endpoint|uuid';
-  } else if (backend === 'huggingface') {
-    lbl.textContent = '导入本地 PNG / 成片 sidecar';
-    inp.placeholder = '本台成片文件名，或上传 PNG';
-  } else if (isModelscope()) {
-    lbl.textContent = '导入本地 PNG / 成片 sidecar';
-    inp.placeholder = '本台成片文件名，或上传 PNG';
-  } else {
-    lbl.textContent = '导入 Civitai 图/视频';
-    inp.placeholder = 'Civitai 图 id / 链接，或 Fal request id';
-  }
+  lbl.textContent = '导入 Civitai 图/视频';
+  if (backend === 'fal') inp.placeholder = 'Civitai 图 id / 链接，也可 Fal request id';
+  else if (backend === 'huggingface' || isModelscope()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
+  else inp.placeholder = 'Civitai 图 id / 链接';
 }
 function pickForBackend() {
   const ids = catalog.map(x => x.id);
@@ -1806,12 +1797,11 @@ async function runImport(body) {
 $('importImg').onclick = async () => {
   if ($('importImg').disabled) return;
   const raw = $('imgId').value.trim();
-  if (!raw) { setStatus(backend === 'civitai' ? '请填图片数字 ID 或完整网址' : '请填 Fal request id，或上传 PNG', 'bad'); return; }
-  const body = { backend, q: raw, endpoint: currentServiceId() };
-  if (backend === 'civitai') {
-    const m = raw.match(/\/images\/(\d+)/i) || raw.match(/[?&](?:imageId|id)=(\d+)/i) || raw.match(/^(\d+)$/);
-    if (m) body.q = m[1];
-  }
+  if (!raw) { setStatus('请填 Civitai 图 id 或完整网址', 'bad'); return; }
+  const civ = raw.match(/\/images\/(\d+)/i) || raw.match(/[?&](?:imageId|id)=(\d+)/i) || (/^\d+$/.test(raw) ? [null, raw] : null);
+  const body = civ
+    ? { backend: 'civitai', q: civ[1] }
+    : { backend, q: raw, endpoint: currentServiceId() };
   await runImport(body);
 };
 if ($('importFile')) $('importFile').onchange = async (e) => {

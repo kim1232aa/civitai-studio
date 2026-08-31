@@ -478,9 +478,28 @@ def import_image(image_id: str) -> dict:
 
 
 def _alias_backend(bid: str) -> str:
-    aliases = {"hf": "huggingface", "ms": "modelscope", "modelscope-ai": "modelscope", "modelscope-cn": "modelscope", "魔搭": "modelscope", "魔搭ai": "modelscope", "魔搭cn": "modelscope"}
+    aliases = {
+        "hf": "huggingface",
+        "ms": "modelscope-ai",
+        "modelscope": "modelscope-ai",
+        "魔搭": "modelscope-ai",
+        "魔搭ai": "modelscope-ai",
+        "魔搭cn": "modelscope-cn",
+    }
     bid = (bid or "civitai").strip()
     return aliases.get(bid, bid)
+
+
+def _looks_civitai_import(q: str) -> bool:
+    s = (q or "").strip()
+    low = s.lower()
+    if "civitai.com" in low or "civitai.red" in low:
+        return True
+    if re.search(r"/images/\d+", s, re.I):
+        return True
+    if re.fullmatch(r"\d+", s):
+        return True
+    return False
 
 
 def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoint=None):
@@ -512,6 +531,11 @@ def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoin
     q = (q or "").strip()
     if not q:
         return 400, {"error": "请填导入内容"}
+    if _looks_civitai_import(q):
+        try:
+            return 200, import_image(q)
+        except Exception as e:
+            return 400, {"error": str(e)}
     side = io_meta.read_sidecar(q)
     if side:
         return 200, io_meta.sidecar_to_import(side)
@@ -522,7 +546,7 @@ def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoin
             "empty": True,
             "backend": backend,
             "prompt": "",
-            "error": "Hugging Face / 魔搭没有云端按图反查。请上传带 parameters 的 PNG，或导入本台生成的成片（同名 .json sidecar）。",
+            "error": "Hugging Face / 魔搭没有云端按图反查。Civitai 图请贴 civitai 链接或数字 id；或上传带 parameters 的 PNG。",
         }
     try:
         return 200, import_image(q)
