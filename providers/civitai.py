@@ -978,8 +978,9 @@ class CivitaiProvider(Provider):
             "resources": resources,
             "trace": payload.get("trace") or "none",
         }
-        if payload.get("firstFrame") or payload.get("comfyImage"):
-            body["comfyImage"] = payload.get("firstFrame") or payload.get("comfyImage")
+        ci = payload.get("comfyImage") or ""
+        if isinstance(ci, str) and ci.startswith("urn:air:") and "comfyimage" in ci.lower():
+            body["comfyImage"] = ci
         # Do not send sessionOwnerApiToken.
         return self.recipe("customComfy", {"input": body, "whatif": whatif, "allowMatureContent": payload.get("allowMatureContent", True)})
 

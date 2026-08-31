@@ -117,8 +117,10 @@ CUSTOM_HINTS = (
 def _wf_rank(f: dict) -> int:
     name = (f.get("name") or "").lower()
     typ = str(f.get("type") or "")
+    if name.endswith((".yaml", ".yml")):
+        return 0
     is_zip = name.endswith(".zip") or typ in ("Archive", "Archives")
-    is_json = name.endswith(".json") or typ in ("Config", "Workflow", "Workflows")
+    is_json = name.endswith(".json")
     is_png = name.endswith((".png", ".webp"))
     sidecar = name in ("config.json", "metadata.json", "extra.json") or name.endswith(".config.json")
     looks_wf = ("workflow" in name) or ("comfy" in name) or typ in ("Workflow", "Workflows")
@@ -199,6 +201,21 @@ def parse_workflow_bytes(raw: bytes) -> dict:
             raise ValueError("这个 zip 里没有 Comfy JSON 工作流（文件: " + ", ".join(names[:8]) + ")")
         candidates.sort(key=lambda x: x[0], reverse=True)
         return candidates[0][1]
+    # PNG with Comfy tEXt / iTXt
+    if head.startswith(b"\x89PNG"):
+        from .io_meta import parse_png_text
+        texts = parse_png_text(raw)
+        for key in ("workflow", "Workflow", "prompt", "comfy.workflow"):
+            val = texts.get(key)
+            if not val:
+                continue
+            try:
+                obj = json.loads(val) if isinstance(val, str) else val
+            except Exception:
+                continue
+            if _looks_comfy(obj):
+                return obj
+        raise ValueError("这个 PNG 没有 Comfy 工作流 tEXt")
     # gzip
     if head.startswith(b"\x1f\x8b"):
         import gzip
