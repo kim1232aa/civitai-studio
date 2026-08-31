@@ -685,12 +685,15 @@ class CivitaiProvider(Provider):
         cat = category or ""
         st = status or ""
         qn = (q or "").lower()
+        def _alnum(s):
+            return "".join(ch for ch in (s or "").lower() if ch.isalnum())
         if cat:
             out = [x for x in out if x.get("category") == cat]
         if st:
             out = [x for x in out if x.get("status") == st]
         if qn:
-            out = [x for x in out if qn in (x.get("name") or "").lower() or qn in (x.get("id") or "").lower() or qn in (x.get("engine") or "").lower()]
+            needle = _alnum(qn)
+            out = [x for x in out if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id")) or needle in _alnum(x.get("engine")) or needle in _alnum(x.get("ecosystem"))]
         body = {
             "total": total,
             "count": len(out),

@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 from .base import Provider
 from .http import collect_urls, extract_error, json_call, parse_job_id, raw_call, save_bytes, save_media_urls
+from .io_meta import looks_like_civitai_service
 
 TOKEN_PATH = Path.home() / ".config/huggingface/token"
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,8 +19,8 @@ ROUTER = "https://router.huggingface.co"
 HUB = "https://huggingface.co/api/models"
 LEGACY = f"{ROUTER}/hf-inference/models"
 
-# Prefer providers that still host FLUX / Qwen / SDXL after hf-inference 410.
-_PREF = ("nscale", "fal-ai", "wavespeed", "replicate", "together", "hf-inference")
+# Prefer Fal for FLUX schnell (hf-inference is 410). nscale is also live.
+_PREF = ("fal-ai", "nscale", "wavespeed", "replicate", "together", "hf-inference")
 _MAP_CACHE = {"at": 0.0, "items": {}}
 _MAP_TTL = 300
 
@@ -76,23 +77,24 @@ def inference_mapping(mid: str) -> dict:
     return mapping
 
 
+def _style_for(provider: str) -> str:
+    if provider == "hf-inference":
+        return "bytes"
+    if provider in ("fal-ai", "wavespeed"):
+        return "fal"
+    return "openai"
+
+
 def _provider_candidates(mapping: dict, mid: str, spec: dict) -> list:
-    """Ordered (provider, providerId, style) for live Inference Providers."""
     live = []
     for name, info in (mapping or {}).items():
         if not isinstance(info, dict):
             continue
-        if (info.get("status") or "").lower() not in ("live", "staging", ""):
-            if (info.get("status") or "").lower() == "error":
-                continue
-        if (info.get("status") or "").lower() == "error":
+        st = (info.get("status") or "").lower()
+        if st == "error":
             continue
         live.append((name, info.get("providerId") or mid, info))
-    live_ok = []
-    for name, pid, info in live:
-        st = (info.get("status") or "").lower()
-        if st == "live":
-            live_ok.append((name, pid, info))
+    live_ok = [(n, p, i) for n, p, i in live if (i.get("status") or "").lower() == "live"]
     if not live_ok:
         live_ok = live
     ordered = []
@@ -108,23 +110,11 @@ def _provider_candidates(mapping: dict, mid: str, spec: dict) -> list:
             seen.add(name)
     if not ordered:
         ordered = [
-            ("nscale", mid, "openai"),
             ("fal-ai", mid, "fal"),
+            ("nscale", mid, "openai"),
             ("hf-inference", mid, "bytes"),
         ]
     return ordered
-
-
-def _style_for(provider: str) -> str:
-    if provider in ("nscale", "together"):
-        return "openai"
-    if provider == "hf-inference":
-        return "bytes"
-    if provider in ("fal-ai", "wavespeed"):
-        return "fal"
-    if provider == "replicate":
-        return "openai"
-    return "openai"
 
 
 def _auth_headers(key: str, extra=None):
@@ -166,7 +156,7 @@ def _prompt_body(payload: dict) -> dict:
     return params
 
 
-def _save_json_images(data: dict, jid: str) -> list:
+def _save_json_images(data: dict, jid: str, meta=None) -> list:
     saved = []
     for i, item in enumerate(data.get("data") or []):
         if not isinstance(item, dict):
@@ -177,12 +167,12 @@ def _save_json_images(data: dict, jid: str) -> list:
                 raw = base64.b64decode(item["b64_json"])
             except Exception:
                 continue
-            saved.extend(save_bytes(raw, stem))
+            saved.extend(save_bytes(raw, stem, meta=meta))
         elif item.get("url"):
-            saved.extend(save_media_urls([item["url"]], stem))
+            saved.extend(save_media_urls([item["url"]], stem, meta=meta))
     urls = collect_urls(data)
     if not saved and urls:
-        saved = save_media_urls(urls, jid)
+        saved = save_media_urls(urls, jid, meta=meta)
     return saved
 
 
@@ -220,11 +210,13 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         body["guidance_scale"] = params["guidance_scale"]
     if params.get("width") and params.get("height"):
         body["image_size"] = {"width": params["width"], "height": params["height"]}
+    blob = (pid + " " + str((payload or {}).get("task") or "")).lower()
+    wants_img = any(x in blob for x in ("image-to-image", "kontext", "/edit", "i2i"))
     img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
     extra = [x for x in (payload.get("images") or []) if x]
     if img and img not in extra:
         extra = [img] + extra
-    if extra:
+    if extra and wants_img:
         if len(extra) == 1:
             body["image_url"] = extra[0]
         else:
@@ -257,6 +249,81 @@ def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
     return code, data, raw, ctype, body
 
 
+HF_PIPES = {
+    "text-to-image": ("image", "text-to-image", ["t2i"], False, False),
+    "image-to-image": ("image", "image-to-image", ["i2i"], True, False),
+    "text-to-video": ("video", "text-to-video", ["t2v"], False, False),
+    "image-to-video": ("video", "image-to-video", ["i2v"], False, True),
+}
+
+
+def _alnum(s):
+    return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+
+
+def _hf_headers():
+    h = {"Accept": "application/json"}
+    k = hf_key()
+    if k:
+        h["Authorization"] = f"Bearer {k}"
+    return h
+
+
+def _hf_row(mid, name, pipe):
+    spec = HF_PIPES.get(pipe) or ("image", "text-to-image", ["t2i"], False, False)
+    cat, task, tags, needs_src, needs_ff = spec
+    row = {
+        "id": mid,
+        "name": name or mid.split("/")[-1],
+        "category": cat,
+        "backend": "huggingface",
+        "status": "available",
+        "task": task,
+        "tags": list(tags),
+        "pipelineTag": pipe,
+    }
+    if needs_src:
+        row["needsSource"] = True
+    if needs_ff:
+        row["needsFirstFrame"] = True
+    return row
+
+
+def search_hf(q, pins=None):
+    q = (q or "").strip()
+    items, seen = [], set()
+    pins = pins or []
+    needle = _alnum(q)
+    for p in pins:
+        pid = p.get("id")
+        if pid and (needle in _alnum(p.get("name")) or needle in _alnum(pid)):
+            items.append(p)
+            seen.add(pid)
+    if q.count("/") == 1 and " " not in q and q not in seen:
+        code, data = json_call(f"{HUB}/{quote(q, safe='/')}", headers=_hf_headers(), timeout=20)
+        if code == 200 and isinstance(data, dict):
+            mid = data.get("id") or q
+            pipe = data.get("pipeline_tag") or "text-to-image"
+            if pipe not in HF_PIPES:
+                pipe = "text-to-image"
+            row = _hf_row(mid, mid.split("/")[-1], pipe)
+            items.insert(0, row)
+            seen.add(mid)
+    url = f"{HUB}?search={quote(q)}&limit=50"
+    code, data = json_call(url, headers=_hf_headers(), timeout=25)
+    models = data if isinstance(data, list) else []
+    for it in models:
+        if not isinstance(it, dict):
+            continue
+        mid = (it.get("id") or "").strip()
+        pipe = it.get("pipeline_tag") or ""
+        if not mid or mid in seen or pipe not in HF_PIPES:
+            continue
+        seen.add(mid)
+        items.append(_hf_row(mid, mid.split("/")[-1], pipe))
+    return items
+
+
 class HuggingFaceProvider(Provider):
     id = "huggingface"
     label = "Hugging Face"
@@ -268,20 +335,23 @@ class HuggingFaceProvider(Provider):
         return sorted({x.get("category") for x in load_items() if x.get("category")})
 
     def catalog(self, q, category, status) -> dict:
-        qn = (q or "").lower()
-        items = list(load_items())
+        qn = (q or "").strip()
+        pins = list(load_items())
+        if qn:
+            items = search_hf(qn, pins)
+        else:
+            items = pins
         if category:
             items = [x for x in items if x.get("category") == category]
         if status:
             items = [x for x in items if x.get("status") == status]
-        if qn:
-            items = [x for x in items if qn in (x.get("name") or "").lower() or qn in (x.get("id") or "").lower()]
         return {
             "total": len(items),
             "count": len(items),
             "backend": "huggingface",
             "items": items,
             "hasKey": self.has_key(),
+            "hub": HUB,
         }
 
     def owns_service(self, service_id: str) -> bool:
@@ -308,49 +378,68 @@ class HuggingFaceProvider(Provider):
         key = hf_key()
         if not key:
             return 401, {"error": "没有 Hugging Face API Key"}
-        mid = model_id((payload or {}).get("serviceId") or "")
+        sid = (payload or {}).get("serviceId") or ""
+        if looks_like_civitai_service(sid):
+            return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
+        mid = model_id(sid)
         if not mid:
             return 400, {"error": "缺少 Hugging Face 模型 id"}
         spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
         mapping = inference_mapping(mid)
         candidates = _provider_candidates(mapping, mid, spec)
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
-        timeout = 180
+        timeout = 300
         for provider, pid, style in candidates:
             jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
             submitted = {"model": mid, "provider": provider}
             saved = []
+            meta = {
+                "backend": "huggingface",
+                "serviceId": mid,
+                "prompt": (payload or {}).get("prompt"),
+                "negativePrompt": (payload or {}).get("negativePrompt"),
+                "seed": (payload or {}).get("seed"),
+                "jobId": jid,
+            }
             try:
                 if style == "bytes":
                     code, data, raw, ctype, submitted = _call_bytes(mid, payload or {}, spec, key, timeout)
+                    meta["submittedInput"] = submitted
                     if code == 503:
-                        return 503, {"error": "模型正在加载，请稍后再试"}
+                        last = (503, {"error": "模型正在加载，请稍后再试"})
+                        continue
                     if code >= 400:
                         err = data if isinstance(data, dict) else {"error": (raw or b"")[:400].decode("utf-8", "replace")}
                         if isinstance(err, dict):
                             err.setdefault("error", extract_error(err, f"HTTP {code}"))
                         last = (code, err)
                         continue
-                    if isinstance(data, dict):
-                        saved = _save_json_images(data, jid)
+                    if isinstance(data, dict) and (data.get("error") or data.get("images") or data.get("data")):
+                        saved = _save_json_images(data, jid, meta=meta)
+                    elif raw and not (ctype or "").startswith("application/json"):
+                        saved = save_bytes(raw, jid, meta=meta)
+                    elif isinstance(data, dict):
+                        saved = _save_json_images(data, jid, meta=meta)
                     elif raw:
-                        saved = save_bytes(raw, jid)
+                        saved = save_bytes(raw, jid, meta=meta)
                 elif style == "fal":
                     code, data, submitted = _call_fal(provider, pid, payload or {}, key, timeout)
+                    meta["submittedInput"] = submitted
                     if code >= 400:
                         if isinstance(data, dict):
                             data.setdefault("error", extract_error(data, f"HTTP {code}"))
                         last = (code, data)
                         continue
-                    saved = _save_json_images(data, jid)
+                    saved = _save_json_images(data, jid, meta=meta)
                 else:
                     code, data, submitted = _call_openai(provider, pid, payload or {}, key, timeout)
+                    meta["submittedInput"] = submitted
                     if code >= 400:
                         if isinstance(data, dict):
                             data.setdefault("error", extract_error(data, f"HTTP {code}"))
                         last = (code, data)
                         continue
-                    saved = _save_json_images(data, jid)
+                    saved = _save_json_images(data, jid, meta=meta)
             except Exception as e:
                 last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
                 continue
@@ -362,13 +451,12 @@ class HuggingFaceProvider(Provider):
                     "endpoint": mid,
                     "provider": provider,
                     "saved": saved,
-                    "submittedInput": {k: v for k, v in (submitted or {}).items() if k != "parameters" or True},
+                    "submittedInput": submitted,
                 }
             last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
         return last
 
     def job_status(self, job_id: str):
-        # sync jobs finish in generate(); nothing to poll
         return 200, {
             "id": job_id,
             "status": "succeeded",

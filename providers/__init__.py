@@ -21,7 +21,7 @@ def all_providers():
 def resolve_from_payload(payload: dict):
     payload = payload or {}
     bid = (payload.get("backend") or "").strip()
-    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai", "魔搭": "modelscope-ai", "魔搭ai": "modelscope-ai", "魔搭cn": "modelscope-cn"}
+    aliases = {"hf": "huggingface", "ms": "modelscope", "modelscope-ai": "modelscope", "modelscope-cn": "modelscope", "魔搭": "modelscope", "魔搭ai": "modelscope", "魔搭cn": "modelscope"}
     bid = aliases.get(bid, bid)
     if bid in PROVIDERS:
         return PROVIDERS[bid]
@@ -35,7 +35,7 @@ def resolve_from_payload(payload: dict):
 def resolve_from_job(job_id: str):
     from .http import parse_job_id
     pid, _ = parse_job_id(job_id or "")
-    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai"}
+    aliases = {"hf": "huggingface", "ms": "modelscope", "modelscope-ai": "modelscope", "modelscope-cn": "modelscope"}
     pid = aliases.get(pid, pid)
     if pid in PROVIDERS:
         return PROVIDERS[pid]

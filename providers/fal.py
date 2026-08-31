@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 from .base import Provider
+import re
+from urllib.parse import quote
+
 from .http import collect_urls, json_call, parse_job_id, save_media_urls
+from .io_meta import looks_like_civitai_service, remember_job as remember_studio_job, job_meta
 
 TOKEN_PATH = Path.home() / ".config/fal/token"
 ROOT = Path(__file__).resolve().parent.parent
@@ -151,6 +155,10 @@ def build_fal_input(payload: dict) -> dict:
         extra = [img] + extra
     FIRST = {"image_url", "start_image_url", "first_frame_url", "image"}
     LAST = {"end_image_url", "tail_image_url", "last_frame_url"}
+    if not fields:
+        for k in list(spec.get("required") or []) + list(spec.get("optional") or []):
+            if k in FIRST or k in LAST or k in ("image_urls", "video_url"):
+                fields.append(k)
     vid = (payload.get("videoUrl") or payload.get("video_url") or payload.get("sourceVideo") or "").strip()
     audio = (payload.get("audioUrl") or payload.get("audio_url") or "").strip()
     for name in fields:
@@ -285,13 +293,16 @@ def _try_get(urls):
 
 def submit(payload: dict):
     eid = (payload.get("serviceId") or payload.get("endpoint") or "").strip().lstrip("/")
+    if looks_like_civitai_service(eid):
+        return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Fal。请在 Fal 目录里选一个模型（例如 fal-ai/flux/schnell）。"}
     if not eid:
         return 400, {"error": "缺少 Fal 模型 id"}
     inp = build_fal_input(payload)
     code, data = fal_call(f"{QUEUE}/{eid}", method="POST", body=inp)
     if isinstance(data, dict):
         rid = data.get("request_id") or data.get("requestId")
-        data["id"] = f"fal|{eid}|{rid}" if rid else None
+        jid = f"fal|{eid}|{rid}" if rid else None
+        data["id"] = jid
         data["backend"] = "fal"
         data["endpoint"] = eid
         data["submittedInput"] = inp
@@ -300,8 +311,162 @@ def submit(payload: dict):
                 "endpoint": eid,
                 "status_url": data.get("status_url"),
                 "response_url": data.get("response_url"),
+                "submittedInput": inp,
+                "prompt": payload.get("prompt"),
             })
+            remember_studio_job(jid, {
+                "backend": "fal",
+                "serviceId": eid,
+                "submittedInput": inp,
+                "prompt": payload.get("prompt"),
+                "negativePrompt": payload.get("negativePrompt"),
+                "seed": payload.get("seed"),
+                "jobId": jid,
+            })
+        # Some endpoints return the image on the queue POST itself.
+        urls = collect_urls(data)
+        if urls and jid:
+            try:
+                data["saved"] = save_media_urls(urls, jid, meta=job_meta(jid))
+                if data.get("saved"):
+                    data["status"] = "succeeded"
+            except Exception as e:
+                data["saveError"] = str(e)
     return code, data
+
+
+
+UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+SIZE_ENUM = {
+    "square_hd": (1024, 1024),
+    "square": (512, 512),
+    "portrait_4_3": (768, 1024),
+    "portrait_16_9": (576, 1024),
+    "landscape_4_3": (1024, 768),
+    "landscape_16_9": (1024, 576),
+}
+
+
+def platform_payloads(eid: str, rid: str):
+    url = (
+        f"{MODELS_API}/requests/by-endpoint"
+        f"?endpoint_id={quote(eid or '', safe='')}&request_id={quote(rid or '')}&expand=payloads"
+    )
+    return fal_call(url, timeout=60)
+
+
+def _save_fal(result, job_id):
+    urls = collect_urls(result)
+    meta = job_meta(job_id) or {}
+    if not meta.get("serviceId") and "|" in (job_id or ""):
+        parts = job_id.split("|", 2)
+        if len(parts) == 3:
+            meta.setdefault("backend", "fal")
+            meta.setdefault("serviceId", parts[1])
+            meta.setdefault("jobId", job_id)
+    if not urls:
+        return []
+    return save_media_urls(urls, job_id, meta=meta)
+
+
+def parse_fal_ref(q, endpoint=None):
+    q = (q or "").strip()
+    if q.startswith("fal|"):
+        parts = q.split("|", 2)
+        if len(parts) == 3:
+            return parts[1].strip(), parts[2].strip()
+    m = UUID_RE.search(q)
+    rid = m.group(0) if m else None
+    eid = (endpoint or "").strip()
+    if m:
+        rest = (q[:m.start()] + " " + q[m.end():]).strip()
+        rest = re.sub(r"(endpoint_id|endpoint|request_id)\s*=", " ", rest, flags=re.I)
+        rest = rest.strip(" /|?,&\t")
+        if rest and "/" in rest:
+            token = rest.split()[0].strip(" /|")
+            if "/" in token:
+                eid = token
+    return (eid or None), rid
+
+
+def map_fal_json_input(inp, endpoint_id):
+    inp = inp or {}
+    if not isinstance(inp, dict):
+        inp = {}
+    out = {
+        "backend": "fal",
+        "serviceId": endpoint_id,
+        "prompt": inp.get("prompt") or "",
+        "source": "fal-job",
+        "empty": not bool(inp.get("prompt")),
+    }
+    if inp.get("negative_prompt"):
+        out["negativePrompt"] = inp["negative_prompt"]
+    if inp.get("num_inference_steps") not in (None, ""):
+        try:
+            out["steps"] = int(inp["num_inference_steps"])
+        except (TypeError, ValueError):
+            pass
+    if inp.get("guidance_scale") not in (None, ""):
+        try:
+            out["cfgScale"] = float(inp["guidance_scale"])
+        except (TypeError, ValueError):
+            pass
+    if inp.get("seed") not in (None, ""):
+        try:
+            out["seed"] = int(inp["seed"])
+        except (TypeError, ValueError):
+            pass
+    sz = inp.get("image_size")
+    if isinstance(sz, dict):
+        try:
+            if sz.get("width"):
+                out["width"] = int(sz["width"])
+            if sz.get("height"):
+                out["height"] = int(sz["height"])
+        except (TypeError, ValueError):
+            pass
+    elif isinstance(sz, str):
+        if sz in SIZE_ENUM:
+            out["width"], out["height"] = SIZE_ENUM[sz]
+        elif "x" in sz.lower():
+            try:
+                a, b = sz.lower().split("x", 1)
+                out["width"], out["height"] = int(a), int(b)
+            except (TypeError, ValueError):
+                pass
+    img = inp.get("image_url")
+    if isinstance(img, list) and img:
+        img = img[0]
+    if img:
+        out["firstFrame"] = img
+        out["sourceImage"] = img
+    return out
+
+
+def import_request(q, endpoint=None):
+    eid, rid = parse_fal_ref(q, endpoint)
+    if not rid:
+        return 400, {"error": "请贴 Fal request id（uuid），或 fal|endpoint|uuid，或 endpoint + request_id"}
+    if not eid:
+        return 400, {"error": "还需要 Fal endpoint id（例如 fal-ai/flux/schnell），或整段 fal|endpoint|uuid"}
+    code, data = platform_payloads(eid, rid)
+    if not isinstance(data, dict):
+        return code if code >= 400 else 502, {"error": "Fal 回放失败"}
+    items = data.get("items") or data.get("requests") or []
+    item = items[0] if items else data
+    if code >= 400 or not isinstance(item, dict):
+        if isinstance(data, dict):
+            data.setdefault("error", data.get("message") or f"HTTP {code}")
+        return code if code >= 400 else 404, data
+    inp = item.get("json_input") or item.get("input") or {}
+    mapped = map_fal_json_input(inp, eid)
+    mapped["jobId"] = f"fal|{eid}|{rid}"
+    mapped["submittedInput"] = inp
+    if not mapped.get("prompt") and not inp:
+        mapped["empty"] = True
+        mapped["error"] = "Fal 没存下这次请求的 payload（可能开了 X-Fal-Store-IO 或已过期）。"
+    return 200, mapped
 
 
 def job_status(job_id: str):
@@ -314,12 +479,34 @@ def job_status(job_id: str):
     code, data = _try_get(status_urls(eid, rid, meta))
     if not isinstance(data, dict):
         return 502, {"error": "Fal 状态响应无效", "id": job_id, "backend": "fal", "status": "failed"}
-    # Recover from hitting the full nested path (HTTP 405) without aborting the UI poll.
+    # Queue GET may 405 after expiry; platform API still has the payload/result.
     if code in (404, 405) or (code >= 400 and not data.get("status")):
+        pc, plat = platform_payloads(eid, rid)
+        item = None
+        if pc == 200 and isinstance(plat, dict):
+            items = plat.get("items") or []
+            item = items[0] if items else None
+        if isinstance(item, dict):
+            outp = item.get("json_output") or item.get("output") or {}
+            saved = []
+            try:
+                saved = _save_fal(outp, job_id) if outp else []
+            except Exception as e:
+                saved = []
+                plat_err = str(e)
+            if saved:
+                return 200, {
+                    "id": job_id,
+                    "backend": "fal",
+                    "status": "succeeded",
+                    "saved": saved,
+                    "result": outp,
+                    "wait": {"progress": 1, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
+                }
         return 200, {
             "id": job_id,
             "backend": "fal",
-            "status": "failed",
+            "status": "processing" if code in (404, 405) else "failed",
             "error": data.get("error") or f"Fal 状态 HTTP {code}",
             "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
         }
@@ -350,11 +537,18 @@ def job_status(job_id: str):
     }
     if data["status"] == "succeeded":
         rc, result = _try_get(result_urls(eid, rid, meta, data))
+        if rc in (404, 405) or not (rc == 200 and isinstance(result, dict) and collect_urls(result)):
+            pc, plat = platform_payloads(eid, rid)
+            if pc == 200 and isinstance(plat, dict):
+                items = plat.get("items") or []
+                item = items[0] if items else None
+                if isinstance(item, dict) and (item.get("json_output") or item.get("output")):
+                    result = item.get("json_output") or item.get("output")
+                    rc = 200
         if rc == 200 and isinstance(result, dict):
             data["result"] = {k: result[k] for k in result if k != "raw"}
-            urls = collect_urls(result)
             try:
-                data["saved"] = save_media_urls(urls, job_id)
+                data["saved"] = _save_fal(result, job_id)
             except Exception as e:
                 data["saveError"] = str(e)
             if not data.get("saved"):
@@ -363,6 +557,81 @@ def job_status(job_id: str):
             data["saveError"] = (result or {}).get("error") if isinstance(result, dict) else f"Fal 结果 HTTP {rc}"
     # Always 200 so the browser poll does not throw on provider 405 leftovers.
     return 200, data
+
+
+
+from urllib.parse import quote as _quote
+
+
+def _alnum(s):
+    return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+
+
+def fal_recipe(eid, fcat, name):
+    blob = f"{eid} {fcat} {name}".lower()
+    if "upscale" in blob:
+        return "upscale", "upscale"
+    if "background" in blob:
+        return "bg", "bg"
+    if "audio" in fcat or "speech" in fcat:
+        return "audio", "audio"
+    if "3d" in fcat or ("/3d" in blob and "video" not in fcat):
+        return "3d", "3d"
+    if "video" in fcat:
+        return "video", "videoGen"
+    return "image", "imageGen"
+
+
+def row_from_fal_api(it):
+    md = it.get("metadata") or {}
+    eid = (it.get("endpoint_id") or it.get("id") or "").strip()
+    local = find_model(eid)
+    if local:
+        return overlay_image_fields(local)
+    name = md.get("display_name") or eid
+    fcat = md.get("category") or ""
+    recipe, step = fal_recipe(eid, fcat, name)
+    fields = infer_image_fields(eid)
+    st = md.get("status") or "active"
+    return overlay_image_fields({
+        "id": eid,
+        "name": name,
+        "description": (md.get("description") or "").strip(),
+        "category": recipe,
+        "falCategory": fcat,
+        "status": "available" if st == "active" else st,
+        "step": step,
+        "backend": "fal",
+        "tags": md.get("tags") or [],
+        "needsSource": bool(fields) or fcat in ("image-to-image", "image-to-video", "image-to-3d") or "/edit" in eid,
+        "needsFirstFrame": "image-to-video" in fcat or "image-to-video" in eid,
+        "imageFields": fields,
+        "promptField": "prompt",
+    })
+
+
+def search_fal(q):
+    q = (q or "").strip()
+    if not q:
+        return []
+    url = f"{MODELS_API}?q={_quote(q)}&limit=50"
+    key = fal_key()
+    headers = {"Authorization": f"Key {key}"} if key else None
+    code, data = json_call(url, headers=headers, timeout=25)
+    models = data.get("models") if isinstance(data, dict) else None
+    if code != 200 or not isinstance(models, list):
+        return []
+    out, seen = [], set()
+    for it in models:
+        if not isinstance(it, dict):
+            continue
+        row = row_from_fal_api(it)
+        eid = row.get("id")
+        if not eid or eid in seen:
+            continue
+        seen.add(eid)
+        out.append(row)
+    return out
 
 
 class FalProvider(Provider):
@@ -376,24 +645,31 @@ class FalProvider(Provider):
         return sorted({x.get("category") for x in load_catalog() if x.get("category")})
 
     def catalog(self, q, category, status) -> dict:
-        q = (q or "").lower()
+        qn = (q or "").strip()
         items = [overlay_image_fields(x) for x in load_catalog()]
+        unfiltered = len(items)
+        # Keep the full local catalog. Live search only ADDS extra ids.
+        # UI filters leftover text client-side; sending q must not collapse ~1492 to 1.
+        if qn:
+            live = search_fal(qn)
+            by = {x.get("id"): x for x in items if x.get("id")}
+            for x in live:
+                eid = x.get("id")
+                if eid and eid not in by:
+                    items.append(x)
+                    by[eid] = x
         if category:
             items = [x for x in items if x.get("category") == category]
         if status:
             items = [x for x in items if x.get("status") == status]
-        if q:
-            items = [
-                x for x in items
-                if q in (x.get("name") or "").lower() or q in (x.get("id") or "").lower()
-            ]
         return {
-            "total": len(items),
+            "total": unfiltered,
             "count": len(items),
             "backend": "fal",
             "items": items,
             "hasFal": has_key(),
             "hasKey": has_key(),
+            "unfilteredTotal": unfiltered,
         }
 
     def owns_service(self, service_id: str) -> bool:

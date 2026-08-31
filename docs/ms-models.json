@@ -45,6 +45,42 @@
       "tags": [
         "t2i"
       ]
+    },
+    {
+      "id": "krea/Krea-2-Turbo",
+      "name": "Krea 2 Turbo",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i",
+        "krea2"
+      ]
+    },
+    {
+      "id": "krea/Krea-2-Raw",
+      "name": "Krea 2 Raw",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i",
+        "krea2"
+      ]
+    },
+    {
+      "id": "krea/krea-realtime-video",
+      "name": "Krea Realtime Video",
+      "category": "video",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-video",
+      "tags": [
+        "t2v",
+        "krea"
+      ]
     }
   ]
 }

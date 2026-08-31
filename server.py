@@ -477,6 +477,59 @@ def import_image(image_id: str) -> dict:
     return civitai_prov.import_image(image_id)
 
 
+def _alias_backend(bid: str) -> str:
+    aliases = {"hf": "huggingface", "ms": "modelscope", "modelscope-ai": "modelscope", "modelscope-cn": "modelscope", "魔搭": "modelscope", "魔搭ai": "modelscope", "魔搭cn": "modelscope"}
+    bid = (bid or "civitai").strip()
+    return aliases.get(bid, bid)
+
+
+def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoint=None):
+    """Provider-aware import. Never triggers generate."""
+    import base64
+    from providers import io_meta
+    from providers import fal as fal_prov
+
+    backend = _alias_backend(backend)
+    filename = Path(filename or "").name
+    if file_bytes:
+        parsed = io_meta.parse_media_bytes(file_bytes, filename)
+        side = io_meta.read_sidecar(filename) if filename else None
+        if not side and q:
+            side = io_meta.read_sidecar(q)
+        if side:
+            merged = io_meta.sidecar_to_import(side)
+            for k, v in parsed.items():
+                if k in ("empty", "error", "source"):
+                    continue
+                if v not in (None, "", []):
+                    merged[k] = v
+            merged["fileName"] = filename
+            if parsed.get("prompt") or merged.get("prompt") or merged.get("serviceId"):
+                merged["empty"] = False
+                merged.pop("error", None)
+            return 200, merged
+        return 200, parsed
+    q = (q or "").strip()
+    if not q:
+        return 400, {"error": "请填导入内容"}
+    side = io_meta.read_sidecar(q)
+    if side:
+        return 200, io_meta.sidecar_to_import(side)
+    if backend == "fal":
+        return fal_prov.import_request(q, endpoint=endpoint)
+    if backend in ("huggingface", "modelscope", "modelscope-ai", "modelscope-cn"):
+        return 200, {
+            "empty": True,
+            "backend": backend,
+            "prompt": "",
+            "error": "Hugging Face / 魔搭没有云端按图反查。请上传带 parameters 的 PNG，或导入本台生成的成片（同名 .json sidecar）。",
+        }
+    try:
+        return 200, import_image(q)
+    except Exception as e:
+        return 400, {"error": str(e)}
+
+
 def submit(body, whatif=False):
     q = urllib.parse.urlencode({
         "whatif": "true" if whatif else "false",
@@ -697,6 +750,12 @@ class Handler(BaseHTTPRequestHandler):
             prov = providers.resolve_from_job(wf_id)
             code, data = prov.job_status(wf_id)
             return self._json(code, data)
+        if path == "/api/import":
+            backend = (qs.get("backend") or ["civitai"])[0]
+            q = (qs.get("q") or qs.get("query") or [""])[0]
+            endpoint = (qs.get("endpoint") or qs.get("serviceId") or [""])[0]
+            code, data = handle_import(backend, q, endpoint=endpoint or None)
+            return self._json(code, data)
         if path.startswith("/api/import-image/"):
             image_id = urllib.parse.unquote(path.split("/api/import-image/", 1)[1]).strip()
             try:
@@ -753,6 +812,25 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "invalid json"})
+        if path == "/api/import":
+            raw = None
+            b64 = payload.get("fileB64") or payload.get("file")
+            if b64:
+                import base64
+                if isinstance(b64, str) and "," in b64:
+                    b64 = b64.split(",", 1)[1]
+                try:
+                    raw = base64.b64decode(b64)
+                except Exception:
+                    return self._json(400, {"error": "文件不是合法 base64"})
+            code, data = handle_import(
+                payload.get("backend") or "civitai",
+                payload.get("q") or payload.get("query") or "",
+                file_bytes=raw,
+                filename=payload.get("fileName") or payload.get("filename") or "",
+                endpoint=payload.get("endpoint") or payload.get("serviceId"),
+            )
+            return self._json(code, data)
         if path in ("/api/generate", "/api/whatif"):
             prov = providers.resolve_from_payload(payload)
             if path == "/api/whatif":
