@@ -6,6 +6,7 @@
 - 仓库：<https://github.com/kim1232aa/civitai-studio>
 - 当前界面版本戳：标题栏 `v0736`（每次修 UI/行为都要改这个数字并 push）
 - 开发约定：[`docs/dev.md`](docs/dev.md)
+- 审查规范：[`docs/review-spec.md`](docs/review-spec.md)
 - 供应商插件：[`docs/providers.md`](docs/providers.md)
 
 ## 待解决问题（按提到的次数）

@@ -123,7 +123,12 @@ git 身份只用环境变量：`GIT_AUTHOR_NAME=kim1232aa`，`GIT_AUTHOR_EMAIL=1
 
 ## 审查
 
+完整规则：[`review-spec.md`](review-spec.md)。流水账不要写进那份，写 [`review.md`](review.md)。
+
 - 过关截图标题 = 当前戳。旧标签直接打回。
+- 审查员自己点页面；禁止代跑生成 API；禁止第二路抢 `8765`。
+- 点测进行中开发不改页面、不重启。
+- 生成过关 = 成片栏新文件。空提示词「先写提示词」不算。夹具 `https://civitai.red/images/139791102`。
 - 不要对 8765 开 browserUse / 桌面自动化（抢焦点）。
 - 魔搭 AI 在部分机器上 `api.modelscope.ai` 解析失败 → 应 502/连接错误，不是切 CN。
 
