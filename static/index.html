@@ -1373,9 +1373,20 @@ function syncImportChrome() {
   else if (backend === 'huggingface' || isModelscope()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
   else inp.placeholder = 'Civitai 图 id / 链接';
 }
+function selectFirstInCatalog(want) {
+  const list = catalog.filter(it => matchRecipe(it, recipe));
+  const has = (id) => list.some(x => x.id === id);
+  for (const id of want) {
+    if (has(id) && selectServiceById(id)) return true;
+  }
+  for (const id of want) {
+    const nl = String(id || '').toLowerCase();
+    const hit = list.find(it => ((it.id || '') + ' ' + (it.name || '')).toLowerCase().includes(nl.split('/').pop()));
+    if (hit && selectServiceById(hit.id)) return true;
+  }
+  return false;
+}
 function pickForBackend() {
-  const ids = catalog.map(x => x.id);
-  const has = (id) => ids.includes(id);
   const krea = importedLooksKrea(lastImport);
   const src = hasSourceNow();
   const vid = recipe === 'video' || (lastImport && lastImport.kind === 'video');
@@ -1402,10 +1413,17 @@ function pickForBackend() {
   } else {
     return false;
   }
-  for (const id of want) {
-    if (has(id) && selectServiceById(id)) return true;
+  if (krea && backend === 'fal') {
+    const kreaHits = catalog.filter(it => {
+      const blob = ((it.id || '') + ' ' + (it.name || '')).toLowerCase();
+      if (!/krea/.test(blob) || !matchRecipe(it, recipe)) return false;
+      if (src) return /image-to-image|i2i|edit|redux/.test(blob);
+      return /text-to-image/.test(blob) || (!/video|image-to-image|i2v/.test(blob));
+    }).map(it => it.id);
+    want = kreaHits.concat(want);
   }
-  renderServiceList({ pickDefault: true });
+  if (selectFirstInCatalog(want)) return true;
+  renderServiceList({ pickDefault: false });
   if (looksCivitaiId(currentServiceId())) {
     selected = null;
     copyPicked(null);
@@ -1503,7 +1521,7 @@ function setStatus(msg, cls='') {
   const dock = $('dockStatus');
   if (dock) { dock.className = cls || ''; dock.textContent = msg; }
 }
-const GAL_KEY = 'civitai-studio-gallery';
+const GAL_KEY = 'civitai-studio-gallery-v2';
 let galleryItems = [];
 let galFilter = 'all';
 function cardUrlKey(u) {
@@ -1981,7 +1999,12 @@ renderGallery();
     const cat = await api(url);
     catalog = cat.items || [];
     setRecipe(recipe || 'image');
-    if (backend !== 'civitai') pickForBackend();
+    if (backend === 'civitai' && lastImport && lastImport.serviceId) {
+      selectServiceById(lastImport.serviceId);
+      if (lastImport.checkpointName || lastImport.diffusionModel) {
+        setCheckpoint(lastImport.checkpointName || '', lastImport.diffusionModel || '');
+      }
+    } else if (backend !== 'civitai') pickForBackend();
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
     if (!n) setStatus(label + ' 目录为空', 'bad');
