@@ -749,7 +749,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0735</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0736</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -952,9 +952,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0735" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0736" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0735</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0736</div>
   </div>
 </aside>
 
@@ -1013,7 +1013,12 @@ function persistBackend(id) {
   if (!id) return;
   try { localStorage.setItem(BACKEND_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(BACKEND_KEY, id); } catch (e) {}
-  try { if (location.hash.replace(/^#/, '') !== id) history.replaceState(null, '', '#' + id); } catch (e) {}
+  try {
+    const cur = (location.hash || '').replace(/^#/, '').split('&')[0];
+    const extra = (typeof recipe !== 'undefined' && recipe === 'workflow') ? '&recipe=workflow' : '';
+    const want = '#' + id + extra;
+    if (location.hash !== want) history.replaceState(null, '', want);
+  } catch (e) {}
 }
 let backend = savedBackend() || 'civitai';
 persistBackend(backend);
@@ -2522,7 +2527,7 @@ renderGallery();
     await loadCatalog();
     await loadOuts();
     let wantWf = false;
-    try { wantWf = /recipe=workflow/.test(location.hash || '') || sessionStorage.getItem('civitai-studio-recipe') === 'workflow'; } catch (e) {}
+    try { wantWf = /recipe=workflow/.test(location.hash || ""); } catch (e) {}
     if (wantWf) {
       setRecipe('workflow');
       try {
@@ -2555,7 +2560,6 @@ renderGallery();
     if (h === backend) return;
     persistBackend(backend);
   });
-  window.addEventListener('pageshow', () => persistBackend(backend));
 })();
 </script>
 </body>
