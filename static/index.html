@@ -738,7 +738,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0731</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0732</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -941,9 +941,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0731" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0732" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0731</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0732</div>
   </div>
 </aside>
 
@@ -971,16 +971,11 @@ window.__studioGo = function (ev) {
   try { if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } } catch (e) {}
   if (window.__goOnce && (Date.now() - window.__goOnce) < 500) return false;
   window.__goOnce = Date.now();
-  try { if (typeof persistBackend === 'function' && backend) persistBackend(backend); } catch (e) {}
   try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
-  const btn = document.getElementById('go');
-  if (btn) { btn.textContent = '提交中…'; btn.disabled = false; }
-  const dock = document.getElementById('dockStatus');
-  if (dock) dock.textContent = '正在提交…';
   if (typeof onGenerate === 'function') {
     try { return onGenerate(ev); } catch (e) {
-      if (dock) dock.textContent = '生成出错 ' + (e && e.message || e);
-      if (btn) { btn.textContent = '生成'; }
+      const d = document.getElementById("dockStatus");
+      if (d) d.textContent = "生成出错 " + (e && e.message || e);
     }
   }
   return false;
@@ -2181,14 +2176,10 @@ async function onGenerate(ev) {
 }
 async function runGenerate() {
   const go = $('go');
-  goBusy = true;
-  if (go) { go.disabled = false; go.textContent = '提交中…'; }
-  setDock('正在提交…');
   const keys = window._hasKeys || {};
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
-  const fail = (msg) => { setDock(msg, 'bad'); };
+  const fail = (msg) => { setDock(msg, 'bad'); if (go) { go.disabled = false; go.textContent = '生成'; } };
   try {
-    await afterPaint();
     if (recipe === 'workflow') {
       if (!(wfState && wfState.workflowApi)) { fail('先导入工作流'); return; }
     } else {
@@ -2207,6 +2198,10 @@ async function runGenerate() {
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
     if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { fail('这个服务需要首帧图'); return; }
+    goBusy = true;
+    if (go) { go.disabled = false; go.textContent = "提交中…"; }
+    setDock("正在提交…");
+    await afterPaint();
     const pl = payload();
     const syncGen = pl.backend === 'huggingface';
     setDock(syncGen ? '正在生成…' : '正在提交到队列…');
@@ -2381,8 +2376,9 @@ renderGallery();
     const statusEl = $('status');
     const dockEl = $('dockStatus');
     const hasBad = (statusEl && statusEl.classList.contains('bad')) || (dockEl && dockEl.classList.contains('bad'));
+    if (goBusy || hasBad) return;
     if (!n) setStatus(label + ' 目录为空', 'bad');
-    else if (!hasBad) setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
+    else setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
   }
   let hubSearchTimer = null;
   function onSvcFilter() {
@@ -2500,7 +2496,6 @@ renderGallery();
   if (go) {
     const fire = (ev) => { window.__studioGo(ev); };
     go.addEventListener('click', fire, true);
-    go.addEventListener('pointerup', fire, true);
   }
   window.addEventListener('hashchange', () => {
     const h = (location.hash || '').replace(/^#/, '').split('&')[0];
