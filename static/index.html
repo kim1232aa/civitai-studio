@@ -746,7 +746,7 @@
   <div class="form">
     <section class="block">
       <h2 class="block-title">服务</h2>
-      <input id="svcFilter" placeholder="筛选服务" style="margin-bottom:8px">
+      <input id="svcFilter" placeholder="搜索 / 筛选模型" style="margin-bottom:8px">
       <div id="serviceList" class="svc-list"></div>
       <div id="wfPanel" hidden>
         <div class="import-row" style="margin-top:8px">
@@ -1021,7 +1021,7 @@ function recipeFor(it) {
 function copyPicked(it) {
   const src = paramSrc(it);
   picked = {
-    serviceId: it ? it.id : null,
+    serviceId: it ? (it.id || it.serviceId || null) : null,
     engine: src.engine != null ? src.engine : null,
     operation: src.operation != null ? src.operation : null,
     ecosystem: src.ecosystem != null ? src.ecosystem : null,
@@ -1050,19 +1050,18 @@ function needsPrompt() {
   const step = selected && selected.step;
   return step === 'imageGen' || step === 'videoGen' || !step;
 }
+function currentServiceId() {
+  return (picked && picked.serviceId) || (selected && (selected.id || selected.serviceId)) || '';
+}
+function setDock(msg, cls) {
+  setStatus(msg, cls || '');
+  const d = $('dockStatus');
+  if (d) { d.className = cls || ''; d.textContent = msg; }
+}
 function syncGo() {
   const go = $('go');
   if (!go) return;
-  if (goBusy) { go.disabled = true; return; }
-  if (recipe === 'workflow') {
-    const hasWf = !!(wfState && wfState.workflowApi);
-    const hasRes = !!(wfState && Array.isArray(wfState.resources) && wfState.resources.length);
-    go.disabled = !!(noToken || !hasWf || !hasRes);
-    return;
-  }
-  const empty = needsPrompt() && !($('prompt').value || '').trim();
-  const noSvc = !(picked && picked.serviceId);
-  go.disabled = !!(noToken || empty || noSvc);
+  go.disabled = !!goBusy;
 }
 function durationRange(it) {
   const eng = (it && it.engine) || '';
@@ -1251,6 +1250,8 @@ function syncBackendChrome() {
   const air = usesCivitaiAir();
   if ($('modelBlock')) $('modelBlock').classList.toggle('hidden', !air);
   if ($('loraBlock')) $('loraBlock').classList.toggle('hidden', !air);
+  const f = $('svcFilter');
+  if (f) f.placeholder = backend === 'civitai' ? '筛选服务' : '搜索模型';
 }
 function renderLoras() {
   $('loras').innerHTML = loras.map((l, i) => `
@@ -1271,7 +1272,7 @@ function payload() {
     comfyWorkflow: (recipe === 'workflow' && wfState && wfState.workflowApi) ? wfState.workflowApi : undefined,
     promptEdits: recipe === 'workflow' ? Array.from(document.querySelectorAll('.wfPrompt')).map(el => ({id: el.dataset.id, text: el.value})) : undefined,
     resources: (recipe === 'workflow' && wfState && wfState.resources) ? wfState.resources : undefined,
-    serviceId: recipe === 'workflow' ? 'utility/customComfy' : picked.serviceId,
+    serviceId: recipe === 'workflow' ? 'utility/customComfy' : currentServiceId(),
     kind,
     engine: picked.engine,
     operation: picked.operation,
@@ -1300,7 +1301,7 @@ function payload() {
       if (!base.images) base.images = [srcImg];
       else if (!base.images.includes(srcImg)) base.images.unshift(srcImg);
     }
-    return base;
+    return slimPayload(base);
   }
   Object.assign(base, {
     duration: +$('duration').value, width: +$('vWidth').value, height: +$('vHeight').value,
@@ -1318,6 +1319,14 @@ function payload() {
     base.sourceImage = srcImg;
     if (!base.firstFrame) base.firstFrame = srcImg;
   }
+  return slimPayload(base);
+}
+function slimPayload(base) {
+  if (backend === 'civitai') return base;
+  delete base.diffusionModel;
+  delete base.loras;
+  delete base.sampler;
+  delete base.scheduler;
   return base;
 }
 async function api(path, opts) {
@@ -1723,15 +1732,21 @@ $('whatif').onclick = async () => {
   } catch (e) { setStatus('预估失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 200) : e.message), 'bad'); }
 };
 $('go').onclick = async () => {
+  if (goBusy) return;
+  goBusy = true;
+  $('go').disabled = true;
+  $('go').textContent = '提交中…';
+  setDock('正在提交…');
+  try {
   if (recipe === 'workflow') {
-    if (!(wfState && wfState.workflowApi)) { setStatus('先导入工作流', 'bad'); return; }
-  } else if (!picked.serviceId) { setStatus('先选一个服务', 'bad'); return; }
+    if (!(wfState && wfState.workflowApi)) { setDock('先导入工作流', 'bad'); return; }
+  } else if (!currentServiceId()) { setDock('先选一个服务', 'bad'); return; }
+  else if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
   const step = selected && selected.step;
   const gen = recipe !== 'workflow' && (step === 'imageGen' || step === 'videoGen' || !step);
-  if (gen && !$('prompt').value.trim()) { setStatus('先写提示词', 'bad'); return; }
-  if (needsSource(selected) && !$('sourceImage').value.trim()) { setStatus('这个服务需要源图', 'bad'); return; }
-  if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { setStatus('这个服务需要首帧图', 'bad'); return; }
-  goBusy = true; $('go').disabled = true; $('go').textContent = '提交中…';
+  if (gen && !$('prompt').value.trim()) { setDock('先写提示词', 'bad'); return; }
+  if (needsSource(selected) && !$('sourceImage').value.trim()) { setDock('这个服务需要源图', 'bad'); return; }
+  if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { setDock('这个服务需要首帧图', 'bad'); return; }
   const pl = payload();
   const syncGen = pl.backend === 'huggingface';
   await startWait(syncGen ? '正在生成' : '正在提交到队列');
@@ -1750,8 +1765,8 @@ $('go').onclick = async () => {
     setStatus('已进队列 ' + jobId);
     $('go').textContent = '排队中…';
     await poll(jobId);
-  } catch (e) { setStatus('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad'); stopWait(); }
-  finally { goBusy = false; $('go').textContent = '生成'; syncGo(); }
+  } catch (e) { setDock('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad'); stopWait(); }
+  } finally { goBusy = false; $('go').textContent = '生成'; syncGo(); }
 };
 $('searchLora').onclick = async () => {
   const q = $('loraQ').value.trim();
@@ -1815,11 +1830,10 @@ renderGallery();
     if ('allowMatureContent' in d) $('mature').checked = !!d.allowMatureContent;
     else $('mature').checked = true;
     loras = (d.loras || []).map(x => Object.assign({}, x)); renderLoras();
+    window._hasKeys = j.hasKeys || {};
     if (j.hasToken === false) {
-      tokenMsg = '还没有 API Key';
+      tokenMsg = '还没有 Civitai API Key';
       noToken = true;
-      $('go').disabled = true;
-      $('whatif').disabled = true;
     }
   } catch (e) {
     tokenMsg = '默认参数加载失败';
@@ -1834,7 +1848,7 @@ renderGallery();
   async function loadCatalog(q) {
     if (q == null) q = (($('svcFilter') && $('svcFilter').value) || '').trim();
     let url = '/api/catalog?backend=' + encodeURIComponent(backend);
-    if (backend === 'modelscope' && q) url += '&q=' + encodeURIComponent(q);
+    if (q) url += '&q=' + encodeURIComponent(q);
     const cat = await api(url);
     catalog = cat.items || [];
     setRecipe(recipe || 'image');
@@ -1845,13 +1859,14 @@ renderGallery();
   }
   let hubSearchTimer = null;
   function onSvcFilter() {
-    if (backend === 'modelscope') {
+    const live = backend === 'modelscope' || backend === 'huggingface' || backend === 'fal';
+    if (live) {
       clearTimeout(hubSearchTimer);
       hubSearchTimer = setTimeout(async () => {
         try {
           await loadCatalog();
         } catch (e) {
-          setStatus('魔搭搜索失败', 'bad');
+          setStatus('搜索失败', 'bad');
         }
       }, 280);
       return;
