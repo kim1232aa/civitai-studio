@@ -2504,11 +2504,8 @@ renderGallery();
   }
   window.addEventListener('hashchange', () => {
     const h = (location.hash || '').replace(/^#/, '').split('&')[0];
-    if (!h) { persistBackend(backend); return; }
     if (h === backend) return;
-    if (!/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn)$/.test(h)) {
-      persistBackend(backend);
-    }
+    persistBackend(backend);
   });
   window.addEventListener('pageshow', () => persistBackend(backend));
 })();
