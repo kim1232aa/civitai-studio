@@ -206,22 +206,29 @@ def is_edit(mid: str) -> bool:
 
 
 class ModelScopeProvider(Provider):
-    id = "modelscope"
-    label = "魔搭"
-
-    def __init__(self):
-        # api.modelscope.ai is NXDOMAIN here; generate/poll on api-inference.modelscope.cn
-        self._base = CN_BASE if _host_ok(CN_BASE) else AI_BASE
-        if not _host_ok(self._base) and _host_ok(CN_BASE):
+    def __init__(self, flavor: str):
+        flavor = "cn" if flavor == "cn" else "ai"
+        self.flavor = flavor
+        if flavor == "cn":
+            self.id = "modelscope-cn"
+            self.label = "魔搭 CN"
             self._base = CN_BASE
-        self._token_path = AI_TOKEN_PATH
-        self._job_ids = ("modelscope", "ms", "modelscope-ai", "modelscope-cn", "mscn")
+            self._token_path = CN_TOKEN_PATH
+            self._job_ids = ("modelscope-cn", "mscn")
+        else:
+            self.id = "modelscope-ai"
+            self.label = "魔搭 AI"
+            self._base = AI_BASE
+            self._token_path = AI_TOKEN_PATH
+            self._job_ids = ("modelscope-ai", "modelscope", "ms")
 
     def _key(self) -> str:
-        tok = _read_token(AI_TOKEN_PATH) or _read_token(CN_TOKEN_PATH)
-        if tok:
-            return tok
-        return (os.environ.get("MODELSCOPE_API_TOKEN") or os.environ.get("MODELSCOPE_SDK_TOKEN") or os.environ.get("MODELSCOPE_API_KEY") or os.environ.get("MODELSCOPE_CN_API_TOKEN") or "").strip()
+        t = _read_token(self._token_path)
+        if t:
+            return t
+        if self.flavor == "cn":
+            return (os.environ.get("MODELSCOPE_CN_API_TOKEN") or "").strip()
+        return (os.environ.get("MODELSCOPE_API_TOKEN") or os.environ.get("MODELSCOPE_SDK_TOKEN") or os.environ.get("MODELSCOPE_API_KEY") or "").strip()
 
     def has_key(self) -> bool:
         return bool(self._key())
@@ -235,10 +242,7 @@ class ModelScopeProvider(Provider):
     def _reach_error(self):
         if _host_ok(self._base):
             return None
-        if _host_ok(CN_BASE):
-            self._base = CN_BASE
-            return None
-        return f"{self.label} 地址 {self._base} 连不上，且 {CN_BASE} 也解析失败。"
+        return f"{self.label} 地址 {self._base} 连不上。AI 和 CN 是两套接口，不会改走另一边。"
 
     def categories(self) -> list:
         return ["image", "video"]
@@ -254,27 +258,14 @@ class ModelScopeProvider(Provider):
         else:
             hub, totals = fetch_hub(search=qn)
             pins = load_disk()
-            by = {x.get("id"): x for x in hub if x.get("id")}
-            for pin in pins:
+            seen = {x.get("id") for x in hub}
+            items = list(hub)
+            for pin in reversed(pins):
                 pid = pin.get("id")
-                if not pid:
-                    continue
-                row = dict(by.get(pid) or {})
-                row.update(pin)
-                by[pid] = row
-            preferred = ["Qwen/Qwen-Image", "Tongyi-MAI/Z-Image-Turbo"]
-            items = []
-            seen = set()
-            for pid in preferred + [x.get("id") for x in pins]:
-                if pid and pid in by and pid not in seen:
-                    items.append(by[pid])
-                    seen.add(pid)
-            for x in hub:
-                pid = x.get("id")
                 if pid and pid not in seen:
-                    items.append(x)
+                    items.insert(0, pin)
                     seen.add(pid)
-            if not items:
+            if not hub:
                 items = list(pins)
             if not qn:
                 _HUB_CACHE["items"] = list(items)
@@ -451,4 +442,5 @@ class ModelScopeProvider(Provider):
 
 from . import register  # noqa: E402
 
-register(ModelScopeProvider())
+register(ModelScopeProvider("ai"))
+register(ModelScopeProvider("cn"))
