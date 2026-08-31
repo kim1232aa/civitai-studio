@@ -114,20 +114,50 @@ CUSTOM_HINTS = (
 
 
 
-def pick_workflow_file(files: list) -> dict | None:
-    """Prefer JSON, then zip archives. Never pick weights as the graph."""
+def _wf_rank(f: dict) -> int:
+    name = (f.get("name") or "").lower()
+    typ = str(f.get("type") or "")
+    is_zip = name.endswith(".zip") or typ in ("Archive", "Archives")
+    is_json = name.endswith(".json") or typ in ("Config", "Workflow", "Workflows")
+    is_png = name.endswith((".png", ".webp"))
+    sidecar = name in ("config.json", "metadata.json", "extra.json") or name.endswith(".config.json")
+    looks_wf = ("workflow" in name) or ("comfy" in name) or typ in ("Workflow", "Workflows")
+    if is_zip and looks_wf:
+        return 50
+    if is_zip:
+        return 40
+    if is_json and looks_wf and not sidecar:
+        return 35
+    if is_json and not sidecar:
+        return 20
+    if is_png:
+        return 10
+    if is_json and sidecar:
+        return 5
+    return 0
+
+
+def pick_workflow_files(files: list) -> list:
+    """Zip workflow packs beat sidecar config.json. Never pick weights."""
     ranked = []
     for f in files or []:
-        name = (f.get("name") or "").lower()
-        typ = str(f.get("type") or "")
-        if name.endswith(".json") or typ in ("Config", "Workflow"):
-            ranked.append((3, f))
-        elif name.endswith(".zip") or typ == "Archive":
-            ranked.append((2, f))
-        elif name.endswith((".png", ".webp")):
-            ranked.append((1, f))
+        r = _wf_rank(f)
+        if r:
+            ranked.append((r, f))
     ranked.sort(key=lambda x: x[0], reverse=True)
-    return ranked[0][1] if ranked else None
+    out, seen = [], set()
+    for _r, f in ranked:
+        k = f.get("id") or f.get("name")
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(f)
+    return out
+
+
+def pick_workflow_file(files: list) -> dict | None:
+    xs = pick_workflow_files(files)
+    return xs[0] if xs else None
 
 
 def _looks_comfy(obj) -> bool:

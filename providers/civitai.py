@@ -894,11 +894,9 @@ class CivitaiProvider(Provider):
         if code != 200 or not isinstance(ver, dict):
             return code if code >= 400 else 404, {"error": "找不到工作流版本"}
         files = ver.get("files") or []
-        json_file = cw.pick_workflow_file(files)
-        if not json_file:
+        cands = cw.pick_workflow_files(files)
+        if not cands:
             return 404, {"error": "这个版本没有 JSON / zip 工作流文件"}
-        fid = json_file.get("id")
-        dl = f"https://civitai.com/api/download/models/{vid}" + (f"?fileId={fid}" if fid else "")
         tok = token()
 
         class _StripAuthRedirect(urllib.request.HTTPRedirectHandler):
@@ -909,13 +907,27 @@ class CivitaiProvider(Provider):
                 return super().redirect_request(req, fp, code, msg, headers, newurl)
 
         opener = urllib.request.build_opener(_StripAuthRedirect)
-        req = urllib.request.Request(dl, headers={"Authorization": f"Bearer {tok}", "User-Agent": "Mozilla/5.0"})
-        with opener.open(req, timeout=90) as r:
-            raw_bytes = r.read()
-        try:
-            wf = cw.parse_workflow_bytes(raw_bytes)
-        except ValueError as e:
-            return 400, {"error": str(e)}
+        wf = None
+        json_file = None
+        last_err = None
+        for cand in cands:
+            fid = cand.get("id")
+            dl = f"https://civitai.com/api/download/models/{vid}" + (f"?fileId={fid}" if fid else "")
+            req = urllib.request.Request(dl, headers={"Authorization": f"Bearer {tok}", "User-Agent": "Mozilla/5.0"})
+            try:
+                with opener.open(req, timeout=90) as r:
+                    raw_bytes = r.read()
+                wf = cw.parse_workflow_bytes(raw_bytes)
+                json_file = cand
+                break
+            except ValueError as e:
+                last_err = e
+                continue
+            except Exception as e:
+                last_err = e
+                continue
+        if wf is None:
+            return 400, {"error": str(last_err or "工作流文件不是合法 JSON")}
         cache = cw.CACHE / f"{vid}.json"
         cache.write_text(json.dumps(wf, ensure_ascii=False), encoding="utf-8")
         api_wf = cw.ui_to_api(wf)
