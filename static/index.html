@@ -781,7 +781,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0773</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0774</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1027,9 +1027,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0773" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0774" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。空种子=随机；固定种子会复现。 · v0773</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。空种子=随机；固定种子会复现。 · v0774</div>
   </div>
 </aside>
 
@@ -1564,10 +1564,47 @@ function setDock(msg, cls) {
   if (d) { d.className = cls || ''; d.textContent = msg; }
   setStatus(msg, cls || '');
 }
-// v0773: sync UI seed to submitted/returned seed after generate; warn fixed-seed replay.
+// v0774: clamp Nano int32 seed write-back; v0773 sync after generate + fixed-seed warn.
 let _fixedSeedWarned = false;
 function seedFieldEl() {
   return (currentKind() === 'video') ? $('vSeed') : $('seed');
+}
+/** Match providers.nanogpt._clamp_seed: empty→null; int; < -1 → -1; > 2147483647 → n % 2147483647 || 2147483647. */
+function clampSeedInt32(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === '' || s === 'random') return null;
+  if (!/^-?\d+$/.test(s)) return null;
+  let n;
+  try { n = BigInt(s); } catch (e) { return null; }
+  if (n < -1n) return -1;
+  const limit = 2147483647n;
+  if (n > limit) {
+    const m = n % limit;
+    n = (m === 0n) ? limit : m;
+  }
+  return Number(n);
+}
+/** Nano only: if #seed/#vSeed clamps differently, write back, show hint, dock warn. Returns true if wrote. */
+function applyNanoSeedClampIfNeeded() {
+  if (typeof isNanogpt !== 'function' || !isNanogpt()) return false;
+  const el = seedFieldEl();
+  if (!el) return false;
+  const raw = el.value != null ? String(el.value).trim() : '';
+  if (!raw) return false;
+  const clamped = clampSeedInt32(raw);
+  if (clamped == null) return false;
+  try {
+    if (BigInt(raw) === BigInt(clamped)) return false;
+  } catch (e) { return false; }
+  const orig = raw;
+  el.value = String(clamped);
+  const other = (el.id === 'vSeed') ? $('seed') : $('vSeed');
+  if (other) other.value = String(clamped);
+  const hint = $('seedHint');
+  if (hint) hint.classList.remove('hidden');
+  setDock('种子超出范围，已取模为 ' + clamped + '（原 ' + orig + '）', 'warn');
+  return true;
 }
 function extractReturnedSeed(j) {
   if (!j || typeof j !== 'object') return { has: false, seed: null };
@@ -2966,6 +3003,10 @@ function applyImport(j) {
   } else {
     syncNanoPromptHint();
   }
+  // v0774: after service select — Nano int32 seed clamp write-back (dock after other import msgs)
+  if (typeof isNanogpt === 'function' && isNanogpt()) {
+    try { applyNanoSeedClampIfNeeded(); } catch (eImpSeed) {}
+  }
   syncGo();
 }
 function readDataURL(file, cb) {
@@ -3342,8 +3383,17 @@ async function runGenerate() {
         return;
       }
     }
+    // v0774: Nano int32 seed clamp write-back before fixed-seed warn.
+    let _seedClampedNow = false;
+    if (typeof isNanogpt === 'function' && isNanogpt()) {
+      try { _seedClampedNow = !!applyNanoSeedClampIfNeeded(); } catch (eClamp) {}
+    }
     // v0773: non-empty seed → warn once (do not block); empty seed → null (random) via payload().
-    try { warnFixedSeedIfNeeded(); } catch (e0) {}
+    if (!_seedClampedNow) {
+      try { warnFixedSeedIfNeeded(); } catch (e0) {}
+    } else {
+      _fixedSeedWarned = true;
+    }
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
     if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { fail('这个服务需要首帧图'); return; }

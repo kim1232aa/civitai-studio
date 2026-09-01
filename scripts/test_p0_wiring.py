@@ -86,6 +86,8 @@ def main() -> int:
     assert _clamp_seed(475720515768790) <= 2147483647
     assert _clamp_seed(475720515768790) > 0
     assert _clamp_seed(-3) == -1
+    # v0774: proven UI import seed → Nano int32 modulo
+    assert _clamp_seed(891104780613135) == 2146323191
     from providers.io_meta import coerce_int, dims_from_selector, first_int, parse_comfy
     node = {
         "class_type": "ResolutionSelector",
@@ -484,7 +486,7 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0773"' in html
+    assert 'title="v0774"' in html
     assert 'aria-label="生成"' in html
     assert 'aria-label="v0772"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
@@ -540,7 +542,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0773"' in html
+    assert 'title="v0774"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -695,21 +697,28 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "truncateNanoPrompt" in html
     assert "syncNanoPromptHint" in html
     assert "nanoPromptHint" in html
-    assert 'title="v0773"' in html
+    assert 'title="v0774"' in html
     assert "prompt_length_error" in nano_src
     assert "NANO_PROMPT_MAX = 1200" in nano_src
 
 
     # v0773: seed sync after generate; fixed-seed warn; Nano prefers response seed
+    # v0774: FE clampSeedInt32 write-back; server seedOriginal/seedClamped
     assert "syncSeedAfterGenerate" in html
     assert "warnFixedSeedIfNeeded" in html
+    assert "clampSeedInt32" in html
+    assert "applyNanoSeedClampIfNeeded" in html
+    assert "种子超出范围，已取模为" in html
     assert "已用种子" in html
     assert "随机种子" in html
     assert "固定种子会复现同一张图；要新图请清空种子" in html
     assert "seedRaw === '' ? null" in html or "seedRaw === \'\' ? null" in html
     assert "seedHint" in html
-    assert 'title="v0773"' in html
-    from providers.nanogpt import _response_seed, _clamp_seed as _ns
+    assert 'title="v0774"' in html
+    from providers.nanogpt import _response_seed, _clamp_seed as _ns, _seed_clamp_meta
+    assert _ns(891104780613135) == 2146323191
+    assert _seed_clamp_meta(891104780613135) == {"seedOriginal": 891104780613135, "seedClamped": True}
+    assert _seed_clamp_meta(42) == {}
     assert _response_seed({"seed": 42}) == 42
     assert _response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99
     assert _response_seed({"data": [{"url": "x"}]}) is None
@@ -747,6 +756,19 @@ console.log('PASS isMusePublicQwenImageCousin');
                         "seed": 222,
                     })
                     assert code2 == 200 and body2.get("seed") == 222, body2
+                    # v0774: oversized seed → seedOriginal + seedClamped; seed stays response/clamped
+                    jc.return_value = (200, {"data": [{"url": "https://example.com/c.png"}]})
+                    code3, body3 = prov.generate({
+                        "serviceId": "z-image-turbo",
+                        "prompt": "hi",
+                        "width": 1024,
+                        "height": 1024,
+                        "seed": 891104780613135,
+                    })
+                    assert code3 == 200, body3
+                    assert body3.get("seed") == 2146323191, body3
+                    assert body3.get("seedClamped") is True, body3
+                    assert body3.get("seedOriginal") == 891104780613135, body3
 
 
     print("PASS p0 wiring")

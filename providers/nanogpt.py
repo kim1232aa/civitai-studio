@@ -138,6 +138,22 @@ def _clamp_seed(raw):
     return n
 
 
+def _seed_clamp_meta(raw):
+    """Return dict with seedOriginal/seedClamped when _clamp_seed changes the value."""
+    clamped = _clamp_seed(raw)
+    if clamped is None:
+        return {}
+    try:
+        if raw in (None, "", "random"):
+            return {}
+        orig = int(raw)
+    except (TypeError, ValueError):
+        return {}
+    if orig != clamped:
+        return {"seedOriginal": orig, "seedClamped": True}
+    return {}
+
+
 def closest_aspect(w, h) -> str:
     try:
         w = int(w)
@@ -1015,8 +1031,10 @@ class NanoGptProvider(Provider):
         # Persist download API URL / versionId — never long-lived B2 signed query.
         persist_body = sanitize_submitted_for_persist(full, lora_meta)
         jid = f"nano-gpt|img|{uuid.uuid4().hex[:12]}"
+        # v0774: when int32 clamp changes seed, expose seedOriginal + seedClamped.
         # v0773: meta.seed prefers API response seed; fallback submitted.
         submitted_seed = full.get("seed")
+        seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         meta = {
             "backend": self.id,
             "serviceId": mid,
@@ -1026,6 +1044,8 @@ class NanoGptProvider(Provider):
             "jobId": jid,
             "submittedInput": persist_body,
         }
+        if seed_extra:
+            meta.update(seed_extra)
         headers = _auth()
         last = (502, {"error": "NanoGPT 出图失败"})
         for url, body in (
@@ -1045,7 +1065,7 @@ class NanoGptProvider(Provider):
             meta["seed"] = used_seed
             saved = _save_result(data, jid, meta)
             if saved:
-                return 200, {
+                out = {
                     "id": jid,
                     "status": "succeeded",
                     "backend": self.id,
@@ -1055,6 +1075,9 @@ class NanoGptProvider(Provider):
                     "seed": used_seed,
                     "cost": data.get("cost"),
                 }
+                if seed_extra:
+                    out.update(seed_extra)
+                return 200, out
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})
         return last
 
@@ -1082,6 +1105,7 @@ class NanoGptProvider(Provider):
             lora_meta = list(resolved or [])
         body = _video_body(pl, spec)
         persist_body = sanitize_submitted_for_persist(body, lora_meta)
+        seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         code, data = json_call(GEN_VIDEO, method="POST", headers=_auth(), body=body, timeout=90)
         if not isinstance(data, dict) or code >= 400:
             if isinstance(data, dict):
@@ -1095,7 +1119,7 @@ class NanoGptProvider(Provider):
                 jid = f"nano-gpt|vid|{uuid.uuid4().hex[:12]}"
                 resp_seed = _response_seed(data)
                 used_seed = resp_seed if resp_seed is not None else body.get("seed")
-                return 200, {
+                out = {
                     "id": jid,
                     "status": "succeeded",
                     "backend": self.id,
@@ -1103,11 +1127,14 @@ class NanoGptProvider(Provider):
                     "submittedInput": persist_body,
                     "seed": used_seed,
                 }
+                if seed_extra:
+                    out.update(seed_extra)
+                return 200, out
             return 502, {"error": "NanoGPT 视频没返回任务 id", "raw": json.dumps(data)[:400]}
         jid = f"nano-gpt|vid|{run}"
         resp_seed = _response_seed(data)
         used_seed = resp_seed if resp_seed is not None else body.get("seed")
-        return 200, {
+        out = {
             "id": jid,
             "status": (data.get("status") or "pending").lower(),
             "backend": self.id,
@@ -1116,6 +1143,9 @@ class NanoGptProvider(Provider):
             "seed": used_seed,
             "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
         }
+        if seed_extra:
+            out.update(seed_extra)
+        return 200, out
 
     def job_status(self, job_id: str):
         pid, rest = parse_job_id(job_id)
