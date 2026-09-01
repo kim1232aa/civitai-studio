@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
+import re
 import time
 import uuid
+import urllib.error
+import urllib.request
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlparse, urlunparse
 
 from .base import Provider
 from .http import collect_urls, extract_error, json_call, parse_job_id, save_bytes, save_media_urls
 from .io_meta import looks_like_civitai_service
 
 TOKEN_PATH = Path.home() / ".config/nano-gpt/token"
+CIVITAI_TOKEN_PATH = Path.home() / ".config/civitai/token"
 ROOT = Path(__file__).resolve().parent.parent
+_CIVITAI_DL_RE = re.compile(
+    r"^https?://(?:www\.)?civitai\.com/api/download/models/(\d+)(?:\?.*)?$",
+    re.I,
+)
+_HF_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BASE = "https://nano-gpt.com"
 API = BASE + "/api/v1"
 IMG_MODELS = API + "/images/models"
@@ -173,6 +183,326 @@ def pick_resolution(spec, w=None, h=None, preferred=None):
         parsed.sort(key=lambda t: -(t[0] * t[1]))
         return parsed[0][2]
     return res[0]
+
+
+
+def civitai_api_token() -> str:
+    """Local Civitai API key only — never sent to Nano, never appended as ?token=."""
+    try:
+        t = CIVITAI_TOKEN_PATH.read_text().strip()
+        if t:
+            return t
+    except Exception:
+        pass
+    return (
+        os.environ.get("CIVITAI_API_TOKEN")
+        or os.environ.get("CIVITAI_TOKEN")
+        or ""
+    ).strip()
+
+
+def is_signed_b2_url(url: str) -> bool:
+    u = (url or "").strip().lower()
+    return "b2.civitai.com" in u and "authorization=" in u
+
+
+def _strip_token_query(url: str) -> str:
+    """Drop ?token= / api key query leaks; keep fileId etc."""
+    p = urlparse((url or "").strip())
+    if not p.scheme:
+        return (url or "").strip()
+    q = [(k, v) for k, v in parse_qsl(p.query, keep_blank_values=True) if k.lower() != "token"]
+    return urlunparse((p.scheme, p.netloc, p.path, p.params, urlencode(q), ""))
+
+
+def civitai_version_id(item) -> str:
+    if isinstance(item, dict):
+        for k in ("versionId", "modelVersionId", "id"):
+            v = item.get(k)
+            if v is not None and str(v).isdigit():
+                return str(v)
+        for k in ("path", "downloadUrl", "url"):
+            m = _CIVITAI_DL_RE.match(_strip_token_query(str(item.get(k) or "")))
+            if m:
+                return m.group(1)
+    elif isinstance(item, str):
+        m = _CIVITAI_DL_RE.match(_strip_token_query(item))
+        if m:
+            return m.group(1)
+    return ""
+
+
+def civitai_download_api_url(item_or_url) -> str:
+    if isinstance(item_or_url, dict):
+        for k in ("downloadUrl", "path", "url"):
+            raw = (item_or_url.get(k) or "").strip()
+            if not raw or raw.lower().startswith("urn:"):
+                continue
+            cleaned = _strip_token_query(raw)
+            if _CIVITAI_DL_RE.match(cleaned.split("#")[0]) or "civitai.com/api/download/models/" in cleaned.lower():
+                return cleaned.split("#")[0]
+        vid = civitai_version_id(item_or_url)
+        if vid:
+            return "https://civitai.com/api/download/models/" + vid
+        return ""
+    s = _strip_token_query(str(item_or_url or ""))
+    if _CIVITAI_DL_RE.match(s.split("#")[0]) or "civitai.com/api/download/models/" in s.lower():
+        return s.split("#")[0]
+    if str(item_or_url).isdigit():
+        return "https://civitai.com/api/download/models/" + str(item_or_url)
+    return ""
+
+
+def _head_redirect_location(url: str, headers: dict, timeout: float = 30) -> str:
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: A002
+            return None
+
+    opener = urllib.request.build_opener(_NoRedirect)
+    base_headers = {
+        "User-Agent": "civitai-studio/nanogpt",
+        "Accept": "*/*",
+    }
+    base_headers.update(headers or {})
+    for method in ("HEAD", "GET"):
+        hdrs = dict(base_headers)
+        if method == "GET":
+            hdrs["Range"] = "bytes=0-0"
+        req = urllib.request.Request(url, method=method, headers=hdrs)
+        try:
+            with opener.open(req, timeout=timeout) as resp:
+                final = resp.geturl()
+                if final and final.rstrip("/") != url.rstrip("/"):
+                    return final
+                return ""
+        except urllib.error.HTTPError as e:
+            if e.code in (301, 302, 303, 307, 308):
+                loc = (e.headers.get("Location") or "").strip()
+                if loc.startswith("/"):
+                    loc = urljoin(url, loc)
+                return loc
+            continue
+        except Exception:
+            continue
+    return ""
+
+
+def resolve_civitai_b2_url(url: str, *, timeout: float = 30) -> str:
+    """At generate-time: civitai download URL → B2 signed Location.
+
+    Uses local ~/.config/civitai/token as Bearer only on the Civitai HEAD/GET.
+    Never appends ?token=. Never returns a URL that embeds the Civitai API key.
+    Public (unauth) 307 is OK when it already yields b2…Authorization=…
+    """
+    url = _strip_token_query((url or "").strip())
+    if not url:
+        raise ValueError("空 LoRA URL")
+    if is_signed_b2_url(url):
+        return url
+    if _HF_REPO_RE.match(url):
+        return url
+    if url.startswith("http") and "civitai.com/api/download/models/" not in url.lower():
+        # Already a direct non-Civitai URL (HF file, CDN, …)
+        return url
+    if not url.startswith("http"):
+        if _HF_REPO_RE.match(url):
+            return url
+        raise ValueError("LoRA 需要 http(s) 下载链或 versionId")
+
+    token = civitai_api_token()
+    attempts = []
+    if token:
+        attempts.append({"Authorization": "Bearer " + token})
+    attempts.append({})  # public / unauth fallback
+
+    last = ""
+    for hdrs in attempts:
+        loc = _head_redirect_location(url, hdrs, timeout=timeout)
+        last = loc or last
+        if not loc:
+            continue
+        loc = loc.strip()
+        # Refuse leaking Civitai API key via ?token=
+        if token and token in loc:
+            raise ValueError("拒绝把 Civitai API Key 写进 LoRA URL")
+        low = loc.lower()
+        if "token=" in low and "authorization=" not in low and "b2.civitai.com" not in low:
+            # civitai sometimes redirects with ?token= — strip and fail closed
+            raise ValueError("直链含 ?token=，拒绝发给 Nano")
+        if loc.startswith("http"):
+            return loc
+    raise ValueError("无法解析 B2 直链" + (f"（{last[:80]}）" if last else ""))
+
+
+def persist_safe_lora_path(path: str, version_id: str | None = None) -> str:
+    """Sidecar / remember: store download API URL or versionId — never long-lived B2 signed query."""
+    vid = str(version_id or "").strip()
+    if vid.isdigit():
+        return "https://civitai.com/api/download/models/" + vid
+    raw = (path or "").strip()
+    if not raw:
+        return ""
+    if is_signed_b2_url(raw) or "b2.civitai.com" in raw.lower():
+        p = urlparse(raw)
+        return urlunparse((p.scheme, p.netloc, p.path, "", "", ""))
+    cleaned = _strip_token_query(raw)
+    m = _CIVITAI_DL_RE.match(cleaned.split("#")[0])
+    if m:
+        # keep fileId if present (not a signed secret)
+        return cleaned.split("#")[0]
+    return cleaned
+
+
+def sanitize_submitted_for_persist(body: dict, lora_meta: list | None = None) -> dict:
+    out = copy.deepcopy(body or {})
+    meta = list(lora_meta or [])
+    loras = out.get("loras")
+    if isinstance(loras, list):
+        safe = []
+        for i, it in enumerate(loras):
+            if not isinstance(it, dict):
+                continue
+            m = meta[i] if i < len(meta) and isinstance(meta[i], dict) else {}
+            vid = m.get("versionId") or civitai_version_id(it) or civitai_version_id(m)
+            path = persist_safe_lora_path(it.get("path") or "", vid)
+            row = {"path": path, "scale": it.get("scale")}
+            if m.get("name"):
+                row["name"] = m.get("name")
+            if vid:
+                row["versionId"] = str(vid)
+            dl = m.get("downloadUrl") or (path if "civitai.com/api/download" in path else "")
+            if dl:
+                row["downloadUrl"] = persist_safe_lora_path(dl, vid)
+            safe.append(row)
+        out["loras"] = safe
+    for i in range(1, 4):
+        k = f"lora_{i}_url"
+        if k in out:
+            m = meta[i - 1] if i - 1 < len(meta) and isinstance(meta[i - 1], dict) else {}
+            vid = m.get("versionId") or ""
+            out[k] = persist_safe_lora_path(out.get(k) or "", vid)
+    return out
+
+
+def model_supports_lora(spec: dict | None, mid: str = "") -> bool:
+    sp = spec or {}
+    if sp.get("supportsLora"):
+        return True
+    blob = " ".join(
+        [
+            str(mid or ""),
+            str(sp.get("id") or ""),
+            str(sp.get("name") or ""),
+            " ".join(str(t) for t in (sp.get("tags") or [])),
+        ]
+    ).lower()
+    return "lora" in blob
+
+
+def resolve_nano_loras(payload: dict, *, timeout: float = 30):
+    """Resolve ≤3 LoRAs to clean B2 signed paths at generate time. Fail closed.
+
+    Returns (resolved_list, None) or (None, error_dict).
+    Partial failure → error (never silently drop while UI still shows the name).
+    """
+    raw = (payload or {}).get("loras") or []
+    if isinstance(raw, dict):
+        raw = [raw]
+    if not isinstance(raw, list):
+        raw = []
+    if not raw:
+        return [], None
+    if len(raw) > 3:
+        names = []
+        for it in raw:
+            if isinstance(it, dict):
+                names.append(str(it.get("name") or it.get("path") or it.get("versionId") or "LoRA"))
+            else:
+                names.append(str(it)[:60] or "LoRA")
+        return None, {
+            "error": f"NanoGPT 最多 3 条 LoRA（已选 {len(raw)}）",
+            "failed": [{"name": n, "error": "超过 3 条"} for n in names[3:]],
+            "code": "lora_too_many",
+        }
+
+    failed = []
+    out = []
+    for it in raw:
+        if isinstance(it, str):
+            name = it.strip() or "LoRA"
+            scale = 1.0
+            vid = civitai_version_id(it)
+            dl = civitai_download_api_url(it)
+            path_hint = it.strip()
+        elif isinstance(it, dict):
+            name = str(it.get("name") or it.get("path") or it.get("air") or "LoRA")
+            try:
+                raw_s = it.get("scale")
+                if raw_s is None:
+                    raw_s = it.get("strength")
+                scale = float(raw_s) if raw_s not in (None, "") else 1.0
+            except (TypeError, ValueError):
+                scale = 1.0
+            vid = civitai_version_id(it)
+            dl = civitai_download_api_url(it)
+            path_hint = (
+                (it.get("path") or it.get("downloadUrl") or it.get("url") or "").strip()
+            )
+            if (not path_hint or path_hint.lower().startswith("urn:")) and vid:
+                path_hint = "https://civitai.com/api/download/models/" + vid
+                dl = dl or path_hint
+        else:
+            failed.append({"name": "LoRA", "error": "条目格式无效"})
+            continue
+
+        scale = max(0.0, min(4.0, scale))
+        try:
+            if not path_hint or path_hint.lower().startswith("urn:"):
+                raise ValueError("无下载链 / versionId（无直链）")
+            if _HF_REPO_RE.match(path_hint):
+                resolved = path_hint
+            elif is_signed_b2_url(path_hint):
+                resolved = path_hint
+            elif "civitai.com/api/download/models/" in path_hint.lower() or vid:
+                target = dl or path_hint
+                if not target.startswith("http") and vid:
+                    target = "https://civitai.com/api/download/models/" + vid
+                resolved = resolve_civitai_b2_url(target, timeout=timeout)
+            elif path_hint.startswith("http"):
+                resolved = resolve_civitai_b2_url(path_hint, timeout=timeout)
+            else:
+                raise ValueError("无直链")
+            if not resolved or resolved.lower().startswith("urn:"):
+                raise ValueError("无直链")
+            # Final guard: never send Civitai API key to Nano
+            tok = civitai_api_token()
+            if tok and tok in resolved:
+                raise ValueError("拒绝泄露 Civitai API Key")
+            if "civitai.com/api/download" in resolved.lower() and "authorization=" not in resolved.lower():
+                # Still the API URL — Nano may not follow with our key; fail closed
+                raise ValueError("未拿到 B2 直链")
+            out.append({
+                "path": resolved,
+                "scale": scale,
+                "name": name,
+                "versionId": vid or "",
+                "downloadUrl": dl or (f"https://civitai.com/api/download/models/{vid}" if vid else ""),
+            })
+        except Exception as e:
+            failed.append({
+                "name": name,
+                "versionId": vid or "",
+                "error": str(e) or "无直链",
+            })
+
+    if failed:
+        label = "、".join(f.get("name") or "?" for f in failed)
+        return None, {
+            "error": f"LoRA 无直链：{label}",
+            "failed": failed,
+            "code": "lora_no_direct_url",
+        }
+    return out, None
 
 
 def _loras(payload: dict) -> list:
@@ -574,12 +904,32 @@ class NanoGptProvider(Provider):
                 "error": "当前 NanoGPT 模型目录没有 resolutions，请换一个带分辨率列表的目录模型（勿自拼 WxH）",
                 "serviceId": mid,
             }
-        full = _image_body(payload or {}, spec)
+        # v0769: resolve Civitai→B2 signed URL at generate time (signed URLs expire).
+        pl = dict(payload or {})
+        raw_loras = pl.get("loras") or []
+        if isinstance(raw_loras, dict):
+            raw_loras = [raw_loras]
+        lora_meta: list = []
+        if raw_loras:
+            if not model_supports_lora(spec, mid):
+                return 400, {
+                    "error": f"当前 Nano 模型不支持 LoRA，请改选 *-lora 模型（当前：{mid}）",
+                    "serviceId": mid,
+                    "code": "lora_model_unsupported",
+                }
+            resolved, err = resolve_nano_loras(pl)
+            if err:
+                return 400, err
+            pl["loras"] = resolved
+            lora_meta = list(resolved or [])
+        full = _image_body(pl, spec)
         if not full.get("resolution") and not full.get("size"):
             return 400, {
                 "error": "无法从目录选中 resolution token，请在构图里选一个目录分辨率",
                 "serviceId": mid,
             }
+        # Persist download API URL / versionId — never long-lived B2 signed query.
+        persist_body = sanitize_submitted_for_persist(full, lora_meta)
         jid = f"nano-gpt|img|{uuid.uuid4().hex[:12]}"
         meta = {
             "backend": self.id,
@@ -588,7 +938,7 @@ class NanoGptProvider(Provider):
             "negativePrompt": (payload or {}).get("negativePrompt"),
             "seed": full.get("seed"),
             "jobId": jid,
-            "submittedInput": full,
+            "submittedInput": persist_body,
         }
         headers = _auth()
         last = (502, {"error": "NanoGPT 出图失败"})
@@ -612,7 +962,7 @@ class NanoGptProvider(Provider):
                     "backend": self.id,
                     "endpoint": mid,
                     "saved": saved,
-                    "submittedInput": body,
+                    "submittedInput": sanitize_submitted_for_persist(body, lora_meta),
                     "cost": data.get("cost"),
                 }
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})

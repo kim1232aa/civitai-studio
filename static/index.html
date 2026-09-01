@@ -383,6 +383,8 @@
   .lora-name { font-size: 13px; font-weight: 500; }
   .lora-air { font-size: 11px; color: var(--muted); margin: 2px 0 0; word-break: break-all; }
   .lora-status { font-size: 11px; color: var(--buzz); margin: 2px 0 0; }
+  .lora.need-url { border-color: var(--accent); }
+  .lora-status.bad, .lora.need-url .lora-status { color: var(--accent) !important; }
   .lora-str { width: 72px !important; flex-shrink: 0; }
   .lora-del {
     padding: 6px 8px;
@@ -766,7 +768,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0768</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0769</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1010,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0768" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0769" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0768</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0769</div>
   </div>
 </aside>
 
@@ -1984,17 +1986,25 @@ function syncBackendChrome() {
     if (lbl) lbl.textContent = '搜索名字 / version id / AIR';
   }
 }
+function loraHasDirectPath(l) {
+  if (!l) return false;
+  if (l.path && !looksAir(l.path)) return true;
+  if (l.downloadUrl && !looksAir(l.downloadUrl)) return true;
+  if (l.versionId && /^\d+$/.test(String(l.versionId))) return true;
+  return false;
+}
 function renderLoras() {
   const box = $('loras');
   if (!box) return;
   box.innerHTML = loras.map((l, i) => {
     const sub = l.path || l.downloadUrl || l.air || '';
-    const needUrl = (backend === 'fal' || isNanogpt()) && !l.path && !l.downloadUrl && l.air;
-    const st = needUrl ? (l.status || '需要可抓取的 LoRA URL') : (l.status || '');
-    return `<div class="lora"><div class="top">
+    const needUrl = (backend === 'fal' || isNanogpt()) && !loraHasDirectPath(l);
+    const st = needUrl ? (l.status || '无直链') : (l.status || '');
+    const stCls = needUrl || st === '无直链' ? 'lora-status bad' : 'lora-status';
+    return `<div class="lora${needUrl ? ' need-url' : ''}"><div class="top">
       <div class="lora-info"><div class="lora-name">${esc(l.name||'LoRA')}</div>
       <div class="lora-air">${esc(sub)}</div>
-      ${st ? `<div class="lora-status">${esc(st)}</div>` : ''}
+      ${st ? `<div class="${stCls}">${esc(st)}</div>` : ''}
       </div>
       <input class="lora-str" type="number" step="0.05" min="0" max="2" value="${clampLoraScale(l.strength, 0.8)}" onchange="loras[${i}].strength=clampLoraScale(this.value,0.8);loras[${i}].scale=loras[${i}].strength">
       <button type="button" class="lora-del" onclick="loras.splice(${i},1);renderLoras()">删</button>
@@ -3150,6 +3160,29 @@ async function runGenerate() {
       syncPickedDockIfStale();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
+    // v0769: Nano LoRA — dock/block when model !supportsLora; red 「无直链」 if no path/versionId.
+    if (isNanogpt() && Array.isArray(loras) && loras.length) {
+      if (!supportsLora(selected)) {
+        fail('当前 Nano 模型不支持 LoRA，请改选 *-lora 模型');
+        return;
+      }
+      if (loras.length > 3) {
+        fail('NanoGPT 最多 3 条 LoRA（已选 ' + loras.length + '）');
+        return;
+      }
+      const bad = [];
+      loras.forEach((l) => {
+        if (!loraHasDirectPath(l)) {
+          l.status = '无直链';
+          bad.push(l.name || 'LoRA');
+        }
+      });
+      if (bad.length) {
+        renderLoras();
+        fail('LoRA 无直链：' + bad.join('、'));
+        return;
+      }
+    }
     const step = selected && selected.step;
     const gen = recipe !== 'workflow' && (step === 'imageGen' || step === 'videoGen' || !step);
     if (gen && !$('prompt').value.trim()) {
@@ -3232,6 +3265,19 @@ async function runGenerate() {
     }
     if (j.error || j.detail) {
       stopWait();
+      // v0769: mark per-item 无直链 when server lists failed LoRAs
+      try {
+        const failed = (j.failed || []).map(f => String((f && f.name) || '')).filter(Boolean);
+        if (failed.length && Array.isArray(loras)) {
+          loras.forEach(l => {
+            if (failed.indexOf(String(l.name || '')) >= 0) l.status = '无直链';
+          });
+          renderLoras();
+        } else if (String(j.code || '') === 'lora_no_direct_url' || /无直链/.test(String(j.error || ''))) {
+          loras.forEach(l => { if (!loraHasDirectPath(l)) l.status = '无直链'; });
+          renderLoras();
+        }
+      } catch (e0) {}
       fail('提交失败 ' + String(j.error || j.detail).slice(0, 300));
       return;
     }
@@ -3346,19 +3392,19 @@ $('searchLora').onclick = async () => {
 };
 function addLora(v) {
   const row = normalizeLora(v);
-  if (!row.air && !row.path) return;
-  if (backend === 'fal' && !row.path && row.air) row.status = 'Fal 需要可抓取的 URL';
+  if (!row.air && !row.path && !row.versionId) return;
+  if ((backend === 'fal' || isNanogpt()) && !loraHasDirectPath(row)) row.status = '无直链';
   loras.push(row);
   renderLoras();
   if ($('hits')) $('hits').innerHTML = '';
-  if (backend === 'fal' && row.air && !row.path) resolveLorasForBackend();
+  if ((backend === 'fal' || isNanogpt()) && row.air && !row.path) resolveLorasForBackend();
 }
 async function resolveOneLora(i) {
   const l = loras[i];
   if (!l || l.path) return;
   const vid = loraVersionId(l);
   if (!vid) {
-    l.status = 'Fal 需要可抓取的 URL';
+    l.status = '无直链';
     return;
   }
   try {
@@ -3370,10 +3416,10 @@ async function resolveOneLora(i) {
       if (!l.name || l.name === 'LoRA') l.name = v.model || v.name || l.name;
       l.status = '';
     } else {
-      l.status = 'Fal 需要可抓取的 URL';
+      l.status = '无直链';
     }
   } catch (e) {
-    l.status = 'Fal 需要可抓取的 URL';
+    l.status = '无直链';
   }
 }
 async function resolveLorasForBackend() {

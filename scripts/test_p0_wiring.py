@@ -484,9 +484,9 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0768"' in html
+    assert 'title="v0769"' in html
     assert 'aria-label="生成"' in html
-    assert 'aria-label="v0768"' not in html
+    assert 'aria-label="v0769"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
     assert "生成中不能切换配方" in sr
     assert "goBusy || generateLockId" in sr
@@ -538,7 +538,89 @@ console.log('PASS isMusePublicQwenImageCousin');
     r_mp = subprocess.run(["node", "-e", js_mp], capture_output=True, text=True)
     assert r_mp.returncode == 0, (r_mp.stdout, r_mp.stderr)
 
+
+    # v0769: NanoGPT Civitai→B2 resolve at generate; fail closed; no key leak
+    assert 'title="v0769"' in html
+    assert '无直链' in html
+    assert 'loraHasDirectPath' in html
+    assert 'lora_no_direct_url' in html or 'LoRA 无直链' in html
+    from providers.nanogpt import (
+        resolve_civitai_b2_url,
+        resolve_nano_loras,
+        sanitize_submitted_for_persist,
+        persist_safe_lora_path,
+        model_supports_lora,
+        civitai_api_token,
+        _strip_token_query,
+        is_signed_b2_url,
+    )
+    assert model_supports_lora({"supportsLora": True}, "z-image-turbo")
+    assert model_supports_lora({}, "z-image-turbo-lora")
+    assert not model_supports_lora({}, "z-image-turbo")
+    # strip ?token= never keep API key query
+    assert "token=" not in _strip_token_query(
+        "https://civitai.com/api/download/models/3231694?token=SECRET&fileId=1"
+    ).lower()
+    assert "fileId=1" in _strip_token_query(
+        "https://civitai.com/api/download/models/3231694?token=SECRET&fileId=1"
+    )
+    # Mock resolve: inject Location without network when possible — prefer live if token/public works,
+    # else unittest.mock.
+    import unittest.mock as mock
+    fake_b2 = (
+        "https://b2.civitai.com/file/civitai-modelfiles/model/1/x.safetensors"
+        "?Authorization=fake_sig&b2ContentDisposition=attachment"
+    )
+    with mock.patch("providers.nanogpt._head_redirect_location", return_value=fake_b2):
+        got = resolve_civitai_b2_url("https://civitai.com/api/download/models/3231694")
+        assert got == fake_b2
+        assert "token=" not in got.split("?")[0]
+        out, err = resolve_nano_loras({
+            "loras": [{"versionId": 3231694, "name": "Asian Mix", "scale": 0.8}]
+        })
+        assert err is None and out and out[0]["path"] == fake_b2
+        assert out[0]["versionId"] == "3231694"
+        safe = sanitize_submitted_for_persist(
+            {"loras": [{"path": fake_b2, "scale": 0.8}], "lora_1_url": fake_b2},
+            out,
+        )
+        assert safe["loras"][0]["path"] == "https://civitai.com/api/download/models/3231694"
+        assert "Authorization=" not in safe["loras"][0]["path"]
+        assert safe["lora_1_url"] == "https://civitai.com/api/download/models/3231694"
+    # Fail closed: AIR-only
+    out2, err2 = resolve_nano_loras({"loras": [{"air": "urn:air:x:lora:civitai:1@1", "name": "NoUrl"}]})
+    assert out2 is None and err2 and err2.get("code") == "lora_no_direct_url"
+    assert "无直链" in err2["error"]
+    # Fail closed: >3
+    out3, err3 = resolve_nano_loras({
+        "loras": [{"path": "https://civitai.com/api/download/models/%d" % i, "name": "L%d" % i} for i in range(4)]
+    })
+    assert err3 and err3.get("code") == "lora_too_many"
+    # Refuse key leak in Location
+    tok = civitai_api_token() or "TEST_CIVITAI_KEY_LEAK"
+    with mock.patch("providers.nanogpt.civitai_api_token", return_value=tok):
+        with mock.patch(
+            "providers.nanogpt._head_redirect_location",
+            return_value="https://evil.example/x?token=" + tok,
+        ):
+            try:
+                resolve_civitai_b2_url("https://civitai.com/api/download/models/1")
+                raise AssertionError("should have refused key leak")
+            except ValueError as e:
+                assert "token" in str(e).lower() or "Key" in str(e) or "泄露" in str(e) or "拒绝" in str(e)
+    # persist_safe strips B2 auth query
+    assert "Authorization=" not in persist_safe_lora_path(fake_b2, "3231694")
+    assert is_signed_b2_url(fake_b2)
+    # _generate_image wires resolve (source markers)
+    nano_src = (Path(__file__).resolve().parent.parent / "providers" / "nanogpt.py").read_text()
+    assert "resolve_nano_loras" in nano_src
+    assert "sanitize_submitted_for_persist" in nano_src
+    assert "model_supports_lora" in nano_src
+    assert "CIVITAI_TOKEN_PATH" in nano_src
+    assert 'code": "lora_model_unsupported"' in nano_src or "lora_model_unsupported" in nano_src
+
     print("PASS p0 wiring")
+
 
     return 0
 
