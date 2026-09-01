@@ -188,9 +188,9 @@ def lora_map(payload: dict) -> dict:
 def _set_int(inp, payload, key, lo=None, hi=None):
     if payload.get(key) in (None, ""):
         return
-    try:
-        v = int(payload[key])
-    except (TypeError, ValueError):
+    from .io_meta import coerce_int
+    v = coerce_int(payload.get(key), None)
+    if v is None:
         return
     if lo is not None:
         v = max(lo, v)
@@ -818,8 +818,32 @@ def import_image(image_id: str) -> dict:
         })
         checkpoint_air = guessed.get("diffusionModel") or ""
         checkpoint_name = guessed.get("checkpointName") or checkpoint_name
-    w = int(meta.get("width") or info_js.get("width") or public_row.get("width") or 960)
-    h = int(meta.get("height") or info_js.get("height") or public_row.get("height") or 1440)
+    from .io_meta import coerce_int, dims_from_selector, first_int
+    selector = None
+    for cand in (file_parsed, meta, info_js, public_row):
+        if isinstance(cand, dict):
+            selector = dims_from_selector(cand) or selector
+            for nested in (cand.get("width"), cand.get("inputs"), cand):
+                if isinstance(nested, dict) and selector is None:
+                    selector = dims_from_selector(nested)
+    w = first_int(
+        file_parsed.get("width") if isinstance(file_parsed, dict) else None,
+        selector[0] if selector else None,
+        meta.get("width"),
+        info_js.get("width"),
+        public_row.get("width"),
+        960,
+    )
+    h = first_int(
+        file_parsed.get("height") if isinstance(file_parsed, dict) else None,
+        selector[1] if selector else None,
+        meta.get("height"),
+        info_js.get("height"),
+        public_row.get("height"),
+        1440,
+    )
+    w = coerce_int(w, 960) or 960
+    h = coerce_int(h, 1440) or 1440
     w = max(64, min(2048, (w // 16) * 16 or 16))
     h = max(64, min(2048, (h // 16) * 16 or 16))
     kind = "video" if str(media_type) == "video" or "minimax" in (checkpoint_air or "").lower() else "image"
@@ -988,6 +1012,35 @@ def _wait_snapshot(data: dict) -> dict:
         "log": None,
     }
 
+
+def _wants_custom_comfy(payload: dict) -> bool:
+    """True only when the user is on the workflow tab / sending a graph.
+
+    A Civitai imageGen serviceId like image/comfy/krea2/... is NOT customComfy.
+    """
+    pld = payload or {}
+    if pld.get("recipe") == "workflow":
+        return True
+    if pld.get("step") == "customComfy":
+        return True
+    if pld.get("comfyWorkflow") or pld.get("workflow"):
+        return True
+    return False
+
+
+def _resource_airs(payload: dict) -> list:
+    raw = (payload or {}).get("resources") or []
+    out = []
+    for x in raw if isinstance(raw, list) else []:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+        elif isinstance(x, dict):
+            air = (x.get("air") or x.get("urn") or "").strip()
+            if air:
+                out.append(air)
+    return out
+
+
 class CivitaiProvider(Provider):
     id = "civitai"
     label = "Civitai"
@@ -1050,7 +1103,7 @@ class CivitaiProvider(Provider):
         return pid == self.id
 
     def generate(self, payload: dict):
-        if (payload or {}).get("comfyWorkflow") or (payload or {}).get("step") == "customComfy":
+        if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=False)
         body = build_workflow(payload or {})
         meta = body.pop("_meta", {})
@@ -1064,7 +1117,7 @@ class CivitaiProvider(Provider):
         return code, data
 
     def whatif(self, payload: dict):
-        if (payload or {}).get("comfyWorkflow") or (payload or {}).get("step") == "customComfy":
+        if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=True)
         body = build_workflow(payload or {})
         meta = body.pop("_meta", {})

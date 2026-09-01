@@ -776,9 +776,18 @@ def job_status(job_id: str):
     data["id"] = job_id
     logs = data.get("logs") or []
     last = None
+    log_blob = ""
     if logs:
-        msg = logs[-1]
-        last = msg.get("message") if isinstance(msg, dict) else str(msg)
+        parts = []
+        for msg in logs:
+            if isinstance(msg, dict):
+                parts.append(str(msg.get("message") or msg.get("error") or ""))
+            else:
+                parts.append(str(msg))
+        last = parts[-1] if parts else None
+        log_blob = " ".join(parts)
+    extra_err = data.get("error") or data.get("detail") or data.get("message") or ""
+    log_blob = f"{log_blob} {extra_err} {json.dumps(data, default=str)[:1200]}"
     ahead = data.get("queue_position") if st == "IN_QUEUE" else None
     data["wait"] = {
         "progress": None,
@@ -787,6 +796,12 @@ def job_status(job_id: str):
         "completeAt": None,
         "log": last,
     }
+    if data["status"] not in ("succeeded", "canceled", "cancelled") and (
+        code == 422 or " 422" in log_blob or "HTTP 422" in log_blob or '"status": 422' in log_blob
+        or "Unprocessable" in log_blob
+    ):
+        data["status"] = "failed"
+        data["error"] = data.get("error") or last or "Fal 422：请求不被接受（字段/模型不匹配）"
     if data["status"] == "succeeded":
         rc, result = _try_get(result_urls(eid, rid, meta, data), need_media=True)
         if rc in (404, 405) or not (rc == 200 and isinstance(result, dict) and collect_urls(result)):

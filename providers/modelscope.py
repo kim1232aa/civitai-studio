@@ -73,6 +73,22 @@ def model_id(service_id: str) -> str:
     return s
 
 
+def _clamp_seed(raw):
+    """ModelScope AIGC: seed in [-1, 2147483647]. Huge Civitai seeds wrap, not drop."""
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if n < -1:
+        return -1
+    limit = 2147483647
+    if n > limit:
+        n = n % limit
+        if n == 0:
+            n = limit
+    return n
+
+
 def _modelscope_loras(payload: dict):
     """Official AIGC field: loras is a repo id string or {repo: weight} summing to 1.0."""
     raw = payload.get("loras") or []
@@ -399,10 +415,9 @@ class ModelScopeProvider(Provider):
         if payload.get("negativePrompt"):
             body["negative_prompt"] = payload["negativePrompt"]
         if payload.get("seed") not in (None, "", "random"):
-            try:
-                body["seed"] = int(payload["seed"])
-            except (TypeError, ValueError):
-                pass
+            seed = _clamp_seed(payload.get("seed"))
+            if seed is not None:
+                body["seed"] = seed
         if payload.get("steps"):
             try:
                 body["steps"] = int(payload["steps"])

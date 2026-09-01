@@ -114,6 +114,7 @@ def save_media_urls(urls, stem, out_dir=None, meta=None):
         name = f"{stem}_{i}{ext}"
         (out / name).write_bytes(raw)
         saved.append({"file": name, "url": f"/out/{name}", "bytes": len(raw), "kind": kind})
+    saved = drop_blank_saved(saved, out)
     if meta:
         write_sidecar(saved, meta, out)
     return saved
@@ -219,21 +220,41 @@ def raw_call(url: str, method="POST", headers=None, body=None, timeout=120):
 
 
 def is_blank_image(path=None, raw=None) -> bool:
-    """True if the file is a real image but essentially all black."""
+    """True if the file is a real PNG that is essentially all black. Stdlib only."""
+    import zlib
     try:
-        from PIL import Image
-        import io
         if raw is None and path:
             raw = Path(path).read_bytes()
         if not raw:
             return True
-        im = Image.open(io.BytesIO(raw)).convert("RGB")
-        sample = im.resize((32, 32))
-        pixels = list(sample.getdata())
-        if not pixels:
+        if raw[:8] != b"\x89PNG\r\n\x1a\n":
+            return False
+        offset = 8
+        n = len(raw)
+        idat = []
+        w = h = 0
+        while offset + 12 <= n:
+            length = int.from_bytes(raw[offset:offset + 4], "big")
+            ctype = raw[offset + 4:offset + 8]
+            start = offset + 8
+            end = start + length
+            if end + 4 > n:
+                break
+            chunk = raw[start:end]
+            if ctype == b"IHDR" and length >= 8:
+                w = int.from_bytes(chunk[0:4], "big")
+                h = int.from_bytes(chunk[4:8], "big")
+            elif ctype == b"IDAT":
+                idat.append(chunk)
+            elif ctype == b"IEND":
+                break
+            offset = end + 4
+        if not idat or w <= 0 or h <= 0:
+            return False
+        data = zlib.decompress(b"".join(idat))
+        if not data:
             return True
-        avg = sum(p[0] + p[1] + p[2] for p in pixels) / (3 * len(pixels))
-        return avg < 6
+        return (sum(data) / len(data)) < 3.0
     except Exception:
         return False
 
@@ -250,6 +271,10 @@ def drop_blank_saved(saved, out_dir=None):
         if fp and fp.exists():
             raw = fp.read_bytes()
         if raw and is_blank_image(raw=raw):
+            try:
+                fp.unlink()
+            except Exception:
+                pass
             continue
         kept.append(item)
     return kept
@@ -265,6 +290,7 @@ def save_bytes(raw: bytes, stem, out_dir=None, meta=None):
     name = f"{str(stem or 'media').replace('|', '_').replace('/', '_')}_0{ext}"
     (out / name).write_bytes(raw)
     saved = [{"file": name, "url": f"/out/{name}", "bytes": len(raw), "kind": kind}]
+    saved = drop_blank_saved(saved, out)
     if meta:
         write_sidecar(saved, meta, out)
     return saved

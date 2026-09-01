@@ -325,6 +325,108 @@ def parse_a1111(text: str) -> dict:
     return {k: v for k, v in out.items() if v not in (None, "")}
 
 
+def coerce_int(val, default=None):
+    """int() that will not explode on a Comfy node dict or ["node", 0] link."""
+    if val is None or val is False:
+        return default
+    if isinstance(val, bool):
+        return default
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        if val != val:  # NaN
+            return default
+        return int(val)
+    if isinstance(val, str):
+        s = val.strip()
+        if not s:
+            return default
+        try:
+            return int(s, 10)
+        except ValueError:
+            try:
+                return int(float(s))
+            except ValueError:
+                m = re.search(r"-?\d+", s)
+                return int(m.group(0)) if m else default
+    if isinstance(val, (list, tuple)):
+        if not val:
+            return default
+        return coerce_int(val[0], default)
+    if isinstance(val, dict):
+        dims = dims_from_selector(val)
+        if dims:
+            return dims[0]
+        for key in ("width", "height", "value", "int", "seed", "steps", "multiple"):
+            if key in val:
+                n = coerce_int(val.get(key), None)
+                if n is not None:
+                    return n
+        inputs = val.get("inputs")
+        if isinstance(inputs, dict):
+            return coerce_int(inputs, default)
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def first_int(*vals, default=None):
+    for v in vals:
+        n = coerce_int(v, None)
+        if n is not None:
+            return n
+    return default
+
+
+def dims_from_selector(node):
+    """ResolutionSelector (megapixels + aspect_ratio + multiple) → (w, h) ints."""
+    if not isinstance(node, dict):
+        return None
+    src = node.get("inputs") if isinstance(node.get("inputs"), dict) else node
+    if not isinstance(src, dict):
+        src = node
+    ctype = str(node.get("class_type") or node.get("type") or "")
+    ar = str(src.get("aspect_ratio") or src.get("aspect") or src.get("ratio") or "")
+    mp = src.get("megapixels")
+    if mp is None:
+        mp = src.get("mp") or src.get("target_megapixels")
+    looks = ("ResolutionSelector" in ctype) or (ar and mp is not None)
+    w_direct = coerce_int(src.get("width"), None)
+    h_direct = coerce_int(src.get("height"), None)
+    if w_direct and h_direct and w_direct >= 64 and h_direct >= 64 and not looks:
+        return (w_direct, h_direct)
+    if not looks and not (w_direct and h_direct):
+        return None
+    m = re.search(r"(\d+)\s*[:/x×]\s*(\d+)", ar)
+    if m:
+        aw, ah = int(m.group(1)), int(m.group(2))
+    else:
+        aw, ah = 1, 1
+    if aw <= 0 or ah <= 0:
+        aw, ah = 1, 1
+    try:
+        megapixels = float(mp) if mp not in (None, "") else 1.0
+    except (TypeError, ValueError):
+        megapixels = 1.0
+    if megapixels <= 0:
+        megapixels = 1.0
+    multiple = coerce_int(src.get("multiple") or src.get("divisible") or 64, 64) or 64
+    if multiple < 8:
+        multiple = 8
+    pixels = megapixels * 1_000_000.0
+    import math
+    w = math.sqrt(pixels * aw / ah)
+    h = w * ah / aw
+
+    def snap(n):
+        n = int(round(n / multiple) * multiple)
+        return max(multiple, n)
+
+    return (snap(w), snap(h))
+
+
 def _comfy_lookup(by_id: dict, val, prefer_keys=()):
     """Resolve Comfy link ["nodeId", port] to a scalar when possible."""
     if not (isinstance(val, list) and val):
@@ -418,6 +520,13 @@ def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
             take("sampler_name", "sampler", str)
             take("scheduler", "scheduler", str)
             take("denoise", "denoise", float)
+        if "ResolutionSelector" in ctype or (
+            isinstance(inputs, dict) and ("megapixels" in inputs or "aspect_ratio" in inputs)
+            and not out.get("width")
+        ):
+            wh = dims_from_selector(node)
+            if wh:
+                out["width"], out["height"] = wh
         if ctype in ("SeedNode", "Seed", "PrimitiveInt", "ImpactInt"):
             seed_val = inputs.get("seed") if isinstance(inputs, dict) else None
             if seed_val in (None, "") and widgets:
@@ -450,13 +559,12 @@ def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
                 h = _comfy_lookup(by_id, h, ("height",))
             if w is None and len(widgets) >= 2:
                 w, h = widgets[0], widgets[1]
-            try:
-                if w:
-                    out["width"] = int(w)
-                if h:
-                    out["height"] = int(h)
-            except (TypeError, ValueError):
-                pass
+            wi = coerce_int(w, None)
+            hi = coerce_int(h, None)
+            if wi:
+                out["width"] = wi
+            if hi:
+                out["height"] = hi
         extra_types = ("SeedVR2", "Upscale", "ControlNet", "IPAdapter", "InstantID", "PuLID")
         if any(tok.lower() in ctype.lower() for tok in extra_types):
             extras.append(ctype)
