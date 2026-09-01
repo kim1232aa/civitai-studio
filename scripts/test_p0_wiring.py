@@ -372,13 +372,80 @@ console.log('PASS isForbiddenHubRemap');
     assert "early single-flight" in html
     assert "only html onclick=__studioGo" in html
     assert "go.addEventListener" not in html
-    assert "v0764" in html
+    assert "v0765" in html
 
     # server refuse mismatched model
     ms = (Path(__file__).resolve().parent.parent / "providers" / "modelscope.py").read_text()
     assert "模型 id 不一致" in ms
 
+
+    # v0765: applyImport must not invoke pickForBackend (exact Hub freeze only)
+    import re as _re
+    m_ai = _re.search(r"function applyImport\(j\) \{", html)
+    assert m_ai, "applyImport missing"
+    _i = m_ai.end() - 1
+    _depth = 0
+    _end = None
+    for _j in range(_i, len(html)):
+        if html[_j] == "{":
+            _depth += 1
+        elif html[_j] == "}":
+            _depth -= 1
+            if _depth == 0:
+                _end = _j + 1
+                break
+    assert _end, "applyImport brace match failed"
+    ai_body = html[m_ai.start():_end]
+    assert "pickForBackend(" not in ai_body, "applyImport must not call pickForBackend"
+    assert "resolveExactHubFromImport" in ai_body
+    assert "function resolveExactHubFromImport" in html
+    assert "function exactRepoNamedIn" in html
+    assert "请先点选确切模型" in html
+    # unit exactRepoNamedIn + resolveExactHubFromImport via node
+    m_ex = _re.search(r"function exactRepoNamedIn\(text, repo\) \{[\s\S]*?\n\}", html)
+    m_re = _re.search(r"function resolveExactHubFromImport\(j\) \{[\s\S]*?\n\}", html)
+    assert m_ex and m_re
+    # stub findCatalogItem / looksCivitaiId for unit
+    js3 = m_ex.group(0) + """
+const catalog = [
+  {id:'Qwen/Qwen-Image'},
+  {id:'Qwen/Qwen-Image-2512'},
+  {id:'MusePublic/Qwen-image'},
+  {id:'Tongyi-MAI/Z-Image-Turbo'},
+];
+function findCatalogItem(id) {
+  id = String(id == null ? '' : id);
+  if (!id) return null;
+  return catalog.find(x => String(x.id) === id) || null;
+}
+function looksCivitaiId(s) {
+  s = String(s || '');
+  return /^(image|video|audio|3d|utility)\\//.test(s) || /\\/comfy\\//.test(s);
+}
+""" + m_re.group(0) + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(exactRepoNamedIn('Qwen/Qwen-Image', 'Qwen/Qwen-Image') === true, 'exact');
+assert(exactRepoNamedIn('foo Qwen/Qwen-Image-2512 bar', 'Qwen/Qwen-Image') === false, '2512 must not match Qwen-Image');
+assert(exactRepoNamedIn('MusePublic/Qwen-image', 'Qwen/Qwen-Image') === false, 'MusePublic');
+assert(exactRepoNamedIn('use Qwen/Qwen-Image please', 'Qwen/Qwen-Image') === true, 'token');
+let hit = resolveExactHubFromImport({checkpointName:'Qwen/Qwen-Image'});
+assert(hit && hit.id === 'Qwen/Qwen-Image', 'checkpoint exact');
+hit = resolveExactHubFromImport({checkpointName:'Qwen/Qwen-Image-2512'});
+assert(!hit || hit.id !== 'Qwen/Qwen-Image', '2512 must not resolve to Qwen-Image');
+hit = resolveExactHubFromImport({hubModel:'Tongyi-MAI/Z-Image-Turbo'});
+assert(hit && hit.id === 'Tongyi-MAI/Z-Image-Turbo', 'hubModel');
+hit = resolveExactHubFromImport({checkpointName:'some random civitai ckpt'});
+assert(hit === null, 'unknown null');
+hit = resolveExactHubFromImport({serviceId:'MusePublic/Qwen-image'});
+assert(hit && hit.id === 'MusePublic/Qwen-image', 'exact MusePublic id ok if literally imported');
+console.log('PASS resolveExactHubFromImport');
+"""
+    r3 = subprocess.run(["node", "-e", js3], capture_output=True, text=True)
+    assert r3.returncode == 0, (r3.stdout, r3.stderr)
+    assert "PASS resolveExactHubFromImport" in (r3.stdout or "")
+
     print("PASS p0 wiring")
+
     return 0
 
 

@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0764</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0765</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0764" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0765" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0764</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0765</div>
   </div>
 </aside>
 
@@ -2564,6 +2564,63 @@ function selectServiceById(id, opts) {
   scrollSvcOnIntoView();
   return true;
 }
+
+function exactRepoNamedIn(text, repo) {
+  // Exact repo token only — "Qwen/Qwen-Image" must not hit inside "Qwen/Qwen-Image-2512".
+  const t = String(text || '');
+  const r = String(repo || '');
+  if (!t || !r) return false;
+  let from = 0;
+  while (true) {
+    const i = t.indexOf(r, from);
+    if (i < 0) return false;
+    const after = t[i + r.length] || '';
+    if (!after || !/[A-Za-z0-9._\-\/]/.test(after)) return true;
+    from = i + 1;
+  }
+}
+function resolveExactHubFromImport(j) {
+  // Exact Hub catalog id from import metadata only. Never pickForBackend / includes() cousins.
+  if (!j) return null;
+  const allow = {
+    'Tongyi-MAI/Z-Image-Turbo': 'Tongyi-MAI/Z-Image-Turbo',
+    'Z-Image-Turbo': 'Tongyi-MAI/Z-Image-Turbo',
+    'Qwen/Qwen-Image': 'Qwen/Qwen-Image',
+    'Qwen/Qwen-Image-Edit': 'Qwen/Qwen-Image-Edit',
+    'black-forest-labs/FLUX.1-schnell': 'black-forest-labs/FLUX.1-schnell',
+    'black-forest-labs/FLUX.1-Krea-dev': 'black-forest-labs/FLUX.1-Krea-dev',
+    'tencent/HunyuanVideo': 'tencent/HunyuanVideo',
+  };
+  const knownRepos = [
+    'Qwen/Qwen-Image-Edit',
+    'Qwen/Qwen-Image',
+    'Tongyi-MAI/Z-Image-Turbo',
+    'black-forest-labs/FLUX.1-Krea-dev',
+    'black-forest-labs/FLUX.1-schnell',
+    'tencent/HunyuanVideo',
+  ];
+  const fields = [j.hubModel, j.modelId, j.serviceId, j.baseModel, j.checkpointName, j.diffusionModel, j.ecosystem];
+  for (let i = 0; i < fields.length; i++) {
+    const s = String(fields[i] == null ? '' : fields[i]).trim();
+    if (!s) continue;
+    if (looksCivitaiId(s)) continue;
+    const mapped = allow[s];
+    if (mapped) {
+      const hit = findCatalogItem(mapped);
+      if (hit && String(hit.id) === String(mapped)) return hit;
+    }
+    const hit = findCatalogItem(s);
+    if (hit && String(hit.id) === s) return hit;
+  }
+  const blob = fields.map(x => String(x == null ? '' : x)).join('\n');
+  for (let i = 0; i < knownRepos.length; i++) {
+    const repo = knownRepos[i];
+    if (!exactRepoNamedIn(blob, repo)) continue;
+    const hit = findCatalogItem(repo);
+    if (hit && String(hit.id) === repo) return hit;
+  }
+  return null;
+}
 function applyImport(j) {
   lastImport = j || lastImport;
   const civitaiSid = looksCivitaiId(j.serviceId);
@@ -2620,21 +2677,17 @@ function applyImport(j) {
   if (j.sourceImage) $('sourceImage').value = j.sourceImage;
   else if (j.kind !== 'video' && $('sourceImage')) $('sourceImage').value = '';
   if (backend !== 'civitai') {
-    // v0764 import freeze: land on exact Hub catalog id only; store userPickedId.
+    // v0765: NEVER auto-pick backend prefs here — exact Hub id from import meta only; else leave null.
     if (!userPickedId) {
-      if (!currentServiceId()) pickForBackend();
-      const sid = currentServiceId();
-      if (sid) {
-        const keep = findCatalogItem(sid);
-        if (!keep || String(keep.id) !== String(sid)) {
-          setDock('导入未精确匹配目录模型：' + sid + '（请点选确切 id，禁止模糊）', 'bad');
-          selected = null;
-          copyPicked(null);
-          userPickedId = null;
-        } else {
-          userPickedId = keep.id;
-          selectService(keep, { user: true });
-        }
+      const keep = resolveExactHubFromImport(j);
+      if (keep) {
+        selectService(keep, { user: true });
+      } else {
+        selected = null;
+        copyPicked(null);
+        userPickedId = null;
+        setDock('导入未精确匹配目录模型（请点选确切 id，禁止模糊/自动代点）', 'warn');
+        showPickedChip();
       }
     } else {
       const keep = findCatalogItem(userPickedId);
@@ -2863,16 +2916,8 @@ async function runGenerate() {
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
   lastGoClick = Date.now();
   lastGoStart = Date.now();
-  // Hard-lock: after import, userPickedId is required; else freeze visible exact id.
+  // Hard-lock: userPickedId required (exact click or exact Hub import). Never pickForBackend.
   // POST body.serviceId AND model MUST === frozenPickId. No MusePublic/2512 remap.
-  if (lastImport && (isModelscope() || backend === 'huggingface') && !userPickedId) {
-    const sid0 = (selected && selected.id) || currentServiceId() || '';
-    if (sid0 && findCatalogItem(sid0)) userPickedId = sid0;
-  }
-  const frozenPickId = String(userPickedId || (selected && selected.id) || currentServiceId() || '');
-  const frozenRecipe = recipe;
-  if (frozenPickId && !userPickedId) userPickedId = frozenPickId;
-  const frozenPick = frozenPickId || null;
   const fail = (msg) => {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
@@ -2881,6 +2926,9 @@ async function runGenerate() {
     setDock(msg, 'bad');
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
   };
+  const frozenRecipe = recipe;
+  let frozenPickId = '';
+  let frozenPick = null;
   try {
     if (recipe === 'workflow') {
       if (!(wfState && wfState.workflowApi)) { fail('先导入工作流'); return; }
@@ -2908,6 +2956,15 @@ async function runGenerate() {
         return;
       }
     } else {
+      // v0765: require userPickedId (exact click / exact Hub import). Never pickForBackend.
+      // Civitai import may have selected serviceId without row click — adopt that exact id only.
+      if (!userPickedId && backend === 'civitai') {
+        const sidC = currentServiceId();
+        if (sidC && findCatalogItem(sidC)) userPickedId = sidC;
+      }
+      if (!userPickedId) { fail('请先点选确切模型'); return; }
+      frozenPickId = String(userPickedId);
+      frozenPick = frozenPickId;
       // Exact restore of frozen user pick — never pickForBackend / cousin when set.
       // Ban MusePublic / 2512 remap lists during generate.
       if (frozenPick) {
@@ -2925,7 +2982,7 @@ async function runGenerate() {
         if (picked) picked.serviceId = frozenPick;
       }
       // NEVER pickForBackend during generate — would hit MusePublic/prefs remap.
-      if (!currentServiceId()) { fail('先点列表里的一个模型'); return; }
+      if (!currentServiceId()) { fail('请先点选确切模型'); return; }
       if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
       // Re-assert exact freeze — cousin / auto-pick must not replace.
       if (frozenPick && selected && String(selected.id) !== frozenPick) {
@@ -3258,7 +3315,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       if (keep) selectService(keep);
       else setDock('已选模型不在当前目录：' + userPickedId + '（请重新点选确切 id）', 'bad');
     } else if (backend !== 'civitai' && !selectionLocked() && !lastImport) {
-      // v0764: after import, never auto remap via pickForBackend (MusePublic/2512).
+      // v0765: after import, never auto remap via pickForBackend (MusePublic/2512).
       pickForBackend();
     }
     const n = catalog.length;
@@ -3335,8 +3392,11 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
         setDock('正在加载 ' + (p.label || p.id) + '…');
         try {
           await loadCatalog();
-          if (backend !== 'civitai' && !userPickedId) {
+          // v0765: never pickForBackend on a post-import auto path that could freeze cousins.
+          if (backend !== 'civitai' && !userPickedId && !lastImport) {
             pickForBackend();
+            resolveLorasForBackend();
+          } else if (backend !== 'civitai' && userPickedId) {
             resolveLorasForBackend();
           }
           updateFields();
