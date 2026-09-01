@@ -543,6 +543,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert 'title="v0769"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
+    assert 'lora-miss-chip' in html
     assert 'lora_no_direct_url' in html or 'LoRA 无直链' in html
     from providers.nanogpt import (
         resolve_civitai_b2_url,

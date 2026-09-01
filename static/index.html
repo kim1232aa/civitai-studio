@@ -385,6 +385,19 @@
   .lora-status { font-size: 11px; color: var(--buzz); margin: 2px 0 0; }
   .lora.need-url { border-color: var(--accent); }
   .lora-status.bad, .lora.need-url .lora-status { color: var(--accent) !important; }
+  .lora-miss-chip {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    padding: 1px 7px;
+    border-radius: 999px;
+    color: var(--accent);
+    background: rgba(255, 77, 61, .14);
+    border: 1px solid rgba(255, 77, 61, .55);
+  }
   .lora-str { width: 72px !important; flex-shrink: 0; }
   .lora-del {
     padding: 6px 8px;
@@ -2001,8 +2014,9 @@ function renderLoras() {
     const needUrl = (backend === 'fal' || isNanogpt()) && !loraHasDirectPath(l);
     const st = needUrl ? (l.status || '无直链') : (l.status || '');
     const stCls = needUrl || st === '无直链' ? 'lora-status bad' : 'lora-status';
+    const chip = needUrl ? '<span class="lora-miss-chip">无直链</span>' : '';
     return `<div class="lora${needUrl ? ' need-url' : ''}"><div class="top">
-      <div class="lora-info"><div class="lora-name">${esc(l.name||'LoRA')}</div>
+      <div class="lora-info"><div class="lora-name">${esc(l.name||'LoRA')}${chip}</div>
       <div class="lora-air">${esc(sub)}</div>
       ${st ? `<div class="${stCls}">${esc(st)}</div>` : ''}
       </div>
