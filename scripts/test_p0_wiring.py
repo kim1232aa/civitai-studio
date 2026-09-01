@@ -484,9 +484,9 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0771"' in html
+    assert 'title="v0772"' in html
     assert 'aria-label="生成"' in html
-    assert 'aria-label="v0771"' not in html
+    assert 'aria-label="v0772"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
     assert "生成中不能切换配方" in sr
     assert "goBusy || generateLockId" in sr
@@ -540,7 +540,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0771"' in html
+    assert 'title="v0772"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -652,6 +652,52 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "def _generate_video" in nano_src
     assert nano_src.count("resolve_nano_loras") >= 2  # image + video
     assert "video path also runs resolve_nano_loras" in nano_src
+
+    # v0772: Nano prompt length precheck (server + FE) — do not waste a generate
+    from providers.nanogpt import prompt_length_error, NANO_PROMPT_MAX, NanoGptProvider
+    assert NANO_PROMPT_MAX == 1200
+    assert prompt_length_error("x" * 1200) is None
+    assert prompt_length_error("ok") is None
+    assert prompt_length_error("") is None
+    assert prompt_length_error(None) is None
+    err_long = prompt_length_error("y" * 1408)
+    assert err_long and err_long.get("code") == "prompt_too_long"
+    assert err_long["length"] == 1408 and err_long["max"] == 1200 and err_long["limit"] == 1200
+    assert "1408/1200" in err_long["error"]
+    assert "提示词过长" in err_long["error"]
+    # Provider generate path returns 400 before Nano API when overlong
+    prov = NanoGptProvider()
+    # Patch nano_key so we get past auth; prompt gate runs in _generate_image/_video
+    import unittest.mock as mock
+    with mock.patch("providers.nanogpt.nano_key", return_value="test-key"):
+        with mock.patch("providers.nanogpt.find_spec", return_value={
+            "id": "wavespeed-ai/krea-v2/turbo",
+            "category": "image",
+            "supported_parameters": {"resolutions": ["1024x1024"]},
+            "capabilities": {},
+        }):
+            with mock.patch("providers.nanogpt.json_call") as jc:
+                code, body = prov.generate({
+                    "serviceId": "wavespeed-ai/krea-v2/turbo",
+                    "prompt": "z" * 1408,
+                    "width": 1024,
+                    "height": 1024,
+                })
+                assert code == 400, (code, body)
+                assert body.get("code") == "prompt_too_long"
+                assert body.get("length") == 1408 and body.get("max") == 1200
+                assert not jc.called, "must not call Nano API when prompt_too_long"
+    # FE: constant + precheck + truncate + import/switch warn
+    assert "NANO_PROMPT_MAX = 1200" in html
+    assert "提示词过长" in html
+    assert "nPrompt > NANO_PROMPT_MAX" in html
+    assert "截断到 1200" in html
+    assert "truncateNanoPrompt" in html
+    assert "syncNanoPromptHint" in html
+    assert "nanoPromptHint" in html
+    assert 'title="v0772"' in html
+    assert "prompt_length_error" in nano_src
+    assert "NANO_PROMPT_MAX = 1200" in nano_src
 
     print("PASS p0 wiring")
 

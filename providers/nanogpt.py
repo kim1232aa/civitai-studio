@@ -35,6 +35,26 @@ VIDEO_STATUS = BASE + "/api/video/status"
 _CACHE = {"at": 0.0, "items": None}
 _TTL = 300
 
+# Nano Image API rejects prompts over this many characters with HTTP 400
+# code prompt_too_long (observed: "1408 > 1200"). Keep FE/server in sync.
+NANO_PROMPT_MAX = 1200
+
+
+def prompt_length_error(prompt) -> dict | None:
+    """Return 400 body if prompt exceeds NANO_PROMPT_MAX; else None."""
+    text = prompt if isinstance(prompt, str) else ("" if prompt is None else str(prompt))
+    n = len(text)
+    if n <= NANO_PROMPT_MAX:
+        return None
+    return {
+        "error": f"提示词过长 {n}/{NANO_PROMPT_MAX}",
+        "code": "prompt_too_long",
+        "length": n,
+        "max": NANO_PROMPT_MAX,
+        "limit": NANO_PROMPT_MAX,
+    }
+
+
 _ASPECTS = (
     (1, 1, "1:1"),
     (4, 3, "4:3"),
@@ -936,6 +956,9 @@ class NanoGptProvider(Provider):
         return self._generate_image(payload, spec, mid)
 
     def _generate_image(self, payload, spec, mid):
+        too = prompt_length_error((payload or {}).get("prompt"))
+        if too:
+            return 400, too
         sp = (spec or {}).get("supported_parameters") or {}
         if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
             return 400, {
@@ -1007,6 +1030,9 @@ class NanoGptProvider(Provider):
         return last
 
     def _generate_video(self, payload, spec, mid):
+        too = prompt_length_error((payload or {}).get("prompt"))
+        if too:
+            return 400, too
         # v0770: video path also runs resolve_nano_loras (same fail-closed rules).
         pl = dict(payload or {})
         raw_loras = pl.get("loras") or []

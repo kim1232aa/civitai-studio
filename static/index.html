@@ -781,7 +781,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0771</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0772</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -831,6 +831,10 @@
     <section class="block">
       <label class="lbl" for="prompt">提示词</label>
       <textarea id="prompt" placeholder="描述画面、主体、风格、光线与镜头…"></textarea>
+      <div id="nanoPromptHint" class="hidden" style="margin-top:6px;font-size:12px;align-items:center;gap:8px;flex-wrap:wrap">
+        <span id="nanoPromptCount" class="warn"></span>
+        <button type="button" class="ghost" id="nanoPromptTruncate" style="padding:2px 8px;font-size:12px">截断到 1200</button>
+      </div>
       <label class="lbl" for="negative">负面提示</label>
       <textarea id="negative" class="neg" placeholder="不想出现的内容，可空"></textarea>
     </section>
@@ -1023,9 +1027,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0771" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0772" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0771</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0772</div>
   </div>
 </aside>
 
@@ -1109,6 +1113,41 @@ function isModelscope(b) {
 function isNanogpt(b) {
   b = b || backend;
   return b === 'nano-gpt' || b === 'nanogpt' || b === 'nano';
+}
+// v0772: Nano API prompt_too_long threshold (server NANO_PROMPT_MAX).
+const NANO_PROMPT_MAX = 1200;
+function nanoPromptLen() {
+  return (($('prompt') && $('prompt').value) || '').length;
+}
+function syncNanoPromptHint(opts) {
+  opts = opts || {};
+  const row = $('nanoPromptHint');
+  const n = nanoPromptLen();
+  const over = n > NANO_PROMPT_MAX;
+  const show = isNanogpt() && over;
+  if (row) {
+    row.classList.toggle('hidden', !show);
+    // .hidden uses display:none !important; clear inline flex conflict when hidden
+    if (show) row.style.display = 'flex';
+    else row.style.display = '';
+  }
+  const cnt = $('nanoPromptCount');
+  if (cnt) cnt.textContent = '提示词过长 ' + n + '/' + NANO_PROMPT_MAX;
+  if (opts.warnDock && show) {
+    setDock('提示词过长 ' + n + '/' + NANO_PROMPT_MAX + '（Nano 上限）', 'warn');
+  }
+  return over && isNanogpt();
+}
+function truncateNanoPrompt() {
+  const pr = $('prompt');
+  if (!pr) return;
+  const n = (pr.value || '').length;
+  if (n > NANO_PROMPT_MAX) {
+    pr.value = pr.value.slice(0, NANO_PROMPT_MAX);
+    setDock('已截断到 ' + NANO_PROMPT_MAX + '（原 ' + n + '）', 'warn');
+  }
+  syncNanoPromptHint();
+  syncGo();
 }
 function isKnownBackend(h) {
   return /^(civitai|fal|huggingface|modelscope-ai|modelscope-cn|nano-gpt)$/.test(h || '');
@@ -1306,7 +1345,7 @@ function hubUtilityBlob(it) {
   // Keep in sync with providers/hub_classify.py — sticky VAE / IP-Adapter / ControlNet / umt5+text-encoder / GGUF / pure LoRA.
   // Video family GGUF / video LoRA stay video (not utility); pure VAE still utility.
   if (!it) return false;
-  // v0771: hubUtilityBlob is for Hub weight dumps (HF/魔搭), not Nano/Fal generation endpoints.
+  // v0772: hubUtilityBlob is for Hub weight dumps (HF/魔搭), not Nano/Fal generation endpoints.
   // Do NOT hide z-image-turbo-lora / .../turbo-lora just because the id leaf ends with -lora.
   const be = String(it.backend || '').toLowerCase();
   if (be === 'nano-gpt' || be === 'nanogpt' || be === 'nano' || be === 'fal') return false;
@@ -1356,7 +1395,7 @@ function isMusePublicQwenImageCousin(it) {
   return /^qwen[-_]?image/.test(leaf);
 }
 function hubNonImageJunk(it) {
-  // v0771: Nano/Fal generation endpoints are never Hub junk (even when id ends *-lora).
+  // v0772: Nano/Fal generation endpoints are never Hub junk (even when id ends *-lora).
   if (it) {
     const be = String(it.backend || '').toLowerCase();
     if (be === 'nano-gpt' || be === 'nanogpt' || be === 'nano' || be === 'fal') {
@@ -1375,7 +1414,7 @@ function hubVideoListNoise(it) {
   // v0768: drop Comfy/nodepack, pure LoRA, safetensors weight dumps that only mention wan;
   // keep real wan t2v/i2v/GGUF video models. Fix \b hole on _comfyui_ / WanVideo_comfy.
   if (!it) return false;
-  // v0771: Nano/Fal video endpoints are not Hub list noise.
+  // v0772: Nano/Fal video endpoints are not Hub list noise.
   const beV = String(it.backend || '').toLowerCase();
   if (beV === 'nano-gpt' || beV === 'nanogpt' || beV === 'nano' || beV === 'fal') return false;
   if (hubUtilityBlob(it)) return true;
@@ -2864,6 +2903,12 @@ function applyImport(j) {
   if (j.empty && j.error) setStatus(j.error, 'bad');
   else if (j.kind === 'video') setStatus('已导入视频参数' + (nLora ? (' · ' + nLora + ' 个 LoRA') : '') + extraTxt + '。图生视频还要首帧：出一张图或上传。然后自己点生成。');
   else setStatus('已导入参数' + (nLora ? (' · ' + nLora + ' 个 LoRA') : ' · 这张图没有识别到 LoRA') + extraTxt + '，自己点生成。');
+  // v0772: warn (do not truncate) when import lands on Nano with overlong prompt
+  if (isNanogpt() && nanoPromptLen() > NANO_PROMPT_MAX) {
+    syncNanoPromptHint({ warnDock: true });
+  } else {
+    syncNanoPromptHint();
+  }
   syncGo();
 }
 function readDataURL(file, cb) {
@@ -3196,7 +3241,7 @@ async function runGenerate() {
       syncPickedDockIfStale();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
-    // v0771: Nano LoRA — dock/block when model !supportsLora; red 「无直链」 if no path/versionId.
+    // v0772: Nano LoRA — dock/block when model !supportsLora; red 「无直链」 if no path/versionId.
     if (isNanogpt() && Array.isArray(loras) && loras.length) {
       if (!supportsLora(selected)) {
         fail('当前 Nano 模型不支持 LoRA，请改选 *-lora 模型');
@@ -3230,6 +3275,15 @@ async function runGenerate() {
       }
       fail('先写提示词');
       return;
+    }
+    // v0772: Nano prompt length precheck — do not POST when over NANO_PROMPT_MAX.
+    if (isNanogpt() && gen) {
+      const nPrompt = nanoPromptLen();
+      if (nPrompt > NANO_PROMPT_MAX) {
+        syncNanoPromptHint();
+        fail('提示词过长 ' + nPrompt + '/' + NANO_PROMPT_MAX);
+        return;
+      }
     }
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
@@ -3301,7 +3355,7 @@ async function runGenerate() {
     }
     if (j.error || j.detail) {
       stopWait();
-      // v0771: mark per-item 无直链 when server lists failed LoRAs
+      // v0772: mark per-item 无直链 when server lists failed LoRAs
       try {
         const failed = (j.failed || []).map(f => String((f && f.name) || '')).filter(Boolean);
         if (failed.length && Array.isArray(loras)) {
@@ -3519,8 +3573,10 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
   if ($('svcFilter')) $('svcFilter').oninput = onSvcFilter;
   if ($('prompt')) $('prompt').addEventListener('input', () => {
     $('prompt').classList.remove('need-prompt');
+    syncNanoPromptHint();
     syncGo();
   });
+  if ($('nanoPromptTruncate')) $('nanoPromptTruncate').onclick = () => truncateNanoPrompt();
   syncGo();
   let catalogSeq = 0;
   async function loadCatalog(q) {
@@ -3649,6 +3705,12 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
             resolveLorasForBackend();
           }
           updateFields();
+          // v0772: switching to Nano with a long prompt → dock warn (no silent truncate)
+          if (isNanogpt() && nanoPromptLen() > NANO_PROMPT_MAX) {
+            syncNanoPromptHint({ warnDock: true });
+          } else {
+            syncNanoPromptHint();
+          }
         } catch (e) { setDock((p.label || p.id) + ' 目录失败', 'bad'); }
       };
       box.appendChild(b);
