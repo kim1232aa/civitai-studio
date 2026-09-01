@@ -218,6 +218,43 @@ def raw_call(url: str, method="POST", headers=None, body=None, timeout=120):
         return 502, str(e).encode(), "text/plain"
 
 
+def is_blank_image(path=None, raw=None) -> bool:
+    """True if the file is a real image but essentially all black."""
+    try:
+        from PIL import Image
+        import io
+        if raw is None and path:
+            raw = Path(path).read_bytes()
+        if not raw:
+            return True
+        im = Image.open(io.BytesIO(raw)).convert("RGB")
+        sample = im.resize((32, 32))
+        pixels = list(sample.getdata())
+        if not pixels:
+            return True
+        avg = sum(p[0] + p[1] + p[2] for p in pixels) / (3 * len(pixels))
+        return avg < 6
+    except Exception:
+        return False
+
+
+def drop_blank_saved(saved, out_dir=None):
+    out = Path(out_dir or DEFAULT_OUT)
+    kept = []
+    for item in saved or []:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("file") or ""
+        fp = out / name if name else None
+        raw = None
+        if fp and fp.exists():
+            raw = fp.read_bytes()
+        if raw and is_blank_image(raw=raw):
+            continue
+        kept.append(item)
+    return kept
+
+
 def save_bytes(raw: bytes, stem, out_dir=None, meta=None):
     from .io_meta import write_sidecar
     out = Path(out_dir or DEFAULT_OUT)
