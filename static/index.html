@@ -1270,14 +1270,13 @@ function hubUtilityBlob(it) {
   if (/controlnet|control_net|control-lora|control_lora/.test(blob)) return true;
   if (/\.gguf\b|\bgguf\b/.test(blob)) return true;
   const idName = (id + ' ' + name).toLowerCase();
+  const leaf = (id.split('/').pop() || '').toLowerCase();
+  const nameL = name.toLowerCase();
+  // Clear something-lora / *_lora adapters → utility even if base mentions flux/qwen.
+  if (/[_-]loras?$/.test(leaf) || /(^|[_/-])loras?($|[_/-])/.test(leaf)) return true;
+  if (/[_-]loras?$/.test(nameL) || /(^|[_/-])loras?($|[_/-])/.test(nameL)) return true;
   if (/z-image-turbo|z_image_turbo|flux\.1|flux-1|sd3|stable.?diffusion.?3|qwen-image|tongyi-mai/.test(idName)) return false;
-  const leaf = id.split('/').pop() || '';
-  const pieces = [id, leaf, name, idName];
-  for (const piece of pieces) {
-    if (!piece) continue;
-    const p = String(piece).toLowerCase();
-    if (/[_-]lora$/.test(p) || /(^|[_/-])lora($|[_/-])/.test(p)) return true;
-  }
+  if (/(^|[_/-])loras?($|[_/-])/.test(idName) || /[_-]loras?$/.test(idName)) return true;
   return false;
 }
 function hubNonImageJunk(it) {

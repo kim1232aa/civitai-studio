@@ -62,8 +62,8 @@ _IP_ADAPTER = re.compile(r"ip-adapter|ip_adapter|ipadapter", re.I)
 _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re.I)
 _GGUF = re.compile(r"\.gguf\b|\bgguf\b", re.I)
 # Pure LoRA weight repos: tokenized lora or ends with _lora / -lora
-_LORA_TOKEN = re.compile(r"(^|[_/-])lora($|[_/-])", re.I)
-_LORA_SUFFIX = re.compile(r"[_-]lora$", re.I)
+_LORA_TOKEN = re.compile(r"(^|[_/-])loras?($|[_/-])", re.I)
+_LORA_SUFFIX = re.compile(r"[_-]loras?$", re.I)
 # Keep full t2i checkpoints that happen to mention lora-ish base names
 _T2I_BASE = re.compile(
     r"z-image-turbo|z_image_turbo|flux\.1|flux-1|sd3|stable.?diffusion.?3|"
@@ -138,20 +138,29 @@ def blob_is_utility(blob: str, *, id_name: str = "") -> bool:
         return True
     if _GGUF.search(s):
         return True
-    # LoRA: only inspect id/name (conservative); skip clear full t2i bases
+    # LoRA: inspect id/name. Clear ``something-lora`` / ``*_lora`` adapters → utility
+    # even when the base name mentions flux.1 / qwen-image / z-image-turbo.
     ln = id_name or s
-    if _T2I_BASE.search(ln):
-        return False
     mid = (ln.split() or [""])[0]
     name = ln[len(mid) :].strip() if " " in ln else ""
-    # Prefer id path leaf + name for suffix / token checks
     leaf = mid.rsplit("/", 1)[-1] if mid else ""
+    lora_hit = False
     for piece in (mid, leaf, name, ln):
         if not piece:
             continue
         if _LORA_SUFFIX.search(piece) or _LORA_TOKEN.search(piece):
+            lora_hit = True
+            break
+    if not lora_hit:
+        return False
+    # Borderline: full t2i checkpoint id that only mentions lora loosely — keep image.
+    # Clear adapter leaf (ends with _lora / -lora or tokenized lora) always utility.
+    for piece in (leaf, name):
+        if piece and (_LORA_SUFFIX.search(piece) or _LORA_TOKEN.search(piece)):
             return True
-    return False
+    if _T2I_BASE.search(ln):
+        return False
+    return True
 
 
 def hub_utility_blob(it) -> bool:
