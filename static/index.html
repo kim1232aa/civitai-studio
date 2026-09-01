@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0767</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0768</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0767" aria-label="v0767" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0768" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0767</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0768</div>
   </div>
 </aside>
 
@@ -1304,8 +1304,8 @@ function hubUtilityBlob(it) {
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
   // umt5 / u-mt5 / t5xxl / clip_l / text-encoder — never on image (even if name has wan)
-  // v0766: sd35_t5xxl / sd35_clip_l — "_" is a word char so \bt5xxl\b / \bclip_l\b miss; allow [_-] prefix like umt5.
-  if (/\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|(?:^|[\W_])t5[_-]?xxl(?:\b|[_-]|$)|(?:^|[\W_])t5[_-](?:xl|base|small|large)(?:\b|[_-]|$)|(?:^|[\W_])t5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|(?:^|[\W_])clip[_-]l(?:\b|[_-]|$)/i.test(blobL)) return true;
+  // v0766/v0768: sd35_t5xxl / sd35_clip_l / sd35_clip_g — "_" is a word char so \bt5xxl\b / \bclip_l\b miss; allow [_-] prefix like umt5.
+  if (/\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|(?:^|[\W_])t5[_-]?xxl(?:\b|[_-]|$)|(?:^|[\W_])t5[_-](?:xl|base|small|large)(?:\b|[_-]|$)|(?:^|[\W_])t5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|(?:^|[\W_])clip[_-][lg](?:\b|[_-]|$)/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();
@@ -1326,28 +1326,49 @@ function hubUtilityBlob(it) {
   }
   return false;
 }
+function isMusePublicQwenImageCousin(it) {
+  // v0768: MusePublic/Qwen-image* is a forbidden hand-pick cousin of Qwen/Qwen-Image for image t2i.
+  if (!it) return false;
+  const id = String(it.id || '');
+  if (!id.startsWith('MusePublic/')) return false;
+  const leaf = (id.split('/').pop() || '').toLowerCase();
+  return /^qwen[-_]?image/.test(leaf);
+}
 function hubNonImageJunk(it) {
-  return hubUpscaleBlob(it) || hubUtilityBlob(it) || (it && ((it.category || '') === 'upscale' || (it.category || '') === 'utility'));
+  return hubUpscaleBlob(it) || hubUtilityBlob(it) || isMusePublicQwenImageCousin(it) || (it && ((it.category || '') === 'upscale' || (it.category || '') === 'utility'));
 }
 function hubVideoListNoise(it) {
-  // v0766: video tab — drop Comfy/nodepack/weight junk that only mentions wan; keep real wan GGUF / t2v/i2v.
+  // v0768: drop Comfy/nodepack, pure LoRA, safetensors weight dumps that only mention wan;
+  // keep real wan t2v/i2v/GGUF video models. Fix \b hole on _comfyui_ / WanVideo_comfy.
   if (!it) return false;
   if (hubUtilityBlob(it)) return true;
   const id = String(it.id || '');
   const name = String(it.name || '');
   const blob = (id + ' ' + name + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  const leaf = (id.split('/').pop() || '').toLowerCase();
+  const nameL = name.toLowerCase();
+  const idName = (id + ' ' + name).toLowerCase();
+  // Comfy / nodepack / custom nodes — ALWAYS noise (even when wan2.x in id). [_-] aware: \b fails on _comfyui_.
+  if (/(?:^|[\W_])comfy(?:ui)?(?:$|[\W_])|(?:^|[\W_])custom[_-]?nodes?(?:$|[\W_])|(?:^|[\W_])nodepacks?(?:$|[\W_])|(?:^|[\W_])repackaged(?:$|[\W_])/.test(blob)) return true;
+  // Pure LoRA / distill-loras — drop even for wan family (wan family used to shield them).
+  const loraLeaf = /[_-]loras?$/.test(leaf) || /(^|[_/-])loras?($|[_/-])/.test(leaf)
+    || /[_-]loras?$/.test(nameL) || /(^|[_/-])loras?($|[_/-])/.test(nameL)
+    || /(^|[_/-])loras?($|[_/-])/.test(idName);
+  if (loraLeaf) return true;
+  // Lone .safetensors weight dumps (not a Hub video package / GGUF).
+  if (/\.safetensors$/i.test(leaf) || /\.safetensors$/i.test(nameL)) return true;
   // Keep real video packages / GGUF checkpoints.
   if (/\.gguf\b|\bgguf\b/.test(blob)) return false;
-  if (/\b(?:t2v|i2v|text-to-video|image-to-video|vid2vid)\b/.test(blob)) return false;
+  if (/\b(?:t2v|i2v|ti2v|text-to-video|image-to-video|vid2vid)\b/.test(blob)) return false;
   if (/\b(?:hunyuan\s*video|hunyuanvideo|ltx-?2|allegro|cogvideo|mochi|open-?sora|seedance|kling)\b/.test(blob)) return false;
-  // Wan-AI / Wan2.x diffusion repos stay (not bare "wan" in a comfy node name alone).
-  if (/\bwan[_-]?ai\b|\bwan2[._-]\d|\bwan[_-]?(?:t2v|i2v|ti2v|vace)\b/.test(blob) && !/\bcomfyui\b|\bcomfy[_-]?node\b|\bcustom[_-]?node\b|\bnodepack\b/.test(blob)) return false;
-  if (/\bcomfyui\b|\bcomfy[_-]?node\b|\bcustom[_-]?node\b|\bnodepack\b|\bworkflow\b/.test(blob)) return true;
-  // Pure LoRA / weight packs without a video-gen task token.
-  if (/(?:^|[\\/_-])loras?(?:$|[\\/_-])/.test(blob) && !hubVideoFamilyBlob(it)) return true;
-  if (/\b(?:weights?|safetensors)\b/.test(blob) && !/\b(?:wan|hunyuan|ltx|allegro|cogvideo|mochi|opensora|seedance|kling)\b/.test(blob)) return true;
+  // Wan-AI / Wan2.x diffusion repos (comfy/lora/safetensors already excluded above).
+  if (/\bwan[_-]?ai\b|\bwan2[._-]\d|\bwan[_-]?(?:t2v|i2v|ti2v|vace)\b/.test(blob)) return false;
+  // Non-video packages that only vaguely mention wan without being a real t2v/i2v/GGUF model.
+  if (/\bwan\b/.test(blob) && !/\b(?:t2v|i2v|ti2v|gguf|text-to-video|image-to-video)\b/.test(blob)) return true;
+  if (/\b(?:weights?)\b/.test(blob) && !/\b(?:t2v|i2v|gguf|wan[_-]?ai|wan2[._-]\d)\b/.test(blob)) return true;
   return false;
 }
+
 function matchRecipe(it, r) {
   if (!it) return false;
   if (r === 'workflow') return false;
@@ -1359,6 +1380,8 @@ function matchRecipe(it, r) {
     if (hubUpscaleBlob(it) || cat === 'upscale') return r === 'upscale';
     if (r === 'image') {
       if (cat !== 'image') return false;
+      // v0768: MusePublic/Qwen-image* forbidden cousin — never list as image t2i.
+      if (isMusePublicQwenImageCousin(it)) return false;
       // Hub catalogs: also drop needsSource i2i so 「需要源图」 cannot steal generate.
       if ((isModelscope() || backend === 'huggingface') && isBadAutoPick(it)) return false;
       return true;
@@ -1857,6 +1880,11 @@ function selectService(it, opts) {
     if (keep) it = keep;
     else return false;
   }
+  // v0768: refuse MusePublic/Qwen-image* hand-pick on image t2i (clearer than silent hide).
+  if (recipe === 'image' && it && isMusePublicQwenImageCousin(it)) {
+    setDock('未改选中：禁止手选 MusePublic/Qwen-image 类模型，请选 Qwen/Qwen-Image', 'warn');
+    return false;
+  }
   // Image recipe: refuse upscale/utility always (user click or programmatic). needsSource only when programmatic.
   if (recipe === 'image' && it && hubNonImageJunk(it)) {
     setDock('未改选中：该模型是超分/工具权重/需源图，不适合文生图', 'warn');
@@ -1882,6 +1910,11 @@ function selectService(it, opts) {
   return true;
 }
 function setRecipe(r) {
+  // v0768: while generating — no-op. Do NOT clear userPickedId / do NOT loadCatalog.
+  if (goBusy || generateLockId) {
+    setDock('生成中不能切换配方', 'warn');
+    return;
+  }
   recipe = r;
   kind = r === 'video' ? 'video' : 'image';
   updateTabClasses();
@@ -3083,6 +3116,18 @@ async function runGenerate() {
       if (isForbiddenHubRemap(lockId, keep.id)) {
         fail('拒绝 cousin 重映射：冻 ' + lockId + ' ≠ ' + keep.id);
         return;
+      }
+      // v0768: ban MusePublic/Qwen-image* as frozen image t2i submit target.
+      if ((frozenRecipe === 'image' || recipe === 'image') && isMusePublicQwenImageCousin(keep)) {
+        fail('禁止提交 MusePublic/Qwen-image 类模型，请选 Qwen/Qwen-Image');
+        return;
+      }
+      if ((frozenRecipe === 'image' || recipe === 'image') && String(lockId).startsWith('MusePublic/')) {
+        const leafL = hubIdLeaf(lockId).toLowerCase();
+        if (/^qwen[-_]?image/.test(leafL)) {
+          fail('禁止提交 MusePublic/Qwen-image 类模型，请选 Qwen/Qwen-Image');
+          return;
+        }
       }
       // Re-assert lock selection (already done in onGenerate; forceFreeze only).
       selected = keep;

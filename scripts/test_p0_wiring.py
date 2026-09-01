@@ -476,7 +476,7 @@ console.log('PASS hubUtilityBlob sd35');
     assert r_fe.returncode == 0, (r_fe.stdout, r_fe.stderr)
 
 
-    # v0767: recipe/tab switch clears svcFilter and reloads catalog
+    # v0767/v0768: recipe/tab switch clears svcFilter and reloads catalog
     m_sr = _re.search(r"function setRecipe\(r\) \{[\s\S]*?\n\}", html)
     assert m_sr, "setRecipe missing"
     sr = m_sr.group(0)
@@ -484,8 +484,59 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0767"' in html
-    assert 'aria-label="v0767"' in html
+    assert 'title="v0768"' in html
+    assert 'aria-label="生成"' in html
+    assert 'aria-label="v0768"' not in html
+    # v0768: setRecipe locked during goBusy/generateLockId
+    assert "生成中不能切换配方" in sr
+    assert "goBusy || generateLockId" in sr
+    # v0768: MusePublic/Qwen-image ban
+    assert "isMusePublicQwenImageCousin" in html
+    assert "禁止手选 MusePublic/Qwen-image" in html
+    assert "禁止提交 MusePublic/Qwen-image" in html
+    # v0768: sd35_clip_g utility FE+PY
+    sd35g = {"id": "muse/sd35_clip_g", "name": "sd35_clip_g", "category": "image"}
+    assert hub_utility_blob(sd35g), sd35g
+    assert apply_hub_category(dict(sd35g))["category"] == "utility"
+    js_fe2 = m_vf.group(0) + "\n" + m_fe.group(0) + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(hubUtilityBlob({id:'muse/sd35_clip_g', name:'sd35_clip_g'}) === true, 'sd35_clip_g');
+assert(hubUtilityBlob({id:'muse/sd35_large', name:'sd35_large'}) === false, 'sd35_large');
+console.log('PASS hubUtilityBlob sd35_clip_g');
+"""
+    r_fe2 = subprocess.run(["node", "-e", js_fe2], capture_output=True, text=True)
+    assert r_fe2.returncode == 0, (r_fe2.stdout, r_fe2.stderr)
+    # v0768: hubVideoListNoise drops Comfy/LoRA/safetensors; keeps real wan t2v/gguf
+    m_noise = _re.search(r"function hubVideoListNoise\(it\) \{[\s\S]*?\n\}", html)
+    assert m_noise, "hubVideoListNoise missing"
+    # Need hubUtilityBlob + hubVideoFamilyBlob deps
+    js_vn = m_vf.group(0) + "\n" + m_fe.group(0) + "\n" + m_noise.group(0) + """
+const assert = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
+assert(hubVideoListNoise({id:'Comfy-Org/Wan_2.2_ComfyUI_Repackaged', name:'Wan_2.2_ComfyUI_Repackaged', category:'video'}) === true, 'comfyui repack');
+assert(hubVideoListNoise({id:'Kijai/WanVideo_comfy', name:'WanVideo_comfy', category:'video'}) === true, 'WanVideo_comfy');
+assert(hubVideoListNoise({id:'lightx2v/Wan2.2-Distill-Loras', name:'Wan2.2-Distill-Loras', category:'video'}) === true, 'Distill-Loras');
+assert(hubVideoListNoise({id:'acevsok/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors', name:'wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors', category:'video'}) === true, 'safetensors dump');
+assert(hubVideoListNoise({id:'Wan-AI/Wan2.1-T2V-14B', name:'Wan2.1-T2V-14B', category:'video'}) === false, 'real T2V');
+assert(hubVideoListNoise({id:'Wan-AI/Wan2.1-I2V-14B-480P', name:'Wan2.1-I2V-14B-480P', category:'video'}) === false, 'real I2V');
+assert(hubVideoListNoise({id:'city96/Wan2.1-T2V-14B-gguf', name:'Wan2.1-T2V-14B-gguf', category:'video'}) === false, 'real GGUF');
+console.log('PASS hubVideoListNoise v0768');
+"""
+    r_vn = subprocess.run(["node", "-e", js_vn], capture_output=True, text=True)
+    assert r_vn.returncode == 0, (r_vn.stdout, r_vn.stderr)
+    # MusePublic cousin helper via node
+    m_mp = _re.search(r"function isMusePublicQwenImageCousin\(it\) \{[\s\S]*?\n\}", html)
+    assert m_mp, "isMusePublicQwenImageCousin missing"
+    js_mp = m_mp.group(0) + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(isMusePublicQwenImageCousin({id:'MusePublic/Qwen-image'}) === true, 'MP Qwen-image');
+assert(isMusePublicQwenImageCousin({id:'MusePublic/Qwen-Image-Edit'}) === true, 'MP Edit');
+assert(isMusePublicQwenImageCousin({id:'MusePublic/Qwen-image-fp8'}) === true, 'MP fp8');
+assert(isMusePublicQwenImageCousin({id:'Qwen/Qwen-Image'}) === false, 'real Qwen');
+assert(isMusePublicQwenImageCousin({id:'MusePublic/Something-Else'}) === false, 'other MP');
+console.log('PASS isMusePublicQwenImageCousin');
+"""
+    r_mp = subprocess.run(["node", "-e", js_mp], capture_output=True, text=True)
+    assert r_mp.returncode == 0, (r_mp.stdout, r_mp.stderr)
 
     print("PASS p0 wiring")
 

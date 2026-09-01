@@ -75,12 +75,12 @@ _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re
 # Before video-family GGUF exception: never video even if name has wan (wan2.1-umt5).
 _TEXT_ENCODER = re.compile(
     # umt5_xxl_encoder: allow _ after mt5 (\b fails because _ is a word char)
-    # v0766: sd35_t5xxl / sd35_clip_l — same \b hole; allow [_-] / non-word prefix
+    # v0766/v0768: sd35_t5xxl / sd35_clip_l / sd35_clip_g — same \b hole; allow [_-] / non-word prefix
     r"\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|"
     r"(?:^|[\W_])t5[_-]?xxl(?:\b|[_-]|$)|(?:^|[\W_])t5[_-](?:xl|base|small|large)(?:\b|[_-]|$)|"
     r"(?:^|[\W_])t5\s*encoder\b|t5[_-]encoder|"
     r"text[_-]?encoder|text-encoding|text_encoding|"
-    r"(?:^|[\W_])clip[_-]l(?:\b|[_-]|$)",
+    r"(?:^|[\W_])clip[_-][lg](?:\b|[_-]|$)",
     re.I,
 )
 _GGUF = re.compile(r"\.gguf\b|\bgguf\b", re.I)
