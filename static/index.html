@@ -760,7 +760,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0754</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0755</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1002,9 +1002,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0754" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0755" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0754</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0755</div>
   </div>
 </aside>
 
@@ -1088,6 +1088,8 @@ function savedBackend() {
 }
 function persistBackend(id) {
   if (!id) return;
+  // Lock last user-clicked backend ~8s against races (catalog/boot/stale fal).
+  if (typeof backendClickLocked === 'function' && backendClickLocked(id)) return;
   try { localStorage.setItem(BACKEND_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(BACKEND_KEY, id); } catch (e) {}
   try {
@@ -1102,6 +1104,9 @@ let backend = savedBackend() || 'civitai';
 try { persistBackend(backend); } catch (e) {}
 let selected = null;
 let userPickedId = null;
+let lastGoStart = 0;
+let lastBackendClickAt = 0;
+let lastBackendClickId = '';
 let picked = { serviceId: null, engine: null, operation: null, ecosystem: null, model: null, version: null, provider: null };
 let refUrls = [];
 const STATUS_RANK = { available: 0, degraded: 1, unknown: 2, unavailable: 3 };
@@ -1288,9 +1293,31 @@ let lastGoFail = 0;
 let lastGoClick = 0;
 let noToken = false;
 let wfState = null;
+function selectionLocked() {
+  try {
+    if (goBusy) return true;
+    if (lastGoStart && (Date.now() - lastGoStart) < 8000) return true;
+    if (lastGoClick && (Date.now() - lastGoClick) < 8000) return true;
+  } catch (e) {}
+  return false;
+}
+function backendClickLocked(id) {
+  try {
+    if (!lastBackendClickId || !lastBackendClickAt) return false;
+    if ((Date.now() - lastBackendClickAt) >= 8000) return false;
+    return !!id && id !== lastBackendClickId;
+  } catch (e) { return false; }
+}
+function isBadAutoPick(it) {
+  if (!it) return true;
+  if (it.needsSource || it.needsFirstFrame) return true;
+  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  return /onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob) || it.category === 'upscale';
+}
 function dockHold() {
   try {
     if (goBusy) return true;
+    if (selectionLocked()) return true;
     const d = $('dockStatus');
     if (d && d.classList.contains('bad')) return true;
     if (lastGoFail && (Date.now() - lastGoFail) < 8000) return true;
@@ -1443,8 +1470,16 @@ function updateFields() {
   if ($('aspectRowV')) $('aspectRowV').classList.toggle('hidden', !showAspect || !vid);
   const showNano = isNanogpt() && !vid && !util;
   if ($('nanoResRow')) $('nanoResRow').classList.toggle('hidden', !showNano);
-  if (showNano) syncNanoResSelect();
-  else if ($('nanoResHint')) $('nanoResHint').textContent = '';
+  if (showNano) {
+    syncNanoResSelect();
+    // Submitted size is the Nano resolution token — free WxH is display-only.
+    if ($('width')) { $('width').disabled = true; $('width').title = 'Nano 提交用 resolution token，不发自由宽高'; }
+    if ($('height')) { $('height').disabled = true; $('height').title = 'Nano 提交用 resolution token，不发自由宽高'; }
+  } else {
+    if ($('width')) { $('width').disabled = false; $('width').title = ''; }
+    if ($('height')) { $('height').disabled = false; $('height').title = ''; }
+    if ($('nanoResHint')) $('nanoResHint').textContent = '';
+  }
   syncGo();
 }
 function renderRefs() {
@@ -1557,7 +1592,10 @@ function alnum(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
 }
 function renderServiceList(opts) {
-  const pickDefault = !opts || opts.pickDefault !== false;
+  const locked = selectionLocked();
+  // While generating / shortly after: never auto-pick another row. userPickedId wins.
+  let pickDefault = !opts || opts.pickDefault !== false;
+  if (locked || userPickedId) pickDefault = false;
   const qf = (($('svcFilter') && $('svcFilter').value) || '').toLowerCase();
   const qn = alnum(qf);
   const list = catalog.filter(it => matchRecipe(it, recipe)).filter(it => {
@@ -1591,23 +1629,28 @@ function renderServiceList(opts) {
   $('serviceList').innerHTML = html;
   bindRows($('serviceList'));
   let pick = wantItem || null;
-  if (!pick && pickDefault && !userPickedId) {
+  if (!pick && pickDefault && !userPickedId && !locked) {
     const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'nano-gpt':['wavespeed-ai/krea-v2/turbo-lora','wavespeed-ai/krea-v2/turbo','z-image-turbo-lora','z-image-turbo']}[backend] || [];
     for (let i = 0; i < prefs.length; i++) {
-      const hit = list.find(x => x.id === prefs[i]);
+      const hit = list.find(x => x.id === prefs[i] && !isBadAutoPick(x));
       if (hit) { pick = hit; break; }
     }
-    if (!pick) pick = list.find(x => (x.status === 'available' || !x.status) && !x.needsSource && !x.needsFirstFrame);
-    if (!pick) pick = list.find(x => x.status === 'available') || list.find(x => x.status === 'degraded') || null;
+    // Never let upscale/onnx / needsSource steal imageGen default.
+    if (!pick) pick = list.find(x => (x.status === 'available' || !x.status) && !isBadAutoPick(x));
+    if (!pick) pick = list.find(x => (x.status === 'available' || x.status === 'degraded') && !isBadAutoPick(x)) || null;
   }
   if (pick) {
     selected = pick;
     copyPicked(pick);
     syncVPreset(pick);
-  } else if (pickDefault && !userPickedId) {
+  } else if (pickDefault && !userPickedId && !locked) {
     selected = null;
     copyPicked(null);
     syncVPreset(null);
+  } else if (userPickedId && wantItem) {
+    selected = wantItem;
+    copyPicked(wantItem);
+    syncVPreset(wantItem);
   }
   [...$('serviceList').querySelectorAll('.svc-row')].forEach(el => {
     el.classList.toggle('on', !!(selected && el.getAttribute('data-id') === selected.id));
@@ -1882,6 +1925,12 @@ function selectFirstInCatalog(want) {
   return false;
 }
 function pickForBackend() {
+  if (selectionLocked()) return false;
+  if (userPickedId) {
+    const keep = findCatalogItem(userPickedId);
+    if (keep) { selectService(keep); return true; }
+    return false;
+  }
   const krea = importedLooksKrea(lastImport);
   const zimg = importedLooksZImage(lastImport);
   const src = hasSourceNow();
@@ -2277,7 +2326,7 @@ async function poll(id) {
       saved.forEach(s => addCard(s.url, id, s.kind === 'video' || (s.file || '').endsWith('.mp4')));
       updateWait('完成', null, 100);
       if (j.warning) setDock('好了 · ' + j.warning, 'warn');
-      else setStatus('好了', 'ok');
+      else setDock('好了', 'ok');
       stopWait();
       return;
     }
@@ -2313,8 +2362,10 @@ function applyImport(j) {
   }
   if (j.prompt != null) $('prompt').value = j.prompt;
   if (j.negativePrompt != null) $('negative').value = j.negativePrompt || '';
+  // Import dims only — do NOT overwrite user's Fal aspectRatio / aspectRatioV select.
   if (j.width) { $('width').value = j.width; $('vWidth').value = Math.min(1344, j.width); }
   if (j.height) { $('height').value = j.height; $('vHeight').value = Math.min(1344, j.height); }
+  // Intentionally ignore j.aspectRatio / j.aspect_ratio from import.
   if (j.steps) { $('steps').value = j.steps; $('vSteps').value = j.steps; }
   if (j.cfgScale != null) $('cfg').value = j.cfgScale;
   if (Array.isArray(j.loras)) {
@@ -2553,6 +2604,8 @@ async function runGenerate() {
   const go = $('go');
   const keys = window._hasKeys || {};
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
+  lastGoClick = Date.now();
+  lastGoStart = Date.now();
   const fail = (msg) => {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
@@ -2586,13 +2639,21 @@ async function runGenerate() {
         return;
       }
     } else {
-      if (!currentServiceId() && userPickedId) {
+      // Freeze user pick: never let catalog race / pickForBackend steal during generate.
+      const frozenId = userPickedId || currentServiceId();
+      if (frozenId) {
+        userPickedId = frozenId;
+        const keep = findCatalogItem(frozenId);
+        if (keep) selectService(keep);
+      }
+      if (!currentServiceId() && backend !== 'civitai' && !userPickedId && !selectionLocked()) pickForBackend();
+      if (!currentServiceId()) { fail('先点列表里的一个模型'); return; }
+      if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
+      // Re-assert after any sync work — upscale/onnx must not replace imageGen pick.
+      if (userPickedId && selected && selected.id !== userPickedId) {
         const keep = findCatalogItem(userPickedId);
         if (keep) selectService(keep);
       }
-      if (!currentServiceId() && backend !== 'civitai' && !userPickedId) pickForBackend();
-      if (!currentServiceId()) { fail('先点列表里的一个模型'); return; }
-      if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
     const step = selected && selected.step;
@@ -2800,17 +2861,18 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     if (seq !== catalogSeq || backend !== want) return;
     catalog = cat.items || [];
     updateTabClasses();
-    renderServiceList({ pickDefault: !userPickedId });
+    // Catalog must not rewrite hash; only re-select userPickedId when set.
+    renderServiceList({ pickDefault: !userPickedId && !selectionLocked() });
     if (backend === 'civitai' && lastImport && lastImport.serviceId) {
       selectServiceById(lastImport.serviceId);
       if (lastImport.checkpointName || lastImport.diffusionModel) {
         setCheckpoint(lastImport.checkpointName || '', lastImport.diffusionModel || '');
       }
-    } else if (backend !== 'civitai' && !userPickedId) {
-      pickForBackend();
     } else if (userPickedId) {
       const keep = findCatalogItem(userPickedId);
       if (keep) selectService(keep);
+    } else if (backend !== 'civitai' && !selectionLocked()) {
+      pickForBackend();
     }
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
@@ -2857,12 +2919,13 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       b.title = p.label || p.id;
       if ((p.id === backend) || (!backend && i === 0)) b.classList.add('on');
       b.onclick = async () => {
+        lastBackendClickAt = Date.now();
+        lastBackendClickId = p.id;
         backend = p.id;
         persistBackend(p.id);
-        if (waitJobId) {
-          try { stopWait(); } catch (e) {}
-          setDock('已切到 ' + (short || p.label || p.id) + '，上一单等待已清', '');
-        }
+        try { stopWait(); } catch (e) {}
+        waitJobId = '';
+        setDock('已切到 ' + (short || p.label || p.id) + ' · 选模型后点生成', '');
         userPickedId = null;
         selected = null;
         box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
@@ -2882,15 +2945,15 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
         }
         syncBackendChrome();
         syncImportChrome();
-        setStatus('正在加载 ' + (p.label || p.id) + '…');
+        setDock('正在加载 ' + (p.label || p.id) + '…');
         try {
           await loadCatalog();
-          if (backend !== 'civitai') {
+          if (backend !== 'civitai' && !userPickedId) {
             pickForBackend();
             resolveLorasForBackend();
           }
           updateFields();
-        } catch (e) { setStatus((p.label || p.id) + ' 目录失败', 'bad'); }
+        } catch (e) { setDock((p.label || p.id) + ' 目录失败', 'bad'); }
       };
       box.appendChild(b);
     });
@@ -2946,13 +3009,17 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
         return;
       }
       if (h === backend) return;
-      // Real navigation (back/forward). Do not overwrite 魔搭 with a stale Fal hash.
+      // Stale fal (or other) hash must not overwrite a recent user click on 魔搭.
+      if (backendClickLocked(h)) {
+        persistBackend(lastBackendClickId || backend);
+        return;
+      }
+      // Real navigation (back/forward).
       backend = h;
       persistBackend(h);
-      if (waitJobId) {
-        try { stopWait(); } catch (e) {}
-        setDock('已切后端，上一单等待已清', '');
-      }
+      try { stopWait(); } catch (e) {}
+      waitJobId = '';
+      setDock('已切后端 · 选模型后点生成', '');
       const box = $('backendSwitch');
       if (box) box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.backend === h));
       userPickedId = null;
@@ -2960,7 +3027,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       if ($('svcFilter')) $('svcFilter').value = '';
       syncBackendChrome();
       syncImportChrome();
-      loadCatalog().catch(() => setStatus(((window._providerLabel || {})[h] || h) + ' 目录失败', 'bad'));
+      loadCatalog().catch(() => setDock(((window._providerLabel || {})[h] || h) + ' 目录失败', 'bad'));
     } catch (e) {}
   });
 })();
