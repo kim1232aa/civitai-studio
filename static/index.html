@@ -1293,8 +1293,12 @@ function hubUtilityBlob(it) {
   if (/flux[_-]vae/i.test(blobL) || /ae\.safetensors/i.test(blobL)) return true;
   if (/vae(?:_pruned|_ft|\d)/i.test(blobL)) return true;
   if (/[a-z0-9]VAE(?:[A-Z_]|_|$)/.test(blob) || /_VAE_/.test(blob)) return true;
+  // umt5 / text-encoder / T5 encoder — never on image recipe list
+  if (/umt5|wan2\.1[_-]?umt5|text[_-]?encoder|t5[_-]encoder|\bt5\s*encoder\b/i.test(blobL)) return true;
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
+  // umt5 / text-encoder dumps → utility (out of image tab)
+  if (/\bumt5\b|\bt5[_-](?:xxl|xl|base|small|large)\b|text[_-]?encoder|text-encoding|text_encoding/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();
@@ -2927,11 +2931,16 @@ async function runGenerate() {
         return;
       }
     }
-    // Recipe must stay on image through this generate (no Allegro tab jump).
-    if (frozenRecipe && recipe !== frozenRecipe) {
-      recipe = frozenRecipe;
-      kind = frozenRecipe === 'video' ? 'video' : 'image';
-      updateTabClasses();
+    // Recipe/kind must stay frozen through this generate (no Allegro tab jump).
+    if (frozenRecipe) {
+      pl.recipe = frozenRecipe;
+      if (frozenRecipe !== 'video' && pl.kind === 'video') pl.kind = 'image';
+      if (frozenRecipe === 'video') pl.kind = 'video';
+      if (recipe !== frozenRecipe) {
+        recipe = frozenRecipe;
+        kind = frozenRecipe === 'video' ? 'video' : 'image';
+        updateTabClasses();
+      }
     }
     const syncGen = pl.backend === 'huggingface' || (pl.backend === 'nano-gpt' && pl.kind !== 'video');
     setDock(syncGen ? '正在生成…' : '正在提交到队列…');
@@ -2957,6 +2966,21 @@ async function runGenerate() {
       stopWait();
       fail('提交失败 ' + String(j.error || j.detail).slice(0, 300));
       return;
+    }
+    // Server may echo a cousin/latest model id — never adopt it into selection/chip.
+    if (frozenPick) {
+      const echoed = String((j && (j.endpoint || j.model || (j.service && j.service.serviceId) || j.serviceId)) || '');
+      if (echoed && echoed !== frozenPick) {
+        try { console.warn('[runGenerate] ignore server model echo', echoed, 'kept', frozenPick); } catch (e0) {}
+      }
+      userPickedId = frozenPick;
+      const keep = findCatalogItem(frozenPick);
+      if (keep) {
+        selected = keep;
+        copyPicked(keep);
+        if (picked) picked.serviceId = frozenPick;
+        showPickedChip();
+      }
     }
     const jobId = j.id || j.workflowId || j.token;
     const saved = j.saved || [];
@@ -3158,7 +3182,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     updateTabClasses();
     // Catalog must not rewrite hash; only re-select userPickedId when set.
     renderServiceList({ pickDefault: !userPickedId && !selectionLocked() });
-    if (backend === 'civitai' && lastImport && lastImport.serviceId) {
+    if (backend === 'civitai' && lastImport && lastImport.serviceId && !userPickedId && !selectionLocked()) {
       selectServiceById(lastImport.serviceId);
       if (lastImport.checkpointName || lastImport.diffusionModel) {
         setCheckpoint(lastImport.checkpointName || '', lastImport.diffusionModel || '');

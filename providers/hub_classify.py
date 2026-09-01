@@ -1,7 +1,7 @@
 """Shared Hub category classifier for ModelScope + Hugging Face catalog rows.
 
 Widen carefully: Nomos/NMKD/4x family upscalers → category=upscale; VAE /
-ControlNet / IP-Adapter / (non-video) GGUF / pure LoRA weight dumps → utility;
+ControlNet / IP-Adapter / umt5+text-encoder / (non-video) GGUF / pure LoRA → utility;
 video-family GGUF / video LoRA / Wan checkpoints stay video; plain t2i
 (Z-Image-Turbo, FLUX.1-schnell, Qwen-Image, …) stay image.
 Bare ``4x`` alone is not enough for upscale — require known family tokens.
@@ -71,6 +71,12 @@ _IP_ADAPTER = re.compile(
     re.I,
 )
 _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re.I)
+# Text encoders (UMT5 / T5 / CLIP text-encoder dumps) — not t2i checkpoints.
+_TEXT_ENCODER = re.compile(
+    r"\bumt5\b|\bt5[_-](?:xxl|xl|base|small|large)\b|"
+    r"text[_-]?encoder|text-encoding|text_encoding",
+    re.I,
+)
 _GGUF = re.compile(r"\.gguf\b|\bgguf\b", re.I)
 # Pure LoRA weight repos: tokenized lora or ends with _lora / -lora
 _LORA_TOKEN = re.compile(r"(^|[_/-])loras?($|[_/-])", re.I)
@@ -155,7 +161,7 @@ def blob_is_utility(blob: str, *, id_name: str = "", it=None) -> bool:
     """Non-t2i adapter / VAE / ControlNet / (non-video) GGUF / pure LoRA weight dump.
 
     Video-family GGUF / video LoRA / Wan checkpoints are NOT utility.
-    Pure VAE (wan_2.1_vae, *_vae) still utility even when category was video.
+    Pure VAE (wan_2.1_vae, *_vae) and umt5 / text-encoder / T5 encoder still utility.
     """
     s = blob or ""
     if not s.strip():
@@ -165,6 +171,8 @@ def blob_is_utility(blob: str, *, id_name: str = "", it=None) -> bool:
     if _IP_ADAPTER.search(s):
         return True
     if _CONTROLNET.search(s):
+        return True
+    if _TEXT_ENCODER.search(s):
         return True
     videoish = _is_video_family(s, it)
     if _GGUF.search(s):

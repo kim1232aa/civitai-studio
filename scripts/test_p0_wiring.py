@@ -273,6 +273,16 @@ def main() -> int:
     img_gguf = {"id": "org/weights-gguf", "name": "model.gguf", "category": "image"}
     assert apply_hub_category(dict(img_gguf))["category"] == "utility"
 
+    # v0762: umt5 / text-encoder → utility (out of image); Qwen-Image stays image
+    umt5 = {"id": "Wan-AI/umt5-xxl", "name": "umt5-xxl", "category": "image"}
+    assert hub_utility_blob(umt5), umt5
+    assert apply_hub_category(dict(umt5))["category"] == "utility"
+    te = {"id": "org/wan-text-encoder", "name": "text-encoder", "category": "image"}
+    assert apply_hub_category(dict(te))["category"] == "utility"
+    te2 = {"id": "org/clip-text_encoder", "name": "CLIP text_encoder", "category": "video"}
+    assert apply_hub_category(dict(te2))["category"] == "utility"
+    assert apply_hub_category({"id": "Qwen/Qwen-Image", "name": "Qwen Image", "category": "image"})["category"] == "image"
+
     # v0762: catalogIdMatchesWant exact-only (no Qwen-Image → Qwen-Image-2512 cousin)
     html = (Path(__file__).resolve().parent.parent / "static" / "index.html").read_text()
     assert "function catalogIdMatchesWant" in html
