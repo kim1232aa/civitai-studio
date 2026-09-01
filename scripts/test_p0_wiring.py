@@ -37,16 +37,28 @@ def main() -> int:
     )
     assert inp.get("loras") and inp["loras"][0]["path"].startswith("https://")
     assert "replicate" in _SKIP_OPENAI
-    from providers.huggingface import _prompt_body
+    from providers.huggingface import _prompt_body, _maybe_lora_pid, _force_loras
     pb = _prompt_body({"steps": 8, "cfgScale": 1, "scheduler": "sgm_uniform", "seed": 3, "width": 960, "height": 1440})
     assert pb["num_inference_steps"] == 8
     assert pb["guidance_scale"] == 1
     assert pb["scheduler"] == "sgm_uniform"
+    assert _maybe_lora_pid("fal-ai/z-image/turbo", {"loras": [{"path": "https://civitai.com/api/download/models/3231694"}]}) == "fal-ai/z-image/turbo"
+    assert _maybe_lora_pid("fal-ai/z-image/turbo", {}) == "fal-ai/z-image/turbo"
+    forced = {}
+    _force_loras(forced, {"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]})
+    assert forced["loras"][0]["path"].startswith("https://")
+    assert _prompt_body({"seed": 1074720209731743})["seed"] <= 2147483647
     from providers.modelscope import _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE
     assert "modelscope.ai" in AI_BASE and "modelscope.cn" not in AI_BASE
     assert "modelscope.cn" in CN_BASE
     assert AI_BASE != CN_BASE
     assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == "Qwen/foo"
+    assert _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]}) is None
+    assert _modelscope_loras({"loras": [{
+        "name": "[Z Image Turbo] Asian Mix Lora - EOL",
+        "path": "https://civitai.com/api/download/models/3231694?fileId=3114056",
+        "scale": 0.8,
+    }]}) is None
     assert _clamp_seed(475720515768790) <= 2147483647
     assert _clamp_seed(475720515768790) > 0
     assert _clamp_seed(-3) == -1

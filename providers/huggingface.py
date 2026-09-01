@@ -152,7 +152,13 @@ def _prompt_body(payload: dict) -> dict:
             pass
     if payload.get("seed") not in (None, "", "random"):
         try:
-            params["seed"] = int(payload["seed"])
+            n = int(payload["seed"])
+            limit = 2147483647
+            if n < -1:
+                n = -1
+            elif n > limit:
+                n = n % limit or limit
+            params["seed"] = n
         except (TypeError, ValueError):
             pass
     sched = (payload.get("scheduler") or "").strip()
@@ -200,8 +206,38 @@ def _call_openai(provider: str, provider_id: str, payload: dict, key: str, timeo
     return code, data if isinstance(data, dict) else {"error": str(data)}, body
 
 
+def _maybe_lora_pid(pid: str, payload: dict) -> str:
+    """Keep the mapped HF providerId. Router does not host Fal `/lora` siblings."""
+    return (pid or "").lstrip("/")
+
+
+def _force_loras(body: dict, payload: dict) -> None:
+    if body.get("loras"):
+        return
+    try:
+        from . import fal as fal_mod
+    except Exception:
+        return
+    cleaned = []
+    for it in (payload or {}).get("loras") or []:
+        if isinstance(it, str) and it.strip().startswith("http"):
+            cleaned.append({"path": it.strip(), "scale": 0.8})
+            continue
+        if not isinstance(it, dict):
+            continue
+        path = fal_mod._fal_lora_path(it)
+        if not path:
+            continue
+        scale_raw = it.get("scale")
+        if scale_raw in (None, ""):
+            scale_raw = it.get("strength")
+        cleaned.append({"path": path, "scale": fal_mod._clip_lora_scale(scale_raw, 0.8)})
+    if cleaned:
+        body["loras"] = cleaned[:3]
+
+
 def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout: int):
-    pid = (provider_id or "").lstrip("/")
+    pid = _maybe_lora_pid((provider_id or "").lstrip("/"), payload or {})
     url = f"{ROUTER}/{provider}/{pid}"
     body = {"prompt": payload.get("prompt") or ""}
     params = _prompt_body(payload)
@@ -228,12 +264,12 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
             body["image_url"] = extra[0]
         else:
             body["image_urls"] = extra[:9]
-    # HF fal-ai provider is Fal underneath — use Fal catalog, not a preset list.
     try:
         from . import fal as fal_mod
         fal_mod.apply_fal_loras(body, payload, fal_mod.find_model(pid) or {"id": pid}, pid)
     except Exception:
         pass
+    _force_loras(body, payload or {})
     headers = _auth_headers(key)
     code, data = json_call(url, method="POST", headers=headers, body=body, timeout=timeout)
     return code, data if isinstance(data, dict) else {"error": str(data)}, body

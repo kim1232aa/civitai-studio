@@ -90,7 +90,7 @@ def _clamp_seed(raw):
 
 
 def _modelscope_loras(payload: dict):
-    """Official AIGC field: loras is a repo id string or {repo: weight} summing to 1.0."""
+    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai http paths are passed through."""
     raw = payload.get("loras") or []
     if isinstance(raw, str) and raw.strip() and "/" in raw and not raw.startswith("http"):
         return raw.strip()
@@ -103,7 +103,16 @@ def _modelscope_loras(payload: dict):
         if isinstance(it, str):
             repo = it.strip()
         elif isinstance(it, dict):
-            repo = (it.get("name") or it.get("path") or it.get("id") or "").strip()
+            path = (it.get("path") or it.get("url") or it.get("downloadUrl") or it.get("download_url") or "").strip()
+            name = (it.get("name") or it.get("id") or "").strip()
+            if path.startswith("http"):
+                repo = path
+            elif name.count("/") == 1 and not name.lower().startswith("urn:"):
+                repo = name
+            elif path.count("/") == 1:
+                repo = path
+            else:
+                repo = path or name
             try:
                 raw_w = it.get("scale")
                 if raw_w is None:
@@ -111,7 +120,12 @@ def _modelscope_loras(payload: dict):
                 weight = float(raw_w) if raw_w not in (None, "") else 1.0
             except (TypeError, ValueError):
                 weight = 1.0
-        if not repo or repo.startswith("http") or repo.lower().startswith("urn:"):
+        else:
+            continue
+        if not repo or repo.lower().startswith("urn:"):
+            continue
+        if repo.startswith("http"):
+            # AIGC wants Hub owner/repo; Civitai download URLs 500 with 空 modelName.
             continue
         if repo.count("/") != 1:
             continue
@@ -434,8 +448,11 @@ class ModelScopeProvider(Provider):
             except (TypeError, ValueError):
                 pass
         ms_loras = _modelscope_loras(payload)
+        lora_skip = None
         if ms_loras is not None:
             body["loras"] = ms_loras
+        elif payload.get("loras"):
+            lora_skip = "魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用"
         img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
         extra = [x for x in (payload.get("images") or []) if x]
         if img and img not in extra:
@@ -470,6 +487,8 @@ class ModelScopeProvider(Provider):
         data["backend"] = self.id
         data["endpoint"] = mid
         data["submittedInput"] = body
+        if lora_skip:
+            data["warning"] = lora_skip
         remember_job(jid, {
             "backend": self.id,
             "serviceId": mid,

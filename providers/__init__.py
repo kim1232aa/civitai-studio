@@ -67,7 +67,7 @@ def _boot_ui_patch():
         from pathlib import Path
         target = Path(__file__).resolve().parent.parent / "static" / "index.html"
         raw = target.read_text(encoding="utf-8")
-        if "v0750" in raw or "v0749" in raw or "v0748" in raw or "v0747" in raw:
+        if "v0751" in raw or "v0750" in raw or "v0749" in raw or "v0748" in raw:
             return
         out = static_patch.patch_index(raw)
         if out != raw:
