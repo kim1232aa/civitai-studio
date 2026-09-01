@@ -648,6 +648,8 @@
     height: auto;
     max-height: 34vh;
     overflow: auto;
+    position: relative;
+    z-index: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -655,6 +657,10 @@
     background: var(--bg);
     border: 1px solid var(--line);
     border-radius: var(--radius);
+  }
+  #importBlock {
+    position: relative;
+    z-index: 1;
   }
   .svc-list::-webkit-scrollbar { width: 8px; }
   .svc-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
@@ -760,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0755</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0756</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1002,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0755" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0756" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0755</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0756</div>
   </div>
 </aside>
 
@@ -1241,10 +1247,28 @@ function loraVersionId(l) {
   const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
   return m ? m[1] : '';
 }
+function hubUpscaleBlob(it) {
+  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  return /onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob);
+}
 function matchRecipe(it, r) {
   if (!it) return false;
   if (r === 'workflow') return false;
-  if (backend !== 'civitai' || it.backend) return (it.category || '') === r;
+  if (backend !== 'civitai' || it.backend) {
+    if (r === 'image') {
+      if ((it.category || '') !== 'image') return false;
+      // Always drop onnx/apisr/upscale rows from 文生图 (APISR sorts into CAP 60).
+      if (hubUpscaleBlob(it)) return false;
+      // Hub catalogs: also drop needsSource i2i so 「需要源图」 cannot steal generate.
+      if ((isModelscope() || backend === 'huggingface') && isBadAutoPick(it)) return false;
+      return true;
+    }
+    if (r === 'upscale') {
+      if ((it.category || '') === 'upscale') return true;
+      return hubUpscaleBlob(it);
+    }
+    return (it.category || '') === r;
+  }
   if (r === 'image') return it.category === 'image' && it.step === 'imageGen';
   if (r === 'video') return it.category === 'video' && it.step === 'videoGen';
   if (r === 'upscale') {
@@ -1573,15 +1597,17 @@ function bindRows(root) {
   if (!root._svcDelegated) {
     root._svcDelegated = true;
     root.addEventListener('click', (e) => {
+      // Import / dock / go sit near the list — ignore click-through.
+      if (e.target && e.target.closest && e.target.closest('#importBlock,#go,.dock')) return;
+      const listEl = $('serviceList');
+      if (listEl && e.target && !listEl.contains(e.target)) return;
       const el = e.target && e.target.closest && e.target.closest('.svc-row');
       if (!el || !root.contains(el)) return;
       e.preventDefault();
       e.stopPropagation();
       const it = findCatalogItem(el.getAttribute('data-id'));
       if (it) {
-        userPickedId = it.id;
-        selectService(it);
-        setDock('已选 ' + (it.name || it.id));
+        selectService(it, { user: true });
       } else {
         setDock('没对上这个模型 id', 'bad');
       }
@@ -1613,7 +1639,8 @@ function renderServiceList(opts) {
   const tags = svcDisambigTags(list);
   const CAP = 60;
   const wantId = userPickedId || (selected && selected.id) || '';
-  const wantItem = wantId ? (list.find(x => x.id === wantId) || findCatalogItem(wantId)) : null;
+  // Only accept picks still in the filtered recipe list (no APISR via findCatalogItem bypass).
+  const wantItem = wantId ? (list.find(x => x.id === wantId) || null) : null;
   let liveShow = live.slice(0, CAP);
   if (wantItem && !liveShow.some(x => x.id === wantItem.id)) {
     liveShow = [wantItem].concat(liveShow.filter(x => x.id !== wantItem.id)).slice(0, CAP);
@@ -1658,9 +1685,18 @@ function renderServiceList(opts) {
   showPickedChip();
   updateFields();
 }
-function selectService(it) {
+function selectService(it, opts) {
+  opts = opts || {};
+  // Only explicit user row clicks own userPickedId. Programmatic selects must not steal it.
+  if (opts.user && it && it.id) {
+    userPickedId = it.id;
+  } else if (userPickedId && it && it.id && String(it.id) !== String(userPickedId)) {
+    // Sticky user pick: refuse a different id (backend/recipe switch clears userPickedId).
+    const keep = findCatalogItem(userPickedId);
+    if (keep) it = keep;
+    else return false;
+  }
   selected = it || null;
-  if (it && it.id) userPickedId = it.id;
   copyPicked(it);
   syncVPreset(it);
   const box = $('serviceList');
@@ -1670,7 +1706,9 @@ function selectService(it) {
     });
   }
   showPickedChip();
+  if (opts.user && it) setDock('已选 ' + (it.name || it.id));
   updateFields();
+  return true;
 }
 function setRecipe(r) {
   recipe = r;
@@ -2343,13 +2381,24 @@ async function poll(id) {
 function selectServiceById(id) {
   const it = catalog.find(x => x.id === id);
   if (!it) return false;
+  // Programmatic: if user already picked something else, keep theirs.
+  if (userPickedId && String(userPickedId) !== String(id)) {
+    const keep = findCatalogItem(userPickedId);
+    if (keep) {
+      selected = keep;
+      copyPicked(keep);
+      renderServiceList({ pickDefault: false });
+      selectService(keep);
+      return true;
+    }
+  }
   recipe = recipeFor(it);
   kind = recipe === 'video' ? 'video' : 'image';
   updateTabClasses();
   selected = it;
   copyPicked(it);
   renderServiceList({ pickDefault: false });
-  selectService(it);
+  selectService(it); // no {user:true} — does not overwrite userPickedId
   return true;
 }
 function applyImport(j) {
@@ -2639,11 +2688,9 @@ async function runGenerate() {
         return;
       }
     } else {
-      // Freeze user pick: never let catalog race / pickForBackend steal during generate.
-      const frozenId = userPickedId || currentServiceId();
-      if (frozenId) {
-        userPickedId = frozenId;
-        const keep = findCatalogItem(frozenId);
+      // Force sticky user pick without clearing userPickedId (selectService is non-user).
+      if (userPickedId) {
+        const keep = findCatalogItem(userPickedId);
         if (keep) selectService(keep);
       }
       if (!currentServiceId() && backend !== 'civitai' && !userPickedId && !selectionLocked()) pickForBackend();
@@ -2653,6 +2700,10 @@ async function runGenerate() {
       if (userPickedId && selected && selected.id !== userPickedId) {
         const keep = findCatalogItem(userPickedId);
         if (keep) selectService(keep);
+      }
+      if (recipe === 'image' && isBadAutoPick(selected)) {
+        fail('请重新点选文生图模型，当前是超分/需要源图的模型');
+        return;
       }
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
