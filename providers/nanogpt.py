@@ -100,6 +100,29 @@ def _alnum(s):
     return "".join(ch for ch in (s or "").lower() if ch.isalnum())
 
 
+
+def _response_seed(data):
+    """Prefer seed echoed by Nano API response (truth); None if absent."""
+    if not isinstance(data, dict):
+        return None
+    for key in ("seed", "noise_seed", "noiseSeed"):
+        if data.get(key) not in (None, ""):
+            return _clamp_seed(data.get(key))
+    for nest_key in ("data", "result", "output", "images", "meta", "metadata"):
+        nest = data.get(nest_key)
+        if isinstance(nest, list) and nest:
+            item = nest[0]
+            if isinstance(item, dict):
+                for key in ("seed", "noise_seed", "noiseSeed"):
+                    if item.get(key) not in (None, ""):
+                        return _clamp_seed(item.get(key))
+        elif isinstance(nest, dict):
+            for key in ("seed", "noise_seed", "noiseSeed"):
+                if nest.get(key) not in (None, ""):
+                    return _clamp_seed(nest.get(key))
+    return None
+
+
 def _clamp_seed(raw):
     if raw in (None, "", "random"):
         return None
@@ -992,12 +1015,14 @@ class NanoGptProvider(Provider):
         # Persist download API URL / versionId — never long-lived B2 signed query.
         persist_body = sanitize_submitted_for_persist(full, lora_meta)
         jid = f"nano-gpt|img|{uuid.uuid4().hex[:12]}"
+        # v0773: meta.seed prefers API response seed; fallback submitted.
+        submitted_seed = full.get("seed")
         meta = {
             "backend": self.id,
             "serviceId": mid,
             "prompt": (payload or {}).get("prompt"),
             "negativePrompt": (payload or {}).get("negativePrompt"),
-            "seed": full.get("seed"),
+            "seed": submitted_seed,
             "jobId": jid,
             "submittedInput": persist_body,
         }
@@ -1015,6 +1040,9 @@ class NanoGptProvider(Provider):
                 data.setdefault("error", extract_error(data, f"HTTP {code}"))
                 last = (code, data)
                 continue
+            resp_seed = _response_seed(data)
+            used_seed = resp_seed if resp_seed is not None else submitted_seed
+            meta["seed"] = used_seed
             saved = _save_result(data, jid, meta)
             if saved:
                 return 200, {
@@ -1024,6 +1052,7 @@ class NanoGptProvider(Provider):
                     "endpoint": mid,
                     "saved": saved,
                     "submittedInput": sanitize_submitted_for_persist(body, lora_meta),
+                    "seed": used_seed,
                     "cost": data.get("cost"),
                 }
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})
@@ -1064,15 +1093,27 @@ class NanoGptProvider(Provider):
             saved = _save_result(data, f"nano-gpt|vid|{uuid.uuid4().hex[:12]}", {"backend": self.id, "serviceId": mid})
             if saved:
                 jid = f"nano-gpt|vid|{uuid.uuid4().hex[:12]}"
-                return 200, {"id": jid, "status": "succeeded", "backend": self.id, "saved": saved, "submittedInput": persist_body}
+                resp_seed = _response_seed(data)
+                used_seed = resp_seed if resp_seed is not None else body.get("seed")
+                return 200, {
+                    "id": jid,
+                    "status": "succeeded",
+                    "backend": self.id,
+                    "saved": saved,
+                    "submittedInput": persist_body,
+                    "seed": used_seed,
+                }
             return 502, {"error": "NanoGPT 视频没返回任务 id", "raw": json.dumps(data)[:400]}
         jid = f"nano-gpt|vid|{run}"
+        resp_seed = _response_seed(data)
+        used_seed = resp_seed if resp_seed is not None else body.get("seed")
         return 200, {
             "id": jid,
             "status": (data.get("status") or "pending").lower(),
             "backend": self.id,
             "endpoint": mid,
             "submittedInput": persist_body,
+            "seed": used_seed,
             "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
         }
 

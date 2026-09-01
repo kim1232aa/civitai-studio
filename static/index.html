@@ -781,7 +781,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0772</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0773</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -916,7 +916,7 @@
             <div><label class="lbl" for="model">模式</label>
               <select id="model"><option value="turbo">turbo</option><option value="raw">raw</option></select>
             </div>
-            <div><label class="lbl" for="seed">种子</label><input id="seed" placeholder="空则随机"></div>
+            <div><label class="lbl" for="seed">种子</label><input id="seed" placeholder="空则随机"><div id="seedHint" class="hidden" style="margin-top:4px;font-size:11px;color:var(--muted)">固定种子会复现同一张图；要新图请清空</div></div>
           </div>
           <div class="row">
             <div><label class="lbl" for="denoise">Denoise</label><input id="denoise" type="number" min="0" max="1" step="0.05" placeholder="1"></div>
@@ -1027,9 +1027,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0772" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0773" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0772</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。空种子=随机；固定种子会复现。 · v0773</div>
   </div>
 </aside>
 
@@ -1563,6 +1563,63 @@ function setDock(msg, cls) {
   const d = $('dockStatus');
   if (d) { d.className = cls || ''; d.textContent = msg; }
   setStatus(msg, cls || '');
+}
+// v0773: sync UI seed to submitted/returned seed after generate; warn fixed-seed replay.
+let _fixedSeedWarned = false;
+function seedFieldEl() {
+  return (currentKind() === 'video') ? $('vSeed') : $('seed');
+}
+function extractReturnedSeed(j) {
+  if (!j || typeof j !== 'object') return { has: false, seed: null };
+  if (Object.prototype.hasOwnProperty.call(j, 'seed')) return { has: true, seed: j.seed };
+  if (j.meta && typeof j.meta === 'object' && Object.prototype.hasOwnProperty.call(j.meta, 'seed')) {
+    return { has: true, seed: j.meta.seed };
+  }
+  const si = j.submittedInput;
+  if (si && typeof si === 'object' && Object.prototype.hasOwnProperty.call(si, 'seed')) {
+    return { has: true, seed: si.seed };
+  }
+  return { has: false, seed: null };
+}
+function syncSeedAfterGenerate(j, baseMsg, cls) {
+  const info = extractReturnedSeed(j);
+  const el = seedFieldEl();
+  const hint = $('seedHint');
+  let dock = baseMsg || '好了';
+  if (info.has) {
+    if (info.seed == null || info.seed === '') {
+      dock = (baseMsg || '好了') + ' · 随机种子';
+      if (hint) { hint.classList.add('hidden'); }
+    } else {
+      if (el) el.value = String(info.seed);
+      // Prefer not auto-clear; leave filled + show hint for fixed seed.
+      if (hint && typeof isNanogpt === 'function' && isNanogpt()) { hint.classList.remove('hidden'); }
+      dock = (baseMsg || '好了') + ' · 已用种子 ' + info.seed;
+    }
+  } else {
+    const raw = el && el.value != null ? String(el.value).trim() : '';
+    if (raw === '') dock = (baseMsg || '好了') + ' · 随机种子';
+    else {
+      dock = (baseMsg || '好了') + ' · 已用种子 ' + raw;
+      if (hint && typeof isNanogpt === 'function' && isNanogpt()) { hint.classList.remove('hidden'); }
+    }
+  }
+  setDock(dock, cls || 'ok');
+}
+function warnFixedSeedIfNeeded() {
+  const el = seedFieldEl();
+  const raw = el && el.value != null ? String(el.value).trim() : '';
+  if (!raw) {
+    _fixedSeedWarned = false;
+    const hint = $('seedHint');
+    if (hint) hint.classList.add('hidden');
+    return;
+  }
+  if (_fixedSeedWarned) return;
+  _fixedSeedWarned = true;
+  setDock('固定种子会复现同一张图；要新图请清空种子', 'warn');
+  const hint = $('seedHint');
+  if (hint) hint.classList.remove('hidden');
 }
 function scrollSvcOnIntoView() {
   try {
@@ -2689,8 +2746,8 @@ async function poll(id) {
       }
       saved.forEach(s => addCard(s.url, id, s.kind === 'video' || (s.file || '').endsWith('.mp4')));
       updateWait('完成', null, 100);
-      if (j.warning) setDock('好了 · ' + j.warning, 'warn');
-      else setDock('好了', 'ok');
+      if (j.warning) syncSeedAfterGenerate(j, '好了 · ' + j.warning, 'warn');
+      else syncSeedAfterGenerate(j, '好了', 'ok');
       stopWait();
       return;
     }
@@ -3285,6 +3342,8 @@ async function runGenerate() {
         return;
       }
     }
+    // v0773: non-empty seed → warn once (do not block); empty seed → null (random) via payload().
+    try { warnFixedSeedIfNeeded(); } catch (e0) {}
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
     if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { fail('这个服务需要首帧图'); return; }
@@ -3391,14 +3450,21 @@ async function runGenerate() {
     if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video' || /\.(mp4|webm)$/i.test(s.file || s.url || '')));
     if ((j.status || '').toLowerCase() === 'succeeded' && saved.length) {
       stopWait();
-      if (j.warning) setDock('好了 · ' + j.warning, 'warn');
-      else setDock('好了', 'ok');
+      if (j.warning) syncSeedAfterGenerate(j, '好了 · ' + j.warning, 'warn');
+      else syncSeedAfterGenerate(j, '好了', 'ok');
       return;
     }
     if (!jobId) { stopWait(); fail('提交失败 ' + JSON.stringify(j).slice(0, 300)); return; }
     waitJobId = jobId;
     const cancelBtn = $('waitCancel');
     if (cancelBtn) cancelBtn.disabled = false;
+    try {
+      const info = extractReturnedSeed(j);
+      if (info.has && info.seed != null && info.seed !== '') {
+        const el = seedFieldEl();
+        if (el) el.value = String(info.seed);
+      }
+    } catch (e0) {}
     if (j.warning) setDock('已进队列 ' + jobId + ' · ' + j.warning, 'warn');
     else setDock('已进队列 ' + jobId);
     if (go) go.textContent = '排队中…';

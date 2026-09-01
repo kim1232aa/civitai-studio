@@ -484,7 +484,7 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0772"' in html
+    assert 'title="v0773"' in html
     assert 'aria-label="生成"' in html
     assert 'aria-label="v0772"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
@@ -540,7 +540,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0772"' in html
+    assert 'title="v0773"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -695,9 +695,59 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "truncateNanoPrompt" in html
     assert "syncNanoPromptHint" in html
     assert "nanoPromptHint" in html
-    assert 'title="v0772"' in html
+    assert 'title="v0773"' in html
     assert "prompt_length_error" in nano_src
     assert "NANO_PROMPT_MAX = 1200" in nano_src
+
+
+    # v0773: seed sync after generate; fixed-seed warn; Nano prefers response seed
+    assert "syncSeedAfterGenerate" in html
+    assert "warnFixedSeedIfNeeded" in html
+    assert "已用种子" in html
+    assert "随机种子" in html
+    assert "固定种子会复现同一张图；要新图请清空种子" in html
+    assert "seedRaw === '' ? null" in html or "seedRaw === \'\' ? null" in html
+    assert "seedHint" in html
+    assert 'title="v0773"' in html
+    from providers.nanogpt import _response_seed, _clamp_seed as _ns
+    assert _response_seed({"seed": 42}) == 42
+    assert _response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99
+    assert _response_seed({"data": [{"url": "x"}]}) is None
+    assert _response_seed({"meta": {"seed": 7}}) == 7
+    # generate path stores response seed over submitted
+    import unittest.mock as mock
+    from providers.nanogpt import NanoGptProvider
+    prov = NanoGptProvider()
+    with mock.patch("providers.nanogpt.nano_key", return_value="test-key"):
+        with mock.patch("providers.nanogpt.find_spec", return_value={
+            "id": "z-image-turbo",
+            "category": "image",
+            "supported_parameters": {"resolutions": ["1024x1024"]},
+            "capabilities": {},
+        }):
+            with mock.patch("providers.nanogpt.json_call") as jc:
+                with mock.patch("providers.nanogpt._save_result", return_value=[{"url": "/out/x.jpg", "file": "x.jpg"}]):
+                    jc.return_value = (200, {"data": [{"url": "https://example.com/a.png", "seed": 555}], "cost": 0.01})
+                    code, body = prov.generate({
+                        "serviceId": "z-image-turbo",
+                        "prompt": "hi",
+                        "width": 1024,
+                        "height": 1024,
+                        "seed": 111,
+                    })
+                    assert code == 200, (code, body)
+                    assert body.get("seed") == 555, body
+                    # fallback to submitted when response has no seed
+                    jc.return_value = (200, {"data": [{"url": "https://example.com/b.png"}]})
+                    code2, body2 = prov.generate({
+                        "serviceId": "z-image-turbo",
+                        "prompt": "hi",
+                        "width": 1024,
+                        "height": 1024,
+                        "seed": 222,
+                    })
+                    assert code2 == 200 and body2.get("seed") == 222, body2
+
 
     print("PASS p0 wiring")
 
