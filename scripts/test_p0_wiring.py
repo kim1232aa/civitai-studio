@@ -135,6 +135,31 @@ def main() -> int:
     assert i2i["input_references"] == ["https://example.com/a.jpg"]
     assert i2i["strength"] == 0.4
     assert "image" not in i2i and "imageUrl" not in i2i and "imageDataUrl" not in i2i and "image_url" not in i2i
+
+    from providers.modelscope import hub_upscale_blob as ms_up, _hub_row, _apply_upscale_category as ms_apply
+    from providers.huggingface import hub_upscale_blob as hf_up, _hf_row, _apply_upscale_category as hf_apply
+    fake_apisr = {"id": "org/APISR-generator-onnx", "name": "APISR ONNX", "chinese_name": "APISR"}
+    assert ms_up(fake_apisr), "APISR-like id must classify as upscale blob"
+    row = _hub_row(fake_apisr, "image", "text-to-image", ["t2i"], False, False)
+    assert row["category"] == "upscale", row
+    assert row["task"] == "upscale"
+    z = _hub_row(
+        {"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image Turbo", "chinese_name": "Z-Image Turbo"},
+        "image", "text-to-image", ["t2i"], False, False,
+    )
+    assert z["category"] == "image" and not ms_up(z), z
+    edit = _hub_row(
+        {"id": "Qwen/Qwen-Image-Edit", "name": "Qwen Image Edit"},
+        "image", "image-to-image", ["i2i"], True, False,
+    )
+    assert edit["category"] == "image" and edit.get("needsSource") is True, edit
+    assert ms_apply({"id": "x/realesrgan", "name": "RealESRGAN", "category": "image"})["category"] == "upscale"
+    assert hf_up({"id": "foo/apisr-onnx", "name": "APISR"})
+    hf_row = _hf_row("foo/APISR-ONNX", "APISR", "text-to-image")
+    assert hf_row["category"] == "upscale", hf_row
+    assert _hf_row("Tongyi-MAI/Z-Image-Turbo", "Z-Image-Turbo", "text-to-image")["category"] == "image"
+    assert hf_apply({"id": "a/super-resolution", "name": "SR", "category": "image"})["category"] == "upscale"
+
     print("PASS p0 wiring")
     return 0
 

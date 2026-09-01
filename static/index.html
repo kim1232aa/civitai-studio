@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0756</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0757</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0756" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0757" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0756</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0757</div>
   </div>
 </aside>
 
@@ -1362,6 +1362,14 @@ function setDock(msg, cls) {
   if (d) { d.className = cls || ''; d.textContent = msg; }
   setStatus(msg, cls || '');
 }
+function scrollSvcOnIntoView() {
+  try {
+    const box = $('serviceList');
+    if (!box) return;
+    const on = box.querySelector('.svc-row.on');
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  } catch (e) {}
+}
 function syncGo() {
   const go = $('go');
   if (!go) return;
@@ -1684,6 +1692,7 @@ function renderServiceList(opts) {
   });
   showPickedChip();
   updateFields();
+  if (selected) scrollSvcOnIntoView();
 }
 function selectService(it, opts) {
   opts = opts || {};
@@ -1695,6 +1704,11 @@ function selectService(it, opts) {
     const keep = findCatalogItem(userPickedId);
     if (keep) it = keep;
     else return false;
+  }
+  // Programmatic (no {user:true}): never bind upscale/onnx/needsSource onto 文生图.
+  if (!opts.user && recipe === 'image' && it && (isBadAutoPick(it) || hubUpscaleBlob(it))) {
+    setDock('未改选中：该模型是超分/需源图，不适合文生图', 'warn');
+    return false;
   }
   selected = it || null;
   copyPicked(it);
@@ -1708,6 +1722,7 @@ function selectService(it, opts) {
   showPickedChip();
   if (opts.user && it) setDock('已选 ' + (it.name || it.id));
   updateFields();
+  if (it) scrollSvcOnIntoView();
   return true;
 }
 function setRecipe(r) {
@@ -2392,6 +2407,11 @@ function selectServiceById(id) {
       return true;
     }
   }
+  // On 文生图: refuse upscale/onnx/needsSource steal (do not change selected/userPickedId).
+  if (recipe === 'image' && (isBadAutoPick(it) || hubUpscaleBlob(it))) {
+    setDock('未改选中：该模型是超分/需源图，不适合文生图', 'warn');
+    return false;
+  }
   recipe = recipeFor(it);
   kind = recipe === 'video' ? 'video' : 'image';
   updateTabClasses();
@@ -2399,6 +2419,7 @@ function selectServiceById(id) {
   copyPicked(it);
   renderServiceList({ pickDefault: false });
   selectService(it); // no {user:true} — does not overwrite userPickedId
+  scrollSvcOnIntoView();
   return true;
 }
 function applyImport(j) {

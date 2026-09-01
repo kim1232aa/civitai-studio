@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import socket
 from pathlib import Path
@@ -157,6 +158,47 @@ def _alnum(s):
     return "".join(ch for ch in (s or "").lower() if ch.isalnum())
 
 
+_UPSCALE_RE = re.compile(r"onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx", re.I)
+
+
+def hub_upscale_blob(it) -> bool:
+    """Hub id/name/task/tags look like an upscaler (APISR/RealESRGAN/onnx), not Z-Image-Turbo."""
+    if not isinstance(it, dict):
+        return False
+    parts = [
+        it.get("id") or "",
+        it.get("name") or "",
+        it.get("chinese_name") or "",
+        it.get("task") or "",
+        it.get("hubTask") or "",
+        " ".join(str(t) for t in (it.get("tags") or []) if t),
+    ]
+    tasks = it.get("tasks") or it.get("Tasks") or []
+    if isinstance(tasks, str):
+        parts.append(tasks)
+    elif isinstance(tasks, (list, tuple)):
+        parts.append(" ".join(str(t) for t in tasks))
+    return bool(_UPSCALE_RE.search(" ".join(parts)))
+
+
+def _apply_upscale_category(row: dict) -> dict:
+    """Force category=upscale when blob matches; keep Z-Image / normal t2i as image."""
+    if not isinstance(row, dict):
+        return row
+    if hub_upscale_blob(row) and (row.get("category") or "image") == "image":
+        row = dict(row)
+        row["category"] = "upscale"
+        row["task"] = "upscale"
+        tags = list(row.get("tags") or [])
+        if "upscale" not in tags:
+            tags = ["upscale"] + tags
+        row["tags"] = tags
+        row.pop("needsSource", None)
+    return row
+
+
+
+
 def _hub_row(it, cat, task, tags, needs_src, needs_ff):
     mid = (it.get("id") or it.get("name") or "").strip()
     name = (it.get("chinese_name") or it.get("name") or (mid.split("/")[-1] if mid else "")).strip()
@@ -175,7 +217,7 @@ def _hub_row(it, cat, task, tags, needs_src, needs_ff):
         row["needsSource"] = True
     if needs_ff:
         row["needsFirstFrame"] = True
-    return row
+    return _apply_upscale_category(row)
 
 
 def _classify_hub(it):
@@ -339,7 +381,7 @@ class ModelScopeProvider(Provider):
         return f"{self.label} 地址 {self._base} 连不上。AI 和 CN 是两套接口，不会改走另一边。"
 
     def categories(self) -> list:
-        return ["image", "video"]
+        return ["image", "video", "upscale"]
 
     def catalog(self, q, category, status) -> dict:
         qn = (q or "").strip()
@@ -366,6 +408,7 @@ class ModelScopeProvider(Provider):
                 _HUB_CACHE["at"] = now
                 _HUB_CACHE["totals"] = totals
         qnl = qn.lower()
+        items = [_apply_upscale_category(dict(x)) for x in items]
         if category:
             items = [x for x in items if x.get("category") == category]
         if status:

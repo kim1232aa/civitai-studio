@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import os
 import time
 import uuid
@@ -310,6 +311,40 @@ def _alnum(s):
     return "".join(ch for ch in (s or "").lower() if ch.isalnum())
 
 
+_UPSCALE_RE = re.compile(r"onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx", re.I)
+
+
+def hub_upscale_blob(it) -> bool:
+    """HF id/name/task/tags look like an upscaler (APISR/RealESRGAN/onnx)."""
+    if not isinstance(it, dict):
+        return False
+    parts = [
+        it.get("id") or "",
+        it.get("name") or "",
+        it.get("task") or "",
+        it.get("pipelineTag") or "",
+        " ".join(str(t) for t in (it.get("tags") or []) if t),
+    ]
+    return bool(_UPSCALE_RE.search(" ".join(parts)))
+
+
+def _apply_upscale_category(row: dict) -> dict:
+    if not isinstance(row, dict):
+        return row
+    if hub_upscale_blob(row) and (row.get("category") or "image") == "image":
+        row = dict(row)
+        row["category"] = "upscale"
+        row["task"] = "upscale"
+        tags = list(row.get("tags") or [])
+        if "upscale" not in tags:
+            tags = ["upscale"] + tags
+        row["tags"] = tags
+        row.pop("needsSource", None)
+    return row
+
+
+
+
 def _hf_headers():
     h = {"Accept": "application/json"}
     k = hf_key()
@@ -335,7 +370,7 @@ def _hf_row(mid, name, pipe):
         row["needsSource"] = True
     if needs_ff:
         row["needsFirstFrame"] = True
-    return row
+    return _apply_upscale_category(row)
 
 
 def search_hf(q, pins=None):
@@ -434,6 +469,7 @@ class HuggingFaceProvider(Provider):
             items = search_hf(qn, pins)
         else:
             items = pins
+        items = [_apply_upscale_category(dict(x)) for x in items]
         if category:
             items = [x for x in items if x.get("category") == category]
         if status:
