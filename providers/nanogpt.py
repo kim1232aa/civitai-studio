@@ -102,22 +102,25 @@ def closest_aspect(w, h) -> str:
     return best
 
 
-def pick_resolution(spec, w=None, h=None):
-    """Pick a catalog resolution token the model actually lists."""
+def pick_resolution(spec, w=None, h=None, preferred=None):
+    """Pick a catalog resolution token the model actually lists.
+
+    Empty catalog resolutions → None (caller must 400). Never invent `{w}x{h}`.
+    """
     sp = (spec or {}).get("supported_parameters") or {}
     res = [str(x) for x in (sp.get("resolutions") or []) if x not in (None, "")]
     if not res:
-        try:
-            if w and h:
-                return f"{int(w)}x{int(h)}"
-        except (TypeError, ValueError):
-            pass
         return None
 
     def norm(s):
         return str(s).lower().replace("×", "x").replace("*", "x").replace(" ", "")
 
     low = {norm(x): x for x in res}
+    pref = (preferred or "").strip()
+    if pref:
+        hit = low.get(norm(pref))
+        if hit:
+            return hit
     try:
         wi = int(w) if w not in (None, "") else 0
         hi = int(h) if h not in (None, "") else 0
@@ -362,7 +365,7 @@ def _image_body(payload: dict, spec: dict) -> dict:
     if neg:
         body["negative_prompt"] = neg
         body["negativePrompt"] = neg
-    res = pick_resolution(spec, w, h)
+    res = pick_resolution(spec, w, h, preferred=(payload or {}).get("resolution"))
     if res:
         body["resolution"] = res
         body["size"] = res
@@ -459,7 +462,7 @@ def _video_body(payload: dict, spec: dict) -> dict:
     w, h = payload.get("width"), payload.get("height")
     ar = closest_aspect(w or 1280, h or 720)
     body["aspect_ratio"] = ar
-    res = pick_resolution(spec, w, h)
+    res = pick_resolution(spec, w, h, preferred=(payload or {}).get("resolution"))
     if res:
         body["resolution"] = res
         body["size"] = res
@@ -527,7 +530,7 @@ class NanoGptProvider(Provider):
         mid = model_id((payload or {}).get("serviceId") or "")
         spec = find_spec(mid)
         pricing = (spec.get("pricing") or {}).get("per_image") or {}
-        res = pick_resolution(spec, payload.get("width"), payload.get("height"))
+        res = pick_resolution(spec, payload.get("width"), payload.get("height"), preferred=(payload or {}).get("resolution"))
         price = None
         if isinstance(pricing, dict) and pricing:
             key = res if res in pricing else ("auto" if "auto" in pricing else next(iter(pricing)))
@@ -565,7 +568,18 @@ class NanoGptProvider(Provider):
         return self._generate_image(payload, spec, mid)
 
     def _generate_image(self, payload, spec, mid):
+        sp = (spec or {}).get("supported_parameters") or {}
+        if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
+            return 400, {
+                "error": "当前 NanoGPT 模型目录没有 resolutions，请换一个带分辨率列表的目录模型（勿自拼 WxH）",
+                "serviceId": mid,
+            }
         full = _image_body(payload or {}, spec)
+        if not full.get("resolution") and not full.get("size"):
+            return 400, {
+                "error": "无法从目录选中 resolution token，请在构图里选一个目录分辨率",
+                "serviceId": mid,
+            }
         jid = f"nano-gpt|img|{uuid.uuid4().hex[:12]}"
         meta = {
             "backend": self.id,

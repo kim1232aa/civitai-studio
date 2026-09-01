@@ -15,6 +15,7 @@ AI_TOKEN_PATH = Path.home() / ".config/modelscope/token"
 CN_TOKEN_PATH = Path.home() / ".config/modelscope-cn/token"
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
+# AI and CN are separate products. Never fall back to the other base/token on failure.
 AI_BASE = "https://api-inference.modelscope.ai/v1"
 CN_BASE = "https://api-inference.modelscope.cn/v1"
 
@@ -90,7 +91,7 @@ def _clamp_seed(raw):
 
 
 def _modelscope_loras(payload: dict):
-    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai http paths are passed through."""
+    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai http paths are skipped (+ warning)."""
     raw = payload.get("loras") or []
     if isinstance(raw, str) and raw.strip() and "/" in raw and not raw.startswith("http"):
         return raw.strip()

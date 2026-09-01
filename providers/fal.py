@@ -401,11 +401,15 @@ def build_fal_input(payload: dict) -> dict:
         except (TypeError, ValueError):
             pass
     ar_field = spec.get("aspectRatioField")
-    if not ar_field and "ratio" in list(spec.get("optional") or []) + list(spec.get("required") or []):
+    req_opt_ar = list(spec.get("optional") or []) + list(spec.get("required") or [])
+    if not ar_field and "ratio" in req_opt_ar:
         ar_field = "ratio"
+    if not ar_field and "aspect_ratio" in req_opt_ar:
+        ar_field = "aspect_ratio"
     if ar_field and payload.get("aspectRatio"):
         inp[ar_field] = payload["aspectRatio"]
-    elif payload.get("aspectRatio") and "kontext" in eid:
+    elif payload.get("aspectRatio") and ("kontext" in eid or not req_opt_ar):
+        # kontext / unschematized endpoints: official field is aspect_ratio
         inp["aspect_ratio"] = payload["aspectRatio"]
     size_keys = set(req_opt) | set(fields)
     if payload.get("width") and payload.get("height") and (
@@ -417,6 +421,19 @@ def build_fal_input(payload: dict) -> dict:
             pass
     if payload.get("scheduler") and (not req_opt or "scheduler" in req_opt):
         inp["scheduler"] = payload["scheduler"]
+    # qty / quantity → num_images when the endpoint lists that field
+    if "num_images" in size_keys or "num_images" in set(req_opt):
+        raw_q = payload.get("quantity")
+        if raw_q in (None, ""):
+            raw_q = payload.get("qty")
+        if raw_q in (None, ""):
+            raw_q = payload.get("num_images")
+        try:
+            n = int(raw_q)
+            if n > 0:
+                inp["num_images"] = max(1, min(12, n))
+        except (TypeError, ValueError):
+            pass
     apply_fal_loras(inp, payload, spec, eid)
     return {k: v for k, v in inp.items() if v not in (None, "", [])}
 

@@ -477,6 +477,7 @@
   }
   .ok { color: var(--ok) !important; }
   .bad { color: var(--accent) !important; }
+  .warn { color: #d4a017 !important; }
 
   .empty-state {
     flex: 1;
@@ -759,7 +760,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0753</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0754</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -853,6 +854,26 @@
           <div><label class="lbl" for="width">宽</label><input id="width" type="number" min="64" max="2048" step="16"></div>
           <div><label class="lbl" for="height">高</label><input id="height" type="number" min="64" max="2048" step="16"></div>
         </div>
+        <div id="aspectRow" class="hidden">
+          <label class="lbl" for="aspectRatio">宽高比 / aspect_ratio</label>
+          <select id="aspectRatio">
+            <option value="">不指定</option>
+            <option>1:1</option>
+            <option>16:9</option>
+            <option>9:16</option>
+            <option>4:3</option>
+            <option>3:4</option>
+            <option>3:2</option>
+            <option>2:3</option>
+            <option>21:9</option>
+            <option>9:21</option>
+          </select>
+        </div>
+        <div id="nanoResRow" class="hidden">
+          <label class="lbl" for="nanoRes">Nano 分辨率 token</label>
+          <select id="nanoRes"></select>
+          <div id="nanoResHint" class="muted" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+        </div>
       </section>
       <section class="block">
         <h2 class="block-title">采样</h2>
@@ -883,6 +904,21 @@
       <section class="block">
         <h2 class="block-title">构图</h2>
         <select id="vPreset" class="hidden" hidden aria-hidden="true" tabindex="-1"></select>
+        <div id="aspectRowV" class="hidden">
+          <label class="lbl" for="aspectRatioV">宽高比 / aspect_ratio</label>
+          <select id="aspectRatioV">
+            <option value="">不指定</option>
+            <option>1:1</option>
+            <option>16:9</option>
+            <option>9:16</option>
+            <option>4:3</option>
+            <option>3:4</option>
+            <option>3:2</option>
+            <option>2:3</option>
+            <option>21:9</option>
+            <option>9:21</option>
+          </select>
+        </div>
         <label class="lbl" for="duration">时长（秒）</label>
         <input id="duration" type="number" min="1" max="30" value="5">
         <div id="firstFrameBlock">
@@ -966,9 +1002,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0753" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0754" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0753</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0754</div>
   </div>
 </aside>
 
@@ -1288,6 +1324,80 @@ function durationRange(it) {
   if (eng === 'happyHorse') return [3, 15];
   return [1, 30];
 }
+function catalogResolutions(it) {
+  const sp = (it && (it.supported_parameters || it.supportedParameters)) || {};
+  const list = sp.resolutions || [];
+  return (Array.isArray(list) ? list : []).map(x => String(x)).filter(Boolean);
+}
+function syncNanoResSelect() {
+  const sel = $('nanoRes');
+  const hint = $('nanoResHint');
+  if (!sel) return;
+  const list = catalogResolutions(selected);
+  const prev = sel.value;
+  sel.innerHTML = '';
+  if (!list.length) {
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = '（目录无 resolutions — 请换模型）';
+    sel.appendChild(o);
+    if (hint) hint.textContent = '将提交：无 — 后端会 400，请选带分辨率列表的目录模型';
+    return;
+  }
+  list.forEach(tok => {
+    const o = document.createElement('option');
+    o.value = tok;
+    o.textContent = tok;
+    sel.appendChild(o);
+  });
+  const pick = nanoClosestResolution(list, +($('width') && $('width').value), +($('height') && $('height').value));
+  if (prev && list.indexOf(prev) >= 0) sel.value = prev;
+  else if (pick) sel.value = pick;
+  else sel.value = list[0];
+  if (hint) hint.textContent = '将提交 resolution=' + (sel.value || '?') + '（由目录 token 决定，不是自由 WxH）';
+}
+function nanoClosestResolution(list, w, h) {
+  if (!list || !list.length) return '';
+  const norm = s => String(s).toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
+  const low = {};
+  list.forEach(x => { low[norm(x)] = x; });
+  const wi = Number(w) || 0, hi = Number(h) || 0;
+  if (wi && hi && low[wi + 'x' + hi]) return low[wi + 'x' + hi];
+  if (low['1k'] || low['2k']) {
+    const mx = Math.max(wi, hi);
+    if (mx >= 1536 && low['2k']) return low['2k'];
+    if (low['1k']) return low['1k'];
+  }
+  // aspect-ish tokens
+  if (wi && hi) {
+    const r = wi / hi;
+    let best = '', bestD = 99;
+    [['1:1',1],['16:9',16/9],['9:16',9/16],['4:3',4/3],['3:4',3/4],['3:2',3/2],['2:3',2/3]].forEach(([name, ar]) => {
+      if (!low[norm(name)]) return;
+      const d = Math.abs(r - ar);
+      if (d < bestD) { bestD = d; best = low[norm(name)]; }
+    });
+    if (best) return best;
+    // WxH-like catalog entries
+    let bestTok = '', bestScore = 1e18;
+    list.forEach(tok => {
+      const n = norm(tok);
+      if (n.indexOf('x') < 0) return;
+      const parts = n.split('x');
+      const pw = +parts[0], ph = +parts[1];
+      if (!(pw > 0 && ph > 0)) return;
+      const score = Math.abs(pw / ph - r) + Math.abs(pw * ph - wi * hi) / Math.max(wi * hi, 1);
+      if (score < bestScore) { bestScore = score; bestTok = tok; }
+    });
+    if (bestTok) return bestTok;
+  }
+  return list[0];
+}
+function currentAspectRatio() {
+  const vid = recipe === 'video' || isVideoGen(selected);
+  const el = vid ? $('aspectRatioV') : $('aspectRatio');
+  return (el && el.value) ? el.value.trim() : '';
+}
 function updateFields() {
   kind = currentKind();
   const vid = recipe === 'video' || isVideoGen(selected);
@@ -1328,6 +1438,13 @@ function updateFields() {
     if (n < lo) dur.value = lo;
     if (n > hi) dur.value = hi;
   }
+  const showAspect = backend === 'fal';
+  if ($('aspectRow')) $('aspectRow').classList.toggle('hidden', !showAspect || vid || util);
+  if ($('aspectRowV')) $('aspectRowV').classList.toggle('hidden', !showAspect || !vid);
+  const showNano = isNanogpt() && !vid && !util;
+  if ($('nanoResRow')) $('nanoResRow').classList.toggle('hidden', !showNano);
+  if (showNano) syncNanoResSelect();
+  else if ($('nanoResHint')) $('nanoResHint').textContent = '';
   syncGo();
 }
 function renderRefs() {
@@ -1650,6 +1767,9 @@ function payload() {
       scheduler: $('scheduler').value,
       denoise: ($('denoise') && $('denoise').value !== '') ? +$('denoise').value : undefined,
     });
+    const ar = currentAspectRatio();
+    if (ar) base.aspectRatio = ar;
+    if (isNanogpt() && $('nanoRes') && $('nanoRes').value) base.resolution = $('nanoRes').value;
     if (picked.model == null) base.model = $('model').value;
     if (srcImg) {
       base.sourceImage = srcImg;
@@ -1672,6 +1792,10 @@ function payload() {
     firstFrame: first || srcImg, lastFrame: $('lastFrame').value.trim(),
     turbo: $('turbo').checked, fast: $('fast').checked,
   });
+  {
+    const ar = currentAspectRatio();
+    if (ar) base.aspectRatio = ar;
+  }
   const eng = picked.engine || '';
   if (eng === 'wan' || eng === 'happyHorse' || eng === 'seedance' || eng === 'kling' || eng === 'kling-v3') {
     base.resolution = $('vRes').value;
@@ -2152,7 +2276,8 @@ async function poll(id) {
       }
       saved.forEach(s => addCard(s.url, id, s.kind === 'video' || (s.file || '').endsWith('.mp4')));
       updateWait('完成', null, 100);
-      setStatus('好了', 'ok');
+      if (j.warning) setDock('好了 · ' + j.warning, 'warn');
+      else setStatus('好了', 'ok');
       stopWait();
       return;
     }
@@ -2402,7 +2527,8 @@ $('whatif').onclick = async () => {
     else line = '预估 ' + (n == null ? '?' : n) + ' yellow buzz';
     if (j.transactions && j.transactions.insufficientBuzz) line += ' · Buzz 不够';
     if ($('cost')) $('cost').textContent = line;
-    setStatus('预估完成');
+    if (j.warning) setDock(j.warning, 'warn');
+    else setStatus('预估完成');
   } catch (e) {
     const msg = (e.data && (e.data.error || e.data.detail)) || e.message || '预估失败';
     if ($('cost')) $('cost').textContent = '预估失败';
@@ -2441,6 +2567,24 @@ async function runGenerate() {
       const nRes = (wfState.resources || []).length;
       if (!nRes && miss) { fail('工作流文件都对不上，先补 AIR 再生成'); return; }
       if (miss) { lastGoFail = Date.now(); setDock('还有 ' + miss + ' 个未匹配，生成可能缺模型', 'bad'); }
+      const barePacks = [];
+      const seenBare = {};
+      const pushBare = (a) => {
+        const s = String(a || '');
+        if (!s) return;
+        const low = s.toLowerCase();
+        if (low.indexOf(':nodepack:') >= 0 && low.indexOf(':nodepacklayer:') < 0 && !seenBare[s]) {
+          seenBare[s] = 1; barePacks.push(s);
+        }
+      };
+      (wfState.resources || []).forEach(pushBare);
+      (am.resources || []).forEach(pushBare);
+      (am.nodepacks || []).forEach(pk => { if (pk) pushBare(pk.air || pk.id || ''); });
+      if (barePacks.length) {
+        const shown = barePacks.slice(0, 3).join('、');
+        fail('Civitai customComfy 要求自定义节点用 install-layer AIR（urn:air:comfy:nodepacklayer:…），当前映射还是裸 nodepack。这个工作流含：' + shown + '。先走图片 Tab 出图；没有官方 nodepacklayer 样例前不改 URN。');
+        return;
+      }
     } else {
       if (!currentServiceId() && userPickedId) {
         const keep = findCatalogItem(userPickedId);
@@ -2482,14 +2626,16 @@ async function runGenerate() {
     if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video' || /\.(mp4|webm)$/i.test(s.file || s.url || '')));
     if ((j.status || '').toLowerCase() === 'succeeded' && saved.length) {
       stopWait();
-      setDock('好了', 'ok');
+      if (j.warning) setDock('好了 · ' + j.warning, 'warn');
+      else setDock('好了', 'ok');
       return;
     }
     if (!jobId) { stopWait(); lastGoFail = Date.now(); setDock('提交失败 ' + JSON.stringify(j).slice(0, 300), 'bad'); return; }
     waitJobId = jobId;
     const cancelBtn = $('waitCancel');
     if (cancelBtn) cancelBtn.disabled = false;
-    setDock('已进队列 ' + jobId);
+    if (j.warning) setDock('已进队列 ' + jobId + ' · ' + j.warning, 'warn');
+    else setDock('已进队列 ' + jobId);
     if (go) go.textContent = '排队中…';
     await poll(jobId);
   } catch (e) {
@@ -2713,6 +2859,10 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       b.onclick = async () => {
         backend = p.id;
         persistBackend(p.id);
+        if (waitJobId) {
+          try { stopWait(); } catch (e) {}
+          setDock('已切到 ' + (short || p.label || p.id) + '，上一单等待已清', '');
+        }
         userPickedId = null;
         selected = null;
         box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
@@ -2779,6 +2929,15 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     const fire = (ev) => { window.__studioGo(ev); };
     go.addEventListener('click', fire, true);
   }
+  ['width', 'height'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('change', () => { if (isNanogpt()) syncNanoResSelect(); });
+    if (el) el.addEventListener('input', () => { if (isNanogpt()) syncNanoResSelect(); });
+  });
+  if ($('nanoRes')) $('nanoRes').addEventListener('change', () => {
+    const hint = $('nanoResHint');
+    if (hint) hint.textContent = '将提交 resolution=' + ($('nanoRes').value || '?') + '（由目录 token 决定，不是自由 WxH）';
+  });
   window.addEventListener('hashchange', () => {
     try {
       const h = (location.hash || '').replace(/^#/, '').split('&')[0];
@@ -2790,6 +2949,10 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       // Real navigation (back/forward). Do not overwrite 魔搭 with a stale Fal hash.
       backend = h;
       persistBackend(h);
+      if (waitJobId) {
+        try { stopWait(); } catch (e) {}
+        setDock('已切后端，上一单等待已清', '');
+      }
       const box = $('backendSwitch');
       if (box) box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.backend === h));
       userPickedId = null;

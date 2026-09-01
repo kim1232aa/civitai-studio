@@ -540,7 +540,7 @@ class HuggingFaceProvider(Provider):
                 last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
                 continue
             if saved:
-                return 200, {
+                out = {
                     "id": jid,
                     "status": "succeeded",
                     "backend": "huggingface",
@@ -549,6 +549,13 @@ class HuggingFaceProvider(Provider):
                     "saved": saved,
                     "submittedInput": submitted,
                 }
+                # Fake-confidence: body may carry loras[] on mapped turbo; router has no /lora sibling.
+                if (payload or {}).get("loras") and isinstance(submitted, dict) and submitted.get("loras"):
+                    out["warning"] = (
+                        "Hugging Face 已把 loras[] 附在 mapped 端点发出去；"
+                        "上游是否加载未证实（路由没有 /lora sibling）"
+                    )
+                return 200, out
             last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
         return last
 

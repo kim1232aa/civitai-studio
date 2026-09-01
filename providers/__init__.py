@@ -61,18 +61,9 @@ def load():
 
 
 def _boot_ui_patch():
-    """Upgrade v0737 Night Lab HTML even if started via python3 server.py."""
+    """Deprecated: static_patch is a no-op identity (fixes live in static/index.html)."""
     try:
-        import static_patch
-        from pathlib import Path
-        target = Path(__file__).resolve().parent.parent / "static" / "index.html"
-        raw = target.read_text(encoding="utf-8")
-        if "v0753" in raw or "v0752" in raw or "v0751" in raw or "v0750" in raw:
-            return
-        out = static_patch.patch_index(raw)
-        if out != raw:
-            target.write_text(out, encoding="utf-8")
-            print("[web] patched static/index.html to v0739", flush=True)
+        import static_patch  # noqa: F401 — keep import so run.sh path still works
     except Exception as e:
         print("[web] static_patch skip", e, flush=True)
 

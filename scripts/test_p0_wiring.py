@@ -37,6 +37,18 @@ def main() -> int:
     )
     assert inp.get("loras") and inp["loras"][0]["path"].startswith("https://")
     assert "replicate" in _SKIP_OPENAI
+    from providers.fal import build_fal_input, find_model
+    fin = build_fal_input({
+        "serviceId": "fal-ai/nano-banana-2",
+        "prompt": "x",
+        "aspectRatio": "16:9",
+        "quantity": 3,
+    })
+    assert fin.get("aspect_ratio") == "16:9", fin
+    spec = find_model("fal-ai/nano-banana-2") or {}
+    opt = set(spec.get("optional") or []) | set(spec.get("required") or [])
+    if "num_images" in opt:
+        assert fin.get("num_images") == 3, fin
     from providers.huggingface import _prompt_body, _maybe_lora_pid, _force_loras
     pb = _prompt_body({"steps": 8, "cfgScale": 1, "scheduler": "sgm_uniform", "seed": 3, "width": 960, "height": 1440})
     assert pb["num_inference_steps"] == 8
@@ -48,10 +60,22 @@ def main() -> int:
     _force_loras(forced, {"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]})
     assert forced["loras"][0]["path"].startswith("https://")
     assert _prompt_body({"seed": 1074720209731743})["seed"] <= 2147483647
-    from providers.modelscope import _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE
+    from providers.modelscope import (
+        _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE,
+        AI_TOKEN_PATH, CN_TOKEN_PATH, ModelScopeProvider,
+    )
     assert "modelscope.ai" in AI_BASE and "modelscope.cn" not in AI_BASE
     assert "modelscope.cn" in CN_BASE
     assert AI_BASE != CN_BASE
+    # Regression: AI / CN must not share token path or base (no cross-fallback).
+    assert AI_TOKEN_PATH != CN_TOKEN_PATH
+    assert str(AI_TOKEN_PATH).endswith("modelscope/token")
+    assert str(CN_TOKEN_PATH).endswith("modelscope-cn/token")
+    ai = ModelScopeProvider("ai")
+    cn = ModelScopeProvider("cn")
+    assert ai._base == AI_BASE and cn._base == CN_BASE
+    assert ai._token_path == AI_TOKEN_PATH and cn._token_path == CN_TOKEN_PATH
+    assert ai.id == "modelscope-ai" and cn.id == "modelscope-cn"
     assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == "Qwen/foo"
     assert _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]}) is None
     assert _modelscope_loras({"loras": [{
@@ -90,6 +114,9 @@ def main() -> int:
     ]}}
     assert pick_resolution(zspec, 960, 1440) == "1024*1536"
     assert pick_resolution(zspec, 1024, 1024) == "1024*1024"
+    assert pick_resolution({"supported_parameters": {"resolutions": []}}, 1024, 1024) is None
+    assert pick_resolution({}, 256, 256) is None
+    assert pick_resolution(spec, 1024, 1024, preferred="2k") == "2k"
     ls = _loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]})
     assert ls and ls[0]["path"].startswith("https://")
     assert nano_seed(475720515768790) <= 2147483647
