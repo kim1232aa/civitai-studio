@@ -1293,12 +1293,10 @@ function hubUtilityBlob(it) {
   if (/flux[_-]vae/i.test(blobL) || /ae\.safetensors/i.test(blobL)) return true;
   if (/vae(?:_pruned|_ft|\d)/i.test(blobL)) return true;
   if (/[a-z0-9]VAE(?:[A-Z_]|_|$)/.test(blob) || /_VAE_/.test(blob)) return true;
-  // umt5 / text-encoder / T5 encoder — never on image recipe list
-  if (/umt5|wan2\.1[_-]?umt5|text[_-]?encoder|t5[_-]encoder|\bt5\s*encoder\b/i.test(blobL)) return true;
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
-  // umt5 / text-encoder dumps → utility (out of image tab)
-  if (/\bumt5\b|\bt5[_-](?:xxl|xl|base|small|large)\b|text[_-]?encoder|text-encoding|text_encoding/i.test(blobL)) return true;
+  // umt5 / text-encoder / T5 encoder — never on image (or video) recipe list
+  if (/\bumt5\b|wan2\.1[_-]?umt5|\bt5[_-](?:xxl|xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();

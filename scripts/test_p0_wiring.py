@@ -277,6 +277,11 @@ def main() -> int:
     umt5 = {"id": "Wan-AI/umt5-xxl", "name": "umt5-xxl", "category": "image"}
     assert hub_utility_blob(umt5), umt5
     assert apply_hub_category(dict(umt5))["category"] == "utility"
+    wan_umt5 = {"id": "Wan-AI/wan2.1-umt5", "name": "wan2.1-umt5", "category": "image"}
+    assert hub_utility_blob(wan_umt5), wan_umt5
+    assert apply_hub_category(dict(wan_umt5))["category"] == "utility"
+    t5enc = {"id": "org/t5-encoder-weights", "name": "T5 encoder", "category": "image"}
+    assert apply_hub_category(dict(t5enc))["category"] == "utility"
     te = {"id": "org/wan-text-encoder", "name": "text-encoder", "category": "image"}
     assert apply_hub_category(dict(te))["category"] == "utility"
     te2 = {"id": "org/clip-text_encoder", "name": "CLIP text_encoder", "category": "video"}

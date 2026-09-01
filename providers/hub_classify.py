@@ -73,7 +73,8 @@ _IP_ADAPTER = re.compile(
 _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re.I)
 # Text encoders (UMT5 / T5 / CLIP text-encoder dumps) — not t2i checkpoints.
 _TEXT_ENCODER = re.compile(
-    r"\bumt5\b|\bt5[_-](?:xxl|xl|base|small|large)\b|"
+    r"\bumt5\b|wan2\.1[_-]?umt5|"
+    r"\bt5[_-](?:xxl|xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|"
     r"text[_-]?encoder|text-encoding|text_encoding",
     re.I,
 )
