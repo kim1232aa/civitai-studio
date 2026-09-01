@@ -1,8 +1,9 @@
 """Shared Hub category classifier for ModelScope + Hugging Face catalog rows.
 
 Widen carefully: Nomos/NMKD/4x family upscalers → category=upscale; VAE /
-ControlNet / IP-Adapter / GGUF / pure LoRA weight dumps → category=utility;
-plain t2i (Z-Image-Turbo, FLUX.1-schnell, Qwen-Image, …) stay image.
+ControlNet / IP-Adapter / (non-video) GGUF / pure LoRA weight dumps → utility;
+video-family GGUF / video LoRA / Wan checkpoints stay video; plain t2i
+(Z-Image-Turbo, FLUX.1-schnell, Qwen-Image, …) stay image.
 Bare ``4x`` alone is not enough for upscale — require known family tokens.
 """
 from __future__ import annotations
@@ -80,6 +81,15 @@ _T2I_BASE = re.compile(
     r"qwen-image|tongyi-mai",
     re.I,
 )
+# Video diffusion families — GGUF/LoRA of these stay video, not utility.
+_VIDEO_FAMILY = re.compile(
+    r"\b(?:"
+    r"wan|hunyuan\s*video|hunyuanvideo|ltx|allegro|cogvideo|mochi|"
+    r"open-?sora|opensora|animatediff|animate.?diff|"
+    r"i2v|t2v|text-to-video|image-to-video|vid2vid"
+    r")\b|\bvideo\b",
+    re.I,
+)
 
 
 def _hub_blob_parts(it) -> list[str]:
@@ -135,8 +145,18 @@ def _id_name_blob(it) -> str:
     return f"{it.get('id') or ''} {it.get('name') or ''}"
 
 
-def blob_is_utility(blob: str, *, id_name: str = "") -> bool:
-    """Non-t2i adapter / VAE / ControlNet / GGUF / pure LoRA weight dump."""
+def _is_video_family(blob: str, it=None) -> bool:
+    if it and isinstance(it, dict) and (it.get("category") or "") == "video":
+        return True
+    return bool(_VIDEO_FAMILY.search(blob or ""))
+
+
+def blob_is_utility(blob: str, *, id_name: str = "", it=None) -> bool:
+    """Non-t2i adapter / VAE / ControlNet / (non-video) GGUF / pure LoRA weight dump.
+
+    Video-family GGUF / video LoRA / Wan checkpoints are NOT utility.
+    Pure VAE (wan_2.1_vae, *_vae) still utility even when category was video.
+    """
     s = blob or ""
     if not s.strip():
         return False
@@ -146,10 +166,12 @@ def blob_is_utility(blob: str, *, id_name: str = "") -> bool:
         return True
     if _CONTROLNET.search(s):
         return True
+    videoish = _is_video_family(s, it)
     if _GGUF.search(s):
-        return True
+        return not videoish
     # LoRA: inspect id/name. Clear ``something-lora`` / ``*_lora`` adapters → utility
     # even when the base name mentions flux.1 / qwen-image / z-image-turbo.
+    # Video LoRA packages stay video.
     ln = id_name or s
     mid = (ln.split() or [""])[0]
     name = ln[len(mid) :].strip() if " " in ln else ""
@@ -162,6 +184,8 @@ def blob_is_utility(blob: str, *, id_name: str = "") -> bool:
             lora_hit = True
             break
     if not lora_hit:
+        return False
+    if videoish:
         return False
     # Borderline: full t2i checkpoint id that only mentions lora loosely — keep image.
     # Clear adapter leaf (ends with _lora / -lora or tokenized lora) always utility.
@@ -177,11 +201,11 @@ def hub_utility_blob(it) -> bool:
     if not isinstance(it, dict):
         return False
     blob = " ".join(_hub_blob_parts(it))
-    return blob_is_utility(blob, id_name=_id_name_blob(it))
+    return blob_is_utility(blob, id_name=_id_name_blob(it), it=it)
 
 
 def apply_hub_category(row: dict) -> dict:
-    """upscale → category upscale; adapter/vae/controlnet/gguf/lora → utility; else leave.
+    """upscale → category upscale; adapter/vae/controlnet/(non-video) gguf/lora → utility; else leave.
 
     Always reclassify upscale/utility blobs even when Hub already tagged category
     as video (or other non-image) — otherwise wan_2.1_vae slips into the video tab.

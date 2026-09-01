@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0761</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0762</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0761" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0762" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0761</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0762</div>
   </div>
 </aside>
 
@@ -1272,8 +1272,16 @@ function hubUpscaleBlob(it) {
   if (new RegExp('\\d+x.{0,20}(?:' + family + ')|(?:' + family + ').{0,20}\\d+x').test(blob)) return true;
   return false;
 }
+function hubVideoFamilyBlob(it) {
+  // Video diffusion / Wan / Allegro / Hunyuan / LTX family — not pure VAE.
+  if (!it) return false;
+  if ((it.category || '') === 'video') return true;
+  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  return /\b(?:wan|hunyuan\s*video|hunyuanvideo|ltx|allegro|cogvideo|mochi|open-?sora|animatediff|animate.?diff|i2v|t2v|text-to-video|image-to-video|vid2vid)\b|\bvideo\b/.test(blob);
+}
 function hubUtilityBlob(it) {
   // Keep in sync with providers/hub_classify.py — sticky VAE / IP-Adapter / ControlNet / GGUF / pure LoRA.
+  // Video family GGUF / video LoRA stay video (not utility); pure VAE still utility.
   if (!it) return false;
   if ((it.category || '') === 'utility') return true;
   const id = String(it.id || '');
@@ -1287,15 +1295,24 @@ function hubUtilityBlob(it) {
   if (/[a-z0-9]VAE(?:[A-Z_]|_|$)/.test(blob) || /_VAE_/.test(blob)) return true;
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
-  if (/\.gguf\b|\bgguf\b/i.test(blobL)) return true;
+  const videoFam = hubVideoFamilyBlob(it);
+  if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();
   const leaf = (id.split('/').pop() || '').toLowerCase();
   const nameL = name.toLowerCase();
   // Clear something-lora / *_lora adapters → utility even if base mentions flux/qwen.
-  if (/[_-]loras?$/.test(leaf) || /(^|[_/-])loras?($|[_/-])/.test(leaf)) return true;
-  if (/[_-]loras?$/.test(nameL) || /(^|[_/-])loras?($|[_/-])/.test(nameL)) return true;
-  if (/z-image-turbo|z_image_turbo|flux\.1|flux-1|sd3|stable.?diffusion.?3|qwen-image|tongyi-mai/.test(idName)) return false;
-  if (/(^|[_/-])loras?($|[_/-])/.test(idName) || /[_-]loras?$/.test(idName)) return true;
+  // Video LoRA packages stay on video tab.
+  const loraLeaf = /[_-]loras?$/.test(leaf) || /(^|[_/-])loras?($|[_/-])/.test(leaf)
+    || /[_-]loras?$/.test(nameL) || /(^|[_/-])loras?($|[_/-])/.test(nameL)
+    || /(^|[_/-])loras?($|[_/-])/.test(idName) || /[_-]loras?$/.test(idName);
+  if (loraLeaf) {
+    if (videoFam) return false;
+    if (/z-image-turbo|z_image_turbo|flux\.1|flux-1|sd3|stable.?diffusion.?3|qwen-image|tongyi-mai/.test(idName)
+        && !(/[_-]loras?$/.test(leaf) || /(^|[_/-])loras?($|[_/-])/.test(leaf) || /[_-]loras?$/.test(nameL))) {
+      return false;
+    }
+    return true;
+  }
   return false;
 }
 function hubNonImageJunk(it) {
@@ -1771,6 +1788,11 @@ function renderServiceList(opts) {
 }
 function selectService(it, opts) {
   opts = opts || {};
+  // While generating: ignore selectService with a different id (chip/dock must not jump).
+  if (goBusy && it && it.id && selected && String(it.id) !== String(selected.id) && !opts.forceFreeze) {
+    try { console.warn('[selectService] ignored during goBusy', it.id, 'kept', selected && selected.id); } catch (e) {}
+    return false;
+  }
   // Only explicit user row clicks own userPickedId. Programmatic selects must not steal it.
   if (opts.user && it && it.id) {
     userPickedId = it.id;
@@ -2043,20 +2065,17 @@ function syncImportChrome() {
   else if (backend === 'huggingface' || isModelscope() || isNanogpt()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
   else inp.placeholder = 'Civitai 图 id / 链接';
 }
-function catalogIdMatchesWant(it, want) {
-  // Exact id OR exact name. Includes only when want is a full id prefix ending at `/`
-  // (foo/bar matches foo/bar/baz) — NOT substring cousins (Qwen-Image ↛ Qwen-Image-2512).
-  if (!it || want == null || want === '') return false;
-  const id = String(it.id || '');
-  const name = String(it.name || '');
+function catalogIdMatchesWant(itOrId, want) {
+  // Exact string equality ONLY (id === want). No includes/substring/startsWith/name cousins.
+  // catalogIdMatchesWant('Qwen/Qwen-Image','Qwen/Qwen-Image-2512') === false
+  // catalogIdMatchesWant({id:'Qwen/Qwen-Image'},'Qwen/Qwen-Image') === true
+  if (want == null || want === '') return false;
   const w = String(want);
-  if (id === w || name === w) return true;
-  const idl = id.toLowerCase();
-  const namel = name.toLowerCase();
-  const wl = w.toLowerCase();
-  if (idl === wl || namel === wl) return true;
-  if (wl && idl.startsWith(wl + '/')) return true;
-  return false;
+  let id = '';
+  if (itOrId != null && typeof itOrId === 'object') id = String(itOrId.id || itOrId.serviceId || '');
+  else id = String(itOrId == null ? '' : itOrId);
+  if (!id) return false;
+  return id === w;
 }
 function selectFirstInCatalog(want) {
   const list = catalog.filter(it => matchRecipe(it, recipe));
@@ -2080,7 +2099,8 @@ function pickForBackend() {
   const krea = importedLooksKrea(lastImport);
   const zimg = importedLooksZImage(lastImport);
   const src = hasSourceNow();
-  const vid = recipe === 'video' || (lastImport && lastImport.kind === 'video');
+  // Only current recipe tab — never lastImport.kind (that auto-switched to Allegro after image gen).
+  const vid = recipe === 'video';
   const hasLoras = Array.isArray(loras) && loras.length > 0;
   let want = [];
   if (backend === 'fal') {
@@ -2465,7 +2485,9 @@ async function poll(id) {
     if (st === 'succeeded') {
       const saved = j.saved || [];
       if (!saved.length) {
-        setStatus('成功但没拿到文件' + (j.saveError ? (' · ' + j.saveError) : ''), 'bad');
+        const msg = '成功但没拿到文件' + (j.saveError ? (' · ' + j.saveError) : '');
+        setStatus(msg, 'bad');
+        setDock(msg, 'bad');
         stopWait();
         return;
       }
@@ -2477,18 +2499,29 @@ async function poll(id) {
       return;
     }
     if (['failed', 'canceled', 'cancelled', 'expired'].includes(st)) {
-      setStatus(st + ' ' + JSON.stringify(j).slice(0, 240), 'bad');
+      const msg = st + ' ' + JSON.stringify(j).slice(0, 240);
+      setStatus(msg, 'bad');
+      setDock(msg, 'bad');
       stopWait();
       return;
     }
     await new Promise(r => setTimeout(r, 3000));
   }
-  setStatus('等太久了，任务还在队列：' + id, 'bad');
+  {
+    const msg = '等太久了，任务还在队列：' + id;
+    setStatus(msg, 'bad');
+    setDock(msg, 'bad');
+  }
   stopWait();
 }
-function selectServiceById(id) {
+function selectServiceById(id, opts) {
+  opts = opts || {};
   const it = catalog.find(x => x.id === id);
   if (!it) return false;
+  if (goBusy && selected && String(it.id) !== String(selected.id)) {
+    try { console.warn('[selectServiceById] ignored during goBusy', id); } catch (e) {}
+    return false;
+  }
   // Programmatic: if user already picked something else, keep theirs.
   if (userPickedId && String(userPickedId) !== String(id)) {
     const keep = findCatalogItem(userPickedId);
@@ -2505,9 +2538,15 @@ function selectServiceById(id) {
     setDock('未改选中：该模型是超分/需源图，不适合文生图', 'warn');
     return false;
   }
-  recipe = recipeFor(it);
-  kind = recipe === 'video' ? 'video' : 'image';
-  updateTabClasses();
+  // NEVER auto-switch recipe/tab (image→video Allegro) unless caller opts in (user import).
+  if (opts.allowRecipeSwitch) {
+    recipe = recipeFor(it);
+    kind = recipe === 'video' ? 'video' : 'image';
+    updateTabClasses();
+  } else if (!matchRecipe(it, recipe)) {
+    setDock('未改配方：模型不属于当前 Tab（' + recipe + '）', 'warn');
+    return false;
+  }
   selected = it;
   copyPicked(it);
   renderServiceList({ pickDefault: false });
@@ -2519,9 +2558,11 @@ function applyImport(j) {
   lastImport = j || lastImport;
   const civitaiSid = looksCivitaiId(j.serviceId);
   if (j.serviceId && !(backend !== 'civitai' && civitaiSid)) {
-    selectServiceById(j.serviceId);
-  } else if (j.kind) {
-    setKind(j.kind);
+    // Import may move tab to match media kind; generate path never does.
+    selectServiceById(j.serviceId, { allowRecipeSwitch: true });
+  } else if (j.kind && (j.kind === 'image' || j.kind === 'video')) {
+    // Only switch tab when import kind differs; never after generate.
+    if (j.kind !== recipe) setKind(j.kind);
   }
   if (j.prompt != null) $('prompt').value = j.prompt;
   if (j.negativePrompt != null) $('negative').value = j.negativePrompt || '';
@@ -2774,8 +2815,12 @@ async function runGenerate() {
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
   lastGoClick = Date.now();
   lastGoStart = Date.now();
-  // Freeze user pick for this run — never fuzzy-replace with a cousin id.
-  const frozenPick = userPickedId ? String(userPickedId) : null;
+  // Hard-lock: freeze whatever is currently selected (user click OR visible chip).
+  // POST body.serviceId MUST equal frozenPickId exactly (string ===). No cousin fallback.
+  const frozenPickId = String(userPickedId || (selected && selected.id) || currentServiceId() || '');
+  const frozenRecipe = recipe;
+  if (frozenPickId && !userPickedId) userPickedId = frozenPickId;
+  const frozenPick = frozenPickId || null;
   const fail = (msg) => {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
@@ -2869,9 +2914,24 @@ async function runGenerate() {
     setDock("正在提交…");
     await afterPaint();
     const pl = payload();
-    if (frozenPick && pl && String(pl.serviceId || '') !== frozenPick) {
-      fail('payload 模型漂移：要 ' + frozenPick + ' 现 ' + (pl && pl.serviceId));
-      return;
+    if (frozenPick) {
+      // Force POST body to exact frozen id — never trust intermediate mutations.
+      pl.serviceId = frozenPick;
+      if (picked) picked.serviceId = frozenPick;
+      if (pl.model != null && String(pl.model) !== frozenPick && String(pl.model).indexOf('/') >= 0) {
+        // Hub backends: model field often mirrors serviceId; keep exact.
+        pl.model = frozenPick;
+      }
+      if (String(pl.serviceId || '') !== frozenPick) {
+        fail('payload 模型漂移：要 ' + frozenPick + ' 现 ' + (pl && pl.serviceId));
+        return;
+      }
+    }
+    // Recipe must stay on image through this generate (no Allegro tab jump).
+    if (frozenRecipe && recipe !== frozenRecipe) {
+      recipe = frozenRecipe;
+      kind = frozenRecipe === 'video' ? 'video' : 'image';
+      updateTabClasses();
     }
     const syncGen = pl.backend === 'huggingface' || (pl.backend === 'nano-gpt' && pl.kind !== 'video');
     setDock(syncGen ? '正在生成…' : '正在提交到队列…');
@@ -2922,6 +2982,24 @@ async function runGenerate() {
     stopWait();
   } finally {
     goBusy = false;
+    // Preserve image recipe + pick after poll/gen — never land on Allegro video tab.
+    try {
+      if (frozenRecipe && recipe !== frozenRecipe) {
+        recipe = frozenRecipe;
+        kind = frozenRecipe === 'video' ? 'video' : 'image';
+        updateTabClasses();
+      }
+      if (frozenPick) {
+        userPickedId = frozenPick;
+        const keep = findCatalogItem(frozenPick);
+        if (keep) {
+          selected = keep;
+          copyPicked(keep);
+          showPickedChip();
+          syncPickedDockIfStale();
+        }
+      }
+    } catch (e0) {}
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
     syncGo();
   }

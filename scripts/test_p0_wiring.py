@@ -258,6 +258,68 @@ def main() -> int:
     from providers.huggingface import HuggingFaceProvider
     assert "utility" in HuggingFaceProvider().categories()
 
+    # v0762: video GGUF / video LoRA stay video; pure VAE still utility; image GGUF still utility
+    wan_gguf = {"id": "Wan-AI/Wan2.1-T2V-14B-GGUF", "name": "Wan2.1 GGUF", "category": "video", "pipeline_tag": "text-to-video"}
+    assert not hub_utility_blob(wan_gguf), wan_gguf
+    assert apply_hub_category(dict(wan_gguf))["category"] == "video", apply_hub_category(dict(wan_gguf))
+    city_gguf = {"id": "city96/Wan2.1-GGUF", "name": "Wan2.1-GGUF", "category": "video", "pipeline_tag": "text-to-video"}
+    assert apply_hub_category(dict(city_gguf))["category"] == "video"
+    vid_lora = {"id": "someone/wan-video-lora", "name": "wan video lora", "category": "video", "tags": ["text-to-video", "lora"]}
+    assert not hub_utility_blob(vid_lora), vid_lora
+    assert apply_hub_category(dict(vid_lora))["category"] == "video"
+    allegro = {"id": "rhymes-ai/Allegro", "name": "Allegro", "category": "video", "tags": ["text-to-video"]}
+    assert apply_hub_category(dict(allegro))["category"] == "video"
+    assert apply_hub_category(dict(wan_vae))["category"] == "utility"  # still hide VAE
+    img_gguf = {"id": "org/weights-gguf", "name": "model.gguf", "category": "image"}
+    assert apply_hub_category(dict(img_gguf))["category"] == "utility"
+
+    # v0762: catalogIdMatchesWant exact-only (no Qwen-Image → Qwen-Image-2512 cousin)
+    html = (Path(__file__).resolve().parent.parent / "static" / "index.html").read_text()
+    assert "function catalogIdMatchesWant" in html
+    assert "Exact string equality ONLY" in html
+    # Extract and eval JS helper via node
+    import subprocess, textwrap, tempfile, os
+    js = r"""
+function catalogIdMatchesWant(itOrId, want) {
+  if (want == null || want === '') return false;
+  const w = String(want);
+  let id = '';
+  if (itOrId != null && typeof itOrId === 'object') id = String(itOrId.id || itOrId.serviceId || '');
+  else id = String(itOrId == null ? '' : itOrId);
+  if (!id) return false;
+  return id === w;
+}
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(catalogIdMatchesWant('Qwen/Qwen-Image','Qwen/Qwen-Image-2512') === false, 'cousin must be false');
+assert(catalogIdMatchesWant('Qwen/Qwen-Image','Qwen/Qwen-Image') === true, 'exact must be true');
+assert(catalogIdMatchesWant({id:'Qwen/Qwen-Image'},'Qwen/Qwen-Image') === true, 'obj exact');
+assert(catalogIdMatchesWant({id:'Qwen/Qwen-Image'},'Qwen/Qwen-Image-2512') === false, 'obj cousin');
+assert(catalogIdMatchesWant('Qwen/Qwen-Image-2512','Qwen/Qwen-Image') === false, 'reverse cousin');
+console.log('PASS catalogIdMatchesWant');
+"""
+    # Prefer the live function body from index.html when present
+    import re
+    m = re.search(r"function catalogIdMatchesWant\(itOrId, want\) \{[\s\S]*?\n\}", html)
+    if m:
+        live = m.group(0)
+        js = live + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(catalogIdMatchesWant('Qwen/Qwen-Image','Qwen/Qwen-Image-2512') === false, 'cousin must be false');
+assert(catalogIdMatchesWant('Qwen/Qwen-Image','Qwen/Qwen-Image') === true, 'exact must be true');
+assert(catalogIdMatchesWant({id:'Qwen/Qwen-Image'},'Qwen/Qwen-Image') === true, 'obj exact');
+assert(catalogIdMatchesWant({id:'Qwen/Qwen-Image'},'Qwen/Qwen-Image-2512') === false, 'obj cousin');
+console.log('PASS catalogIdMatchesWant');
+"""
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "PASS catalogIdMatchesWant" in (r.stdout or "")
+
+    # frozenPickId wiring markers in runGenerate
+    assert "frozenPickId" in html and "Hard-lock" in html
+    assert "pl.serviceId = frozenPick" in html
+    assert "ignored during goBusy" in html
+    assert "allowRecipeSwitch" in html
+
     print("PASS p0 wiring")
     return 0
 
