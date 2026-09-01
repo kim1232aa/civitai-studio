@@ -1,5 +1,7 @@
 # 各供应商 LoRA / 自定义参数 / 代表问题
 
+接线深挖（代码路径级）：[`lora-wiring-deep.md`](lora-wiring-deep.md)。
+
 调查截止 **v0753**（`0fac0ea`，2026-09-02）。只记官方字段和实测，不把「找替代 LoRA」写成产品对照表。
 
 夹具：Civitai 图 `139791102`（Z-Image Turbo），LoRA version `3231694`（Asian Mix），下载链 `https://civitai.com/api/download/models/3231694`。
