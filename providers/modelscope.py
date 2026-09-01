@@ -89,30 +89,8 @@ def _clamp_seed(raw):
     return n
 
 
-# Civitai Z-Image LoRAs → Hub owner/repo that AIGC can actually load.
-MS_LORA_ANALOGS = {
-    "3231694": "laonansheng/Asian-beauty-Z-Image-Turbo-Tongyi-MAI-v1.0",
-}
-MS_ASIAN_ZIMAGE = "laonansheng/Asian-beauty-Z-Image-Turbo-Tongyi-MAI-v1.0"
-
-
-def _analog_hub_lora(it: dict):
-    """Map a Civitai LoRA row to a Z-Image Hub repo. None = no analog."""
-    if not isinstance(it, dict):
-        return None
-    vid = str(it.get("versionId") or it.get("modelVersionId") or it.get("id") or "").strip()
-    if vid in MS_LORA_ANALOGS:
-        return MS_LORA_ANALOGS[vid]
-    blob = " ".join(
-        str(it.get(k) or "") for k in ("name", "path", "url", "downloadUrl", "air")
-    ).lower()
-    if "asian" in blob and ("z-image" in blob or "zimage" in blob or "mix" in blob):
-        return MS_ASIAN_ZIMAGE
-    return None
-
-
 def _modelscope_loras(payload: dict):
-    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai URLs map to Hub analogs."""
+    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai http paths are passed through."""
     raw = payload.get("loras") or []
     if isinstance(raw, str) and raw.strip() and "/" in raw and not raw.startswith("http"):
         return raw.strip()
@@ -122,16 +100,12 @@ def _modelscope_loras(payload: dict):
     for it in raw if isinstance(raw, list) else []:
         repo = ""
         weight = 1.0
-        analog = None
         if isinstance(it, str):
             repo = it.strip()
         elif isinstance(it, dict):
-            analog = _analog_hub_lora(it)
             path = (it.get("path") or it.get("url") or it.get("downloadUrl") or it.get("download_url") or "").strip()
             name = (it.get("name") or it.get("id") or "").strip()
-            if analog:
-                repo = analog
-            elif path.startswith("http"):
+            if path.startswith("http"):
                 repo = path
             elif name.count("/") == 1 and not name.lower().startswith("urn:"):
                 repo = name
@@ -151,6 +125,7 @@ def _modelscope_loras(payload: dict):
         if not repo or repo.lower().startswith("urn:"):
             continue
         if repo.startswith("http"):
+            # AIGC wants Hub owner/repo; Civitai download URLs 500 with 空 modelName.
             continue
         if repo.count("/") != 1:
             continue

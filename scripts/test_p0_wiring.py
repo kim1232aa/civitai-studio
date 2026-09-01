@@ -53,13 +53,12 @@ def main() -> int:
     assert "modelscope.cn" in CN_BASE
     assert AI_BASE != CN_BASE
     assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == "Qwen/foo"
-    assert _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]}) is None
+    assert _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]}) is None
     assert _modelscope_loras({"loras": [{
         "name": "[Z Image Turbo] Asian Mix Lora - EOL",
         "path": "https://civitai.com/api/download/models/3231694?fileId=3114056",
-        "versionId": "3231694",
         "scale": 0.8,
-    }]}) == "laonansheng/Asian-beauty-Z-Image-Turbo-Tongyi-MAI-v1.0"
+    }]}) is None
     assert _clamp_seed(475720515768790) <= 2147483647
     assert _clamp_seed(475720515768790) > 0
     assert _clamp_seed(-3) == -1
