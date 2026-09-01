@@ -537,6 +537,8 @@
     text-transform: uppercase;
   }
   .gal-count { color: var(--muted); font-size: 12px; margin-left: 8px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .gal-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #galRefresh { padding: 6px 10px; font-size: 12px; }
   .gal-filters { display: flex; gap: 4px; }
   .gal-filters button {
     background: var(--elev);
@@ -757,7 +759,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0746</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0747</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -964,19 +966,22 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0746" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0747" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0746</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0747</div>
   </div>
 </aside>
 
 <main>
   <header class="gal-head">
     <h2>成片 <span class="gal-count" id="galCount">0</span></h2>
+    <div class="gal-act">
     <div class="gal-filters" id="galFilters">
       <button type="button" class="on" data-kind="all">全部</button>
       <button type="button" data-kind="image">图片</button>
       <button type="button" data-kind="video">视频</button>
+    </div>
+    <button type="button" class="ghost" id="galRefresh" title="重新读取磁盘成片">刷新</button>
     </div>
   </header>
   <div class="status" id="status">准备好了。图片和视频都在这一页。</div>
@@ -2027,6 +2032,40 @@ function addCard(src, meta, isVideo) {
   saveGallery();
   renderGallery();
 }
+let outsTick = 0;
+async function loadOuts() {
+  const tick = ++outsTick;
+  try {
+    const r = await api('/api/outs');
+    if (tick !== outsTick) return;
+    const items = r.items || [];
+    const diskKeys = new Set();
+    items.forEach(s => {
+      const a = cardUrlKey(s.url);
+      const b = cardUrlKey(s.file);
+      if (a) diskKeys.add(a);
+      if (b) diskKeys.add(b);
+    });
+    galleryItems = galleryItems.filter(it => {
+      if (itemKeys(it).some(k => diskKeys.has(k))) return false;
+      if (isOutRef(it && it.url) || isOutRef(it && it.meta)) return false;
+      return true;
+    });
+    items.forEach(s => {
+      const key = cardUrlKey(s.file || s.url);
+      if (!key) return;
+      galleryItems.push({
+        id: 'out:' + key,
+        url: s.url || ('/out/' + (s.file || key)),
+        kind: s.kind === 'video' ? 'video' : 'image',
+        meta: s.file || key,
+        ts: 0,
+      });
+    });
+    saveGallery();
+    renderGallery();
+  } catch (e) {}
+}
 async function cancelWaitJob() {
   const id = waitJobId;
   const btn = $('waitCancel');
@@ -2537,6 +2576,8 @@ if ($('galFilters')) {
 }
 loadGallery();
 renderGallery();
+loadOuts();
+if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
 
 (async () => {
   let tokenMsg = '';
@@ -2677,37 +2718,6 @@ renderGallery();
       };
       box.appendChild(b);
     });
-  }
-  async function loadOuts() {
-    try {
-      const r = await api('/api/outs');
-      const items = r.items || [];
-      const diskKeys = new Set();
-      items.forEach(s => {
-        const a = cardUrlKey(s.url);
-        const b = cardUrlKey(s.file);
-        if (a) diskKeys.add(a);
-        if (b) diskKeys.add(b);
-      });
-      galleryItems = galleryItems.filter(it => {
-        if (itemKeys(it).some(k => diskKeys.has(k))) return false;
-        if (isOutRef(it && it.url) || isOutRef(it && it.meta)) return false;
-        return true;
-      });
-      items.forEach(s => {
-        const key = cardUrlKey(s.file || s.url);
-        if (!key) return;
-        galleryItems.push({
-          id: 'out:' + key,
-          url: s.url || ('/out/' + (s.file || key)),
-          kind: s.kind === 'video' ? 'video' : 'image',
-          meta: s.file || key,
-          ts: 0,
-        });
-      });
-      saveGallery();
-      renderGallery();
-    } catch (e) {}
   }
   try {
     await loadProviders();
