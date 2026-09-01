@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0759</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0760</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0759" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0760" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0759</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0760</div>
   </div>
 </aside>
 
@@ -1249,26 +1249,32 @@ function loraVersionId(l) {
 }
 function hubUpscaleBlob(it) {
   // Keep in sync with providers/hub_classify.py — Nomos/NMKD/4x families, not bare 4x / Z-Image.
+  // Bare org nmkd/ alone is NOT upscale; need siax/superscale/scale. Include bare word-boundary nomos.
   const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
   const family = 'nomos|esrgan|apisr|realesr(?:gan)?|cugan|ultrasharp|remacri|swinir|hat(?:-?l)?|dat(?:-?2)?|span|animesharp|animevig|schat|compact|latent.?upscaler|lds?r|upscaler?|nmkd|siax|superscale';
   if (/onnx|upscal|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob)) return true;
-  if (/\bnomos\d|nomos8k|4xnomos|8xnomos|\d+x[_-]?nomos/.test(blob)) return true;
-  if (/\b(?:nmkd|siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|hat-l|dat-2|span)\b|nmkd[_-]?siax|nmkd[_-]?superscale|nmkdsuperscale/.test(blob)) return true;
+  if (/\bnomos\d|nomos8k|4xnomos|8xnomos|\d+x[_-]?nomos|\bnomos\b/.test(blob)) return true;
+  if (/\b(?:siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|hat-l|dat-2|span)\b|nmkd[_-]?siax|nmkd[_-]?superscale|nmkdsuperscale/.test(blob)) return true;
   if (new RegExp('\\d+x[_-]?(?:' + family + ')').test(blob)) return true;
   if (new RegExp('\\d+x.{0,20}(?:' + family + ')|(?:' + family + ').{0,20}\\d+x').test(blob)) return true;
   return false;
 }
 function hubUtilityBlob(it) {
-  // Keep in sync with providers/hub_classify.py — VAE / IP-Adapter / ControlNet / GGUF / pure LoRA.
+  // Keep in sync with providers/hub_classify.py — sticky VAE / IP-Adapter / ControlNet / GGUF / pure LoRA.
   if (!it) return false;
   if ((it.category || '') === 'utility') return true;
   const id = String(it.id || '');
   const name = String(it.name || '');
-  const blob = (id + ' ' + name + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
-  if (/\bvae\b|flux_vae|flux-vae|ae\.safetensors/.test(blob)) return true;
-  if (/ip-adapter|ip_adapter|ipadapter/.test(blob)) return true;
-  if (/controlnet|control_net|control-lora|control_lora/.test(blob)) return true;
-  if (/\.gguf\b|\bgguf\b/.test(blob)) return true;
+  const blob = id + ' ' + name + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '));
+  const blobL = blob.toLowerCase();
+  // Sticky VAE (not bare "wave"): _vae / 12VAE_pruned / v1.2VAE / vae_pruned
+  if (/(?:^|[\W_\d])vae(?:$|[\W_\d])/i.test(blobL)) return true;
+  if (/flux[_-]vae/i.test(blobL) || /ae\.safetensors/i.test(blobL)) return true;
+  if (/vae(?:_pruned|_ft|\d)/i.test(blobL)) return true;
+  if (/[a-z0-9]VAE(?:[A-Z_]|_|$)/.test(blob) || /_VAE_/.test(blob)) return true;
+  if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
+  if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
+  if (/\.gguf\b|\bgguf\b/i.test(blobL)) return true;
   const idName = (id + ' ' + name).toLowerCase();
   const leaf = (id.split('/').pop() || '').toLowerCase();
   const nameL = name.toLowerCase();
@@ -1614,6 +1620,19 @@ function findCatalogItem(id) {
   if (!id) return null;
   return catalog.find(x => String(x.id) === id) || catalog.find(x => String(x.serviceId || '') === id) || null;
 }
+function selectedPickLabel(it) {
+  // Single source of truth for 已选 chip + dock (prefer name then id).
+  if (!it) return '';
+  const base = (it.name || it.id || '').trim();
+  if (!base) return '';
+  try {
+    const tags = svcDisambigTags((catalog || []).filter(x => (x.name || x.id) === (it.name || it.id)));
+    const extra = tags && tags[it.id];
+    return base + (extra ? ' · ' + extra : '');
+  } catch (e) {
+    return base;
+  }
+}
 function showPickedChip() {
   const el = $('svcPicked');
   if (!el) return;
@@ -1624,12 +1643,22 @@ function showPickedChip() {
     el.title = '';
     return;
   }
-  const tags = svcDisambigTags((catalog || []).filter(x => (x.name || x.id) === (it.name || it.id)));
-  const extra = tags[it.id];
-  const name = (it.name || it.id || '') + (extra ? ' · ' + extra : '');
+  const name = selectedPickLabel(it);
   el.textContent = '已选 ' + name;
   el.title = it.id || '';
   el.classList.remove('is-empty');
+}
+function syncPickedDockIfStale() {
+  // If dock still says 已选 X from another model, realign to selected (same label as chip).
+  try {
+    const d = $('dockStatus');
+    if (!d) return;
+    const cur = d.textContent || '';
+    if (!/^已选 /.test(cur)) return;
+    const lab = selected ? selectedPickLabel(selected) : '';
+    if (!lab) return;
+    if (cur !== '已选 ' + lab) setDock('已选 ' + lab);
+  } catch (e) {}
 }
 function bindRows(root) {
   if (!root) return;
@@ -1722,6 +1751,7 @@ function renderServiceList(opts) {
     el.classList.toggle('on', !!(selected && el.getAttribute('data-id') === selected.id));
   });
   showPickedChip();
+  syncPickedDockIfStale();
   updateFields();
   if (selected) scrollSvcOnIntoView();
 }
@@ -1755,7 +1785,7 @@ function selectService(it, opts) {
     });
   }
   showPickedChip();
-  if (opts.user && it) setDock('已选 ' + (it.name || it.id));
+  if (opts.user && it) setDock('已选 ' + selectedPickLabel(it));
   updateFields();
   if (it) scrollSvcOnIntoView();
   return true;
@@ -2761,6 +2791,8 @@ async function runGenerate() {
         fail('请重新点选文生图模型，当前是超分/需要源图的模型');
         return;
       }
+      // Dock 已选 X must match selected (same label as chip).
+      syncPickedDockIfStale();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
     const step = selected && selected.step;

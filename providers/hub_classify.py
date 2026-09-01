@@ -16,9 +16,10 @@ _UPSCALE_EXPLICIT = re.compile(
 )
 
 # Known upscaler family names (match without requiring a scale factor)
+# Bare org ``nmkd/`` alone is NOT upscale — need siax/superscale/scale tokens.
 _UPSCALE_FAMILY_TOKENS = re.compile(
     r"\b(?:"
-    r"nmkd|siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|"
+    r"siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|"
     r"hat-l|dat-2|span|nomos|apisr|esrgan|realesr(?:gan)?|cugan|"
     r"animesharp|schat|compact|latent.?upscaler"
     r")\b"
@@ -52,13 +53,22 @@ _NMKD_SCALE = re.compile(r"\d+x.{0,24}(?:siax|superscale|nmkd)|(?:siax|superscal
 _UPSCALE_RE = re.compile(
     rf"(?:onnx|upscal|apisr|realesr|esrgan|super.?res|generator-onnx|"
     rf"\d+x[_-]?(?:{_FAMILY})|\bnomos\d|nomos8k|4xnomos|8xnomos|"
-    rf"nmkd|siax|superscale|nmkd[_-]?siax|nmkd[_-]?superscale)",
+    rf"siax|superscale|nmkd[_-]?siax|nmkd[_-]?superscale|nmkdsuperscale)",
     re.I,
 )
 
 # --- non-t2i adapters / weight dumps → utility ---
-_VAE = re.compile(r"\bvae\b|flux_vae|flux-vae|ae\.safetensors", re.I)
-_IP_ADAPTER = re.compile(r"ip-adapter|ip_adapter|ipadapter", re.I)
+# Sticky VAE: _vae / 12VAE_pruned / v1.2VAE — not bare "wave". CamelCase VAE is case-sensitive.
+_VAE = re.compile(
+    r"(?i:(?:^|[\W_\d])vae(?:$|[\W_\d]))|"
+    r"(?i:flux[_-]vae)|ae\.safetensors|"
+    r"(?i:vae(?:_pruned|_ft|\d))|"
+    r"[a-z0-9]VAE(?:[A-Z_]|_|$)|_VAE_"
+)
+_IP_ADAPTER = re.compile(
+    r"ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter",
+    re.I,
+)
 _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re.I)
 _GGUF = re.compile(r"\.gguf\b|\bgguf\b", re.I)
 # Pure LoRA weight repos: tokenized lora or ends with _lora / -lora

@@ -218,6 +218,31 @@ def main() -> int:
     assert _hf_row("Qwen/Qwen-Image", "Qwen-Image", "text-to-image")["category"] == "image"
     assert _hf_row("black-forest-labs/FLUX.1-schnell", "FLUX.1 schnell", "text-to-image")["category"] == "image"
 
+    # v0760: sticky VAE names; bare nmkd/ org not upscale; ip-composition-adapter utility
+    from providers.hub_classify import hub_upscale_blob as hub_up
+    sticky = [
+        {"id": "org/BeautyFool_v1.2VAE_pruned", "name": "BeautyFool_v1.2VAE_pruned", "category": "image"},
+        {"id": "org/qwen_image_vae", "name": "qwen_image_vae", "category": "image"},
+        {"id": "org/ya3_VAE", "name": "ya3_VAE", "category": "image"},
+    ]
+    for row in sticky:
+        assert hub_utility_blob(row), row
+        assert apply_hub_category(dict(row))["category"] == "utility", row
+        assert not hub_up(row), row
+    assert not hub_utility_blob({"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image-Turbo"})
+    assert apply_hub_category({"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image-Turbo", "category": "image"})["category"] == "image"
+
+    bare_nmkd = {"id": "nmkd/some-diffusion", "name": "some-diffusion", "category": "image"}
+    assert not hub_up(bare_nmkd) and not ms_up(bare_nmkd) and not hf_up(bare_nmkd), bare_nmkd
+    assert apply_hub_category(dict(bare_nmkd))["category"] == "image"
+
+    ipcomp = {"id": "x/ip-composition-adapter", "name": "ip-composition-adapter", "category": "image"}
+    assert hub_utility_blob(ipcomp)
+    assert apply_hub_category(dict(ipcomp))["category"] == "utility"
+
+    bare_nomos = {"id": "muse/nomos", "name": "nomos", "category": "image"}
+    assert hub_up(bare_nomos) and ms_up(bare_nomos) and hf_up(bare_nomos), bare_nomos
+
     print("PASS p0 wiring")
     return 0
 
