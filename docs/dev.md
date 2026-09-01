@@ -132,7 +132,7 @@ git 身份只用环境变量：`GIT_AUTHOR_NAME=kim1232aa`，`GIT_AUTHOR_EMAIL=1
 - 点测进行中开发不改页面、不重启。
 - 生成过关 = 成片栏新文件。空提示词「先写提示词」不算。夹具 `https://civitai.red/images/139791102`。
 - 不要对 8765 开 browserUse / 桌面自动化（抢焦点）。
-- 魔搭 AI 在部分机器上 `api.modelscope.ai` 解析失败 → 应 502/连接错误，不是切 CN。
+- 魔搭 AI 用 `api-inference.modelscope.ai`（旧 `api.modelscope.ai` 已 NXDOMAIN）。解析失败应 502/连接错误，不是切 CN。
 
 ## 提交
 

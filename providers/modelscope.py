@@ -15,7 +15,7 @@ AI_TOKEN_PATH = Path.home() / ".config/modelscope/token"
 CN_TOKEN_PATH = Path.home() / ".config/modelscope-cn/token"
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
-AI_BASE = "https://api.modelscope.ai/v1"
+AI_BASE = "https://api-inference.modelscope.ai/v1"
 CN_BASE = "https://api-inference.modelscope.cn/v1"
 
 
@@ -501,10 +501,19 @@ class ModelScopeProvider(Provider):
         data["status"] = mapped.get(st, (data.get("status") or "pending").lower())
         data["backend"] = self.id
         data["id"] = job_id
-        data["wait"] = {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None}
+        err_txt = extract_error(data, "")
+        data["wait"] = {
+            "progress": None,
+            "precedingJobs": None,
+            "etaSeconds": None,
+            "completeAt": None,
+            "log": (err_txt or "")[:120] or None,
+        }
+        if data["status"] == "failed":
+            data["error"] = err_txt or f"{self.label} 生成失败"
         if data["status"] == "succeeded":
             nested = data.get("data") if isinstance(data.get("data"), dict) else {}
-            urls = collect_urls(data) + collect_urls(data.get("output") or {}) + collect_urls(nested)
+            urls = collect_urls(data) + collect_urls(data.get("output") or {}) + collect_urls(data.get("outputs") or {}) + collect_urls(nested)
             for u in data.get("output_images") or []:
                 if isinstance(u, str) and u.startswith("http"):
                     urls.append(u)
@@ -518,6 +527,9 @@ class ModelScopeProvider(Provider):
                 data["saved"] = save_media_urls(seen, job_id, meta=job_meta(job_id) or {"backend": self.id, "jobId": job_id})
             except Exception as e:
                 data["saveError"] = str(e)
+            if not data.get("saved"):
+                data["status"] = "failed"
+                data["error"] = data.get("saveError") or f"{self.label} 成功但没拿到文件"
         return 200 if code in (200, 202) else code, data
 
 

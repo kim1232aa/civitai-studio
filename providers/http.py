@@ -144,6 +144,7 @@ def _looks_media(u: str) -> bool:
         ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm",
         "fal.media", "v3.fal.media", "v3b.fal.media", "/files/",
         "nano-gpt.com", "nanogpt", "wavespeed.ai",
+        "modelscope", "aliyuncs.com", "aliyun", "oss-",
     )):
         return True
     return False

@@ -42,7 +42,10 @@ def main() -> int:
     assert pb["num_inference_steps"] == 8
     assert pb["guidance_scale"] == 1
     assert pb["scheduler"] == "sgm_uniform"
-    from providers.modelscope import _modelscope_loras, _clamp_seed
+    from providers.modelscope import _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE
+    assert "modelscope.ai" in AI_BASE and "modelscope.cn" not in AI_BASE
+    assert "modelscope.cn" in CN_BASE
+    assert AI_BASE != CN_BASE
     assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == "Qwen/foo"
     assert _clamp_seed(475720515768790) <= 2147483647
     assert _clamp_seed(475720515768790) > 0

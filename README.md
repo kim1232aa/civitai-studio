@@ -4,7 +4,7 @@
 
 - 地址：<http://127.0.0.1:8765>（只绑回环）
 - 仓库：<https://github.com/kim1232aa/civitai-studio>
-- 当前界面版本戳：标题栏 `v0749`（每次修 UI/行为都要改这个数字并 push main）
+- 当前界面版本戳：标题栏 `v0750`（每次修 UI/行为都要改这个数字并 push main）
 - 开发约定：[`docs/dev.md`](docs/dev.md)
 - 审查规范：[`docs/review-spec.md`](docs/review-spec.md)
 - 供应商插件：[`docs/providers.md`](docs/providers.md)
@@ -55,7 +55,7 @@ chmod +x run.sh
 | Civitai | `civitai` | `~/.config/civitai/token` | orchestration + site API |
 | Fal | `fal` | `~/.config/fal/token`（`KEY_ID:KEY_SECRET`） | fal.run |
 | Hugging Face | `huggingface` | `~/.config/huggingface/token` | router / Inference |
-| 魔搭 AI | `modelscope-ai` | `~/.config/modelscope/token` | `https://api.modelscope.ai/v1` |
+| 魔搭 AI | `modelscope-ai` | `~/.config/modelscope/token` | `https://api-inference.modelscope.ai/v1` |
 | 魔搭 CN | `modelscope-cn` | `~/.config/modelscope-cn/token` | `https://api-inference.modelscope.cn/v1` |
 | NanoGPT | `nano-gpt` | `~/.config/nano-gpt/token` | `https://nano-gpt.com/api/v1` |
 

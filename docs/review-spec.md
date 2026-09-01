@@ -39,7 +39,7 @@
    - Fal：`fal-ai/z-image/turbo`；有 LoRA 用 `fal-ai/z-image/turbo/lora`
    - Hugging Face / 魔搭 AI / 魔搭 CN：`Tongyi-MAI/Z-Image-Turbo`
 5. 审查员自己点四家：**Fal、Hugging Face、魔搭 AI、魔搭 CN**。每家都要新成片。
-6. 魔搭 AI 若 `api.modelscope.ai` 解析失败：必须报连接错误。**静默切到魔搭 CN 算失败。**
+6. 魔搭 AI 若 `api-inference.modelscope.ai` 解析失败：必须报连接错误。**静默切到魔搭 CN 算失败。**
 7. 点「魔搭」后 URL 自己漂到 `#fal` / `#huggingface`（没有再点）算失败。
 8. 点生成不得因为旧 hash / `persistBackend` 把供应商改走。
 
