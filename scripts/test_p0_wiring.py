@@ -372,7 +372,7 @@ console.log('PASS isForbiddenHubRemap');
     assert "early single-flight" in html
     assert "only html onclick=__studioGo" in html
     assert "go.addEventListener" not in html
-    assert "v0766" in html
+    assert "v0767" in html
 
     # server refuse mismatched model
     ms = (Path(__file__).resolve().parent.parent / "providers" / "modelscope.py").read_text()
@@ -475,6 +475,17 @@ console.log('PASS hubUtilityBlob sd35');
     r_fe = subprocess.run(["node", "-e", js_fe], capture_output=True, text=True)
     assert r_fe.returncode == 0, (r_fe.stdout, r_fe.stderr)
 
+
+    # v0767: recipe/tab switch clears svcFilter and reloads catalog
+    m_sr = _re.search(r"function setRecipe\(r\) \{[\s\S]*?\n\}", html)
+    assert m_sr, "setRecipe missing"
+    sr = m_sr.group(0)
+    assert "svcFilter" in sr and ".value = ''" in sr
+    assert "loadCatalog" in sr
+    assert "window.loadCatalog = loadCatalog" in html
+    assert "当前配方无匹配模型，请搜索或切换供应商" in html
+    assert 'title="v0767"' in html
+    assert 'aria-label="v0767"' in html
 
     print("PASS p0 wiring")
 

@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0766</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0767</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0766" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0767" aria-label="v0767" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0766</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0767</div>
   </div>
 </aside>
 
@@ -1902,7 +1902,16 @@ function setRecipe(r) {
     if (location.hash !== want) history.replaceState(null, '', want);
   } catch (e) {}
   if (wf) loadWorkflows();
-  else renderServiceList({ pickDefault: true });
+  else {
+    // v0767: clear leftover image-search filter; refetch full/default catalog for new recipe/tab.
+    // In-memory catalog is often image-q filtered (no video rows) until Hub backends reload.
+    if ($('svcFilter')) $('svcFilter').value = '';
+    renderServiceList({ pickDefault: true }); // fallback while loadCatalog in flight
+    if (typeof window.loadCatalog === 'function') {
+      setDock('正在加载目录…');
+      window.loadCatalog().catch(() => setDock('目录失败', 'bad'));
+    }
+  }
 }
 function setKind(k) {
   if (k === 'image' || k === 'video') setRecipe(k);
@@ -3430,10 +3439,13 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     }
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
+    const matched = catalog.filter(it => matchRecipe(it, recipe));
     if (dockHold()) return;
     if (!n) setDock(label + ' 目录为空', 'bad');
+    else if (!matched.length) setDock('当前配方无匹配模型，请搜索或切换供应商', 'warn');
     else setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
   }
+  window.loadCatalog = loadCatalog;
   let hubSearchTimer = null;
   function onSvcFilter() {
     if (isModelscope() || backend === 'huggingface') {
