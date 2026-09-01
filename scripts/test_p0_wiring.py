@@ -338,6 +338,46 @@ console.log('PASS catalogIdMatchesWant');
     assert "ignored during goBusy" in html
     assert "allowRecipeSwitch" in html
 
+    # v0764: umt5_xxl_encoder (underscore after mt5) → utility
+    umt5_xxl = {"id": "org/umt5_xxl_encoder", "name": "umt5_xxl_encoder", "category": "image"}
+    assert hub_utility_blob(umt5_xxl), umt5_xxl
+    assert apply_hub_category(dict(umt5_xxl))["category"] == "utility"
+    umt5_fp8 = {"id": "org/umt5_xxl_fp8_e4m3fn_scaled.safetensors", "name": "umt5_xxl_fp8", "category": "image"}
+    assert hub_utility_blob(umt5_fp8), umt5_fp8
+
+    # v0764: cousin false for Qwen-Image vs 2512 and vs MusePublic/Qwen-image
+    assert "function isForbiddenHubRemap" in html
+    assert "拒绝写入不同 model" in html
+    assert "MusePublic/Qwen-Image-Edit']" not in html  # banned from want list
+    assert "want = ['Qwen/Qwen-Image-Edit']" in html
+    m2 = re.search(r"function isForbiddenHubRemap\(frozen, candidate\) \{[\s\S]*?\n\}", html)
+    assert m2, "isForbiddenHubRemap missing"
+    m3 = re.search(r"function hubIdLeaf\(id\) \{[\s\S]*?\n\}", html)
+    assert m3, "hubIdLeaf missing"
+    js2 = m3.group(0) + "\n" + m2.group(0) + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(isForbiddenHubRemap('Qwen/Qwen-Image','Qwen/Qwen-Image-2512') === true, '2512 cousin');
+assert(isForbiddenHubRemap('Qwen/Qwen-Image','MusePublic/Qwen-image') === true, 'MusePublic cousin');
+assert(isForbiddenHubRemap('Qwen/Qwen-Image','MusePublic/Qwen-Image') === true, 'MusePublic same leaf');
+assert(isForbiddenHubRemap('Qwen/Qwen-Image','Qwen/Qwen-Image') === false, 'exact ok');
+assert(isForbiddenHubRemap('Qwen/Qwen-Image-Edit','MusePublic/Qwen-Image-Edit') === true, 'Edit MusePublic');
+console.log('PASS isForbiddenHubRemap');
+"""
+    r2 = subprocess.run(["node", "-e", js2], capture_output=True, text=True)
+    assert r2.returncode == 0, (r2.stdout, r2.stderr)
+    assert "PASS isForbiddenHubRemap" in (r2.stdout or "")
+
+    # payload builder refuse mismatched serviceId markers + single-flight
+    assert "拒绝写入不同 model" in html
+    assert "early single-flight" in html
+    assert "only html onclick=__studioGo" in html
+    assert "go.addEventListener" not in html
+    assert "v0764" in html
+
+    # server refuse mismatched model
+    ms = (Path(__file__).resolve().parent.parent / "providers" / "modelscope.py").read_text()
+    assert "模型 id 不一致" in ms
+
     print("PASS p0 wiring")
     return 0
 

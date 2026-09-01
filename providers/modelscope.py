@@ -437,6 +437,15 @@ class ModelScopeProvider(Provider):
         mid = model_id(sid)
         if not mid:
             return 400, {"error": f"缺少{self.label} 模型 id"}
+        # v0764: refuse client model field that disagrees with serviceId (no MusePublic/2512 remap).
+        raw_model = (payload or {}).get("model")
+        if isinstance(raw_model, str) and "/" in raw_model.strip():
+            want_m = model_id(raw_model.strip())
+            if want_m and want_m != mid:
+                return 400, {
+                    "error": f"模型 id 不一致：serviceId={mid} model={want_m}（拒绝 remap）",
+                    "backend": self.id,
+                }
         body = {"model": mid, "prompt": payload.get("prompt") or ""}
         if payload.get("negativePrompt"):
             body["negative_prompt"] = payload["negativePrompt"]

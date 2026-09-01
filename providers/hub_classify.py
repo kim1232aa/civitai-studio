@@ -74,7 +74,8 @@ _CONTROLNET = re.compile(r"controlnet|control_net|control-lora|control_lora", re
 # Text encoders (UMT5 / T5 / CLIP text-encoder dumps) — not t2i checkpoints.
 # Before video-family GGUF exception: never video even if name has wan (wan2.1-umt5).
 _TEXT_ENCODER = re.compile(
-    r"\bu[_-]?mt5\b|wan2\.1[_-]?u[_-]?mt5|"
+    # umt5_xxl_encoder: allow _ after mt5 (\b fails because _ is a word char)
+    r"\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|"
     r"\bt5[_-]?xxl\b|\bt5[_-](?:xl|base|small|large)\b|"
     r"\bt5\s*encoder\b|t5[_-]encoder|"
     r"text[_-]?encoder|text-encoding|text_encoding|"

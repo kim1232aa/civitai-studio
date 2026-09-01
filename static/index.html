@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0763</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0764</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0763" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0764" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0763</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0764</div>
   </div>
 </aside>
 
@@ -1040,17 +1040,30 @@ const $ = (id) => document.getElementById(id);
 window.__studioGo = function (ev) {
   try { if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } } catch (e) {}
   try { lastGoClick = Date.now(); } catch (e) {}
-  try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
+  // Immediate dock feedback — never silent first click.
   try {
     const d = document.getElementById('dockStatus');
     if (d) { d.className = ''; d.textContent = '已点到生成'; }
   } catch (e) {}
   try { if (typeof setDock === 'function') setDock('已点到生成'); } catch (e) {}
-  if (window.__goOnce && (Date.now() - window.__goOnce) < 400) return false;
+  // Single-flight: block duplicate handlers / second click while busy.
+  try {
+    if (typeof goBusy !== 'undefined' && goBusy) {
+      try { setDock('还在提交，等这一次结束再点', 'bad'); } catch (e0) {}
+      return false;
+    }
+    if (typeof goClickLock !== 'undefined' && goClickLock) {
+      try { setDock('点太快了，稍等'); } catch (e0) {}
+      return false;
+    }
+  } catch (e) {}
+  if (window.__goOnce && (Date.now() - window.__goOnce) < 800) return false;
   window.__goOnce = Date.now();
+  try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
   const boom = (e) => {
     lastGoFail = Date.now();
     try { goBusy = false; } catch (e0) {}
+    try { goClickLock = false; } catch (e0) {}
     const msg = "生成出错 " + (e && e.message || e);
     try { console.error('[studioGo]', e); } catch (e1) {}
     try { setDock(msg, 'bad'); } catch (e2) {
@@ -1071,14 +1084,8 @@ window.__studioGo = function (ev) {
   }
   return false;
 };
-if (!window.__goBound) {
-  window.__goBound = true;
-  document.addEventListener('click', function (ev) {
-    const t = ev.target && ev.target.closest && ev.target.closest('#go');
-    if (!t) return;
-    window.__studioGo(ev);
-  }, true);
-}
+// v0764: only html onclick=__studioGo — no document/go capture duplicates.
+window.__goBound = true;
 function isModelscope(b) {
   b = b || backend;
   return b === 'modelscope' || b === 'modelscope-ai' || b === 'modelscope-cn' || b === 'ms';
@@ -1296,7 +1303,7 @@ function hubUtilityBlob(it) {
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
   // umt5 / u-mt5 / t5xxl / clip_l / text-encoder — never on image (even if name has wan)
-  if (/\bu[_-]?mt5\b|wan2\.1[_-]?u[_-]?mt5|\bt5[_-]?xxl\b|\bt5[_-](?:xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|\bclip[_-]l\b/i.test(blobL)) return true;
+  if (/\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|\bt5[_-]?xxl\b|\bt5[_-](?:xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|\bclip[_-]l\b/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();
@@ -1636,13 +1643,18 @@ function svcDisambigTags(list) {
 }
 function svcRow(it, tags) {
   const src = paramSrc(it);
-  let name = it.name || it.id || '未命名';
-  const extra = tags && tags[it.id];
-  if (extra) name = name + ' · ' + extra;
+  const id = String(it.id || '');
+  const leaf = id.includes('/') ? id.split('/').pop() : (it.name || id || '未命名');
+  let name = leaf || it.name || id || '未命名';
+  const owner = id.includes('/') ? id.split('/')[0] : '';
+  if (owner && tags && tags[it.id]) name = name + ' · ' + tags[it.id];
+  else if (owner && (catalog || []).filter(x => String(x.id || '').split('/').pop() === leaf).length > 1) {
+    name = name + ' · ' + owner;
+  }
   const meta = [src.engine, src.operation, src.provider || src.version].filter(Boolean).join(' · ');
   const on = selected && selected.id === it.id;
   const badge = it.status === 'degraded' ? '<span class="badge-deg">降级</span>' : '';
-  const tip = [name, meta, it.id].filter(Boolean).join(' · ');
+  const tip = [id || name, meta].filter(Boolean).join(' · ');
   return `<button type="button" class="svc-row${on ? ' on' : ''}" data-id="${esc(it.id)}" title="${esc(tip)}">
     <span class="svc-main"><span class="svc-name">${esc(name)}</span></span>${badge}
   </button>`;
@@ -1654,17 +1666,12 @@ function findCatalogItem(id) {
   return catalog.find(x => String(x.id) === id) || catalog.find(x => String(x.serviceId || '') === id) || null;
 }
 function selectedPickLabel(it) {
-  // Single source of truth for 已选 chip + dock (prefer name then id).
+  // Chip/dock must show id leaf that matches data-id (never cousin short name alone).
   if (!it) return '';
-  const base = (it.name || it.id || '').trim();
-  if (!base) return '';
-  try {
-    const tags = svcDisambigTags((catalog || []).filter(x => (x.name || x.id) === (it.name || it.id)));
-    const extra = tags && tags[it.id];
-    return base + (extra ? ' · ' + extra : '');
-  } catch (e) {
-    return base;
-  }
+  const id = String(it.id || it.serviceId || '').trim();
+  const leaf = id.includes('/') ? id.split('/').pop() : id;
+  if (leaf) return leaf;
+  return (it.name || '').trim() || '';
 }
 function showPickedChip() {
   const el = $('svcPicked');
@@ -2140,7 +2147,8 @@ function pickForBackend() {
     else if (krea) want = ['black-forest-labs/FLUX.1-Krea-dev', 'black-forest-labs/FLUX.1-schnell'];
     else want = ['black-forest-labs/FLUX.1-schnell'];
   } else if (isModelscope()) {
-    if (src) want = ['Qwen/Qwen-Image-Edit', 'MusePublic/Qwen-Image-Edit'];
+    // v0764: never auto-pick MusePublic / 2512 cousins — exact Hub ids only.
+    if (src) want = ['Qwen/Qwen-Image-Edit'];
     else want = ['Tongyi-MAI/Z-Image-Turbo', 'Qwen/Qwen-Image'];
   } else if (isNanogpt()) {
     if (vid) {
@@ -2612,7 +2620,26 @@ function applyImport(j) {
   if (j.sourceImage) $('sourceImage').value = j.sourceImage;
   else if (j.kind !== 'video' && $('sourceImage')) $('sourceImage').value = '';
   if (backend !== 'civitai') {
-    if (!currentServiceId() && !userPickedId) pickForBackend();
+    // v0764 import freeze: land on exact Hub catalog id only; store userPickedId.
+    if (!userPickedId) {
+      if (!currentServiceId()) pickForBackend();
+      const sid = currentServiceId();
+      if (sid) {
+        const keep = findCatalogItem(sid);
+        if (!keep || String(keep.id) !== String(sid)) {
+          setDock('导入未精确匹配目录模型：' + sid + '（请点选确切 id，禁止模糊）', 'bad');
+          selected = null;
+          copyPicked(null);
+          userPickedId = null;
+        } else {
+          userPickedId = keep.id;
+          selectService(keep, { user: true });
+        }
+      }
+    } else {
+      const keep = findCatalogItem(userPickedId);
+      if (keep) selectService(keep, { user: true });
+    }
     resolveLorasForBackend();
   }
   if ($('loraBlock')) $('loraBlock').classList.toggle('hidden', !showLoraBlock());
@@ -2800,6 +2827,8 @@ async function onGenerate(ev) {
     return;
   }
   goClickLock = true;
+  goBusy = true; // early single-flight — before any await
+  setDock('正在提交…');
   try {
     await runGenerate();
   } catch (e) {
@@ -2811,14 +2840,35 @@ async function onGenerate(ev) {
     goClickLock = false;
   }
 }
+function hubIdLeaf(id) {
+  id = String(id || '');
+  return id.includes('/') ? id.split('/').pop() : id;
+}
+function isForbiddenHubRemap(frozen, candidate) {
+  // Ban MusePublic / *-2512 substitution when frozen is Qwen/Qwen-Image (or Edit).
+  const f = String(frozen || '');
+  const c = String(candidate || '');
+  if (!f || !c || f === c) return false;
+  const fl = hubIdLeaf(f).toLowerCase();
+  const cl = hubIdLeaf(c).toLowerCase();
+  if (c.startsWith('MusePublic/') && (fl.indexOf('qwen-image') >= 0 || f.indexOf('Qwen/') === 0)) return true;
+  if (/qwen-image-2512/i.test(c) && /^qwen-image$/i.test(fl)) return true;
+  if (!/qwen-image-2512/i.test(f) && /qwen-image-2512/i.test(c) && /qwen-image/i.test(fl)) return true;
+  if (f !== c && fl === cl && f.split('/')[0] !== c.split('/')[0]) return true;
+  return false;
+}
 async function runGenerate() {
   const go = $('go');
   const keys = window._hasKeys || {};
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
   lastGoClick = Date.now();
   lastGoStart = Date.now();
-  // Hard-lock: freeze whatever is currently selected (user click OR visible chip).
-  // POST body.serviceId MUST equal frozenPickId exactly (string ===). No cousin fallback.
+  // Hard-lock: after import, userPickedId is required; else freeze visible exact id.
+  // POST body.serviceId AND model MUST === frozenPickId. No MusePublic/2512 remap.
+  if (lastImport && (isModelscope() || backend === 'huggingface') && !userPickedId) {
+    const sid0 = (selected && selected.id) || currentServiceId() || '';
+    if (sid0 && findCatalogItem(sid0)) userPickedId = sid0;
+  }
   const frozenPickId = String(userPickedId || (selected && selected.id) || currentServiceId() || '');
   const frozenRecipe = recipe;
   if (frozenPickId && !userPickedId) userPickedId = frozenPickId;
@@ -2826,6 +2876,7 @@ async function runGenerate() {
   const fail = (msg) => {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
+    try { goBusy = false; } catch (e1) {}
     try { console.error('[runGenerate:fail]', msg); } catch (e0) {}
     setDock(msg, 'bad');
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
@@ -2858,17 +2909,22 @@ async function runGenerate() {
       }
     } else {
       // Exact restore of frozen user pick — never pickForBackend / cousin when set.
+      // Ban MusePublic / 2512 remap lists during generate.
       if (frozenPick) {
         const keep = findCatalogItem(frozenPick);
         if (!keep) { fail('已选模型不在目录：' + frozenPick + '（请重新点选）'); return; }
-        selectService(keep);
+        if (isForbiddenHubRemap(frozenPick, keep.id)) {
+          fail('拒绝 cousin 重映射：冻 ' + frozenPick + ' ≠ ' + keep.id);
+          return;
+        }
+        selectService(keep, { forceFreeze: true });
         if (!selected || String(selected.id) !== frozenPick) {
           fail('无法固定已选模型：要 ' + frozenPick + ' 现 ' + (selected && selected.id));
           return;
         }
         if (picked) picked.serviceId = frozenPick;
       }
-      if (!currentServiceId() && backend !== 'civitai' && !frozenPick && !userPickedId && !selectionLocked()) pickForBackend();
+      // NEVER pickForBackend during generate — would hit MusePublic/prefs remap.
       if (!currentServiceId()) { fail('先点列表里的一个模型'); return; }
       if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
       // Re-assert exact freeze — cousin / auto-pick must not replace.
@@ -2920,12 +2976,22 @@ async function runGenerate() {
       // Force POST body to exact frozen id — never trust intermediate mutations.
       pl.serviceId = frozenPick;
       if (picked) picked.serviceId = frozenPick;
-      if (pl.model != null && String(pl.model) !== frozenPick && String(pl.model).indexOf('/') >= 0) {
-        // Hub backends: model field often mirrors serviceId; keep exact.
+      // Hub backends: model must === frozenPickId (abort on mismatch / MusePublic/2512).
+      if (pl.model != null && String(pl.model).indexOf('/') >= 0) {
+        if (String(pl.model) !== frozenPick || isForbiddenHubRemap(frozenPick, pl.model)) {
+          fail('拒绝写入不同 model：要 ' + frozenPick + ' 现 ' + pl.model);
+          return;
+        }
+        pl.model = frozenPick;
+      } else if (isModelscope() || backend === 'huggingface') {
         pl.model = frozenPick;
       }
       if (String(pl.serviceId || '') !== frozenPick) {
         fail('payload 模型漂移：要 ' + frozenPick + ' 现 ' + (pl && pl.serviceId));
+        return;
+      }
+      if (isForbiddenHubRemap(frozenPick, pl.serviceId)) {
+        fail('拒绝 MusePublic/2512 remap：' + pl.serviceId);
         return;
       }
     }
@@ -3004,9 +3070,9 @@ async function runGenerate() {
     stopWait();
   } finally {
     goBusy = false;
-    // Preserve image recipe + pick after poll/gen — never land on Allegro video tab.
+    // Preserve image recipe + pick after poll/gen — never land on Allegro / video tab.
     try {
-      if (frozenRecipe && recipe !== frozenRecipe) {
+      if (frozenRecipe) {
         recipe = frozenRecipe;
         kind = frozenRecipe === 'video' ? 'video' : 'image';
         updateTabClasses();
@@ -3021,6 +3087,8 @@ async function runGenerate() {
           syncPickedDockIfStale();
         }
       }
+      // Re-render without auto-pick (blocks Allegro / first-video steal).
+      renderServiceList({ pickDefault: false });
     } catch (e0) {}
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
     syncGo();
@@ -3188,7 +3256,9 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     } else if (userPickedId) {
       const keep = findCatalogItem(userPickedId);
       if (keep) selectService(keep);
-    } else if (backend !== 'civitai' && !selectionLocked()) {
+      else setDock('已选模型不在当前目录：' + userPickedId + '（请重新点选确切 id）', 'bad');
+    } else if (backend !== 'civitai' && !selectionLocked() && !lastImport) {
+      // v0764: after import, never auto remap via pickForBackend (MusePublic/2512).
       pickForBackend();
     }
     const n = catalog.length;
@@ -3304,11 +3374,8 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     setRecipe('image');
     setDock('无法加载服务目录，请刷新', 'bad');
   }
+  // v0764: Generate is html onclick=__studioGo only (no capture duplicate).
   const go = $('go');
-  if (go) {
-    const fire = (ev) => { window.__studioGo(ev); };
-    go.addEventListener('click', fire, true);
-  }
   ['width', 'height'].forEach(id => {
     const el = $(id);
     if (el) el.addEventListener('change', () => { if (isNanogpt()) syncNanoResSelect(); });
