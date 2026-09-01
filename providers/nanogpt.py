@@ -297,8 +297,10 @@ def resolve_civitai_b2_url(url: str, *, timeout: float = 30) -> str:
     url = _strip_token_query((url or "").strip())
     if not url:
         raise ValueError("空 LoRA URL")
-    if is_signed_b2_url(url):
-        return url
+    # Never accept an existing B2 signed/bare URL as the resolve entry — caller must
+    # supply versionId / download API URL so we can mint a fresh 307 Location.
+    if is_signed_b2_url(url) or "b2.civitai.com" in url.lower():
+        raise ValueError("不可用过期 B2 直链作解析入口；请用 download API / versionId")
     if _HF_REPO_RE.match(url):
         return url
     if url.startswith("http") and "civitai.com/api/download/models/" not in url.lower():
@@ -343,8 +345,8 @@ def persist_safe_lora_path(path: str, version_id: str | None = None) -> str:
     if not raw:
         return ""
     if is_signed_b2_url(raw) or "b2.civitai.com" in raw.lower():
-        p = urlparse(raw)
-        return urlunparse((p.scheme, p.netloc, p.path, "", "", ""))
+        # No versionId (handled above) — do not leave bare b2 path after stripping query
+        return ""
     cleaned = _strip_token_query(raw)
     m = _CIVITAI_DL_RE.match(cleaned.split("#")[0])
     if m:
@@ -461,17 +463,38 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
                 raise ValueError("无下载链 / versionId（无直链）")
             if _HF_REPO_RE.match(path_hint):
                 resolved = path_hint
-            elif is_signed_b2_url(path_hint):
-                resolved = path_hint
-            elif "civitai.com/api/download/models/" in path_hint.lower() or vid:
-                target = dl or path_hint
-                if not target.startswith("http") and vid:
-                    target = "https://civitai.com/api/download/models/" + vid
-                resolved = resolve_civitai_b2_url(target, timeout=timeout)
-            elif path_hint.startswith("http"):
-                resolved = resolve_civitai_b2_url(path_hint, timeout=timeout)
             else:
-                raise ValueError("无直链")
+                # v0770: NEVER trust existing b2…Authorization= as final path.
+                # Always re-resolve from stable identity (versionId / download API).
+                b2ish = is_signed_b2_url(path_hint) or "b2.civitai.com" in path_hint.lower()
+                target = (dl or "").strip()
+                if not target and vid:
+                    target = "https://civitai.com/api/download/models/" + vid
+                if (
+                    not target
+                    and path_hint
+                    and "civitai.com/api/download/models/" in path_hint.lower()
+                ):
+                    target = path_hint
+                if b2ish and not target:
+                    raise ValueError(
+                        "过期 B2 直链无法刷新（缺 versionId / download API URL）"
+                    )
+                if target:
+                    if not target.startswith("http") and vid:
+                        target = "https://civitai.com/api/download/models/" + vid
+                    # Strip any prior signed Location — resolve from download API only
+                    if is_signed_b2_url(target) or "b2.civitai.com" in target.lower():
+                        if not vid:
+                            raise ValueError(
+                                "过期 B2 直链无法刷新（缺 versionId / download API URL）"
+                            )
+                        target = "https://civitai.com/api/download/models/" + vid
+                    resolved = resolve_civitai_b2_url(target, timeout=timeout)
+                elif path_hint.startswith("http") and not b2ish:
+                    resolved = resolve_civitai_b2_url(path_hint, timeout=timeout)
+                else:
+                    raise ValueError("无直链")
             if not resolved or resolved.lower().startswith("urn:"):
                 raise ValueError("无直链")
             # Final guard: never send Civitai API key to Nano
@@ -813,6 +836,12 @@ def _video_body(payload: dict, spec: dict) -> dict:
     last = (payload or {}).get("lastFrame")
     if last:
         body["lastFrame"] = last
+    loras = _loras(payload)
+    if loras:
+        body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
+        for i, item in enumerate(loras, 1):
+            body[f"lora_{i}_url"] = item["path"]
+            body[f"lora_{i}_scale"] = item["scale"]
     return body
 
 
@@ -904,7 +933,7 @@ class NanoGptProvider(Provider):
                 "error": "当前 NanoGPT 模型目录没有 resolutions，请换一个带分辨率列表的目录模型（勿自拼 WxH）",
                 "serviceId": mid,
             }
-        # v0769: resolve Civitai→B2 signed URL at generate time (signed URLs expire).
+        # v0770: always re-resolve Civitai→fresh B2 at generate (never trust stale signed URL).
         pl = dict(payload or {})
         raw_loras = pl.get("loras") or []
         if isinstance(raw_loras, dict):
@@ -969,7 +998,26 @@ class NanoGptProvider(Provider):
         return last
 
     def _generate_video(self, payload, spec, mid):
-        body = _video_body(payload or {}, spec)
+        # v0770: video path also runs resolve_nano_loras (same fail-closed rules).
+        pl = dict(payload or {})
+        raw_loras = pl.get("loras") or []
+        if isinstance(raw_loras, dict):
+            raw_loras = [raw_loras]
+        lora_meta: list = []
+        if raw_loras:
+            if not model_supports_lora(spec, mid):
+                return 400, {
+                    "error": f"当前 Nano 模型不支持 LoRA，请改选 *-lora 模型（当前：{mid}）",
+                    "serviceId": mid,
+                    "code": "lora_model_unsupported",
+                }
+            resolved, err = resolve_nano_loras(pl)
+            if err:
+                return 400, err
+            pl["loras"] = resolved
+            lora_meta = list(resolved or [])
+        body = _video_body(pl, spec)
+        persist_body = sanitize_submitted_for_persist(body, lora_meta)
         code, data = json_call(GEN_VIDEO, method="POST", headers=_auth(), body=body, timeout=90)
         if not isinstance(data, dict) or code >= 400:
             if isinstance(data, dict):
@@ -981,7 +1029,7 @@ class NanoGptProvider(Provider):
             saved = _save_result(data, f"nano-gpt|vid|{uuid.uuid4().hex[:12]}", {"backend": self.id, "serviceId": mid})
             if saved:
                 jid = f"nano-gpt|vid|{uuid.uuid4().hex[:12]}"
-                return 200, {"id": jid, "status": "succeeded", "backend": self.id, "saved": saved, "submittedInput": body}
+                return 200, {"id": jid, "status": "succeeded", "backend": self.id, "saved": saved, "submittedInput": persist_body}
             return 502, {"error": "NanoGPT 视频没返回任务 id", "raw": json.dumps(data)[:400]}
         jid = f"nano-gpt|vid|{run}"
         return 200, {
@@ -989,7 +1037,7 @@ class NanoGptProvider(Provider):
             "status": (data.get("status") or "pending").lower(),
             "backend": self.id,
             "endpoint": mid,
-            "submittedInput": body,
+            "submittedInput": persist_body,
             "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
         }
 

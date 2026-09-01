@@ -484,9 +484,9 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0769"' in html
+    assert 'title="v0770"' in html
     assert 'aria-label="生成"' in html
-    assert 'aria-label="v0769"' not in html
+    assert 'aria-label="v0770"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
     assert "生成中不能切换配方" in sr
     assert "goBusy || generateLockId" in sr
@@ -539,8 +539,8 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert r_mp.returncode == 0, (r_mp.stdout, r_mp.stderr)
 
 
-    # v0769: NanoGPT Civitai→B2 resolve at generate; fail closed; no key leak
-    assert 'title="v0769"' in html
+    # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
+    assert 'title="v0770"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -597,6 +597,32 @@ console.log('PASS isMusePublicQwenImageCousin');
         "loras": [{"path": "https://civitai.com/api/download/models/%d" % i, "name": "L%d" % i} for i in range(4)]
     })
     assert err3 and err3.get("code") == "lora_too_many"
+    # v0770: stale B2 alone (no versionId / download API) → FAIL closed — never passthrough
+    out_stale, err_stale = resolve_nano_loras({
+        "loras": [{"path": fake_b2, "name": "StaleB2", "scale": 1.0}]
+    })
+    assert out_stale is None and err_stale and err_stale.get("code") == "lora_no_direct_url"
+    assert any(
+        "B2" in (f.get("error") or "") or "刷新" in (f.get("error") or "") or "无直链" in (f.get("error") or "")
+        for f in (err_stale.get("failed") or [])
+    ) or ("B2" in err_stale.get("error", "") or "刷新" in err_stale.get("error", "") or "无直链" in err_stale.get("error", ""))
+    # v0770: versionId + stale B2 path → still re-resolves via download API (not passthrough)
+    with mock.patch("providers.nanogpt._head_redirect_location", return_value=fake_b2) as m_head:
+        out_re, err_re = resolve_nano_loras({
+            "loras": [{"path": fake_b2, "versionId": 3231694, "name": "ReResolve", "scale": 0.7}]
+        })
+        assert err_re is None and out_re and out_re[0]["path"] == fake_b2
+        assert m_head.called, "must re-resolve via HEAD/GET, not trust stale B2"
+        # Called with download API URL, not the stale B2
+        call_url = m_head.call_args[0][0]
+        assert "civitai.com/api/download/models/3231694" in call_url
+        assert "Authorization=" not in call_url
+    # resolve_civitai_b2_url rejects B2 as entry
+    try:
+        resolve_civitai_b2_url(fake_b2)
+        raise AssertionError("should refuse B2 as resolve entry")
+    except ValueError as e:
+        assert "B2" in str(e) or "versionId" in str(e) or "download" in str(e).lower()
     # Refuse key leak in Location
     tok = civitai_api_token() or "TEST_CIVITAI_KEY_LEAK"
     with mock.patch("providers.nanogpt.civitai_api_token", return_value=tok):
@@ -609,16 +635,23 @@ console.log('PASS isMusePublicQwenImageCousin');
                 raise AssertionError("should have refused key leak")
             except ValueError as e:
                 assert "token" in str(e).lower() or "Key" in str(e) or "泄露" in str(e) or "拒绝" in str(e)
-    # persist_safe strips B2 auth query
+    # persist_safe: with versionId → download API; without → empty (no bare b2)
+    assert persist_safe_lora_path(fake_b2, "3231694") == "https://civitai.com/api/download/models/3231694"
     assert "Authorization=" not in persist_safe_lora_path(fake_b2, "3231694")
+    assert persist_safe_lora_path(fake_b2, None) == ""
+    assert persist_safe_lora_path(fake_b2, "") == ""
     assert is_signed_b2_url(fake_b2)
-    # _generate_image wires resolve (source markers)
+    # _generate_image + _generate_video wire resolve (source markers)
     nano_src = (Path(__file__).resolve().parent.parent / "providers" / "nanogpt.py").read_text()
     assert "resolve_nano_loras" in nano_src
     assert "sanitize_submitted_for_persist" in nano_src
     assert "model_supports_lora" in nano_src
     assert "CIVITAI_TOKEN_PATH" in nano_src
     assert 'code": "lora_model_unsupported"' in nano_src or "lora_model_unsupported" in nano_src
+    assert "elif is_signed_b2_url(path_hint):" not in nano_src  # old passthrough removed
+    assert "def _generate_video" in nano_src
+    assert nano_src.count("resolve_nano_loras") >= 2  # image + video
+    assert "video path also runs resolve_nano_loras" in nano_src
 
     print("PASS p0 wiring")
 

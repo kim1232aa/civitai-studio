@@ -781,7 +781,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0769</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0770</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1023,9 +1023,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0769" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0770" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0769</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0770</div>
   </div>
 </aside>
 
@@ -3174,7 +3174,7 @@ async function runGenerate() {
       syncPickedDockIfStale();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
-    // v0769: Nano LoRA — dock/block when model !supportsLora; red 「无直链」 if no path/versionId.
+    // v0770: Nano LoRA — dock/block when model !supportsLora; red 「无直链」 if no path/versionId.
     if (isNanogpt() && Array.isArray(loras) && loras.length) {
       if (!supportsLora(selected)) {
         fail('当前 Nano 模型不支持 LoRA，请改选 *-lora 模型');
@@ -3279,7 +3279,7 @@ async function runGenerate() {
     }
     if (j.error || j.detail) {
       stopWait();
-      // v0769: mark per-item 无直链 when server lists failed LoRAs
+      // v0770: mark per-item 无直链 when server lists failed LoRAs
       try {
         const failed = (j.failed || []).map(f => String((f && f.name) || '')).filter(Boolean);
         if (failed.length && Array.isArray(loras)) {
