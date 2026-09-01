@@ -82,7 +82,7 @@ function isModelscope(b) {"""
   window.addEventListener('hashchange', () => {
     try {
       const h = (location.hash || '').replace(/^#/, '').split('&')[0];
-      if (!/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn)$/.test(h)) {
+      if (!/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn|nano-gpt)$/.test(h)) {
         persistBackend(backend);
         return;
       }

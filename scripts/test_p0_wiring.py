@@ -62,6 +62,20 @@ def main() -> int:
     assert _wants_custom_comfy({"recipe": "workflow", "prompt": "x"})
     assert _wants_custom_comfy({"step": "customComfy"})
     assert not _wants_custom_comfy({"prompt": "x", "serviceId": "image/comfy/krea2/turbo/createImage"})
+    from providers.nanogpt import closest_aspect, pick_resolution, _loras, _clamp_seed as nano_seed, _image_body
+    assert closest_aspect(960, 1440) in ("2:3", "4:5")
+    spec = {"supported_parameters": {"resolutions": ["1k", "2k"]}}
+    assert pick_resolution(spec, 1024, 1024) == "1k"
+    assert pick_resolution(spec, 2048, 2048) == "2k"
+    spec2 = {"supported_parameters": {"resolutions": ["1:1", "4:3", "2:3", "9:16"]}}
+    assert pick_resolution(spec2, 960, 1440) == "2:3"
+    ls = _loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]})
+    assert ls and ls[0]["path"].startswith("https://")
+    assert nano_seed(475720515768790) <= 2147483647
+    body = _image_body({"serviceId": "wavespeed-ai/krea-v2/turbo-lora", "prompt": "x", "width": 1024, "height": 1024, "quantity": 1, "loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 1}]}, spec)
+    assert body["model"] == "wavespeed-ai/krea-v2/turbo-lora"
+    assert body["loras"][0]["path"].startswith("https://")
+    assert body["resolution"] == "1k"
     print("PASS p0 wiring")
     return 0
 

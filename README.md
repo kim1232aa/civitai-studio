@@ -4,7 +4,7 @@
 
 - 地址：<http://127.0.0.1:8765>（只绑回环）
 - 仓库：<https://github.com/kim1232aa/civitai-studio>
-- 当前界面版本戳：标题栏 `v0747`（每次修 UI/行为都要改这个数字并 push main）
+- 当前界面版本戳：标题栏 `v0748`（每次修 UI/行为都要改这个数字并 push main）
 - 开发约定：[`docs/dev.md`](docs/dev.md)
 - 审查规范：[`docs/review-spec.md`](docs/review-spec.md)
 - 供应商插件：[`docs/providers.md`](docs/providers.md)
@@ -29,6 +29,7 @@
 - **Civitai**：图 / 视频 / customComfy。导入 Civitai 图抽参数。工作流按文件名和节点查 AIR，查不到就列 unmatched，不编 URN。
 - **Fal.ai**：图、视频、放大、3D、音频。LoRA 走 `loras: [{path, scale}]`。目录不要一次画出全部按钮。
 - **Hugging Face**：FLUX、Qwen、Z-Image-Turbo、HunyuanVideo。同步返回文件。
+- **NanoGPT**：图 / 视频。官方目录 200+ 图模、LoRA、图生图、seed、比例。密钥 `~/.config/nano-gpt/token`。
 - **魔搭 AI** 与 **魔搭 CN** 是两家，**禁止互相 fallback**。AI 连不上就报连接错误，不要改走 CN。
 
 ## 跑起来
@@ -56,6 +57,7 @@ chmod +x run.sh
 | Hugging Face | `huggingface` | `~/.config/huggingface/token` | router / Inference |
 | 魔搭 AI | `modelscope-ai` | `~/.config/modelscope/token` | `https://api.modelscope.ai/v1` |
 | 魔搭 CN | `modelscope-cn` | `~/.config/modelscope-cn/token` | `https://api-inference.modelscope.cn/v1` |
+| NanoGPT | `nano-gpt` | `~/.config/nano-gpt/token` | `https://nano-gpt.com/api/v1` |
 
 不要用 `~/.config/modelscope/base_url` 把 AI 指到 CN。
 

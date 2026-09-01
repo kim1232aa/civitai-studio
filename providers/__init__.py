@@ -21,7 +21,7 @@ def all_providers():
 def resolve_from_payload(payload: dict):
     payload = payload or {}
     bid = (payload.get("backend") or "").strip()
-    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai", "魔搭": "modelscope-ai", "魔搭ai": "modelscope-ai", "魔搭cn": "modelscope-cn"}
+    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai", "魔搭": "modelscope-ai", "魔搭ai": "modelscope-ai", "魔搭cn": "modelscope-cn", "nano": "nano-gpt", "nanogpt": "nano-gpt", "nano_gpt": "nano-gpt"}
     bid = aliases.get(bid, bid)
     if bid in PROVIDERS:
         return PROVIDERS[bid]
@@ -35,7 +35,7 @@ def resolve_from_payload(payload: dict):
 def resolve_from_job(job_id: str):
     from .http import parse_job_id
     pid, _ = parse_job_id(job_id or "")
-    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai"}
+    aliases = {"hf": "huggingface", "ms": "modelscope-ai", "modelscope": "modelscope-ai", "nano": "nano-gpt", "nanogpt": "nano-gpt"}
     pid = aliases.get(pid, pid)
     if pid in PROVIDERS:
         return PROVIDERS[pid]
@@ -57,6 +57,7 @@ def load():
     from . import fal as _fal  # noqa: F401
     from . import huggingface as _hf  # noqa: F401
     from . import modelscope as _ms  # noqa: F401
+    from . import nanogpt as _nano  # noqa: F401
 
 
 def _boot_ui_patch():
@@ -66,7 +67,7 @@ def _boot_ui_patch():
         from pathlib import Path
         target = Path(__file__).resolve().parent.parent / "static" / "index.html"
         raw = target.read_text(encoding="utf-8")
-        if "v0747" in raw or "v0746" in raw or "v0745" in raw:
+        if "v0748" in raw or "v0747" in raw or "v0746" in raw or "v0745" in raw:
             return
         out = static_patch.patch_index(raw)
         if out != raw:

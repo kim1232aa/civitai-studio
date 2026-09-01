@@ -492,6 +492,9 @@ def _alias_backend(bid: str) -> str:
         "魔搭": "modelscope-ai",
         "魔搭ai": "modelscope-ai",
         "魔搭cn": "modelscope-cn",
+        "nano": "nano-gpt",
+        "nanogpt": "nano-gpt",
+        "nano_gpt": "nano-gpt",
     }
     bid = (bid or "civitai").strip()
     return aliases.get(bid, bid)
@@ -574,7 +577,7 @@ def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoin
         return 200, io_meta.sidecar_to_import(side)
     if backend == "fal":
         return fal_prov.import_request(q, endpoint=endpoint)
-    if backend in ("huggingface", "modelscope", "modelscope-ai", "modelscope-cn"):
+    if backend in ("huggingface", "modelscope", "modelscope-ai", "modelscope-cn", "nano-gpt", "nanogpt"):
         return 200, {
             "empty": True,
             "backend": backend,

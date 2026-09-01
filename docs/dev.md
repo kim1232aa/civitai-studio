@@ -25,7 +25,7 @@
 
 | 键 | 位置 | 含义 |
 | --- | --- | --- |
-| `#civitai` `#fal` `#huggingface` `#modelscope-ai` `#modelscope-cn` | `location.hash` 第一段 | 当前供应商 |
+| `#civitai` `#fal` `#huggingface` `#modelscope-ai` `#modelscope-cn` `#nano-gpt` | `location.hash` 第一段 | 当前供应商 |
 | `&recipe=workflow` | hash 第二段 | 仅当工作流 tab 真的打开 |
 | `civitai-studio-backend` | localStorage + sessionStorage | 供应商，刷新后还在 |
 | `civitai-studio-recipe` | sessionStorage | 配方 tab；**不要**单靠它在 boot 时切到工作流 |
@@ -43,6 +43,7 @@
 | Hugging Face | `huggingface` | `providers/huggingface.py` |
 | 魔搭 AI | `modelscope-ai` | `providers/modelscope.py` `ModelScopeProvider("ai")` |
 | 魔搭 CN | `modelscope-cn` | 同上 `("cn")` |
+| NanoGPT | `nano-gpt` | `providers/nanogpt.py` |
 
 别名：不要再把 `modelscope` 当成合并后的一家。AI 与 CN **禁止** token / base URL 交叉。
 
@@ -79,6 +80,7 @@
 ~/.config/huggingface/token
 ~/.config/modelscope/token          # 仅魔搭 AI
 ~/.config/modelscope-cn/token       # 仅魔搭 CN
+~/.config/nano-gpt/token
 ```
 
 git 身份只用环境变量：`GIT_AUTHOR_NAME=kim1232aa`，`GIT_AUTHOR_EMAIL=193197560+kim1232aa@users.noreply.github.com`。不要 `git config`。

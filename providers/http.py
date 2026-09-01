@@ -143,6 +143,7 @@ def _looks_media(u: str) -> bool:
     if any(x in low for x in (
         ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm",
         "fal.media", "v3.fal.media", "v3b.fal.media", "/files/",
+        "nano-gpt.com", "nanogpt", "wavespeed.ai",
     )):
         return True
     return False

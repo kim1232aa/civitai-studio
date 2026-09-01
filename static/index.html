@@ -759,7 +759,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0747</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0748</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -966,9 +966,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0747" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0748" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0747</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0748</div>
   </div>
 </aside>
 
@@ -1029,6 +1029,13 @@ function isModelscope(b) {
   b = b || backend;
   return b === 'modelscope' || b === 'modelscope-ai' || b === 'modelscope-cn' || b === 'ms';
 }
+function isNanogpt(b) {
+  b = b || backend;
+  return b === 'nano-gpt' || b === 'nanogpt' || b === 'nano';
+}
+function isKnownBackend(h) {
+  return /^(civitai|fal|huggingface|modelscope-ai|modelscope-cn|nano-gpt)$/.test(h || '');
+}
 
 let loras = [];
 let kind = 'image';
@@ -1038,7 +1045,7 @@ const BACKEND_KEY = 'civitai-studio-backend';
 function savedBackend() {
   try {
     const h = (location.hash || '').replace(/^#/, '').split('&')[0];
-    if (/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn)$/.test(h)) return h;
+    if (isKnownBackend(h)) return h;
   } catch (e) {}
   try { const s = sessionStorage.getItem(BACKEND_KEY); if (s) return s; } catch (e) {}
   try { return localStorage.getItem(BACKEND_KEY) || ''; } catch (e) { return ''; }
@@ -1146,7 +1153,7 @@ function supportsLora(it) {
   if (id.includes('lora') || name.includes('lora')) return true;
   if (req.includes('loras') || req.includes('lora') || req.includes('lora_url') || req.includes('lora_path')) return true;
   if (fcat.includes('lora') || tags.some(t => t.includes('lora'))) return true;
-  if (backend === 'huggingface' || isModelscope()) {
+  if (backend === 'huggingface' || isModelscope() || isNanogpt()) {
     return (id + ' ' + name + ' ' + tags.join(' ')).includes('lora');
   }
   return false;
@@ -1158,6 +1165,7 @@ function showLoraBlock() {
   // Fal official LoRA param is loras[{path,scale}]. Keep the block on
   // image/video even when the current row is a non-/lora sibling.
   if (backend === 'fal' && (recipe === 'image' || recipe === 'video')) return true;
+  if (isNanogpt() && (recipe === 'image' || recipe === 'video')) return true;
   if (isModelscope() && (recipe === 'image' || recipe === 'video')) return true;
   if (backend === 'huggingface' && recipe === 'image') return true;
   return supportsLora(selected);
@@ -1467,7 +1475,7 @@ function renderServiceList(opts) {
   bindRows($('serviceList'));
   let pick = wantItem || null;
   if (!pick && pickDefault && !userPickedId) {
-    const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image']}[backend] || [];
+    const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'nano-gpt':['wavespeed-ai/krea-v2/turbo-lora','wavespeed-ai/krea-v2/turbo','z-image-turbo-lora','z-image-turbo']}[backend] || [];
     for (let i = 0; i < prefs.length; i++) {
       const hit = list.find(x => x.id === prefs[i]);
       if (hit) { pick = hit; break; }
@@ -1554,7 +1562,7 @@ function syncBackendChrome() {
   if (f) f.placeholder = backend === 'civitai' ? '筛选服务' : '搜索模型';
   const q = $('loraQ');
   const lbl = $('loraQLbl');
-  if (backend === 'fal') {
+  if (backend === 'fal' || isNanogpt()) {
     if (q) q.placeholder = 'URL、HF owner/name、名字或 version id';
     if (lbl) lbl.textContent = '搜索名字 / URL / HF 仓库 / version id';
   } else if (isModelscope()) {
@@ -1570,8 +1578,8 @@ function renderLoras() {
   if (!box) return;
   box.innerHTML = loras.map((l, i) => {
     const sub = l.path || l.downloadUrl || l.air || '';
-    const needUrl = backend === 'fal' && !l.path && !l.downloadUrl && l.air;
-    const st = needUrl ? (l.status || 'Fal 需要可抓取的 URL') : (l.status || '');
+    const needUrl = (backend === 'fal' || isNanogpt()) && !l.path && !l.downloadUrl && l.air;
+    const st = needUrl ? (l.status || '需要可抓取的 LoRA URL') : (l.status || '');
     return `<div class="lora"><div class="top">
       <div class="lora-info"><div class="lora-name">${esc(l.name||'LoRA')}</div>
       <div class="lora-air">${esc(sub)}</div>
@@ -1686,7 +1694,7 @@ function slimPayload(base) {
   }
   delete base.sampler;
   if (backend !== 'civitai') delete base.denoise;
-  if (backend === 'fal' || isModelscope() || backend === 'huggingface' || supportsLora(selected)) {
+  if (backend === 'fal' || isModelscope() || backend === 'huggingface' || isNanogpt() || supportsLora(selected)) {
     base.loras = (base.loras || []).map(l => ({
       path: l.path || l.url || l.downloadUrl || '',
       scale: clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8),
@@ -1733,7 +1741,7 @@ function syncImportChrome() {
   if (!lbl || !inp) return;
   lbl.textContent = '导入 Civitai 图/视频';
   if (backend === 'fal') inp.placeholder = 'Civitai 图 id / 链接，也可 Fal request id';
-  else if (backend === 'huggingface' || isModelscope()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
+  else if (backend === 'huggingface' || isModelscope() || isNanogpt()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
   else inp.placeholder = 'Civitai 图 id / 链接';
 }
 function selectFirstInCatalog(want) {
@@ -1793,6 +1801,24 @@ function pickForBackend() {
   } else if (isModelscope()) {
     if (src) want = ['Qwen/Qwen-Image-Edit', 'MusePublic/Qwen-Image-Edit'];
     else want = ['Tongyi-MAI/Z-Image-Turbo', 'Qwen/Qwen-Image'];
+  } else if (isNanogpt()) {
+    if (vid) {
+      want = src
+        ? ['bytedance/seedance-2.5', 'wan/v2.6/image-to-video', 'kling/v3/image-to-video']
+        : ['bytedance/seedance-2.5', 'wan/v2.6/text-to-video'];
+    } else if (src) {
+      if (krea) want = ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo', 'flux-kontext'];
+      else if (zimg) want = ['z-image-turbo-image-to-image', 'z-image-base'];
+      else want = ['wavespeed-ai/krea-v2/turbo-lora', 'flux-kontext', 'pruna-ai/p-image/edit-lora'];
+    } else if (zimg) {
+      want = hasLoras ? ['z-image-turbo-lora', 'z-image-turbo'] : ['z-image-turbo', 'z-image-turbo-lora'];
+    } else if (krea) {
+      want = hasLoras
+        ? ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo']
+        : ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo', 'fal-ai/krea-2/turbo'];
+    } else {
+      want = ['wavespeed-ai/krea-v2/turbo-lora', 'z-image-turbo', 'flux-lightning'];
+    }
   } else {
     return false;
   }
@@ -2446,7 +2472,7 @@ async function runGenerate() {
     setDock("正在提交…");
     await afterPaint();
     const pl = payload();
-    const syncGen = pl.backend === 'huggingface';
+    const syncGen = pl.backend === 'huggingface' || (pl.backend === 'nano-gpt' && pl.kind !== 'video');
     setDock(syncGen ? '正在生成…' : '正在提交到队列…');
     await startWait(syncGen ? '正在生成' : '正在提交到队列');
     if (syncGen) tickWait('同步等待模型返回，请稍候');
@@ -2481,7 +2507,7 @@ $('searchLora').onclick = async () => {
   const q = $('loraQ').value.trim();
   if (!q) return;
   $('hits').textContent = '搜…';
-  if ((backend === 'fal' || backend === 'huggingface' || isModelscope()) && (isHttpUrl(q) || isHfRepo(q))) {
+  if ((backend === 'fal' || backend === 'huggingface' || isModelscope() || isNanogpt()) && (isHttpUrl(q) || isHfRepo(q))) {
     addLora({ path: q, name: q, strength: 0.8 });
     return;
   }
@@ -2553,7 +2579,7 @@ async function resolveOneLora(i) {
   }
 }
 async function resolveLorasForBackend() {
-  if (backend !== 'fal') { renderLoras(); return; }
+  if (backend !== 'fal' && !isNanogpt()) { renderLoras(); return; }
   for (let i = 0; i < loras.length; i++) await resolveOneLora(i);
   renderLoras();
 }
@@ -2680,7 +2706,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.backend = p.id;
-      const short = { huggingface: 'HF', 'modelscope-ai': '魔搭 AI', 'modelscope-cn': '魔搭 CN' }[p.id];
+      const short = { huggingface: 'HF', 'modelscope-ai': '魔搭 AI', 'modelscope-cn': '魔搭 CN', 'nano-gpt': 'Nano' }[p.id];
       b.textContent = short || p.label || p.id;
       b.title = p.label || p.id;
       if ((p.id === backend) || (!backend && i === 0)) b.classList.add('on');
@@ -2756,7 +2782,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
   window.addEventListener('hashchange', () => {
     try {
       const h = (location.hash || '').replace(/^#/, '').split('&')[0];
-      if (!/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn)$/.test(h)) {
+      if (!isKnownBackend(h)) {
         persistBackend(backend);
         return;
       }

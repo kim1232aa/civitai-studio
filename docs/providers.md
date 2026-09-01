@@ -12,7 +12,7 @@ JSON 请求、落盘 `out/`、任务 id `{provider}|其余`、目录过滤、`GE
 
 ## 现有 id
 
-见 [`dev.md`](dev.md) 的供应商表。魔搭是 **两家**：`modelscope-ai` 与 `modelscope-cn`，token 和 base URL 都不共用。
+见 [`dev.md`](dev.md) 的供应商表。魔搭是 **两家**：`modelscope-ai` 与 `modelscope-cn`，token 和 base URL 都不共用。NanoGPT 是独立一家：`nano-gpt`，token 在 `~/.config/nano-gpt/token`，不要和 Fal / HF 混用。
 
 ## 加一家
 
