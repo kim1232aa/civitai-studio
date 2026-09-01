@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0762</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0763</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0762" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0763" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0762</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0763</div>
   </div>
 </aside>
 
@@ -1280,7 +1280,7 @@ function hubVideoFamilyBlob(it) {
   return /\b(?:wan|hunyuan\s*video|hunyuanvideo|ltx|allegro|cogvideo|mochi|open-?sora|animatediff|animate.?diff|i2v|t2v|text-to-video|image-to-video|vid2vid)\b|\bvideo\b/.test(blob);
 }
 function hubUtilityBlob(it) {
-  // Keep in sync with providers/hub_classify.py — sticky VAE / IP-Adapter / ControlNet / GGUF / pure LoRA.
+  // Keep in sync with providers/hub_classify.py — sticky VAE / IP-Adapter / ControlNet / umt5+text-encoder / GGUF / pure LoRA.
   // Video family GGUF / video LoRA stay video (not utility); pure VAE still utility.
   if (!it) return false;
   if ((it.category || '') === 'utility') return true;
@@ -1295,8 +1295,8 @@ function hubUtilityBlob(it) {
   if (/[a-z0-9]VAE(?:[A-Z_]|_|$)/.test(blob) || /_VAE_/.test(blob)) return true;
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
-  // umt5 / text-encoder / T5 encoder — never on image (or video) recipe list
-  if (/\bumt5\b|wan2\.1[_-]?umt5|\bt5[_-](?:xxl|xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding/i.test(blobL)) return true;
+  // umt5 / u-mt5 / t5xxl / clip_l / text-encoder — never on image (even if name has wan)
+  if (/\bu[_-]?mt5\b|wan2\.1[_-]?u[_-]?mt5|\bt5[_-]?xxl\b|\bt5[_-](?:xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|\bclip[_-]l\b/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();

@@ -273,13 +273,16 @@ def main() -> int:
     img_gguf = {"id": "org/weights-gguf", "name": "model.gguf", "category": "image"}
     assert apply_hub_category(dict(img_gguf))["category"] == "utility"
 
-    # v0762: umt5 / text-encoder → utility (out of image); Qwen-Image stays image
+    # v0763: umt5 / u-mt5 / t5xxl / clip_l / text-encoder → utility (out of image); Qwen-Image stays image
     umt5 = {"id": "Wan-AI/umt5-xxl", "name": "umt5-xxl", "category": "image"}
     assert hub_utility_blob(umt5), umt5
     assert apply_hub_category(dict(umt5))["category"] == "utility"
     wan_umt5 = {"id": "Wan-AI/wan2.1-umt5", "name": "wan2.1-umt5", "category": "image"}
     assert hub_utility_blob(wan_umt5), wan_umt5
     assert apply_hub_category(dict(wan_umt5))["category"] == "utility"
+    assert hub_utility_blob({"id": "org/u-mt5", "name": "u-mt5", "category": "image"})
+    assert hub_utility_blob({"id": "org/t5xxl", "name": "t5xxl", "category": "image"})
+    assert hub_utility_blob({"id": "org/clip_l", "name": "clip_l", "category": "image"})
     t5enc = {"id": "org/t5-encoder-weights", "name": "T5 encoder", "category": "image"}
     assert apply_hub_category(dict(t5enc))["category"] == "utility"
     te = {"id": "org/wan-text-encoder", "name": "text-encoder", "category": "image"}
