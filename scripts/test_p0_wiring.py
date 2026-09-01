@@ -372,7 +372,7 @@ console.log('PASS isForbiddenHubRemap');
     assert "early single-flight" in html
     assert "only html onclick=__studioGo" in html
     assert "go.addEventListener" not in html
-    assert "v0765" in html
+    assert "v0766" in html
 
     # server refuse mismatched model
     ms = (Path(__file__).resolve().parent.parent / "providers" / "modelscope.py").read_text()
@@ -443,6 +443,38 @@ console.log('PASS resolveExactHubFromImport');
     r3 = subprocess.run(["node", "-e", js3], capture_output=True, text=True)
     assert r3.returncode == 0, (r3.stdout, r3.stderr)
     assert "PASS resolveExactHubFromImport" in (r3.stdout or "")
+
+
+    # v0766: generateLockId hard lock; full id chip; sd35_t5xxl/clip utility; no MusePublic steal
+    assert "generateLockId" in html
+    assert "lockId = String(userPickedId" in html or "const lockId = String(userPickedId" in html
+    assert "banned during goBusy/lock" in html
+    assert "owner/leaf" in html or "owner + '/' + leaf" in html
+    assert "hubVideoListNoise" in html
+    assert "MusePublic/" in html  # still mentioned as ban
+    assert "want = (want || []).filter(id => !String(id || '').startsWith('MusePublic/'))" in html
+    sd35 = {"id": "org/sd35_t5xxl", "name": "sd35_t5xxl", "category": "image"}
+    assert hub_utility_blob(sd35), sd35
+    assert apply_hub_category(dict(sd35))["category"] == "utility"
+    sd35c = {"id": "org/sd35_clip_l", "name": "sd35_clip_l", "category": "image"}
+    assert hub_utility_blob(sd35c), sd35c
+    assert apply_hub_category(dict(sd35c))["category"] == "utility"
+    # FE hubUtilityBlob must also catch sd35_* via node extract
+    m_fe = _re.search(r"function hubUtilityBlob\(it\) \{[\s\S]*?\n\}", html)
+    assert m_fe, "hubUtilityBlob missing"
+    # Also hubVideoFamilyBlob needed by hubUtilityBlob
+    m_vf = _re.search(r"function hubVideoFamilyBlob\(it\) \{[\s\S]*?\n\}", html)
+    assert m_vf, "hubVideoFamilyBlob missing"
+    js_fe = m_vf.group(0) + "\n" + m_fe.group(0) + """
+const assert = (c, m) => { if (!c) { console.error(m); process.exit(1); } };
+assert(hubUtilityBlob({id:'org/sd35_t5xxl', name:'sd35_t5xxl'}) === true, 'sd35_t5xxl');
+assert(hubUtilityBlob({id:'org/sd35_clip_l', name:'sd35_clip_l'}) === true, 'sd35_clip_l');
+assert(hubUtilityBlob({id:'Qwen/Qwen-Image', name:'Qwen-Image'}) === false, 'Qwen-Image');
+console.log('PASS hubUtilityBlob sd35');
+"""
+    r_fe = subprocess.run(["node", "-e", js_fe], capture_output=True, text=True)
+    assert r_fe.returncode == 0, (r_fe.stdout, r_fe.stderr)
+
 
     print("PASS p0 wiring")
 

@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0765</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0766</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0765" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0766" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0765</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0766</div>
   </div>
 </aside>
 
@@ -1063,6 +1063,7 @@ window.__studioGo = function (ev) {
   const boom = (e) => {
     lastGoFail = Date.now();
     try { goBusy = false; } catch (e0) {}
+    try { generateLockId = ''; } catch (e0) {}
     try { goClickLock = false; } catch (e0) {}
     const msg = "生成出错 " + (e && e.message || e);
     try { console.error('[studioGo]', e); } catch (e1) {}
@@ -1303,7 +1304,8 @@ function hubUtilityBlob(it) {
   if (/ip-adapter|ip_adapter|ipadapter|ip-composition-adapter|ip_composition_adapter/i.test(blobL)) return true;
   if (/controlnet|control_net|control-lora|control_lora/i.test(blobL)) return true;
   // umt5 / u-mt5 / t5xxl / clip_l / text-encoder — never on image (even if name has wan)
-  if (/\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|\bt5[_-]?xxl\b|\bt5[_-](?:xl|base|small|large)\b|\bt5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|\bclip[_-]l\b/i.test(blobL)) return true;
+  // v0766: sd35_t5xxl / sd35_clip_l — "_" is a word char so \bt5xxl\b / \bclip_l\b miss; allow [_-] prefix like umt5.
+  if (/\bu[_-]?mt5(?:\b|[_-]|$)|wan2\.1[_-]?u[_-]?mt5|umt5[_-]|(?:^|[\W_])t5[_-]?xxl(?:\b|[_-]|$)|(?:^|[\W_])t5[_-](?:xl|base|small|large)(?:\b|[_-]|$)|(?:^|[\W_])t5\s*encoder\b|t5[_-]encoder|text[_-]?encoder|text-encoding|text_encoding|(?:^|[\W_])clip[_-]l(?:\b|[_-]|$)/i.test(blobL)) return true;
   const videoFam = hubVideoFamilyBlob(it);
   if (/\.gguf\b|\bgguf\b/i.test(blobL)) return !videoFam;
   const idName = (id + ' ' + name).toLowerCase();
@@ -1327,6 +1329,25 @@ function hubUtilityBlob(it) {
 function hubNonImageJunk(it) {
   return hubUpscaleBlob(it) || hubUtilityBlob(it) || (it && ((it.category || '') === 'upscale' || (it.category || '') === 'utility'));
 }
+function hubVideoListNoise(it) {
+  // v0766: video tab — drop Comfy/nodepack/weight junk that only mentions wan; keep real wan GGUF / t2v/i2v.
+  if (!it) return false;
+  if (hubUtilityBlob(it)) return true;
+  const id = String(it.id || '');
+  const name = String(it.name || '');
+  const blob = (id + ' ' + name + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  // Keep real video packages / GGUF checkpoints.
+  if (/\.gguf\b|\bgguf\b/.test(blob)) return false;
+  if (/\b(?:t2v|i2v|text-to-video|image-to-video|vid2vid)\b/.test(blob)) return false;
+  if (/\b(?:hunyuan\s*video|hunyuanvideo|ltx-?2|allegro|cogvideo|mochi|open-?sora|seedance|kling)\b/.test(blob)) return false;
+  // Wan-AI / Wan2.x diffusion repos stay (not bare "wan" in a comfy node name alone).
+  if (/\bwan[_-]?ai\b|\bwan2[._-]\d|\bwan[_-]?(?:t2v|i2v|ti2v|vace)\b/.test(blob) && !/\bcomfyui\b|\bcomfy[_-]?node\b|\bcustom[_-]?node\b|\bnodepack\b/.test(blob)) return false;
+  if (/\bcomfyui\b|\bcomfy[_-]?node\b|\bcustom[_-]?node\b|\bnodepack\b|\bworkflow\b/.test(blob)) return true;
+  // Pure LoRA / weight packs without a video-gen task token.
+  if (/(?:^|[\\/_-])loras?(?:$|[\\/_-])/.test(blob) && !hubVideoFamilyBlob(it)) return true;
+  if (/\b(?:weights?|safetensors)\b/.test(blob) && !/\b(?:wan|hunyuan|ltx|allegro|cogvideo|mochi|opensora|seedance|kling)\b/.test(blob)) return true;
+  return false;
+}
 function matchRecipe(it, r) {
   if (!it) return false;
   if (r === 'workflow') return false;
@@ -1340,6 +1361,11 @@ function matchRecipe(it, r) {
       if (cat !== 'image') return false;
       // Hub catalogs: also drop needsSource i2i so 「需要源图」 cannot steal generate.
       if ((isModelscope() || backend === 'huggingface') && isBadAutoPick(it)) return false;
+      return true;
+    }
+    if (r === 'video') {
+      if (cat !== 'video') return false;
+      if (hubVideoListNoise(it)) return false;
       return true;
     }
     if (r === 'upscale') return false;
@@ -1389,6 +1415,7 @@ function currentKind() {
   return 'image';
 }
 let goBusy = false;
+let generateLockId = ''; // v0766: frozen userPickedId for in-flight generate; bans remap
 let lastGoFail = 0;
 let lastGoClick = 0;
 let noToken = false;
@@ -1645,11 +1672,18 @@ function svcRow(it, tags) {
   const src = paramSrc(it);
   const id = String(it.id || '');
   const leaf = id.includes('/') ? id.split('/').pop() : (it.name || id || '未命名');
-  let name = leaf || it.name || id || '未命名';
   const owner = id.includes('/') ? id.split('/')[0] : '';
-  if (owner && tags && tags[it.id]) name = name + ' · ' + tags[it.id];
-  else if (owner && (catalog || []).filter(x => String(x.id || '').split('/').pop() === leaf).length > 1) {
-    name = name + ' · ' + owner;
+  // v0766: always show owner/leaf for Hub ids — MusePublic/Qwen-image vs Qwen/Qwen-Image must be obvious.
+  let name = (owner && leaf) ? (owner + '/' + leaf) : (leaf || it.name || id || '未命名');
+  if (tags && tags[it.id] && owner) {
+    // Extra disambig tag when same display name collides beyond owner.
+    const tag = tags[it.id];
+    if (tag && tag !== owner && tag !== leaf) name = name + ' · ' + tag;
+  } else if (owner && (catalog || []).filter(x => {
+    const ol = String(x.id || '').split('/').pop();
+    return ol === leaf || ol.toLowerCase() === String(leaf).toLowerCase();
+  }).length > 1) {
+    // case-insensitive leaf cousins (Qwen-image vs Qwen-Image) — owner already in name.
   }
   const meta = [src.engine, src.operation, src.provider || src.version].filter(Boolean).join(' · ');
   const on = selected && selected.id === it.id;
@@ -1660,17 +1694,17 @@ function svcRow(it, tags) {
   </button>`;
 }
 function findCatalogItem(id) {
-  // Exact string equality only — never includes()/substring (Qwen-Image ≠ Qwen-Image-2512).
+  // Exact string equality ONLY — case-sensitive. Never includes/substring/toLowerCase.
+  // MusePublic/Qwen-image must NEVER match want Qwen/Qwen-Image.
   id = String(id == null ? '' : id);
   if (!id) return null;
   return catalog.find(x => String(x.id) === id) || catalog.find(x => String(x.serviceId || '') === id) || null;
 }
 function selectedPickLabel(it) {
-  // Chip/dock must show id leaf that matches data-id (never cousin short name alone).
+  // v0766: chip/dock show full owner/leaf so MusePublic/Qwen-image ≠ Qwen/Qwen-Image.
   if (!it) return '';
   const id = String(it.id || it.serviceId || '').trim();
-  const leaf = id.includes('/') ? id.split('/').pop() : id;
-  if (leaf) return leaf;
+  if (id) return id;
   return (it.name || '').trim() || '';
 }
 function showPickedChip() {
@@ -1713,6 +1747,10 @@ function bindRows(root) {
       if (!el || !root.contains(el)) return;
       e.preventDefault();
       e.stopPropagation();
+      if (goBusy || generateLockId) {
+        setDock(goBusy ? '正在提交，暂不能改选模型' : '生成锁定中，暂不能改选', 'warn');
+        return;
+      }
       const it = findCatalogItem(el.getAttribute('data-id'));
       if (it) {
         selectService(it, { user: true });
@@ -1797,13 +1835,21 @@ function renderServiceList(opts) {
 }
 function selectService(it, opts) {
   opts = opts || {};
-  // While generating: ignore selectService with a different id (chip/dock must not jump).
-  if (goBusy && it && it.id && selected && String(it.id) !== String(selected.id) && !opts.forceFreeze) {
-    try { console.warn('[selectService] ignored during goBusy', it.id, 'kept', selected && selected.id); } catch (e) {}
-    return false;
+  // v0766: while generating / lockId set — ban ANY selectService except forceFreeze restoring the lock.
+  if ((goBusy || generateLockId) && !opts.forceFreeze) {
+    const lock = generateLockId || userPickedId || (selected && selected.id) || '';
+    if (it && it.id && lock && String(it.id) !== String(lock)) {
+      try { console.warn('[selectService] ignored during goBusy/lock', it.id, 'kept', lock); } catch (e) {}
+      return false;
+    }
+    if (opts.user) {
+      try { console.warn('[selectService] user click ignored during goBusy/lock'); } catch (e) {}
+      return false;
+    }
   }
   // Only explicit user row clicks own userPickedId. Programmatic selects must not steal it.
-  if (opts.user && it && it.id) {
+  // Never write userPickedId while goBusy/generateLockId (even with opts.user).
+  if (opts.user && it && it.id && !(goBusy || generateLockId)) {
     userPickedId = it.id;
   } else if (userPickedId && it && it.id && String(it.id) !== String(userPickedId)) {
     // Sticky user pick: refuse a different id (backend/recipe switch clears userPickedId).
@@ -2087,18 +2133,29 @@ function catalogIdMatchesWant(itOrId, want) {
   return id === w;
 }
 function selectFirstInCatalog(want) {
+  if (goBusy || generateLockId) {
+    try { console.warn('[selectFirstInCatalog] banned during goBusy/lock'); } catch (e) {}
+    return false;
+  }
   const list = catalog.filter(it => matchRecipe(it, recipe));
   const has = (id) => list.some(x => x.id === id);
   for (const id of want) {
+    if (String(id || '').startsWith('MusePublic/')) continue;
     if (has(id) && selectServiceById(id)) return true;
   }
   for (const id of want) {
+    if (String(id || '').startsWith('MusePublic/')) continue;
     const hit = list.find(it => catalogIdMatchesWant(it, id));
     if (hit && selectServiceById(hit.id)) return true;
   }
   return false;
 }
 function pickForBackend() {
+  // v0766: never remap while generating / lockId set.
+  if (goBusy || generateLockId) {
+    try { console.warn('[pickForBackend] banned during goBusy/lock'); } catch (e) {}
+    return false;
+  }
   if (selectionLocked()) return false;
   if (userPickedId) {
     const keep = findCatalogItem(userPickedId);
@@ -2192,6 +2249,8 @@ function pickForBackend() {
     }).map(it => it.id);
     want = kreaHits.concat(want);
   }
+  // v0766: strip any MusePublic* from want entirely (even leftover cousins).
+  want = (want || []).filter(id => !String(id || '').startsWith('MusePublic/'));
   if (selectFirstInCatalog(want)) return true;
   renderServiceList({ pickDefault: false });
   if (looksCivitaiId(currentServiceId())) {
@@ -2528,9 +2587,12 @@ function selectServiceById(id, opts) {
   opts = opts || {};
   const it = catalog.find(x => x.id === id);
   if (!it) return false;
-  if (goBusy && selected && String(it.id) !== String(selected.id)) {
-    try { console.warn('[selectServiceById] ignored during goBusy', id); } catch (e) {}
-    return false;
+  if (goBusy || generateLockId) {
+    const lock = generateLockId || userPickedId || (selected && selected.id) || '';
+    if (lock && String(it.id) !== String(lock)) {
+      try { console.warn('[selectServiceById] ignored during goBusy/lock', id, 'kept', lock); } catch (e) {}
+      return false;
+    }
   }
   // Programmatic: if user already picked something else, keep theirs.
   if (userPickedId && String(userPickedId) !== String(id)) {
@@ -2600,6 +2662,7 @@ function resolveExactHubFromImport(j) {
     'tencent/HunyuanVideo',
   ];
   const fields = [j.hubModel, j.modelId, j.serviceId, j.baseModel, j.checkpointName, j.diffusionModel, j.ecosystem];
+  // Pass 1: allow-list / known exact Hub repos only (never MusePublic cousins).
   for (let i = 0; i < fields.length; i++) {
     const s = String(fields[i] == null ? '' : fields[i]).trim();
     if (!s) continue;
@@ -2609,6 +2672,14 @@ function resolveExactHubFromImport(j) {
       const hit = findCatalogItem(mapped);
       if (hit && String(hit.id) === String(mapped)) return hit;
     }
+  }
+  // Pass 2: literal catalog id — but refuse MusePublic* when any field also names Qwen/Qwen-Image*.
+  const blobEarly = fields.map(x => String(x == null ? '' : x)).join('\n');
+  for (let i = 0; i < fields.length; i++) {
+    const s = String(fields[i] == null ? '' : fields[i]).trim();
+    if (!s) continue;
+    if (looksCivitaiId(s)) continue;
+    if (s.startsWith('MusePublic/') && (/Qwen\/Qwen-Image(?:-Edit)?(?:\b|$)/.test(blobEarly))) continue;
     const hit = findCatalogItem(s);
     if (hit && String(hit.id) === s) return hit;
   }
@@ -2677,7 +2748,7 @@ function applyImport(j) {
   if (j.sourceImage) $('sourceImage').value = j.sourceImage;
   else if (j.kind !== 'video' && $('sourceImage')) $('sourceImage').value = '';
   if (backend !== 'civitai') {
-    // v0765: NEVER auto-pick backend prefs here — exact Hub id from import meta only; else leave null.
+    // v0766: NEVER auto-pick backend prefs here — exact Hub id from import meta only; else leave null.
     if (!userPickedId) {
       const keep = resolveExactHubFromImport(j);
       if (keep) {
@@ -2880,13 +2951,40 @@ async function onGenerate(ev) {
     return;
   }
   goClickLock = true;
-  goBusy = true; // early single-flight — before any await
-  setDock('正在提交…');
+  // early single-flight — before any await
+  // v0766: lock userPickedId BEFORE any await / catalog / hasSource logic.
+  const lockId = String(userPickedId || '');
+  if (!lockId && recipe !== 'workflow') {
+    goClickLock = false;
+    setDock('请先点选确切模型', 'bad');
+    return;
+  }
+  if (lockId) {
+    const lockItem = findCatalogItem(lockId); // exact only — no MusePublic cousins
+    if (!lockItem) {
+      goClickLock = false;
+      setDock('已选模型不在当前目录：' + lockId + '（请重新点选确切 id）', 'bad');
+      return;
+    }
+    generateLockId = lockId;
+    goBusy = true; // BEFORE any await/afterPaint
+    setDock('正在提交…');
+    selected = lockItem;
+    copyPicked(lockItem);
+    if (picked) picked.serviceId = lockId;
+    try { renderServiceList({ pickDefault: false }); } catch (e0) {}
+    showPickedChip();
+  } else {
+    generateLockId = '';
+    goBusy = true;
+    setDock('正在提交…');
+  }
   try {
     await runGenerate();
   } catch (e) {
     lastGoFail = Date.now();
     try { goBusy = false; } catch (e0) {}
+    try { generateLockId = ''; } catch (e0) {}
     try { console.error('[onGenerate]', e); } catch (e1) {}
     try { setDock('生成出错 ' + (e && e.message || e), 'bad'); } catch (e2) {}
   } finally {
@@ -2922,6 +3020,7 @@ async function runGenerate() {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
     try { goBusy = false; } catch (e1) {}
+    try { generateLockId = ''; } catch (e1) {}
     try { console.error('[runGenerate:fail]', msg); } catch (e0) {}
     setDock(msg, 'bad');
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
@@ -2956,50 +3055,44 @@ async function runGenerate() {
         return;
       }
     } else {
-      // v0765: require userPickedId (exact click / exact Hub import). Never pickForBackend.
-      // Civitai import may have selected serviceId without row click — adopt that exact id only.
-      if (!userPickedId && backend === 'civitai') {
+      // v0766: lockId already set in onGenerate from userPickedId. NOTHING may change it until POST done.
+      // Civitai only: adopt exact serviceId if user never clicked a row.
+      if (!userPickedId && !generateLockId && backend === 'civitai') {
         const sidC = currentServiceId();
-        if (sidC && findCatalogItem(sidC)) userPickedId = sidC;
+        if (sidC && findCatalogItem(sidC)) {
+          userPickedId = sidC;
+          generateLockId = sidC;
+        }
       }
-      if (!userPickedId) { fail('请先点选确切模型'); return; }
-      frozenPickId = String(userPickedId);
-      frozenPick = frozenPickId;
-      // Exact restore of frozen user pick — never pickForBackend / cousin when set.
-      // Ban MusePublic / 2512 remap lists during generate.
-      if (frozenPick) {
-        const keep = findCatalogItem(frozenPick);
-        if (!keep) { fail('已选模型不在目录：' + frozenPick + '（请重新点选）'); return; }
-        if (isForbiddenHubRemap(frozenPick, keep.id)) {
-          fail('拒绝 cousin 重映射：冻 ' + frozenPick + ' ≠ ' + keep.id);
-          return;
-        }
-        selectService(keep, { forceFreeze: true });
-        if (!selected || String(selected.id) !== frozenPick) {
-          fail('无法固定已选模型：要 ' + frozenPick + ' 现 ' + (selected && selected.id));
-          return;
-        }
-        if (picked) picked.serviceId = frozenPick;
+      const lockId = String(generateLockId || userPickedId || '');
+      if (!lockId) { fail('请先点选确切模型'); return; }
+      frozenPickId = lockId;
+      frozenPick = lockId;
+      generateLockId = lockId;
+      const keep = findCatalogItem(lockId); // exact — do NOT search cousins / MusePublic
+      if (!keep) { fail('已选模型不在当前目录：' + lockId + '（请重新点选确切 id）'); return; }
+      if (isForbiddenHubRemap(lockId, keep.id)) {
+        fail('拒绝 cousin 重映射：冻 ' + lockId + ' ≠ ' + keep.id);
+        return;
       }
-      // NEVER pickForBackend during generate — would hit MusePublic/prefs remap.
-      if (!currentServiceId()) { fail('请先点选确切模型'); return; }
-      if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
-      // Re-assert exact freeze — cousin / auto-pick must not replace.
-      if (frozenPick && selected && String(selected.id) !== frozenPick) {
-        const keep = findCatalogItem(frozenPick);
-        if (!keep) { fail('选中漂移且原模型丢失：' + frozenPick); return; }
-        selectService(keep);
-        if (!selected || String(selected.id) !== frozenPick) {
-          fail('选中被替换，已取消生成（要 ' + frozenPick + ' 现 ' + (selected && selected.id) + '）');
-          return;
-        }
-        if (picked) picked.serviceId = frozenPick;
+      // Re-assert lock selection (already done in onGenerate; forceFreeze only).
+      selected = keep;
+      copyPicked(keep);
+      if (picked) picked.serviceId = lockId;
+      selectService(keep, { forceFreeze: true });
+      if (!selected || String(selected.id) !== lockId) {
+        fail('无法固定已选模型：要 ' + lockId + ' 现 ' + (selected && selected.id));
+        return;
+      }
+      // NEVER pickForBackend / selectFirstInCatalog / selectServiceById during generate.
+      if (!currentServiceId() || String(currentServiceId()) !== lockId) {
+        fail('提交前选中漂移：要 ' + lockId + ' 现 ' + currentServiceId());
+        return;
       }
       if (recipe === 'image' && isBadAutoPick(selected)) {
         fail('请重新点选文生图模型，当前是超分/需要源图的模型');
         return;
       }
-      // Dock 已选 X must match selected (same label as chip).
       syncPickedDockIfStale();
     }
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
@@ -3136,6 +3229,7 @@ async function runGenerate() {
       }
       if (frozenPick) {
         userPickedId = frozenPick;
+        generateLockId = frozenPick; // keep until render settles
         const keep = findCatalogItem(frozenPick);
         if (keep) {
           selected = keep;
@@ -3147,6 +3241,7 @@ async function runGenerate() {
       // Re-render without auto-pick (blocks Allegro / first-video steal).
       renderServiceList({ pickDefault: false });
     } catch (e0) {}
+    try { generateLockId = ''; } catch (e1) {}
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
     syncGo();
   }
@@ -3303,6 +3398,21 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     if (seq !== catalogSeq || backend !== want) return;
     catalog = cat.items || [];
     updateTabClasses();
+    // v0766: while goBusy/generateLockId — never pickForBackend / never steal selection.
+    if (goBusy || generateLockId) {
+      const lock = generateLockId || userPickedId || '';
+      renderServiceList({ pickDefault: false });
+      if (lock) {
+        const keep = findCatalogItem(lock);
+        if (keep) {
+          selected = keep;
+          copyPicked(keep);
+          showPickedChip();
+        }
+        // Do NOT setDock「不在当前目录」mid-generate — lockId is authoritative until POST completes.
+      }
+      return;
+    }
     // Catalog must not rewrite hash; only re-select userPickedId when set.
     renderServiceList({ pickDefault: !userPickedId && !selectionLocked() });
     if (backend === 'civitai' && lastImport && lastImport.serviceId && !userPickedId && !selectionLocked()) {
@@ -3315,7 +3425,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       if (keep) selectService(keep);
       else setDock('已选模型不在当前目录：' + userPickedId + '（请重新点选确切 id）', 'bad');
     } else if (backend !== 'civitai' && !selectionLocked() && !lastImport) {
-      // v0765: after import, never auto remap via pickForBackend (MusePublic/2512).
+      // never auto remap via pickForBackend (MusePublic/2512).
       pickForBackend();
     }
     const n = catalog.length;
@@ -3392,7 +3502,7 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
         setDock('正在加载 ' + (p.label || p.id) + '…');
         try {
           await loadCatalog();
-          // v0765: never pickForBackend on a post-import auto path that could freeze cousins.
+          // v0766: never pickForBackend on a post-import auto path that could freeze cousins.
           if (backend !== 'civitai' && !userPickedId && !lastImport) {
             pickForBackend();
             resolveLorasForBackend();
