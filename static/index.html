@@ -759,7 +759,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0748</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0749</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -966,9 +966,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0748" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0749" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0748</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0749</div>
   </div>
 </aside>
 
@@ -1693,7 +1693,7 @@ function slimPayload(base) {
     delete base.scheduler;
   }
   delete base.sampler;
-  if (backend !== 'civitai') delete base.denoise;
+  if (backend !== 'civitai' && !isNanogpt()) delete base.denoise;
   if (backend === 'fal' || isModelscope() || backend === 'huggingface' || isNanogpt() || supportsLora(selected)) {
     base.loras = (base.loras || []).map(l => ({
       path: l.path || l.url || l.downloadUrl || '',

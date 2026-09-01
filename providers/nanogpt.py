@@ -113,20 +113,20 @@ def pick_resolution(spec, w=None, h=None):
         except (TypeError, ValueError):
             pass
         return None
-    low = {x.lower(): x for x in res}
+
+    def norm(s):
+        return str(s).lower().replace("×", "x").replace("*", "x").replace(" ", "")
+
+    low = {norm(x): x for x in res}
     try:
         wi = int(w) if w not in (None, "") else 0
         hi = int(h) if h not in (None, "") else 0
     except (TypeError, ValueError):
         wi = hi = 0
     if wi and hi:
-        for cand in (f"{wi}x{hi}", f"{wi}*{hi}", f"{wi}×{hi}"):
-            hit = low.get(cand.lower().replace("×", "x").replace("*", "x"))
-            if hit:
-                return hit
-            for r in res:
-                if r.lower().replace("*", "x").replace("×", "x") == f"{wi}x{hi}":
-                    return r
+        hit = low.get(f"{wi}x{hi}")
+        if hit:
+            return hit
     if "1k" in low or "2k" in low:
         mx = max(wi, hi)
         if mx >= 1536 and "2k" in low:
@@ -139,12 +139,36 @@ def pick_resolution(spec, w=None, h=None):
     token = _FAL_SIZE.get(ar)
     if token and token.lower() in low:
         return low[token.lower()]
+    parsed = []
+    for r in res:
+        n = norm(r)
+        if "x" not in n:
+            continue
+        a, _, b = n.partition("x")
+        try:
+            pw, ph = int(a), int(b)
+        except ValueError:
+            continue
+        if pw > 0 and ph > 0:
+            parsed.append((pw, ph, r))
+    if parsed and wi and hi:
+        def score(t):
+            pw, ph, _ = t
+            aspect_d = abs((pw / ph) - (wi / hi))
+            area_d = abs(pw * ph - wi * hi) / max(wi * hi, 1)
+            return (aspect_d, area_d)
+
+        parsed.sort(key=score)
+        return parsed[0][2]
     if wi and hi and wi == hi:
         for t in ("square_hd", "square", "1024x1024", "1:1"):
-            if t.lower() in low:
-                return low[t.lower()]
+            if t in low:
+                return low[t]
     if "auto" in low:
         return low["auto"]
+    if parsed:
+        parsed.sort(key=lambda t: -(t[0] * t[1]))
+        return parsed[0][2]
     return res[0]
 
 
@@ -357,17 +381,11 @@ def _image_body(payload: dict, spec: dict) -> dict:
         body["seed"] = seed
     imgs = _source_images(payload)
     if imgs:
+        # NanoGPT rejects mixing input_references with image / imageDataUrl / image_url.
         body["input_references"] = imgs
-        body["image"] = imgs[0]
-        body["image_url"] = imgs[0]
-        if imgs[0].startswith("data:"):
-            body["imageDataUrl"] = imgs[0]
-        else:
-            body["imageUrl"] = imgs[0]
-        if len(imgs) > 1:
-            body["imageDataUrls"] = imgs
-            body["images"] = imgs
         denoise = payload.get("denoise")
+        if denoise in (None, ""):
+            denoise = payload.get("strength")
         try:
             body["strength"] = float(denoise) if denoise not in (None, "") else 0.65
         except (TypeError, ValueError):

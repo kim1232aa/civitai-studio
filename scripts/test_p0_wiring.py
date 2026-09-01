@@ -69,6 +69,12 @@ def main() -> int:
     assert pick_resolution(spec, 2048, 2048) == "2k"
     spec2 = {"supported_parameters": {"resolutions": ["1:1", "4:3", "2:3", "9:16"]}}
     assert pick_resolution(spec2, 960, 1440) == "2:3"
+    zspec = {"supported_parameters": {"resolutions": [
+        "256*256", "512*512", "768*768", "1024*1024", "1280*720", "720*1280",
+        "1536*1024", "1024*1536", "1536*1536",
+    ]}}
+    assert pick_resolution(zspec, 960, 1440) == "1024*1536"
+    assert pick_resolution(zspec, 1024, 1024) == "1024*1024"
     ls = _loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]})
     assert ls and ls[0]["path"].startswith("https://")
     assert nano_seed(475720515768790) <= 2147483647
@@ -76,6 +82,17 @@ def main() -> int:
     assert body["model"] == "wavespeed-ai/krea-v2/turbo-lora"
     assert body["loras"][0]["path"].startswith("https://")
     assert body["resolution"] == "1k"
+    i2i = _image_body({
+        "serviceId": "wavespeed-ai/krea-v2/turbo-lora",
+        "prompt": "x",
+        "width": 960,
+        "height": 1440,
+        "sourceImage": "https://example.com/a.jpg",
+        "denoise": 0.4,
+    }, spec)
+    assert i2i["input_references"] == ["https://example.com/a.jpg"]
+    assert i2i["strength"] == 0.4
+    assert "image" not in i2i and "imageUrl" not in i2i and "imageDataUrl" not in i2i and "image_url" not in i2i
     print("PASS p0 wiring")
     return 0
 
