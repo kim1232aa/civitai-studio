@@ -484,9 +484,9 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0770"' in html
+    assert 'title="v0771"' in html
     assert 'aria-label="生成"' in html
-    assert 'aria-label="v0770"' not in html
+    assert 'aria-label="v0771"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
     assert "生成中不能切换配方" in sr
     assert "goBusy || generateLockId" in sr
@@ -540,7 +540,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0770"' in html
+    assert 'title="v0771"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html

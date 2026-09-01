@@ -389,7 +389,15 @@ def sanitize_submitted_for_persist(body: dict, lora_meta: list | None = None) ->
 def model_supports_lora(spec: dict | None, mid: str = "") -> bool:
     sp = spec or {}
     if sp.get("supportsLora"):
+        # Explicit flag wins — but never for upscale/utility/bg categories (false positive guard).
+        cat = str(sp.get("category") or "").lower()
+        if cat in ("upscale", "utility", "bg"):
+            return False
         return True
+    cat = str(sp.get("category") or "").lower()
+    if cat in ("upscale", "utility", "bg"):
+        # Don't infer supportsLora from bare 'lora' substring on upscalers / utility.
+        return False
     blob = " ".join(
         [
             str(mid or ""),
@@ -597,7 +605,8 @@ def _row_image(it: dict) -> dict:
         cat = "3d"
     i2i = bool(caps.get("image_to_image") or caps.get("inpainting"))
     t2i = bool(caps.get("image_generation", True))
-    lora = ("lora" in blob) or any("lora" in t for t in tags)
+    # v0771: do not mark upscale/bg/utility as supportsLora from bare 'lora' substring.
+    lora = False if cat in ("upscale", "bg", "utility") else (("lora" in blob) or any("lora" in t for t in tags))
     row = {
         "id": mid,
         "name": name,

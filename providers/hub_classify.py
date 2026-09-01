@@ -214,6 +214,14 @@ def blob_is_utility(blob: str, *, id_name: str = "", it=None) -> bool:
 def hub_utility_blob(it) -> bool:
     if not isinstance(it, dict):
         return False
+    # v0771: Nano/Fal generation endpoints are not Hub weight dumps.
+    be = str(it.get("backend") or "").lower()
+    if be in ("nano-gpt", "nanogpt", "nano", "fal"):
+        return False
+    if it.get("supportsLora") is True:
+        cat = str(it.get("category") or "").lower()
+        if cat in ("image", "text-to-image", "video", "text-to-video"):
+            return False
     blob = " ".join(_hub_blob_parts(it))
     return blob_is_utility(blob, id_name=_id_name_blob(it), it=it)
 
