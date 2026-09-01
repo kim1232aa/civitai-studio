@@ -41,5 +41,11 @@ class Provider(ABC):
         """On succeeded, attach saved via providers.http.save_media_urls."""
         ...
 
+    def cancel_job(self, job_id: str) -> tuple[int, dict]:
+        return 400, {"error": f"{self.label} 没有取消接口"}
+
     def categories(self) -> list:
         return []
+
+    def search_loras(self, q: str, nsfw: bool = True):
+        return 200, {"items": [], "backend": self.id, "note": f"{self.label} 没有 LoRA 搜索"}

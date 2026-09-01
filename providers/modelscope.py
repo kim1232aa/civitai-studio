@@ -73,6 +73,40 @@ def model_id(service_id: str) -> str:
     return s
 
 
+def _modelscope_loras(payload: dict):
+    """Official AIGC field: loras is a repo id string or {repo: weight} summing to 1.0."""
+    raw = payload.get("loras") or []
+    if isinstance(raw, str) and raw.strip() and "/" in raw and not raw.startswith("http"):
+        return raw.strip()
+    if isinstance(raw, dict):
+        return raw
+    pairs = {}
+    for it in raw if isinstance(raw, list) else []:
+        repo = ""
+        weight = 1.0
+        if isinstance(it, str):
+            repo = it.strip()
+        elif isinstance(it, dict):
+            repo = (it.get("name") or it.get("path") or it.get("id") or "").strip()
+            try:
+                raw_w = it.get("scale")
+                if raw_w is None:
+                    raw_w = it.get("strength")
+                weight = float(raw_w) if raw_w not in (None, "") else 1.0
+            except (TypeError, ValueError):
+                weight = 1.0
+        if not repo or repo.startswith("http") or repo.lower().startswith("urn:"):
+            continue
+        if repo.count("/") != 1:
+            continue
+        pairs[repo] = max(0.0, weight)
+    if not pairs:
+        return None
+    if len(pairs) == 1:
+        return next(iter(pairs.keys()))
+    total = sum(pairs.values()) or 1.0
+    return {k: (v / total) for k, v in pairs.items()}
+
 
 HUB = "https://www.modelscope.cn/openapi/v1/models"
 # Hub slug, studio category, task, tags, needsSource, needsFirstFrame
@@ -200,6 +234,32 @@ def fetch_hub(search=""):
     return items, totals
 
 
+def search_loras(q: str, limit: int = 8):
+    """ModelScope Hub search. Official loras field wants owner/repo."""
+    q = (q or "").strip()
+    items, seen = [], set()
+    if not q:
+        return 200, {"items": [], "backend": "modelscope"}
+    rows, _ = fetch_hub_search(q)
+    extra, _ = fetch_hub_search(q + " lora")
+    for row in list(rows) + list(extra):
+        mid = (row.get("id") or "").strip()
+        if not mid or mid in seen or mid.count("/") != 1:
+            continue
+        seen.add(mid)
+        items.append({
+            "id": mid,
+            "name": row.get("name") or mid,
+            "path": mid,
+            "type": "LORA",
+            "source": "modelscope",
+            "versions": [{"id": mid, "name": row.get("task") or "lora"}],
+        })
+        if len(items) >= limit:
+            break
+    return 200, {"items": items, "backend": "modelscope"}
+
+
 def is_edit(mid: str) -> bool:
     low = (mid or "").lower()
     return "image-edit" in low or "image-to-image" in low or "/edit" in low
@@ -232,6 +292,9 @@ class ModelScopeProvider(Provider):
 
     def has_key(self) -> bool:
         return bool(self._key())
+
+    def search_loras(self, q: str, nsfw: bool = True):
+        return search_loras(q)
 
     def _auth(self, extra=None):
         h = {"Authorization": f"Bearer {self._key()}"}
@@ -355,6 +418,9 @@ class ModelScopeProvider(Provider):
                 body["size"] = f"{int(payload['width'])}x{int(payload['height'])}"
             except (TypeError, ValueError):
                 pass
+        ms_loras = _modelscope_loras(payload)
+        if ms_loras is not None:
+            body["loras"] = ms_loras
         img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
         extra = [x for x in (payload.get("images") or []) if x]
         if img and img not in extra:
@@ -364,10 +430,10 @@ class ModelScopeProvider(Provider):
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
         url = f"{self._base}/images/generations"
         code, data = json_call(url, method="POST", headers=headers, body=body, timeout=90)
-        if code >= 400 and body.keys() - {"model", "prompt", "image_url"}:
-            slim = {"model": mid, "prompt": body.get("prompt") or ""}
-            if body.get("image_url"):
-                slim["image_url"] = body["image_url"]
+        official = {"model", "prompt", "negative_prompt", "size", "seed", "steps", "guidance", "image_url", "loras"}
+        extra_keys = set(body) - official
+        if code >= 400 and extra_keys:
+            slim = {k: v for k, v in body.items() if k in official}
             code, data = json_call(url, method="POST", headers=headers, body=slim, timeout=90)
             body = slim
         if not isinstance(data, dict):

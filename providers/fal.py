@@ -19,6 +19,7 @@ MODELS_API = "https://api.fal.ai/v1/models"
 # Endpoint ids that are Fal even when not yet in the local catalog.
 FAL_PREFIXES = (
     "fal-ai/",
+    "krea/",
     "minimax/",
     "bytedance/",
     "openai/",
@@ -213,6 +214,9 @@ def _fal_lora_path(item: dict) -> str:
             v = v.strip()
             if v and not _is_civitai_air(v):
                 return v
+    vid = item.get("versionId") or item.get("modelVersionId") or item.get("id")
+    if vid and (isinstance(vid, int) or str(vid).isdigit()):
+        return f"https://civitai.com/api/download/models/{vid}"
     return ""
 
 
@@ -221,7 +225,7 @@ def _clip_lora_scale(v, default=1.0) -> float:
         x = float(v)
     except (TypeError, ValueError):
         x = default
-    return max(0.0, min(2.0, x))
+    return max(0.0, min(4.0, x))
 
 
 def _lora_field_shape(spec: dict, eid: str):
@@ -238,6 +242,71 @@ def _lora_field_shape(spec: dict, eid: str):
     if "/lora" in e or "lora" in e:
         return "loras"
     return None
+
+
+def _norm_eid(s: str) -> str:
+    return (s or "").strip().lstrip("/").lower().replace("_", "-")
+
+
+def fal_lora_sibling(eid: str) -> str:
+    """Pick an upstream Fal endpoint that actually documents LoRA.
+
+    No model-name presets. Order:
+    1. current id already supports loras
+    2. `{id}/lora` exists in the local Fal catalog
+    3. catalog row whose id starts with `{id}/` and fal_supports_lora
+    4. hyphen-normalized prefix match (flux/krea → flux-krea-lora)
+    """
+    e = (eid or "").strip().lstrip("/")
+    if not e:
+        return ""
+    if fal_supports_lora({"id": e}):
+        return e
+    items = [it for it in load_catalog() if it.get("id")]
+    ids = {it.get("id") for it in items}
+    direct = e + "/lora"
+    if direct in ids:
+        return direct
+    if e.endswith("/text-to-image"):
+        swapped = e[: -len("/text-to-image")] + "/lora"
+        if swapped in ids:
+            return swapped
+    prefixed = []
+    for it in items:
+        iid = it.get("id") or ""
+        if iid == e or not fal_supports_lora(it):
+            continue
+        if iid.startswith(e + "/") and "lora" in iid.lower():
+            prefixed.append(iid)
+    if prefixed:
+        prefixed.sort(key=lambda x: (x.count("/"), len(x)))
+        return prefixed[0]
+    needle = _norm_eid(e).replace("/", "-")
+    parts = [p for p in needle.split("-") if p]
+    stem = "-".join(parts[:-1]) if len(parts) > 2 else needle
+    fuzzy = []
+    for it in items:
+        iid = it.get("id") or ""
+        if iid == e or not fal_supports_lora(it):
+            continue
+        nid = _norm_eid(iid).replace("/", "-")
+        if "lora" not in nid:
+            continue
+        if nid == needle + "-lora" or nid.startswith(needle + "-"):
+            fuzzy.append(iid)
+        elif stem and (nid == stem + "-lora" or nid.startswith(stem + "-") and nid.endswith("lora")):
+            fuzzy.append(iid)
+    if fuzzy:
+        src_tok = set(parts)
+
+        def _score(iid: str):
+            nid = _norm_eid(iid).replace("/", "-")
+            hit = set(p for p in nid.split("-") if p)
+            return (-len(src_tok & hit), nid.count("-"), len(nid))
+
+        fuzzy.sort(key=_score)
+        return fuzzy[0]
+    return ""
 
 
 def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
@@ -338,8 +407,16 @@ def build_fal_input(payload: dict) -> dict:
         inp[ar_field] = payload["aspectRatio"]
     elif payload.get("aspectRatio") and "kontext" in eid:
         inp["aspect_ratio"] = payload["aspectRatio"]
-    if payload.get("width") and payload.get("height") and spec.get("optional") and "image_size" in (spec.get("optional") or []):
-        inp["image_size"] = {"width": int(payload["width"]), "height": int(payload["height"])}
+    size_keys = set(req_opt) | set(fields)
+    if payload.get("width") and payload.get("height") and (
+        not size_keys or "image_size" in size_keys or spec.get("category") != "video"
+    ):
+        try:
+            inp["image_size"] = {"width": int(payload["width"]), "height": int(payload["height"])}
+        except (TypeError, ValueError):
+            pass
+    if payload.get("scheduler") and (not req_opt or "scheduler" in req_opt):
+        inp["scheduler"] = payload["scheduler"]
     apply_fal_loras(inp, payload, spec, eid)
     return {k: v for k, v in inp.items() if v not in (None, "", [])}
 
@@ -355,6 +432,22 @@ def queue_app(endpoint_id: str) -> str:
     if len(parts) >= 2:
         return "/".join(parts[:2])
     return "/".join(parts)
+
+
+def queue_bases(endpoint_id: str) -> list[str]:
+    parts = [p for p in (endpoint_id or "").strip("/").split("/") if p]
+    out = []
+    if len(parts) >= 2:
+        out.append("/".join(parts[:2]))
+    if len(parts) >= 3:
+        out.append("/".join(parts[:3]))
+    if parts:
+        out.append("/".join(parts))
+    seen = []
+    for x in out:
+        if x and x not in seen:
+            seen.append(x)
+    return seen
 
 
 def _remember_job(rid: str, meta: dict):
@@ -388,38 +481,51 @@ def status_urls(eid: str, rid: str, meta=None):
     out = []
     if meta and meta.get("status_url"):
         out.append(_with_logs(meta["status_url"]))
-    app = queue_app(eid)
-    for base in (app, eid):
-        if base:
-            out.append(f"{QUEUE}/{base}/requests/{rid}/status?logs=1")
+    for base in queue_bases(eid):
+        out.append(f"{QUEUE}/{base}/requests/{rid}/status?logs=1")
     return _unique(out)
 
 
 def result_urls(eid: str, rid: str, meta=None, status_data=None):
     out = []
     for src in (status_data, meta):
-        if src and src.get("response_url"):
-            out.append(str(src["response_url"]).rstrip("/"))
-    app = queue_app(eid)
-    for base in (app, eid):
-        if base:
-            out.append(f"{QUEUE}/{base}/requests/{rid}")
+        if not src:
+            continue
+        for key in ("response_url", "result_url"):
+            if src.get(key):
+                u = str(src[key]).rstrip("/")
+                out.append(u)
+                if not u.endswith("/response"):
+                    out.append(u + "/response")
+    for base in queue_bases(eid):
+        out.append(f"{QUEUE}/{base}/requests/{rid}")
+        out.append(f"{QUEUE}/{base}/requests/{rid}/response")
     return _unique(out)
 
 
-def _try_get(urls):
+def cancel_urls(eid: str, rid: str, meta=None):
+    out = []
+    if meta and meta.get("cancel_url"):
+        out.append(str(meta["cancel_url"]).rstrip("/"))
+    for base in queue_bases(eid):
+        out.append(f"{QUEUE}/{base}/requests/{rid}/cancel")
+    return _unique(out)
+
+
+def _try_get(urls, need_media=False):
     last_code, last_data = 502, {"error": "Fal 状态请求失败"}
     for url in urls:
         code, data = fal_call(url)
         last_code, last_data = code, data
         if code == 200 and isinstance(data, dict) and data.get("raw") != "":
-            # 405/empty still 200? no. 405 is not 200.
             if data.get("error") and not (data.get("status") or data.get("images") or data.get("image") or data.get("request_id")):
+                continue
+            if need_media and not collect_urls(data):
                 continue
             return code, data
         if code in (404, 405, 422):
             continue
-        if isinstance(data, dict) and data.get("status"):
+        if isinstance(data, dict) and data.get("status") and not need_media:
             return code, data
     return last_code, last_data
 
@@ -430,6 +536,13 @@ def submit(payload: dict):
         return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Fal。请在 Fal 目录里选一个模型（例如 fal-ai/flux/schnell）。"}
     if not eid:
         return 400, {"error": "缺少 Fal 模型 id"}
+    if payload.get("loras") and not fal_supports_lora({"id": eid}):
+        sib = fal_lora_sibling(eid)
+        if sib:
+            eid = sib
+            payload = dict(payload)
+            payload["serviceId"] = eid
+            payload["endpoint"] = eid
     inp = build_fal_input(payload)
     code, data = fal_call(f"{QUEUE}/{eid}", method="POST", body=inp)
     if isinstance(data, dict):
@@ -444,6 +557,7 @@ def submit(payload: dict):
                 "endpoint": eid,
                 "status_url": data.get("status_url"),
                 "response_url": data.get("response_url"),
+                "cancel_url": data.get("cancel_url"),
                 "submittedInput": inp,
                 "prompt": payload.get("prompt"),
             })
@@ -455,6 +569,9 @@ def submit(payload: dict):
                 "negativePrompt": payload.get("negativePrompt"),
                 "seed": payload.get("seed"),
                 "jobId": jid,
+                "cancel_url": data.get("cancel_url"),
+                "status_url": data.get("status_url"),
+                "response_url": data.get("response_url"),
             })
         # Some endpoints return the image on the queue POST itself.
         urls = collect_urls(data)
@@ -608,7 +725,9 @@ def job_status(job_id: str):
     if len(parts) != 3:
         return 400, {"error": "无效 Fal 任务 id"}
     _, eid, rid = parts
-    meta = _FAL_JOBS.get(rid) or {}
+    stored = job_meta(job_id) or {}
+    meta = dict(stored)
+    meta.update(_FAL_JOBS.get(rid) or {})
     code, data = _try_get(status_urls(eid, rid, meta))
     if not isinstance(data, dict):
         return 502, {"error": "Fal 状态响应无效", "id": job_id, "backend": "fal", "status": "failed"}
@@ -669,7 +788,7 @@ def job_status(job_id: str):
         "log": last,
     }
     if data["status"] == "succeeded":
-        rc, result = _try_get(result_urls(eid, rid, meta, data))
+        rc, result = _try_get(result_urls(eid, rid, meta, data), need_media=True)
         if rc in (404, 405) or not (rc == 200 and isinstance(result, dict) and collect_urls(result)):
             pc, plat = platform_payloads(eid, rid)
             if pc == 200 and isinstance(plat, dict):
@@ -678,16 +797,18 @@ def job_status(job_id: str):
                 if isinstance(item, dict) and (item.get("json_output") or item.get("output")):
                     result = item.get("json_output") or item.get("output")
                     rc = 200
-        if rc == 200 and isinstance(result, dict):
+        if rc == 200 and isinstance(result, dict) and collect_urls(result):
             data["result"] = {k: result[k] for k in result if k != "raw"}
             try:
                 data["saved"] = _save_fal(result, job_id)
             except Exception as e:
                 data["saveError"] = str(e)
-            if not data.get("saved"):
-                data.setdefault("saveError", data.get("saveError") or "Fal 完成但没有媒体 URL")
-        else:
-            data["saveError"] = (result or {}).get("error") if isinstance(result, dict) else f"Fal 结果 HTTP {rc}"
+        if not data.get("saved"):
+            # COMPLETED on the queue is not "got the file". Keep polling.
+            data["status"] = "processing"
+            data["wait"] = data.get("wait") or {}
+            data["wait"]["log"] = data.get("saveError") or "Fal 已完成，正在取媒体 URL"
+            data.pop("saveError", None)
     # Always 200 so the browser poll does not throw on provider 405 leftovers.
     return 200, data
 
@@ -743,6 +864,18 @@ def row_from_fal_api(it):
         "imageFields": fields,
         "promptField": "prompt",
     })
+
+
+def search_loras(q: str, limit: int = 8):
+    """Fal LoRA `path` is a download URL or HF owner/repo. Search HF Hub filter=lora."""
+    from . import huggingface as hf
+    code, payload = hf.search_loras(q, limit=limit)
+    items = []
+    for it in payload.get("items") or []:
+        row = dict(it)
+        row["source"] = "fal"
+        items.append(row)
+    return code, {"items": items, "backend": "fal"}
 
 
 def search_fal(q):
@@ -821,6 +954,9 @@ class FalProvider(Provider):
         pid, _ = parse_job_id(job_id)
         return pid == self.id or (job_id or "").startswith("fal|")
 
+    def search_loras(self, q: str, nsfw: bool = True):
+        return search_loras(q)
+
     def generate(self, payload: dict):
         return submit(payload)
 
@@ -833,6 +969,40 @@ class FalProvider(Provider):
 
     def job_status(self, job_id: str):
         return job_status(job_id)
+
+    def cancel_job(self, job_id: str):
+        parts = (job_id or "").split("|", 2)
+        if len(parts) != 3:
+            return 400, {"error": "无效 Fal 任务 id"}
+        _, eid, rid = parts
+        stored = job_meta(job_id) or {}
+        meta = dict(stored)
+        meta.update(_FAL_JOBS.get(rid) or {})
+        last_code, last_data = 400, {"error": "Fal 取消失败"}
+        for url in cancel_urls(eid, rid, meta):
+            code, data = fal_call(url, method="PUT")
+            last_code, last_data = code, data if isinstance(data, dict) else {"error": str(data)}
+            if code in (200, 202):
+                st = ""
+                if isinstance(data, dict):
+                    st = str(data.get("status") or "")
+                return 200, {
+                    "id": job_id,
+                    "backend": "fal",
+                    "status": "canceled" if st.upper() in ("CANCELLATION_REQUESTED", "CANCELLED", "CANCELED") else "canceled",
+                    "vendorStatus": st or "CANCELLATION_REQUESTED",
+                }
+            if code == 400:
+                msg = ""
+                if isinstance(data, dict):
+                    msg = str(data.get("status") or data.get("error") or "")
+                if "ALREADY_COMPLETED" in msg.upper() or "already" in msg.lower():
+                    return 400, {"error": "Fal 任务已经开始或完成，取消不了", "vendorStatus": msg}
+            if code in (404, 405):
+                continue
+        if isinstance(last_data, dict):
+            last_data.setdefault("error", last_data.get("message") or f"Fal 取消 HTTP {last_code}")
+        return last_code if last_code >= 400 else 400, last_data if isinstance(last_data, dict) else {"error": str(last_data)}
 
 
 from . import register  # noqa: E402

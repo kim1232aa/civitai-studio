@@ -156,6 +156,101 @@ def parse_png_text(data: bytes) -> dict[str, str]:
     return out
 
 
+SAMPLER_CANON = {
+    "er_sde": "er_sde",
+    "ersde": "er_sde",
+    "euler": "euler",
+    "eulera": "euler_ancestral",
+    "euler_a": "euler_ancestral",
+    "eulerancestral": "euler_ancestral",
+    "euler_ancestral": "euler_ancestral",
+    "heun": "heun",
+    "dpm_2": "dpm_2",
+    "dpm2": "dpm_2",
+    "dpmpp_2m": "dpmpp_2m",
+    "dpm++2m": "dpmpp_2m",
+    "dpmpp2m": "dpmpp_2m",
+    "dpmpp_sde": "dpmpp_sde",
+    "dpm++sde": "dpmpp_sde",
+    "dpmpp_2m_sde": "dpmpp_2m_sde",
+    "lcm": "lcm",
+    "ddim": "ddim",
+    "uni_pc": "uni_pc",
+    "unipc": "uni_pc",
+}
+
+SCHEDULER_CANON = {
+    "sgm_uniform": "sgm_uniform",
+    "sgmuniform": "sgm_uniform",
+    "simple": "simple",
+    "normal": "normal",
+    "karras": "karras",
+    "exponential": "exponential",
+    "ddim_uniform": "ddim_uniform",
+    "ddimuniform": "ddim_uniform",
+    "beta": "beta",
+}
+
+
+def _fold_name(name: str) -> str:
+    s = (name or "").strip().lower()
+    s = s.replace("++", "pp")
+    s = re.sub(r"[\s\-]+", "_", s)
+    s = re.sub(r"[^a-z0-9_]+", "", s)
+    return s
+
+
+def normalize_sampler(name: str, allowed: list | tuple | None = None) -> str:
+    raw = (name or "").strip()
+    if not raw:
+        return ""
+    folded = _fold_name(raw)
+    canon = SAMPLER_CANON.get(folded, folded)
+    if allowed:
+        allow = {str(x) for x in allowed}
+        if canon in allow:
+            return canon
+        if raw in allow:
+            return raw
+        if folded in allow:
+            return folded
+        return ""
+    return canon
+
+
+def normalize_scheduler(name: str, allowed: list | tuple | None = None) -> str:
+    raw = (name or "").strip()
+    if not raw:
+        return ""
+    folded = _fold_name(raw)
+    canon = SCHEDULER_CANON.get(folded, folded)
+    if allowed:
+        allow = {str(x) for x in allowed}
+        if canon in allow:
+            return canon
+        if raw in allow:
+            return raw
+        if folded in allow:
+            return folded
+        return ""
+    return canon
+
+
+def split_sampler_scheduler(sampler: str, scheduler: str = "") -> tuple[str, str]:
+    samp = (sampler or "").strip()
+    sched = (scheduler or "").strip()
+    folded = _fold_name(samp)
+    if folded.endswith("_simple"):
+        return samp[: -len("_simple")].strip("_") or "er_sde", "simple"
+    for tail in ("sgm_uniform", "karras", "exponential", "ddim_uniform", "normal", "beta", "simple"):
+        token = "_" + tail
+        if folded.endswith(tail) and folded != tail:
+            head = folded[: -len(tail)].strip("_")
+            if head:
+                return head, tail
+    return samp, sched
+
+
 def parse_a1111(text: str) -> dict:
     text = (text or "").strip()
     if not text:
@@ -208,15 +303,47 @@ def parse_a1111(text: str) -> dict:
     seed = grab(r"seed:\s*(-?\d+)", int)
     if seed is not None:
         out["seed"] = seed
-    size = grab(r"size:\s*(\d+)\s*x\s*(\d+)" if False else r"size:\s*(\d+x\d+)")
     m = re.search(r"size:\s*(\d+)\s*[x×]\s*(\d+)", blob, re.I)
     if m:
         out["width"] = int(m.group(1))
         out["height"] = int(m.group(2))
     sampler = grab(r"sampler:\s*([^,]+)")
+    scheduler = grab(r"schedule(?:r)?:\s*([^,]+)")
     if sampler:
-        out["sampler"] = sampler
+        sampler, sched_from_samp = split_sampler_scheduler(sampler, scheduler or "")
+        out["sampler"] = normalize_sampler(sampler) or sampler
+        scheduler = scheduler or sched_from_samp
+    if scheduler:
+        out["scheduler"] = normalize_scheduler(scheduler) or scheduler
+    denoise = grab(r"denoising strength:\s*([0-9.]+)", float) or grab(r"denoise:\s*([0-9.]+)", float)
+    if denoise is not None:
+        out["denoise"] = denoise
+    model = grab(r"model:\s*([^,]+)")
+    if model:
+        out["checkpointName"] = model
+        out["Model"] = model
     return {k: v for k, v in out.items() if v not in (None, "")}
+
+
+def _comfy_lookup(by_id: dict, val, prefer_keys=()):
+    """Resolve Comfy link ["nodeId", port] to a scalar when possible."""
+    if not (isinstance(val, list) and val):
+        return val
+    nid = str(val[0])
+    node = by_id.get(nid)
+    if not isinstance(node, dict):
+        return None
+    inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+    widgets = node.get("widgets_values") or []
+    for key in prefer_keys:
+        if key in inputs and not isinstance(inputs.get(key), list):
+            return inputs.get(key)
+    for key in ("seed", "text", "value", "int", "float"):
+        if key in inputs and not isinstance(inputs.get(key), list):
+            return inputs.get(key)
+    if widgets:
+        return widgets[0]
+    return None
 
 
 def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
@@ -228,24 +355,36 @@ def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
         return {}
     nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else None
     items = []
+    by_id = {}
     if nodes:
         items = nodes
+        for node in nodes:
+            if isinstance(node, dict) and node.get("id") is not None:
+                by_id[str(node.get("id"))] = node
     else:
         for nid, node in graph.items():
             if isinstance(node, dict) and (node.get("class_type") or node.get("type")):
                 node = dict(node)
                 node["_id"] = nid
                 items.append(node)
+                by_id[str(nid)] = node
     prompt = ""
     negative = ""
     out = {}
+    models = []
+    vaes = []
+    extras = []
+    node_types = []
     for node in items:
         ctype = str(node.get("class_type") or node.get("type") or "")
+        node_types.append(ctype)
         inputs = node.get("inputs") or {}
         widgets = node.get("widgets_values") or []
         title = str(node.get("title") or node.get("meta", {}).get("title") if isinstance(node.get("meta"), dict) else "")
         if "CLIPTextEncode" in ctype or ctype in ("CLIP Text Encode (Prompt)",):
             text = inputs.get("text") if isinstance(inputs, dict) else None
+            if isinstance(text, list):
+                text = _comfy_lookup(by_id, text, ("text",))
             if not text and widgets:
                 text = widgets[0]
             if isinstance(text, list):
@@ -258,26 +397,57 @@ def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
                 prompt = text
             elif "negative" in blob:
                 negative = text
-        if "KSampler" in ctype:
-            for key, dest, cast in (
-                ("steps", "steps", int),
-                ("cfg", "cfgScale", float),
-                ("seed", "seed", int),
-                ("sampler_name", "sampler", str),
-                ("scheduler", "scheduler", str),
-            ):
+        if "KSampler" in ctype or ctype in ("SamplerCustom", "SamplerCustomAdvanced", "KSamplerAdvanced"):
+            def take(key, dest, cast):
                 val = inputs.get(key) if isinstance(inputs, dict) else None
+                if isinstance(val, list):
+                    val = _comfy_lookup(by_id, val, (key, "seed", "value"))
                 if val in (None, "") and key == "steps" and len(widgets) > 2:
-                    val = widgets[2] if len(widgets) > 2 else None
+                    val = widgets[2]
                 if val in (None, ""):
-                    continue
+                    return
                 try:
                     out[dest] = cast(val)
                 except (TypeError, ValueError):
+                    if dest in ("sampler", "scheduler") and val:
+                        out[dest] = str(val)
+            take("steps", "steps", int)
+            take("cfg", "cfgScale", float)
+            take("seed", "seed", int)
+            take("noise_seed", "seed", int)
+            take("sampler_name", "sampler", str)
+            take("scheduler", "scheduler", str)
+            take("denoise", "denoise", float)
+        if ctype in ("SeedNode", "Seed", "PrimitiveInt", "ImpactInt"):
+            seed_val = inputs.get("seed") if isinstance(inputs, dict) else None
+            if seed_val in (None, "") and widgets:
+                seed_val = widgets[0]
+            if seed_val not in (None, "") and "seed" not in out:
+                try:
+                    out["seed"] = int(seed_val)
+                except (TypeError, ValueError):
                     pass
+        if ctype in ("UNETLoader", "CheckpointLoaderSimple", "CheckpointLoader", "unCLIPCheckpointLoader"):
+            fname = None
+            if isinstance(inputs, dict):
+                fname = inputs.get("unet_name") or inputs.get("ckpt_name") or inputs.get("ckptName")
+            if not fname and widgets:
+                fname = widgets[0]
+            if fname and not isinstance(fname, list):
+                models.append(str(fname))
+        if ctype in ("VAELoader",):
+            fname = inputs.get("vae_name") if isinstance(inputs, dict) else None
+            if not fname and widgets:
+                fname = widgets[0]
+            if fname and not isinstance(fname, list):
+                vaes.append(str(fname))
         if "EmptyLatentImage" in ctype:
             w = inputs.get("width") if isinstance(inputs, dict) else None
             h = inputs.get("height") if isinstance(inputs, dict) else None
+            if isinstance(w, list):
+                w = _comfy_lookup(by_id, w, ("width",))
+            if isinstance(h, list):
+                h = _comfy_lookup(by_id, h, ("height",))
             if w is None and len(widgets) >= 2:
                 w, h = widgets[0], widgets[1]
             try:
@@ -287,10 +457,32 @@ def parse_comfy(prompt_json: str, workflow_json: str | None = None) -> dict:
                     out["height"] = int(h)
             except (TypeError, ValueError):
                 pass
+        extra_types = ("SeedVR2", "Upscale", "ControlNet", "IPAdapter", "InstantID", "PuLID")
+        if any(tok.lower() in ctype.lower() for tok in extra_types):
+            extras.append(ctype)
     if prompt:
         out["prompt"] = prompt
     if negative:
         out["negativePrompt"] = negative
+    if out.get("sampler"):
+        samp, sched = split_sampler_scheduler(str(out["sampler"]), str(out.get("scheduler") or ""))
+        out["sampler"] = normalize_sampler(samp) or samp
+        if sched and not out.get("scheduler"):
+            out["scheduler"] = sched
+    if out.get("scheduler"):
+        out["scheduler"] = normalize_scheduler(str(out["scheduler"])) or out["scheduler"]
+    if models:
+        out["models"] = models
+        stem = Path(models[0]).stem
+        out["checkpointName"] = stem
+        out["Model"] = stem
+    if vaes:
+        out["vaes"] = vaes
+    if extras:
+        out["unmatchedNodes"] = sorted(set(extras))
+    if node_types:
+        out["comfyNodeCount"] = len(node_types)
+        out["engine"] = "ComfyUI"
     return out
 
 
@@ -317,8 +509,10 @@ def parse_media_bytes(data: bytes, filename: str = "") -> dict:
     if "prompt" in texts:
         parsed = parse_comfy(texts["prompt"], texts.get("workflow"))
         parsed["source"] = "png-comfy"
-        parsed["empty"] = not bool(parsed.get("prompt") or parsed.get("steps"))
+        parsed["empty"] = not bool(parsed.get("prompt") or parsed.get("steps") or parsed.get("checkpointName"))
         parsed["fileName"] = filename or ""
+        if texts.get("workflow"):
+            parsed["hasComfyWorkflow"] = True
         if parsed["empty"]:
             parsed["error"] = "PNG 里有 Comfy prompt 块，但没解析出提示词/步数。"
         return parsed

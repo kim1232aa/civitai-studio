@@ -20,7 +20,9 @@ HUB = "https://huggingface.co/api/models"
 LEGACY = f"{ROUTER}/hf-inference/models"
 
 # Prefer Fal for FLUX schnell (hf-inference is 410). nscale is also live.
-_PREF = ("fal-ai", "nscale", "wavespeed", "replicate", "together", "hf-inference")
+# replicate rejects POST /v1/images/generations ("Not allowed to POST … provider replicate").
+_PREF = ("fal-ai", "nscale", "wavespeed", "together", "hf-inference")
+_SKIP_OPENAI = {"replicate"}
 _MAP_CACHE = {"at": 0.0, "items": {}}
 _MAP_TTL = 300
 
@@ -114,7 +116,7 @@ def _provider_candidates(mapping: dict, mid: str, spec: dict) -> list:
             ("nscale", mid, "openai"),
             ("hf-inference", mid, "bytes"),
         ]
-    return ordered
+    return [(n, p, s) for n, p, s in ordered if not (s == "openai" and n in _SKIP_OPENAI)]
 
 
 def _auth_headers(key: str, extra=None):
@@ -153,6 +155,9 @@ def _prompt_body(payload: dict) -> dict:
             params["seed"] = int(payload["seed"])
         except (TypeError, ValueError):
             pass
+    sched = (payload.get("scheduler") or "").strip()
+    if sched:
+        params["scheduler"] = sched
     return params
 
 
@@ -210,6 +215,8 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         body["guidance_scale"] = params["guidance_scale"]
     if params.get("width") and params.get("height"):
         body["image_size"] = {"width": params["width"], "height": params["height"]}
+    if params.get("scheduler"):
+        body["scheduler"] = params["scheduler"]
     blob = (pid + " " + str((payload or {}).get("task") or "")).lower()
     wants_img = any(x in blob for x in ("image-to-image", "kontext", "/edit", "i2i"))
     img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
@@ -221,6 +228,12 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
             body["image_url"] = extra[0]
         else:
             body["image_urls"] = extra[:9]
+    # HF fal-ai provider is Fal underneath — use Fal catalog, not a preset list.
+    try:
+        from . import fal as fal_mod
+        fal_mod.apply_fal_loras(body, payload, fal_mod.find_model(pid) or {"id": pid}, pid)
+    except Exception:
+        pass
     headers = _auth_headers(key)
     code, data = json_call(url, method="POST", headers=headers, body=body, timeout=timeout)
     return code, data if isinstance(data, dict) else {"error": str(data)}, body
@@ -324,12 +337,56 @@ def search_hf(q, pins=None):
     return items
 
 
+def search_loras(q: str, limit: int = 8):
+    """Official Hub list: GET /api/models?search=&filter=lora."""
+    q = (q or "").strip()
+    items = []
+    seen = set()
+    if q.count("/") == 1 and " " not in q:
+        code, data = json_call(f"{HUB}/{quote(q, safe='/')}", headers=_hf_headers(), timeout=20)
+        if code == 200 and isinstance(data, dict):
+            mid = data.get("id") or q
+            items.append({
+                "id": mid,
+                "name": mid,
+                "path": mid,
+                "type": "LORA",
+                "source": "huggingface",
+                "versions": [{"id": mid, "name": data.get("pipeline_tag") or "lora"}],
+            })
+            seen.add(mid)
+    url = f"{HUB}?search={quote(q)}&filter=lora&limit={int(limit)}"
+    code, data = json_call(url, headers=_hf_headers(), timeout=25)
+    models = data if isinstance(data, list) else []
+    for it in models:
+        if not isinstance(it, dict):
+            continue
+        mid = (it.get("id") or "").strip()
+        if not mid or mid in seen:
+            continue
+        seen.add(mid)
+        items.append({
+            "id": mid,
+            "name": mid,
+            "path": mid,
+            "type": "LORA",
+            "source": "huggingface",
+            "versions": [{"id": mid, "name": it.get("pipeline_tag") or "lora"}],
+        })
+        if len(items) >= limit:
+            break
+    return 200, {"items": items, "backend": "huggingface"}
+
+
 class HuggingFaceProvider(Provider):
     id = "huggingface"
     label = "Hugging Face"
 
     def has_key(self) -> bool:
         return bool(hf_key())
+
+    def search_loras(self, q: str, nsfw: bool = True):
+        return search_loras(q)
 
     def categories(self) -> list:
         return sorted({x.get("category") for x in load_items() if x.get("category")})
@@ -390,6 +447,8 @@ class HuggingFaceProvider(Provider):
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
         for provider, pid, style in candidates:
+            if style == "openai" and provider in _SKIP_OPENAI:
+                continue
             jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
             submitted = {"model": mid, "provider": provider}
             saved = []
@@ -434,10 +493,11 @@ class HuggingFaceProvider(Provider):
                 else:
                     code, data, submitted = _call_openai(provider, pid, payload or {}, key, timeout)
                     meta["submittedInput"] = submitted
-                    if code >= 400:
+                    err_txt = extract_error(data, f"HTTP {code}") if isinstance(data, dict) else str(data)
+                    if code >= 400 or (isinstance(err_txt, str) and "Not allowed to POST" in err_txt):
                         if isinstance(data, dict):
-                            data.setdefault("error", extract_error(data, f"HTTP {code}"))
-                        last = (code, data)
+                            data.setdefault("error", err_txt)
+                        last = (code if code >= 400 else 400, data if isinstance(data, dict) else {"error": err_txt})
                         continue
                     saved = _save_json_images(data, jid, meta=meta)
             except Exception as e:

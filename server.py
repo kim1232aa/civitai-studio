@@ -426,6 +426,11 @@ def build_workflow(payload: dict) -> dict:
         inp["sampler"] = payload["sampler"]
     if payload.get("scheduler"):
         inp["scheduler"] = payload["scheduler"]
+    if payload.get("denoise") not in (None, ""):
+        try:
+            inp["denoise"] = float(payload["denoise"])
+        except (TypeError, ValueError):
+            pass
     if payload.get("resolution"):
         inp["resolution"] = payload["resolution"]
     if payload.get("aspectRatio"):
@@ -449,7 +454,8 @@ def build_workflow(payload: dict) -> dict:
     if cap:
         allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
                    "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
-                   "steps", "width", "height", "cfgScale", "quantity", "duration"}
+                   "steps", "width", "height", "cfgScale", "quantity", "duration",
+                   "sampler", "scheduler", "denoise"}
         for lst in (cap.get("required"), cap.get("optional"), cap.get("frameFields"), list((cap.get("constraints") or {}).keys()), list((cap.get("extraFlags") or {}).keys())):
             if lst:
                 allowed.update(lst)
@@ -516,6 +522,32 @@ def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoin
         side = io_meta.read_sidecar(filename) if filename else None
         if not side and q:
             side = io_meta.read_sidecar(q)
+        if parsed and not parsed.get("empty"):
+            try:
+                from providers import civitai as civitai_mod
+                parsed = civitai_mod.enrich_local_parse(parsed)
+                samp, sched = civitai_mod._normalize_pair(parsed.get("sampler"), parsed.get("scheduler"))
+                parsed["sampler"] = samp
+                parsed["scheduler"] = sched
+                if parsed.get("diffusionModel") or parsed.get("checkpointName"):
+                    eco = civitai_mod._ecosystem_from_blob(parsed.get("diffusionModel"), parsed.get("checkpointName"), parsed.get("engine"))
+                    engine, operation, model = "comfy", "createImage", "turbo"
+                    ecosystem = eco or "krea2"
+                    if ecosystem == "zImage":
+                        engine, ecosystem = "sdcpp", "zImage"
+                    elif ecosystem == "qwen":
+                        engine, ecosystem = "sdcpp", "qwen"
+                    svc = civitai_mod.match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category="image")
+                    parsed.setdefault("kind", "image")
+                    parsed.setdefault("engine", engine)
+                    parsed.setdefault("operation", operation)
+                    parsed.setdefault("ecosystem", ecosystem)
+                    parsed.setdefault("model", model)
+                    if svc:
+                        parsed.setdefault("serviceId", svc.get("id"))
+                        parsed.setdefault("serviceName", svc.get("name"))
+            except Exception:
+                pass
         if side:
             merged = io_meta.sidecar_to_import(side)
             for k, v in parsed.items():
@@ -556,10 +588,11 @@ def handle_import(backend="civitai", q="", file_bytes=None, filename="", endpoin
 
 
 def submit(body, whatif=False):
+    allow = True if not isinstance(body, dict) else bool(body.get("allowMatureContent", True))
     q = urllib.parse.urlencode({
         "whatif": "true" if whatif else "false",
         "wait": "0",
-        "hideMatureContent": "false",
+        "hideMatureContent": "false" if allow else "true",
     })
     return civitai(f"{ORCH}/v2/consumer/workflows?{q}", method="POST", body=body)
 
@@ -662,6 +695,16 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(n).decode())
 
+    def _cancel_job(self, path):
+        rest = urllib.parse.unquote(path.split("/api/jobs/", 1)[1])
+        job_id = rest[:-7] if rest.endswith("/cancel") else rest
+        job_id = job_id.strip("/")
+        if not job_id:
+            return self._json(400, {"error": "缺少任务 id"})
+        prov = providers.resolve_from_job(job_id)
+        code, data = prov.cancel_job(job_id)
+        return self._json(code, data)
+
     def do_GET(self):
         try:
             return self._handle_get()
@@ -691,7 +734,9 @@ class Handler(BaseHTTPRequestHandler):
             civ = providers.get("civitai")
             q = (qs.get("q") or [""])[0]
             user = (qs.get("username") or [""])[0]
-            code, data = civ.list_workflows(q=q, username=user)
+            nsfw_raw = (qs.get("nsfw") or ["true"])[0]
+            nsfw = str(nsfw_raw).lower() in ("1", "true", "yes")
+            code, data = civ.list_workflows(q=q, username=user, nsfw=nsfw)
             return self._json(code, data)
         if path == "/api/workflows/air":
             civ = providers.get("civitai")
@@ -826,14 +871,27 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/search":
             q = (qs.get("q") or [""])[0]
             types = (qs.get("type") or ["LORA"])[0]
-            url = f"{SITE}/models?limit=8&query={urllib.parse.quote(q)}&types={urllib.parse.quote(types)}"
+            nsfw_raw = (qs.get("nsfw") or ["true"])[0]
+            nsfw = str(nsfw_raw).lower() in ("1", "true", "yes")
+            backend = _alias_backend((qs.get("backend") or ["civitai"])[0])
+            prov = providers.get(backend) or providers.get("civitai")
+            if backend != "civitai" and hasattr(prov, "search_loras"):
+                code, data = prov.search_loras(q, nsfw=nsfw)
+                if isinstance(data, dict):
+                    data.setdefault("backend", backend)
+                    data.setdefault("nsfw", nsfw)
+                return self._json(code, data if isinstance(data, dict) else {"items": []})
+            url = (
+                f"{SITE}/models?limit=8&query={urllib.parse.quote(q)}"
+                f"&types={urllib.parse.quote(types)}&nsfw={'true' if nsfw else 'false'}"
+            )
             code, data = civitai(url)
             items = []
             if isinstance(data, dict):
                 for it in (data.get("items") or [])[:8]:
                     vers = [{"id": v.get("id"), "name": v.get("name"), "baseModel": v.get("baseModel")} for v in (it.get("modelVersions") or [])[:6]]
-                    items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "versions": vers})
-            return self._json(code, {"items": items})
+                    items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "source": "civitai", "nsfw": it.get("nsfw"), "versions": vers})
+            return self._json(code, {"items": items, "nsfw": nsfw, "backend": "civitai"})
         if path.startswith("/out/"):
             name = Path(path.split("/out/", 1)[1]).name
             fp = OUT / name
@@ -899,7 +957,22 @@ class Handler(BaseHTTPRequestHandler):
             body = payload.get("input") or payload
             code, data = civitai(f"{ORCH}/v2/consumer/recipes/{recipe}?{q}", method="POST", body=body)
             return self._json(code, data)
+        if path.startswith("/api/jobs/") and path.rstrip("/").endswith("/cancel"):
+            return self._cancel_job(path)
         self._json(404, {"error": "not found"})
+
+    def do_DELETE(self):
+        try:
+            path = urllib.parse.urlparse(self.path).path
+            if path.startswith("/api/jobs/") and path.rstrip("/").endswith("/cancel"):
+                return self._cancel_job(path)
+            return self._json(404, {"error": "not found"})
+        except Exception as e:
+            print("[web] DELETE", e, flush=True)
+            try:
+                return self._json(500, {"error": "服务器出错"})
+            except Exception:
+                return
 
 
 def main():

@@ -130,21 +130,41 @@ def parse_job_id(job_id: str) -> tuple[str, str]:
     return "civitai", s
 
 
+def _looks_media(u: str) -> bool:
+    s = (u or "").strip()
+    if s.startswith("data:image") or s.startswith("data:video"):
+        return True
+    if not s.startswith("http"):
+        return False
+    low = s.lower()
+    if "queue.fal.run" in low or ("/requests/" in low and "fal.run" in low):
+        return False
+    if any(x in low for x in (
+        ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm",
+        "fal.media", "v3.fal.media", "v3b.fal.media", "/files/",
+    )):
+        return True
+    return False
+
+
 def collect_urls(obj) -> list[str]:
     """Pull http(s) URLs out of typical image/video result blobs."""
     urls = []
 
     def add(val):
-        if isinstance(val, str) and (val.startswith("http") or val.startswith("data:image") or val.startswith("data:video")):
+        if isinstance(val, str) and _looks_media(val):
             urls.append(val)
         elif isinstance(val, dict):
             if val.get("available") is False:
                 return
-            for k in ("url", "image_url", "video_url", "audio_url"):
+            for k in (
+                "url", "image_url", "video_url", "audio_url", "file_url",
+                "signed_url", "imageUrl", "videoUrl", "fileUrl",
+            ):
                 u = val.get(k)
-                if isinstance(u, str) and (u.startswith("http") or u.startswith("data:")):
+                if isinstance(u, str) and _looks_media(u):
                     urls.append(u)
-            for nested in ("images", "image", "videos", "video"):
+            for nested in ("images", "image", "videos", "video", "urls", "files", "output"):
                 if nested in val and nested != "url":
                     add(val.get(nested))
         elif isinstance(val, list):
@@ -155,14 +175,14 @@ def collect_urls(obj) -> list[str]:
         for key in (
             "images", "image", "videos", "video", "blobs", "audio", "audios",
             "image_url", "video_url", "audio_url", "output", "output_images",
-            "result", "json_output", "data",
+            "result", "json_output", "data", "urls", "files", "payload",
+            "response",
         ):
             if key in obj:
                 add(obj.get(key))
         add(obj)
     elif isinstance(obj, list):
         add(obj)
-    # unique, preserve order
     seen = []
     for u in urls:
         if u not in seen:

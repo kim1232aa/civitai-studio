@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
@@ -396,6 +397,11 @@ def build_workflow(payload: dict) -> dict:
         inp["sampler"] = payload["sampler"]
     if payload.get("scheduler"):
         inp["scheduler"] = payload["scheduler"]
+    if payload.get("denoise") not in (None, ""):
+        try:
+            inp["denoise"] = float(payload["denoise"])
+        except (TypeError, ValueError):
+            pass
     if payload.get("resolution"):
         inp["resolution"] = payload["resolution"]
     if payload.get("aspectRatio"):
@@ -419,7 +425,8 @@ def build_workflow(payload: dict) -> dict:
     if cap:
         allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
                    "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
-                   "steps", "width", "height", "cfgScale", "quantity", "duration"}
+                   "steps", "width", "height", "cfgScale", "quantity", "duration",
+                   "sampler", "scheduler", "denoise"}
         for lst in (cap.get("required"), cap.get("optional"), cap.get("frameFields"), list((cap.get("constraints") or {}).keys()), list((cap.get("extraFlags") or {}).keys())):
             if lst:
                 allowed.update(lst)
@@ -444,6 +451,181 @@ def parse_image_id(raw: str) -> int:
     raise ValueError("请填图片数字 ID 或完整网址")
 
 
+def _ecosystem_from_blob(*parts) -> str:
+    blob = " ".join(str(p or "") for p in parts).lower()
+    if "krea" in blob:
+        return "krea2"
+    if "zimage" in blob or "z-image" in blob or "z_image" in blob:
+        return "zImage"
+    if "qwen" in blob:
+        return "qwen"
+    if "flux" in blob:
+        return "flux"
+    if "wan" in blob:
+        return "wan"
+    if "sdxl" in blob or "pony" in blob or "illustrious" in blob:
+        return "sdxl"
+    return ""
+
+
+def _air_from_ids(model_id, version_id, typ="", base="", name=""):
+    try:
+        mid = int(model_id)
+        vid = int(version_id)
+    except (TypeError, ValueError):
+        return ""
+    eco = _ecosystem_from_blob(base, name, typ) or "krea2"
+    kind = "lora" if _is_lora_resource(typ, "", name or "") else "diffusionmodel"
+    return f"urn:air:{eco}:{kind}:civitai:{mid}@{vid}"
+
+
+def _normalize_pair(sampler, scheduler):
+    from . import io_meta
+    samp, sched = io_meta.split_sampler_scheduler(str(sampler or ""), str(scheduler or ""))
+    samp_n = io_meta.normalize_sampler(samp, SAMPLERS) or io_meta.normalize_sampler(samp)
+    sched_n = io_meta.normalize_scheduler(sched, SCHEDULERS) or io_meta.normalize_scheduler(sched)
+    if samp_n not in SAMPLERS:
+        samp_n = DEFAULTS["sampler"]
+    if sched_n not in SCHEDULERS:
+        sched_n = DEFAULTS["scheduler"]
+    return samp_n, sched_n
+
+
+def _fetch_html(url, timeout=25) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def generation_from_page(image_id: int) -> dict:
+    """Parse __NEXT_DATA__ from the public image page. No API key."""
+    for host in ("https://civitai.com", "https://civitai.red"):
+        try:
+            html = _fetch_html(f"{host}/images/{int(image_id)}")
+        except Exception:
+            continue
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html)
+        if not m:
+            continue
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        queries = ((((data.get("props") or {}).get("pageProps") or {}).get("trpcState") or {}).get("json") or {}).get("queries") or []
+        gen, info = {}, {}
+        for q in queries:
+            key = q.get("queryKey") or []
+            path = ""
+            if isinstance(key, list) and key and isinstance(key[0], list):
+                path = ".".join(str(x) for x in key[0])
+            state = (q.get("state") or {}).get("data") or {}
+            if not isinstance(state, dict):
+                continue
+            if "getGenerationData" in path:
+                gen = state
+            elif path.endswith(".get") or path == "image.get":
+                info = state
+        if gen or info:
+            return {"gen": gen, "info": info}
+    return {}
+
+
+def public_image_row(image_id: int) -> dict:
+    code, data = json_call(f"{SITE}/images?imageId={int(image_id)}&nsfw=X", timeout=25)
+    if isinstance(data, dict):
+        items = data.get("items") or []
+        if items and isinstance(items[0], dict):
+            return items[0]
+    return {}
+
+
+def _download_bytes(url: str, timeout=60) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def enrich_local_parse(parsed: dict) -> dict:
+    """Best-effort public model match from UNET/checkpoint filename. Never invent a prompt."""
+    if not isinstance(parsed, dict):
+        return parsed
+    name = parsed.get("checkpointName") or parsed.get("Model") or ""
+    models = parsed.get("models") or []
+    fname = Path(str(models[0])).name if models else ""
+    query = name or Path(fname).stem
+    query = re.sub(r"[_-]?int[48].*$", "", query, flags=re.I)
+    query = re.sub(r"[_-]?(nvfp4|gguf|fp8|fp16).*$", "", query, flags=re.I)
+    query = query.replace("_", " ").replace("-", " ").strip()
+    query = re.sub(r"\s+", " ", query)
+    if not query or len(query) < 4:
+        return parsed
+    code, data = json_call(f"{SITE}/models?limit=5&query={urllib.parse.quote(query)}", timeout=20)
+    items = (data or {}).get("items") if isinstance(data, dict) else []
+    if not items:
+        return parsed
+    pick = None
+    for it in items:
+        if str(it.get("type") or "").lower() == "checkpoint":
+            pick = it
+            break
+    pick = pick or items[0]
+    vers = pick.get("modelVersions") or []
+    ver = None
+    stem = Path(fname or name).stem.lower()
+    for v in vers:
+        blob = (str(v.get("name") or "") + " " + str(v.get("baseModel") or "")).lower()
+        if "v1.0" in stem and str(v.get("name") or "") == "v1.0":
+            ver = v
+            break
+        if stem and stem[:16] in json.dumps(v, ensure_ascii=False).lower():
+            ver = v
+            break
+    ver = ver or (vers[0] if vers else None)
+    if not ver:
+        parsed["checkpointName"] = parsed.get("checkpointName") or pick.get("name") or name
+        return parsed
+    mid, vid = pick.get("id"), ver.get("id")
+    air = ver.get("air") or _air_from_ids(mid, vid, pick.get("type"), ver.get("baseModel") or pick.get("baseModel"), pick.get("name"))
+    if air and not parsed.get("diffusionModel"):
+        parsed["diffusionModel"] = air
+    parsed["checkpointName"] = pick.get("name") or parsed.get("checkpointName") or name
+    parsed["modelId"] = mid
+    parsed["modelVersionId"] = vid
+    return parsed
+
+
+_LORA_TYPES = {
+    "LORA", "LORAS", "LOCON", "LOHA", "LOKR", "DORA", "LYCORIS", "TEXTUALINVERSION",
+}
+_LORA_TAG_RE = re.compile(r"<lora:([^:>]+)(?::([0-9.]+))?>", re.I)
+
+
+def _is_lora_resource(typ: str, air: str, name: str = "") -> bool:
+    t = (typ or "").upper().replace(" ", "").replace("_", "")
+    if t in _LORA_TYPES:
+        return True
+    blob = f"{air} {name}".lower()
+    if ":lora:" in blob or "/lora" in blob:
+        return True
+    return False
+
+
+def _prompt_lora_tags(prompt: str) -> list:
+    out = []
+    seen = set()
+    for name, weight in _LORA_TAG_RE.findall(prompt or ""):
+        key = name.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        try:
+            strength = float(weight) if weight else 0.8
+        except (TypeError, ValueError):
+            strength = 0.8
+        out.append({"name": name.strip(), "strength": strength})
+    return out
+
+
 def _version_from_cache(vid):
     with _version_lock:
         return _VERSION_CACHE.get(int(vid) if str(vid).isdigit() else vid)
@@ -457,46 +639,101 @@ def _store_version(vid, ver):
 
 
 def fetch_version_air(vid, timeout=20):
-    """Mini first (air+fileName), then full version. Cached. GET only."""
+    """Public version endpoint first (no key). Auth mini/full as fallback. Cached."""
     cached = _version_from_cache(vid)
     if cached:
         return cached
-    code, ver = civitai(f"{SITE}/model-versions/mini/{vid}", timeout=timeout)
-    if not (isinstance(ver, dict) and ver.get("air")):
+    code, ver = json_call(f"{SITE}/model-versions/{vid}", timeout=timeout)
+    if not (isinstance(ver, dict) and (ver.get("air") or ver.get("id"))):
+        code, ver = civitai(f"{SITE}/model-versions/mini/{vid}", timeout=timeout)
+    if not (isinstance(ver, dict) and (ver.get("air") or ver.get("id"))):
         code, ver = civitai(f"{SITE}/model-versions/{vid}", timeout=timeout)
-    if isinstance(ver, dict) and ver.get("air"):
+    if isinstance(ver, dict) and (ver.get("air") or ver.get("id")):
+        if not ver.get("air"):
+            mid = ver.get("modelId")
+            base = ver.get("baseModel") or ""
+            typ = ((ver.get("model") or {}).get("type") if isinstance(ver.get("model"), dict) else "") or ""
+            if mid and vid:
+                ver = dict(ver)
+                ver["air"] = _air_from_ids(mid, vid, typ, base, (ver.get("model") or {}).get("name") if isinstance(ver.get("model"), dict) else "")
         return _store_version(vid, ver)
     return ver if isinstance(ver, dict) else {}
 
 
 def import_image(image_id: str) -> dict:
-    q = urllib.parse.quote(json.dumps({"json": {"id": parse_image_id(image_id)}}))
+    from . import io_meta
+
+    iid = parse_image_id(image_id)
+    q = urllib.parse.quote(json.dumps({"json": {"id": iid}}))
     gen_url = f"https://civitai.com/api/trpc/image.getGenerationData?input={q}"
     info_url = f"https://civitai.com/api/trpc/image.get?input={q}"
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        f_gen = ex.submit(civitai, gen_url)
-        f_info = ex.submit(civitai, info_url)
-        _, gen = f_gen.result()
-        _, info = f_info.result()
+    gen_code, gen, info_code, info = 0, {}, 0, {}
+    if has_key():
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            f_gen = ex.submit(civitai, gen_url)
+            f_info = ex.submit(civitai, info_url)
+            gen_code, gen = f_gen.result()
+            info_code, info = f_info.result()
+    if not isinstance(gen, dict):
+        gen = {}
+    if not isinstance(info, dict):
+        info = {}
     js = ((gen.get("result") or {}).get("data") or {}).get("json") or {}
-    meta = js.get("meta") or {}
-    resources = js.get("resources") or []
     info_js = ((info.get("result") or {}).get("data") or {}).get("json") or {}
-    media_type = info_js.get("type") or js.get("type") or "image"
-    uuid = info_js.get("url") or ""
+    page = {}
+    if not (js.get("meta") or js.get("resources") or info_js.get("width")):
+        page = generation_from_page(iid)
+        if page.get("gen") and not js:
+            js = page["gen"]
+        if page.get("info") and not info_js:
+            info_js = page["info"]
+    meta = js.get("meta") or {}
+    if not isinstance(meta, dict):
+        meta = {}
+    public_row = {}
+    file_parsed = {}
+    if not meta.get("prompt") or not meta.get("sampler"):
+        public_row = public_image_row(iid)
+        url = (info_js.get("url") or public_row.get("url") or "")
+        if isinstance(url, str) and url.startswith("http"):
+            try:
+                raw = _download_bytes(url)
+                file_parsed = io_meta.parse_media_bytes(raw, f"{iid}.png")
+            except Exception:
+                file_parsed = {}
+        if file_parsed and not file_parsed.get("empty"):
+            for k, v in file_parsed.items():
+                if k in ("empty", "error", "source", "fileName"):
+                    continue
+                if v not in (None, "", [], {}) and meta.get(k) in (None, "", [], {}):
+                    meta[k] = v
+    resources = []
+    for src in (
+        js.get("resources"),
+        meta.get("resources"),
+        meta.get("civitaiResources"),
+        js.get("civitaiResources"),
+        (js.get("additionalMeta") or {}).get("resources") if isinstance(js.get("additionalMeta"), dict) else None,
+    ):
+        if isinstance(src, list):
+            resources.extend(x for x in src if isinstance(x, dict))
+    if not js and not meta and not file_parsed:
+        err = gen.get("error") or info.get("error") or ""
+        if gen_code == 401 or info_code == 401 or "没有 API Key" in str(err):
+            raise ValueError("没有 Civitai API Key，公开页也没读到这张图的提示词 / 底模 / LoRA。把 token 放到 ~/.config/civitai/token，或改上传带 Comfy/A1111 参数的 PNG。")
+        raise ValueError(err or f"Civitai 没返回这张图的生成参数（HTTP {gen_code or 404}）")
+    media_type = info_js.get("type") or js.get("type") or public_row.get("type") or "image"
+    uuid = info_js.get("url") or public_row.get("url") or ""
     name = info_js.get("name") or ""
     media_url = ""
-    if uuid:
+    if isinstance(uuid, str) and uuid.startswith("http"):
+        media_url = uuid
+    elif uuid:
         ext = "mp4" if str(media_type) == "video" or str(name).endswith(".mp4") else "jpeg"
         media_url = f"https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{uuid}/original=true/{uuid}.{ext}"
-    sampler = str(meta.get("sampler") or "er_sde")
-    scheduler = str(meta.get("scheduler") or "simple")
-    if "er_sde_simple" in sampler:
-        sampler, scheduler = "er_sde", "simple"
-    elif "_" in sampler and sampler not in SAMPLERS:
-        a, b = sampler.rsplit("_", 1)
-        if a in SAMPLERS and b in SCHEDULERS:
-            sampler, scheduler = a, b
+    raw_sampler = meta.get("sampler") or file_parsed.get("sampler") or DEFAULTS["sampler"]
+    raw_sched = meta.get("scheduler") or file_parsed.get("scheduler") or ""
+    sampler, scheduler = _normalize_pair(raw_sampler, raw_sched)
     need = []
     seen = set()
     for r in resources:
@@ -518,18 +755,32 @@ def import_image(image_id: str) -> dict:
             for f in as_completed(futs):
                 fetched[futs[f]] = f.result() or {}
     loras, checkpoint_air, checkpoint_name = [], "", ""
+    seen_lora = set()
     for r in resources:
-        vid = r.get("modelVersionId") or r.get("versionId")
+        vid = r.get("modelVersionId") or r.get("versionId") or r.get("id")
+        if vid and not (isinstance(vid, int) or str(vid).isdigit()):
+            vid = r.get("modelVersionId") or r.get("versionId")
         ver = fetched.get(vid) or _version_from_cache(vid) or {}
-        air = r.get("air") or ver.get("air")
+        air = (r.get("air") or ver.get("air") or "").strip()
+        typ = r.get("modelType") or r.get("type") or (ver.get("model") or {}).get("type") or ""
+        name = r.get("modelName") or r.get("name") or (ver.get("model") or {}).get("name") or ver.get("name") or ""
         if not air:
-            continue
-        typ = (r.get("modelType") or (ver.get("model") or {}).get("type") or "").upper()
-        if typ == "LORA":
+            mid = r.get("modelId") or ver.get("modelId")
+            air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
+        strength_raw = r.get("strength") if r.get("strength") is not None else r.get("weight")
+        try:
+            strength = float(strength_raw) if strength_raw is not None else 0.8
+        except (TypeError, ValueError):
+            strength = 0.8
+        if _is_lora_resource(typ, air, name):
+            key = str(vid or air or name).lower()
+            if key in seen_lora:
+                continue
+            seen_lora.add(key)
             item = {
                 "air": air,
-                "strength": float(r["strength"]) if r.get("strength") is not None else 0.8,
-                "name": r.get("modelName") or ver.get("name"),
+                "strength": strength,
+                "name": name or "LoRA",
             }
             if vid:
                 item["versionId"] = vid
@@ -544,11 +795,31 @@ def import_image(image_id: str) -> dict:
                 item["path"] = path
                 item["downloadUrl"] = path
             loras.append(item)
-        else:
-            checkpoint_air = air
-            checkpoint_name = r.get("modelName") or ver.get("name") or ""
-    w = int(meta.get("width") or info_js.get("width") or 960)
-    h = int(meta.get("height") or info_js.get("height") or 1440)
+        elif air or str(typ).upper() in ("CHECKPOINT", "CHECKPOINTTRC", ""):
+            if air and (":lora:" in air.lower()):
+                continue
+            if air:
+                checkpoint_air = air
+                checkpoint_name = name or ""
+    for tag in _prompt_lora_tags(meta.get("prompt") or ""):
+        key = tag["name"].lower()
+        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
+            continue
+        loras.append({
+            "air": "",
+            "strength": tag["strength"],
+            "name": tag["name"],
+        })
+    if not checkpoint_air:
+        guessed = enrich_local_parse({
+            "checkpointName": checkpoint_name or meta.get("Model") or meta.get("checkpointName") or "",
+            "models": meta.get("models") or file_parsed.get("models") or [],
+            "Model": meta.get("Model") or "",
+        })
+        checkpoint_air = guessed.get("diffusionModel") or ""
+        checkpoint_name = guessed.get("checkpointName") or checkpoint_name
+    w = int(meta.get("width") or info_js.get("width") or public_row.get("width") or 960)
+    h = int(meta.get("height") or info_js.get("height") or public_row.get("height") or 1440)
     w = max(64, min(2048, (w // 16) * 16 or 16))
     h = max(64, min(2048, (h // 16) * 16 or 16))
     kind = "video" if str(media_type) == "video" or "minimax" in (checkpoint_air or "").lower() else "image"
@@ -556,51 +827,99 @@ def import_image(image_id: str) -> dict:
     operation = None
     ecosystem = None
     model = "turbo"
+    base_blob = " ".join(str(x or "") for x in (
+        checkpoint_air, checkpoint_name, meta.get("engine"), meta.get("Model"),
+        public_row.get("baseModel"), info_js.get("baseModel"),
+    ))
     if kind == "video":
         engine, operation = "minimax-h3-comfy", "imageToVideo"
     else:
         engine, operation, ecosystem, model = "comfy", "createImage", "krea2", "turbo"
-        air = checkpoint_air.lower()
-        if "krea2" in air:
+        eco = _ecosystem_from_blob(base_blob)
+        if eco == "krea2":
             ecosystem = "krea2"
-        elif "zimage" in air or "z-image" in air:
+        elif eco == "zImage":
             engine, ecosystem = "sdcpp", "zImage"
-        elif "qwen" in air:
+        elif eco == "qwen":
             engine, ecosystem = "sdcpp", "qwen"
     svc = match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category=kind)
-    return {
+    denoise = meta.get("denoise") if meta.get("denoise") is not None else file_parsed.get("denoise")
+    try:
+        denoise = float(denoise) if denoise is not None else None
+    except (TypeError, ValueError):
+        denoise = None
+    unmatched = []
+    for n in (meta.get("unmatchedNodes") or file_parsed.get("unmatchedNodes") or []):
+        unmatched.append(str(n))
+    comfy_blob = meta.get("comfy") if isinstance(meta.get("comfy"), dict) else None
+    graph = {}
+    if isinstance(comfy_blob, dict):
+        graph = comfy_blob.get("prompt") or {}
+    extra_toks = ("SeedVR2", "Upscale", "ControlNet", "IPAdapter", "InstantID", "PuLID")
+    if isinstance(graph, dict):
+        for node in graph.values():
+            if not isinstance(node, dict):
+                continue
+            ctype = str(node.get("class_type") or node.get("type") or "")
+            if any(tok.lower() in ctype.lower() for tok in extra_toks) and ctype not in unmatched:
+                unmatched.append(ctype)
+    if meta.get("vaes") or file_parsed.get("vaes"):
+        unmatched.append("VAE " + ", ".join((meta.get("vaes") or file_parsed.get("vaes") or [])[:2]))
+    node_count = meta.get("comfyNodeCount") or file_parsed.get("comfyNodeCount")
+    comfy_blob = meta.get("comfy") if isinstance(meta.get("comfy"), dict) else None
+    if comfy_blob and not node_count:
+        prompt_graph = comfy_blob.get("prompt") or {}
+        if isinstance(prompt_graph, dict):
+            node_count = len(prompt_graph)
+        wf = comfy_blob.get("workflow") or {}
+        if not node_count and isinstance(wf, dict):
+            node_count = len(wf.get("nodes") or [])
+    sources = []
+    if js.get("meta"):
+        sources.append("civitai-meta")
+    if page.get("gen"):
+        sources.append("page")
+    if file_parsed and not file_parsed.get("empty"):
+        sources.append(file_parsed.get("source") or "png")
+    out = {
         "kind": kind,
         "serviceId": (svc or {}).get("id"),
         "serviceName": (svc or {}).get("name"),
-        "prompt": meta.get("prompt") or "",
-        "negativePrompt": meta.get("negativePrompt") or "",
+        "prompt": meta.get("prompt") or file_parsed.get("prompt") or "",
+        "negativePrompt": meta.get("negativePrompt") or file_parsed.get("negativePrompt") or "",
         "width": w,
         "height": h,
-        "steps": int(meta.get("steps") or (20 if kind == "video" else 8)),
-        "cfgScale": float(meta.get("cfgScale") or 1),
-        "sampler": sampler if sampler in SAMPLERS else "er_sde",
-        "scheduler": scheduler if scheduler in SCHEDULERS else "simple",
-        "seed": meta.get("seed"),
+        "steps": int(meta.get("steps") or file_parsed.get("steps") or (20 if kind == "video" else 8)),
+        "cfgScale": float(meta.get("cfgScale") if meta.get("cfgScale") is not None else (file_parsed.get("cfgScale") if file_parsed.get("cfgScale") is not None else 1)),
+        "sampler": sampler,
+        "scheduler": scheduler,
+        "seed": meta.get("seed") if meta.get("seed") is not None else file_parsed.get("seed"),
+        "denoise": denoise,
         "model": model,
         "engine": engine,
         "operation": operation,
         "ecosystem": ecosystem,
         "diffusionModel": checkpoint_air,
-        "checkpointName": checkpoint_name or str(meta.get("Model") or ""),
+        "checkpointName": checkpoint_name or str(meta.get("Model") or file_parsed.get("checkpointName") or ""),
         "loras": loras,
         "mediaUrl": media_url,
         "mediaType": media_type,
         "duration": 5,
         "firstFrame": "",
+        "unmatched": unmatched,
+        "comfyNodeCount": node_count,
+        "importSource": "+".join(sources) or "partial",
+        "empty": not bool(meta.get("prompt") or file_parsed.get("prompt")),
     }
-
+    return out
 
 
 def submit(body, whatif=False):
+    allow = True if not isinstance(body, dict) else bool(body.get("allowMatureContent", True))
     q = urllib.parse.urlencode({
         "whatif": "true" if whatif else "false",
         "wait": "0",
-        "hideMatureContent": "false",
+        "hideMatureContent": "false" if allow else "true",
     })
     return civitai(f"{ORCH}/v2/consumer/workflows?{q}", method="POST", body=body)
 
@@ -614,9 +933,9 @@ def workflow_urls(wf: dict) -> list[str]:
 
 
 
-def fetch_models(q: str, limit=8, types=None):
+def fetch_models(q: str, limit=8, types=None, nsfw=True):
     """GET /api/v1/models. Nested versions have files[].name but no air."""
-    qs = {"limit": str(int(limit) or 8), "query": q, "nsfw": "true"}
+    qs = {"limit": str(int(limit) or 8), "query": q, "nsfw": "true" if nsfw else "false"}
     if types:
         qs["types"] = types
     return civitai(f"{SITE}/models?" + urllib.parse.urlencode(qs))
@@ -773,6 +1092,23 @@ class CivitaiProvider(Provider):
                     data["saveError"] = str(e)
         return code, data
 
+    def cancel_job(self, job_id: str):
+        _, opaque = parse_job_id(job_id)
+        wf_id = opaque or job_id
+        if not wf_id:
+            return 400, {"error": "缺少 Civitai 任务 id"}
+        code, data = civitai(f"{ORCH}/v2/consumer/workflows/{wf_id}", method="DELETE")
+        if code in (200, 202, 204):
+            return 200, {
+                "id": wf_id,
+                "backend": "civitai",
+                "status": "canceled",
+            }
+        if isinstance(data, dict):
+            data.setdefault("error", data.get("message") or data.get("title") or f"Civitai 取消 HTTP {code}")
+            return code if code >= 400 else 400, data
+        return code if code >= 400 else 400, {"error": f"Civitai 取消 HTTP {code}"}
+
     def import_image(self, image_id: str) -> dict:
         return import_image(image_id)
 
@@ -791,8 +1127,8 @@ class CivitaiProvider(Provider):
     def blobs(self, blob_id: str):
         return civitai(f"{ORCH}/v2/consumer/blobs?blobId={urllib.parse.quote(blob_id)}")
 
-    def search_models(self, q: str, types="LORA"):
-        code, data = fetch_models(q, limit=8, types=types or None)
+    def search_models(self, q: str, types="LORA", nsfw=True):
+        code, data = fetch_models(q, limit=8, types=types or None, nsfw=nsfw)
         items = []
         if isinstance(data, dict):
             for it in (data.get("items") or [])[:8]:
@@ -800,8 +1136,11 @@ class CivitaiProvider(Provider):
                 for v in (it.get("modelVersions") or [])[:6]:
                     files = [{"name": f.get("name"), "id": f.get("id")} for f in (v.get("files") or [])]
                     vers.append({"id": v.get("id"), "name": v.get("name"), "baseModel": v.get("baseModel"), "files": files})
-                items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "versions": vers})
+                items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "source": "civitai", "versions": vers})
         return code, {"items": items}
+
+    def search_loras(self, q: str, nsfw: bool = True):
+        return self.search_models(q, types="LORA", nsfw=nsfw)
 
     def model_version(self, vid: str):
         code, data = fetch_model_version(vid)
@@ -847,9 +1186,9 @@ class CivitaiProvider(Provider):
         rec = cw.lookup_filename(filename or "")
         return 200, rec
 
-    def list_workflows(self, q="", username="", limit=30):
+    def list_workflows(self, q="", username="", limit=30, nsfw=True):
         from .civitai_workflows import MOODY_USER
-        qs = {"types": "Workflows", "limit": str(int(limit) or 30), "nsfw": "true"}
+        qs = {"types": "Workflows", "limit": str(int(limit) or 30), "nsfw": "true" if nsfw else "false"}
         if q:
             qs["query"] = q
         user = username or (MOODY_USER if not q else "")
@@ -972,6 +1311,21 @@ class CivitaiProvider(Provider):
             return 400, {
                 "error": "customComfy 必须声明 resources（AIR）。这个工作流没有映射到任何权重或节点包。",
                 "airMap": mapped,
+            }
+        bare_packs = [
+            a for a in resources
+            if isinstance(a, str) and ":nodepack:" in a.lower() and ":nodepacklayer:" not in a.lower()
+        ]
+        if bare_packs:
+            shown = "、".join(bare_packs[:3])
+            return 400, {
+                "error": (
+                    "Civitai customComfy 要求自定义节点用 install-layer AIR"
+                    "（urn:air:comfy:nodepacklayer:…），当前映射还是裸 nodepack。"
+                    f"这个工作流含：{shown}。先走图片 Tab 出图；没有官方 nodepacklayer 样例前不改 URN。"
+                ),
+                "resources": resources,
+                "bareNodepacks": bare_packs,
             }
         body = {
             "workflow": api_wf,

@@ -419,8 +419,9 @@
     min-height: 1.2em;
     margin-bottom: 8px;
   }
-  .btns { display: flex; gap: 8px; align-items: stretch; position: relative; z-index: 5; }
-  #go { position: relative; z-index: 6; pointer-events: auto; }
+  .dock { position: relative; z-index: 40; }
+  .btns { display: flex; gap: 8px; align-items: stretch; position: relative; z-index: 50; }
+  #go { position: relative; z-index: 60; pointer-events: auto; touch-action: manipulation; }
   .btns .ghost { flex: 0 0 88px; }
   .qty-dock {
     display: flex;
@@ -598,7 +599,9 @@
     border-radius: 50%;
     animation: waitspin .7s linear infinite;
   }
-  .wait-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .wait-title { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+  .wait-cancel { margin-left: auto; flex-shrink: 0; font-size: 12px; padding: 4px 10px; }
+  .wait-cancel:disabled { opacity: .55; cursor: wait; }
   .wait-bar {
     height: 8px;
     background: var(--bg);
@@ -754,7 +757,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0737</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0745</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -867,6 +870,9 @@
             </div>
             <div><label class="lbl" for="seed">种子</label><input id="seed" placeholder="空则随机"></div>
           </div>
+          <div class="row">
+            <div><label class="lbl" for="denoise">Denoise</label><input id="denoise" type="number" min="0" max="1" step="0.05" placeholder="1"></div>
+          </div>
         </details>
       </section>
     </div>
@@ -949,6 +955,7 @@
       <div class="wait-head">
         <span class="wait-spin" aria-hidden="true"></span>
         <div class="wait-title" id="waitTitle">处理中</div>
+        <button type="button" class="ghost wait-cancel" id="waitCancel">取消队列</button>
       </div>
       <div class="wait-bar"><i id="waitBar" class="indet"></i></div>
       <div class="wait-meta" id="waitMeta">已等 0 秒</div>
@@ -957,9 +964,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0737" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0745" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0737</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0745</div>
   </div>
 </aside>
 
@@ -985,9 +992,15 @@
 const $ = (id) => document.getElementById(id);
 window.__studioGo = function (ev) {
   try { if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } } catch (e) {}
-  if (window.__goOnce && (Date.now() - window.__goOnce) < 500) return false;
+  try { lastGoClick = Date.now(); } catch (e) {}
+  try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
+  try {
+    const d = document.getElementById('dockStatus');
+    if (d) { d.className = ''; d.textContent = '已点到生成'; }
+  } catch (e) {}
+  try { if (typeof setDock === 'function') setDock('已点到生成'); } catch (e) {}
+  if (window.__goOnce && (Date.now() - window.__goOnce) < 400) return false;
   window.__goOnce = Date.now();
-  try { setDock('已点到生成'); } catch (e) {}
   if (typeof onGenerate === 'function') {
     try { return onGenerate(ev); } catch (e) {
       lastGoFail = Date.now();
@@ -999,6 +1012,14 @@ window.__studioGo = function (ev) {
   }
   return false;
 };
+if (!window.__goBound) {
+  window.__goBound = true;
+  document.addEventListener('click', function (ev) {
+    const t = ev.target && ev.target.closest && ev.target.closest('#go');
+    if (!t) return;
+    window.__studioGo(ev);
+  }, true);
+}
 function isModelscope(b) {
   b = b || backend;
   return b === 'modelscope' || b === 'modelscope-ai' || b === 'modelscope-cn' || b === 'ms';
@@ -1030,6 +1051,7 @@ function persistBackend(id) {
   } catch (e) {}
 }
 let backend = savedBackend() || 'civitai';
+try { persistBackend(backend); } catch (e) {}
 let selected = null;
 let userPickedId = null;
 let picked = { serviceId: null, engine: null, operation: null, ecosystem: null, model: null, version: null, provider: null };
@@ -1057,8 +1079,11 @@ function opOf(item) {
   return String(paramOf(item, 'operation') || '');
 }
 function isVideoGen(it) {
-  if (it) return it.step === 'videoGen';
-  return recipe === 'video';
+  if (recipe === 'video') return true;
+  if (!it) return false;
+  if (it.step === 'videoGen' || it.category === 'video') return true;
+  const blob = ((it.id || '') + ' ' + (it.falCategory || '') + ' ' + (it.name || '')).toLowerCase();
+  return blob.includes('video') || blob.includes('i2v') || blob.includes('t2v');
 }
 const FIRST_IMG_FIELDS = ['image_url', 'start_image_url', 'first_frame_url', 'image'];
 const LAST_IMG_FIELDS = ['end_image_url', 'tail_image_url', 'last_frame_url'];
@@ -1124,12 +1149,18 @@ function supportsLora(it) {
 function showLoraBlock() {
   const util = recipe === 'upscale' || recipe === 'bg';
   if (util) return false;
+  if (Array.isArray(loras) && loras.length) return true;
+  // Fal official LoRA param is loras[{path,scale}]. Keep the block on
+  // image/video even when the current row is a non-/lora sibling.
+  if (backend === 'fal' && (recipe === 'image' || recipe === 'video')) return true;
+  if (isModelscope() && (recipe === 'image' || recipe === 'video')) return true;
+  if (backend === 'huggingface' && recipe === 'image') return true;
   return supportsLora(selected);
 }
 function clampLoraScale(v, fallback) {
   const n = parseFloat(v);
   const x = Number.isFinite(n) ? n : (fallback == null ? 0.8 : fallback);
-  return Math.max(0, Math.min(2, x));
+  return Math.max(0, Math.min(4, x));
 }
 function isHttpUrl(s) { return /^https?:\/\//i.test(String(s || '')); }
 function isHfRepo(s) { return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(s || '').trim()); }
@@ -1205,6 +1236,7 @@ function currentKind() {
 }
 let goBusy = false;
 let lastGoFail = 0;
+let lastGoClick = 0;
 let noToken = false;
 let wfState = null;
 function dockHold() {
@@ -1213,6 +1245,7 @@ function dockHold() {
     const d = $('dockStatus');
     if (d && d.classList.contains('bad')) return true;
     if (lastGoFail && (Date.now() - lastGoFail) < 8000) return true;
+    if (lastGoClick && (Date.now() - lastGoClick) < 8000) return true;
   } catch (e) {}
   return false;
 }
@@ -1244,7 +1277,7 @@ function durationRange(it) {
 }
 function updateFields() {
   kind = currentKind();
-  const vid = isVideoGen(selected);
+  const vid = recipe === 'video' || isVideoGen(selected);
   const util = recipe === 'upscale' || recipe === 'bg';
   $('imageFields').classList.toggle('hidden', vid || util);
   $('videoFields').classList.toggle('hidden', !vid);
@@ -1264,6 +1297,17 @@ function updateFields() {
   if (dz) dz.textContent = '点击或拖入参考图（最多 ' + cap + ' 张）';
   if (refUrls.length > cap) { refUrls = refUrls.slice(0, cap); renderRefs(); }
   const dur = $('duration');
+  const civ = backend === 'civitai';
+  const hf = backend === 'huggingface';
+  const hideWrap = (el, on) => {
+    if (!el) return;
+    const box = el.closest('div');
+    if (box) box.classList.toggle('hidden', !!on);
+  };
+  hideWrap($('sampler'), !civ);
+  hideWrap($('denoise'), !civ);
+  hideWrap($('model'), !civ);
+  hideWrap($('scheduler'), !(civ || hf));
   if (dur && vid) {
     const [lo, hi] = durationRange(selected);
     dur.min = lo; dur.max = hi;
@@ -1508,6 +1552,9 @@ function syncBackendChrome() {
   if (backend === 'fal') {
     if (q) q.placeholder = 'URL、HF owner/name、名字或 version id';
     if (lbl) lbl.textContent = '搜索名字 / URL / HF 仓库 / version id';
+  } else if (isModelscope()) {
+    if (q) q.placeholder = '魔搭 owner/repo，例如 Qwen/Qwen-Image';
+    if (lbl) lbl.textContent = '魔搭 LoRA 仓库 id（官方 loras 字段）';
   } else {
     if (q) q.placeholder = 'Kroma 或 3184845';
     if (lbl) lbl.textContent = '搜索名字 / version id / AIR';
@@ -1575,6 +1622,7 @@ function payload() {
       path: l.path || l.downloadUrl || '',
       url: l.path || l.downloadUrl || '',
       downloadUrl: l.downloadUrl || l.path || '',
+      versionId: l.versionId || loraVersionId(l) || '',
       scale: clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8),
       strength: clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8),
       name: l.name,
@@ -1586,6 +1634,7 @@ function payload() {
       width: +$('width').value, height: +$('height').value, steps: +$('steps').value,
       cfgScale: +$('cfg').value, quantity: +$('qty').value, sampler: $('sampler').value,
       scheduler: $('scheduler').value,
+      denoise: ($('denoise') && $('denoise').value !== '') ? +$('denoise').value : undefined,
     });
     if (picked.model == null) base.model = $('model').value;
     if (srcImg) {
@@ -1624,18 +1673,26 @@ function payload() {
 function slimPayload(base) {
   if (backend === 'civitai') return base;
   delete base.diffusionModel;
-  if (!supportsLora(selected)) delete base.loras;
-  else {
+  if (backend === 'huggingface') {
+    // InferenceClient text_to_image documents scheduler; OpenAI path ignores it.
+  } else {
+    delete base.scheduler;
+  }
+  delete base.sampler;
+  if (backend !== 'civitai') delete base.denoise;
+  if (backend === 'fal' || isModelscope() || backend === 'huggingface' || supportsLora(selected)) {
     base.loras = (base.loras || []).map(l => ({
       path: l.path || l.url || l.downloadUrl || '',
       scale: clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8),
       strength: clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8),
       name: l.name || '',
       air: l.air || '',
+      versionId: l.versionId || l.modelVersionId || '',
     }));
+    if (!base.loras.length) delete base.loras;
+  } else {
+    delete base.loras;
   }
-  delete base.sampler;
-  delete base.scheduler;
   delete base.engine;
   delete base.operation;
   delete base.ecosystem;
@@ -1704,7 +1761,9 @@ function pickForBackend() {
           ? ['fal-ai/z-image/turbo/image-to-image/lora', 'fal-ai/z-image/turbo/image-to-image', 'fal-ai/flux/dev/image-to-image']
           : ['fal-ai/z-image/turbo/image-to-image', 'fal-ai/flux/dev/image-to-image'];
       } else if (krea) {
-        want = ['fal-ai/flux/krea/image-to-image', 'fal-ai/flux-pro/kontext', 'fal-ai/flux/dev/image-to-image'];
+        want = hasLoras
+          ? ['fal-ai/flux-krea-lora/image-to-image', 'fal-ai/flux/krea/image-to-image', 'fal-ai/flux-pro/kontext']
+          : ['fal-ai/flux/krea/image-to-image', 'fal-ai/flux-pro/kontext', 'fal-ai/flux/dev/image-to-image'];
       } else {
         want = ['fal-ai/flux/dev/image-to-image', 'fal-ai/flux-pro/kontext'];
       }
@@ -1713,7 +1772,9 @@ function pickForBackend() {
         ? ['fal-ai/z-image/turbo/lora', 'fal-ai/z-image/base/lora', 'fal-ai/z-image/turbo']
         : ['fal-ai/z-image/turbo', 'fal-ai/z-image', 'Tongyi-MAI/Z-Image-Turbo'];
     } else if (krea) {
-      want = ['krea/v2/medium/text-to-image', 'fal-ai/flux/krea', 'fal-ai/flux/schnell'];
+      want = hasLoras
+        ? ['fal-ai/krea-2/turbo/lora', 'fal-ai/flux-krea-lora', 'fal-ai/krea-2/turbo']
+        : ['fal-ai/krea-2/turbo', 'krea/v2/medium/text-to-image', 'fal-ai/flux/krea'];
     } else {
       want = ['fal-ai/flux/schnell'];
     }
@@ -1788,6 +1849,8 @@ async function api(path, opts) {
 let waitTimer = null;
 let waitStart = 0;
 let waitExtra = '';
+let waitJobId = '';
+let waitCanceled = false;
 function fmtWait(sec) {
   sec = Math.max(0, Number(sec) || 0);
   if (sec < 10) return (Math.round(sec * 10) / 10).toFixed(1) + ' 秒';
@@ -1820,11 +1883,14 @@ function tickWait(extra, pct) {
 async function startWait(title) {
   waitStart = Date.now();
   waitExtra = '';
+  waitCanceled = false;
   const pane = $('waitPane');
   if (pane) pane.classList.remove('hidden');
   if ($('waitTitle')) $('waitTitle').textContent = title;
   const bar = $('waitBar');
   if (bar) { bar.classList.add('indet'); bar.style.width = '28%'; }
+  const btn = $('waitCancel');
+  if (btn) { btn.disabled = !waitJobId; btn.textContent = '取消队列'; }
   tickWait();
   clearInterval(waitTimer);
   waitTimer = setInterval(() => tickWait(), 200);
@@ -1838,10 +1904,13 @@ function stopWait() {
   clearInterval(waitTimer);
   waitTimer = null;
   waitExtra = '';
+  waitJobId = '';
   const pane = $('waitPane');
   if (pane) pane.classList.add('hidden');
   const bar = $('waitBar');
   if (bar) { bar.classList.add('indet'); bar.style.width = '40%'; }
+  const btn = $('waitCancel');
+  if (btn) { btn.disabled = false; btn.textContent = '取消队列'; }
 }
 
 function setStatus(msg, cls='') {
@@ -1877,7 +1946,7 @@ function isOutRef(u) {
   return /(?:^|\/)out\//.test(s);
 }
 function loadGallery() {
-  try { galleryItems = JSON.parse(localStorage.getItem(GAL_KEY) || '[]'); }
+  try { galleryItems = JSON.parse((function(){ try { return localStorage.getItem(GAL_KEY) || '[]'; } catch (e) { return '[]'; } })()); }
   catch (e) { galleryItems = []; }
   if (!Array.isArray(galleryItems)) galleryItems = [];
   const seen = new Set();
@@ -1891,7 +1960,7 @@ function loadGallery() {
   saveGallery();
 }
 function saveGallery() {
-  localStorage.setItem(GAL_KEY, JSON.stringify(galleryItems.slice(0, 200)));
+  try { localStorage.setItem(GAL_KEY, JSON.stringify(galleryItems.slice(0, 200))); } catch (e) {}
 }
 function bindGallery() {
   const grid = $('grid');
@@ -1957,8 +2026,38 @@ function addCard(src, meta, isVideo) {
   saveGallery();
   renderGallery();
 }
+async function cancelWaitJob() {
+  const id = waitJobId;
+  const btn = $('waitCancel');
+  if (!id) {
+    setStatus('现在没有排队中的任务', 'bad');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '取消中'; }
+  try {
+    const j = await api('/api/jobs/' + encodeURIComponent(id) + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    waitCanceled = true;
+    setStatus('已请求取消 ' + id + (j && j.error ? (' · ' + j.error) : ''), j && j.error ? 'bad' : 'ok');
+    updateWait('已取消', (j && j.error) || '已向队列发取消', null);
+  } catch (e) {
+    const msg = (e.data && (e.data.error || e.data.detail)) || e.message || '取消失败';
+    setStatus('取消失败 ' + msg, 'bad');
+    if (btn) { btn.disabled = false; btn.textContent = '取消队列'; }
+  }
+}
+if (document.getElementById('waitCancel')) {
+  document.getElementById('waitCancel').onclick = () => { cancelWaitJob(); };
+}
 async function poll(id) {
+  waitJobId = id;
+  waitCanceled = false;
+  const btn = $('waitCancel');
+  if (btn) btn.disabled = false;
   for (let i = 0; i < 180; i++) {
+    if (waitCanceled) {
+      stopWait();
+      return;
+    }
     const j = await api('/api/jobs/' + encodeURIComponent(id));
     const st = (j.status || '').toLowerCase();
     const w = j.wait || {};
@@ -1991,7 +2090,7 @@ async function poll(id) {
       stopWait();
       return;
     }
-    if (['failed', 'canceled', 'expired'].includes(st)) {
+    if (['failed', 'canceled', 'cancelled', 'expired'].includes(st)) {
       setStatus(st + ' ' + JSON.stringify(j).slice(0, 240), 'bad');
       stopWait();
       return;
@@ -2035,8 +2134,20 @@ function applyImport(j) {
     renderLoras();
   }
   if (backend === 'civitai') {
-    if (j.sampler) $('sampler').value = j.sampler;
-    if (j.scheduler) $('scheduler').value = j.scheduler;
+    function ensureOpt(sel, val) {
+      if (!sel || val == null || val === '') return;
+      const hit = Array.from(sel.options).some(o => o.value === String(val));
+      if (!hit) {
+        const o = document.createElement('option');
+        o.value = String(val);
+        o.textContent = String(val);
+        sel.appendChild(o);
+      }
+      sel.value = String(val);
+    }
+    if (j.sampler) ensureOpt($('sampler'), j.sampler);
+    if (j.scheduler) ensureOpt($('scheduler'), j.scheduler);
+    if (j.denoise != null && $('denoise')) $('denoise').value = j.denoise;
     if (j.model && (j.model === 'turbo' || j.model === 'raw')) $('model').value = j.model;
     if ('diffusionModel' in j || j.checkpointName) {
       setCheckpoint(j.checkpointName || '', ('diffusionModel' in j) ? (j.diffusionModel || '') : $('diffusion').value);
@@ -2056,8 +2167,16 @@ function applyImport(j) {
     if (!currentServiceId() && !userPickedId) pickForBackend();
     resolveLorasForBackend();
   }
+  if ($('loraBlock')) $('loraBlock').classList.toggle('hidden', !showLoraBlock());
+  const nLora = Array.isArray(loras) ? loras.length : 0;
+  const extra = [];
+  if (j.comfyNodeCount) extra.push(j.comfyNodeCount + ' 节点 Comfy');
+  if (Array.isArray(j.unmatched) && j.unmatched.length) extra.push('未直接匹配 ' + j.unmatched.slice(0, 3).join('、'));
+  if (j.importSource) extra.push(j.importSource);
+  const extraTxt = extra.length ? ' · ' + extra.join(' · ') : '';
   if (j.empty && j.error) setStatus(j.error, 'bad');
-  else setStatus(j.kind === 'video' ? '已导入视频参数。图生视频还要首帧：出一张图或上传。然后自己点生成。' : '已导入参数，自己点生成。');
+  else if (j.kind === 'video') setStatus('已导入视频参数' + (nLora ? (' · ' + nLora + ' 个 LoRA') : '') + extraTxt + '。图生视频还要首帧：出一张图或上传。然后自己点生成。');
+  else setStatus('已导入参数' + (nLora ? (' · ' + nLora + ' 个 LoRA') : ' · 这张图没有识别到 LoRA') + extraTxt + '，自己点生成。');
   syncGo();
 }
 function readDataURL(file, cb) {
@@ -2099,7 +2218,7 @@ if ($('tabAudio')) $('tabAudio').onclick = () => setRecipe('audio');
     if (!box) return;
     box.textContent = '加载 Moody 工作流收藏…';
     try {
-      const r = await api('/api/workflows');
+      const r = await api('/api/workflows?nsfw=' + ($('mature') && $('mature').checked ? 'true' : 'false'));
       const items = r.items || [];
       if (!items.length) { box.textContent = '没有工作流'; return; }
       box.innerHTML = items.map(it => `<button type="button" class="svc" data-mid="${it.id}" data-vid="${it.versionId||''}">${esc(it.name||it.id)}</button>`).join('');
@@ -2203,13 +2322,26 @@ $('whatif').onclick = async () => {
   if (recipe === 'workflow') {
     if (!(wfState && wfState.workflowApi)) { setStatus('先导入工作流', 'bad'); return; }
   } else if (!currentServiceId()) { setStatus('先选一个服务', 'bad'); return; }
+  if ($('cost')) $('cost').textContent = '预估中…';
   setStatus('预估中…');
   try {
     const j = await api('/api/whatif', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) });
-    const total = (j.cost || {}).total ?? ((j.transactions || {}).list || []).reduce((s, x) => s + (x.amount || 0), 0);
-    $('cost').textContent = `预估 ${total} yellow buzz` + (j.transactions && j.transactions.insufficientBuzz ? ' · Buzz 不够' : '');
+    const note = (j.cost || {}).note || j.note || '';
+    const listed = ((j.transactions || {}).list || []).reduce((s, x) => s + (x.amount || 0), 0);
+    const total = (j.cost || {}).total;
+    const n = (total == null || total === '') ? listed : total;
+    let line;
+    if (n !== 0 && n != null && n !== '') line = '预估 ' + n + ' yellow buzz';
+    else if (note) line = note;
+    else line = '预估 ' + (n == null ? '?' : n) + ' yellow buzz';
+    if (j.transactions && j.transactions.insufficientBuzz) line += ' · Buzz 不够';
+    if ($('cost')) $('cost').textContent = line;
     setStatus('预估完成');
-  } catch (e) { setStatus('预估失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 200) : e.message), 'bad'); }
+  } catch (e) {
+    const msg = (e.data && (e.data.error || e.data.detail)) || e.message || '预估失败';
+    if ($('cost')) $('cost').textContent = '预估失败';
+    setStatus('预估失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 200) : msg), 'bad');
+  }
 };
 let goClickLock = false;
 async function onGenerate(ev) {
@@ -2231,6 +2363,7 @@ async function runGenerate() {
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
   const fail = (msg) => {
     lastGoFail = Date.now();
+    lastGoClick = Date.now();
     setDock(msg, 'bad');
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
   };
@@ -2287,6 +2420,9 @@ async function runGenerate() {
       return;
     }
     if (!jobId) { stopWait(); lastGoFail = Date.now(); setDock('提交失败 ' + JSON.stringify(j).slice(0, 300), 'bad'); return; }
+    waitJobId = jobId;
+    const cancelBtn = $('waitCancel');
+    if (cancelBtn) cancelBtn.disabled = false;
     setDock('已进队列 ' + jobId);
     if (go) go.textContent = '排队中…';
     await poll(jobId);
@@ -2305,11 +2441,11 @@ $('searchLora').onclick = async () => {
   const q = $('loraQ').value.trim();
   if (!q) return;
   $('hits').textContent = '搜…';
-  if (backend === 'fal' && (isHttpUrl(q) || isHfRepo(q))) {
-    addLora({ path: q, name: q.split('/').filter(Boolean).pop(), strength: 0.8 });
+  if ((backend === 'fal' || backend === 'huggingface' || isModelscope()) && (isHttpUrl(q) || isHfRepo(q))) {
+    addLora({ path: q, name: q, strength: 0.8 });
     return;
   }
-  if (/^\d+$/.test(q)) {
+  if (backend === 'civitai' && /^\d+$/.test(q)) {
     try { addLora(await api('/api/model-version/' + q)); }
     catch (e) { $('hits').textContent = '没找到这个 version'; }
     return;
@@ -2319,15 +2455,28 @@ $('searchLora').onclick = async () => {
     return;
   }
   try {
-    const j = await api('/api/search?type=LORA&q=' + encodeURIComponent(q));
-    if (!j.items.length) { $('hits').textContent = '没有结果'; return; }
-    $('hits').innerHTML = j.items.map(it => {
-      const v = (it.versions || [])[0];
-      return `<div data-vid="${v && v.id}"><b>${esc(it.name)}</b> ${v ? ('· ' + esc(v.name) + ' · ' + esc(v.baseModel)) : ''}</div>`;
+    const j = await api('/api/search?type=LORA&q=' + encodeURIComponent(q) + '&backend=' + encodeURIComponent(backend) + '&nsfw=' + ($('mature') && $('mature').checked ? 'true' : 'false'));
+    const rows = j.items || [];
+    if (!rows.length) { $('hits').textContent = (j.note || '没有结果'); return; }
+    $('hits').innerHTML = rows.map((it) => {
+      const v = (it.versions || [])[0] || {};
+      const path = it.path || '';
+      const extra = v.baseModel || v.name || path || '';
+      return `<div data-path="${esc(path)}" data-vid="${v.id || ''}" data-name="${esc(it.name || '')}"><b>${esc(it.name)}</b> ${extra ? ('· ' + esc(extra)) : ''}</div>`;
     }).join('');
     [...$('hits').children].forEach(el => el.onclick = async () => {
-      const vid = el.getAttribute('data-vid'); if (!vid) return;
-      addLora(await api('/api/model-version/' + vid));
+      const path = el.getAttribute('data-path');
+      const name = el.getAttribute('data-name') || '';
+      const vid = el.getAttribute('data-vid');
+      if (path && (isHttpUrl(path) || isHfRepo(path))) {
+        addLora({ path, name: name || path, strength: 0.8 });
+        return;
+      }
+      if (backend === 'civitai' && vid) {
+        addLora(await api('/api/model-version/' + vid));
+        return;
+      }
+      if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8 });
     });
   } catch (e) { $('hits').textContent = '搜索失败'; }
 };
@@ -2370,7 +2519,11 @@ async function resolveLorasForBackend() {
 }
 window.addLora = addLora;
 window.clampLoraScale = clampLoraScale;
-window.onerror = (m) => setStatus('页面出错: ' + m, 'bad');
+window.onerror = (m) => {
+  const s = String(m || '');
+  if (/localStorage|sessionStorage|sandboxed|allow-same-origin/i.test(s)) return;
+  setStatus('页面出错: ' + m, 'bad');
+};
 
 if ($('galFilters')) {
   [...$('galFilters').querySelectorAll('button')].forEach(b => {
@@ -2589,6 +2742,27 @@ renderGallery();
     const fire = (ev) => { window.__studioGo(ev); };
     go.addEventListener('click', fire, true);
   }
+  window.addEventListener('hashchange', () => {
+    try {
+      const h = (location.hash || '').replace(/^#/, '').split('&')[0];
+      if (!/^(civitai|fal|huggingface|modelscope-ai|modelscope-cn)$/.test(h)) {
+        persistBackend(backend);
+        return;
+      }
+      if (h === backend) return;
+      // Real navigation (back/forward). Do not overwrite 魔搭 with a stale Fal hash.
+      backend = h;
+      persistBackend(h);
+      const box = $('backendSwitch');
+      if (box) box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.backend === h));
+      userPickedId = null;
+      selected = null;
+      if ($('svcFilter')) $('svcFilter').value = '';
+      syncBackendChrome();
+      syncImportChrome();
+      loadCatalog().catch(() => setStatus(((window._providerLabel || {})[h] || h) + ' 目录失败', 'bad'));
+    } catch (e) {}
+  });
 })();
 </script>
 </body>
