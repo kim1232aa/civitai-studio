@@ -217,6 +217,11 @@
   }
   textarea { min-height: 132px; resize: vertical; padding: 10px 12px; font-size: 14px; }
   #prompt { min-height: 176px; }
+  #prompt.need-prompt {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
   textarea.neg { min-height: 64px; font-size: 13px; }
   select {
     appearance: none;
@@ -749,7 +754,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0736</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0737</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -952,9 +957,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0736" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0737" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0736</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0737</div>
   </div>
 </aside>
 
@@ -982,11 +987,14 @@ window.__studioGo = function (ev) {
   try { if (ev) { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } } catch (e) {}
   if (window.__goOnce && (Date.now() - window.__goOnce) < 500) return false;
   window.__goOnce = Date.now();
-  try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
+  try { setDock('已点到生成'); } catch (e) {}
   if (typeof onGenerate === 'function') {
     try { return onGenerate(ev); } catch (e) {
-      const d = document.getElementById("dockStatus");
-      if (d) d.textContent = "生成出错 " + (e && e.message || e);
+      lastGoFail = Date.now();
+      try { setDock("生成出错 " + (e && e.message || e), 'bad'); } catch (e2) {
+        const d = document.getElementById("dockStatus");
+        if (d) { d.className = 'bad'; d.textContent = "生成出错 " + (e && e.message || e); }
+      }
     }
   }
   return false;
@@ -1014,14 +1022,14 @@ function persistBackend(id) {
   try { localStorage.setItem(BACKEND_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(BACKEND_KEY, id); } catch (e) {}
   try {
-    const cur = (location.hash || '').replace(/^#/, '').split('&')[0];
-    const extra = (typeof recipe !== 'undefined' && recipe === 'workflow') ? '&recipe=workflow' : '';
+    const raw = location.hash || '';
+    const keepWf = /(?:^|#|&)recipe=workflow\b/.test(raw) || (typeof recipe !== 'undefined' && recipe === 'workflow');
+    const extra = keepWf ? '&recipe=workflow' : '';
     const want = '#' + id + extra;
     if (location.hash !== want) history.replaceState(null, '', want);
   } catch (e) {}
 }
 let backend = savedBackend() || 'civitai';
-persistBackend(backend);
 let selected = null;
 let userPickedId = null;
 let picked = { serviceId: null, engine: null, operation: null, ecosystem: null, model: null, version: null, provider: null };
@@ -1196,8 +1204,18 @@ function currentKind() {
   return 'image';
 }
 let goBusy = false;
+let lastGoFail = 0;
 let noToken = false;
 let wfState = null;
+function dockHold() {
+  try {
+    if (goBusy) return true;
+    const d = $('dockStatus');
+    if (d && d.classList.contains('bad')) return true;
+    if (lastGoFail && (Date.now() - lastGoFail) < 8000) return true;
+  } catch (e) {}
+  return false;
+}
 function needsPrompt() {
   if (recipe === 'workflow') return false;
   const step = selected && selected.step;
@@ -1215,6 +1233,7 @@ function syncGo() {
   const go = $('go');
   if (!go) return;
   go.disabled = false;
+  go.removeAttribute('disabled');
 }
 function durationRange(it) {
   const eng = (it && it.engine) || '';
@@ -2210,7 +2229,11 @@ async function runGenerate() {
   const go = $('go');
   const keys = window._hasKeys || {};
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
-  const fail = (msg) => { setDock(msg, 'bad'); if (go) { go.disabled = false; go.textContent = '生成'; } };
+  const fail = (msg) => {
+    lastGoFail = Date.now();
+    setDock(msg, 'bad');
+    if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
+  };
   try {
     if (recipe === 'workflow') {
       if (!(wfState && wfState.workflowApi)) { fail('先导入工作流'); return; }
@@ -2218,7 +2241,7 @@ async function runGenerate() {
       const miss = (am.unmatchedFiles || []).length + (am.unmatchedNodes || []).length;
       const nRes = (wfState.resources || []).length;
       if (!nRes && miss) { fail('工作流文件都对不上，先补 AIR 再生成'); return; }
-      if (miss) setDock('还有 ' + miss + ' 个未匹配，生成可能缺模型', 'bad');
+      if (miss) { lastGoFail = Date.now(); setDock('还有 ' + miss + ' 个未匹配，生成可能缺模型', 'bad'); }
     } else {
       if (!currentServiceId() && userPickedId) {
         const keep = findCatalogItem(userPickedId);
@@ -2231,12 +2254,22 @@ async function runGenerate() {
     if (backend && keys[backend] === false) { fail('还没有 ' + label + ' API Key'); return; }
     const step = selected && selected.step;
     const gen = recipe !== 'workflow' && (step === 'imageGen' || step === 'videoGen' || !step);
-    if (gen && !$('prompt').value.trim()) { fail('先写提示词'); return; }
+    if (gen && !$('prompt').value.trim()) {
+      const pr = $('prompt');
+      if (pr) {
+        pr.classList.add('need-prompt');
+        try { pr.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { try { pr.scrollIntoView(); } catch (e2) {} }
+        try { pr.focus(); } catch (e) {}
+      }
+      fail('先写提示词');
+      return;
+    }
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
     if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { fail('这个服务需要首帧图'); return; }
+    try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
     goBusy = true;
-    if (go) { go.disabled = false; go.textContent = "提交中…"; }
+    if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = "提交中…"; }
     setDock("正在提交…");
     await afterPaint();
     const pl = payload();
@@ -2253,16 +2286,17 @@ async function runGenerate() {
       setDock('好了', 'ok');
       return;
     }
-    if (!jobId) { stopWait(); setDock('提交失败 ' + JSON.stringify(j).slice(0, 300), 'bad'); return; }
+    if (!jobId) { stopWait(); lastGoFail = Date.now(); setDock('提交失败 ' + JSON.stringify(j).slice(0, 300), 'bad'); return; }
     setDock('已进队列 ' + jobId);
     if (go) go.textContent = '排队中…';
     await poll(jobId);
   } catch (e) {
+    lastGoFail = Date.now();
     setDock('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad');
     stopWait();
   } finally {
     goBusy = false;
-    if (go) { go.disabled = false; go.textContent = '生成'; }
+    if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
     syncGo();
   }
 }
@@ -2382,7 +2416,10 @@ renderGallery();
     if (el) el.title = $('diffusion').value.trim();
   });
   if ($('svcFilter')) $('svcFilter').oninput = onSvcFilter;
-  if ($('prompt')) $('prompt').addEventListener('input', syncGo);
+  if ($('prompt')) $('prompt').addEventListener('input', () => {
+    $('prompt').classList.remove('need-prompt');
+    syncGo();
+  });
   syncGo();
   let catalogSeq = 0;
   async function loadCatalog(q) {
@@ -2410,10 +2447,7 @@ renderGallery();
     }
     const n = catalog.length;
     const label = (window._providerLabel && window._providerLabel[backend]) || backend;
-    const statusEl = $('status');
-    const dockEl = $('dockStatus');
-    const hasBad = (statusEl && statusEl.classList.contains('bad')) || (dockEl && dockEl.classList.contains('bad'));
-    if (goBusy || hasBad) return;
+    if (dockHold()) return;
     if (!n) setDock(label + ' 目录为空', 'bad');
     else setStatus(label + ' 已加载 ' + n + ' 个模型。自己点生成。' + (tokenMsg ? ' ' + tokenMsg : ''));
   }
@@ -2555,11 +2589,6 @@ renderGallery();
     const fire = (ev) => { window.__studioGo(ev); };
     go.addEventListener('click', fire, true);
   }
-  window.addEventListener('hashchange', () => {
-    const h = (location.hash || '').replace(/^#/, '').split('&')[0];
-    if (h === backend) return;
-    persistBackend(backend);
-  });
 })();
 </script>
 </body>
