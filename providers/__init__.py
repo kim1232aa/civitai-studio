@@ -60,18 +60,18 @@ def load():
 
 
 def _boot_ui_patch():
-    """Upgrade old Night Lab HTML even if started via python3 server.py."""
+    """Upgrade v0737 Night Lab HTML even if started via python3 server.py."""
     try:
         import static_patch
         from pathlib import Path
         target = Path(__file__).resolve().parent.parent / "static" / "index.html"
         raw = target.read_text(encoding="utf-8")
-        if "v0745" in raw:
+        if "v0746" in raw or "v0745" in raw:
             return
         out = static_patch.patch_index(raw)
         if out != raw:
             target.write_text(out, encoding="utf-8")
-            print("[web] patched static/index.html", flush=True)
+            print("[web] patched static/index.html to v0739", flush=True)
     except Exception as e:
         print("[web] static_patch skip", e, flush=True)
 
