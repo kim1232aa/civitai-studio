@@ -160,6 +160,27 @@ def main() -> int:
     assert _hf_row("Tongyi-MAI/Z-Image-Turbo", "Z-Image-Turbo", "text-to-image")["category"] == "image"
     assert hf_apply({"id": "a/super-resolution", "name": "SR", "category": "image"})["category"] == "upscale"
 
+    # v0758: widen Nomos / 4x family upscale classifier (not bare 4x / Z-Image)
+    nomos = {"id": "muse/4xNomos8kSCHAT-L", "name": "4xNomos8kSCHAT-L"}
+    assert ms_up(nomos) and hf_up(nomos), nomos
+    assert ms_apply(dict(nomos, category="image"))["category"] == "upscale"
+    assert hf_apply(dict(nomos, category="image"))["category"] == "upscale"
+    assert _hub_row(nomos, "image", "text-to-image", ["t2i"], False, False)["category"] == "upscale"
+    assert _hf_row("muse/4xNomos8kSCHAT-L", "4xNomos8kSCHAT-L", "text-to-image")["category"] == "upscale"
+
+    apisr_x = {"id": "Xenova/4x_APISR_GRL_GAN_generator-onnx", "name": "4x_APISR_GRL_GAN_generator-onnx"}
+    assert ms_up(apisr_x) and hf_up(apisr_x), apisr_x
+    assert _hf_row(apisr_x["id"], apisr_x["name"], "text-to-image")["category"] == "upscale"
+
+    zimg = {"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image-Turbo"}
+    assert not ms_up(zimg) and not hf_up(zimg), zimg
+    assert ms_apply(dict(zimg, category="image"))["category"] == "image"
+    assert hf_apply(dict(zimg, category="image"))["category"] == "image"
+    assert _hf_row("Tongyi-MAI/Z-Image-Turbo", "Z-Image-Turbo", "text-to-image")["category"] == "image"
+    # bare 4x / flux / turbo must NOT flip to upscale
+    assert not ms_up({"id": "org/some-4x-model", "name": "some 4x model"})
+    assert not hf_up({"id": "black-forest-labs/FLUX.1-schnell", "name": "FLUX.1 schnell"})
+
     print("PASS p0 wiring")
     return 0
 

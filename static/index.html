@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0757</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0758</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0757" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0758" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0757</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0758</div>
   </div>
 </aside>
 
@@ -1248,8 +1248,14 @@ function loraVersionId(l) {
   return m ? m[1] : '';
 }
 function hubUpscaleBlob(it) {
-  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
-  return /onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob);
+  // Keep in sync with providers/hub_classify.py — Nomos/4x families, not bare 4x / Z-Image.
+  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + (it.pipelineTag || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
+  const family = 'nomos|esrgan|apisr|realesr(?:gan)?|cugan|ultrasharp|remacri|swinir|hat|dat|span|animesharp|animevig|schat|compact|latent.?upscaler|lds?r|upscaler?';
+  if (/onnx|upscal|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob)) return true;
+  if (/\bnomos\d|nomos8k|4xnomos|8xnomos|\d+x[_-]?nomos/.test(blob)) return true;
+  if (new RegExp('\\d+x[_-]?(?:' + family + ')').test(blob)) return true;
+  if (new RegExp('\\d+x.{0,20}(?:' + family + ')|(?:' + family + ').{0,20}\\d+x').test(blob)) return true;
+  return false;
 }
 function matchRecipe(it, r) {
   if (!it) return false;
@@ -1335,8 +1341,8 @@ function backendClickLocked(id) {
 function isBadAutoPick(it) {
   if (!it) return true;
   if (it.needsSource || it.needsFirstFrame) return true;
-  const blob = ((it.id || '') + ' ' + (it.name || '') + ' ' + (it.task || '') + ' ' + ((it.tags || []).join(' '))).toLowerCase();
-  return /onnx|upscale|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob) || it.category === 'upscale';
+  if (it.category === 'upscale') return true;
+  return hubUpscaleBlob(it);
 }
 function dockHold() {
   try {
@@ -1705,8 +1711,12 @@ function selectService(it, opts) {
     if (keep) it = keep;
     else return false;
   }
-  // Programmatic (no {user:true}): never bind upscale/onnx/needsSource onto 文生图.
-  if (!opts.user && recipe === 'image' && it && (isBadAutoPick(it) || hubUpscaleBlob(it))) {
+  // Image recipe: refuse upscale always (user click or programmatic). needsSource only when programmatic.
+  if (recipe === 'image' && it && (hubUpscaleBlob(it) || (it.category || '') === 'upscale')) {
+    setDock('未改选中：该模型是超分/需源图，不适合文生图', 'warn');
+    return false;
+  }
+  if (!opts.user && recipe === 'image' && it && isBadAutoPick(it)) {
     setDock('未改选中：该模型是超分/需源图，不适合文生图', 'warn');
     return false;
   }
