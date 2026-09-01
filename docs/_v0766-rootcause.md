@@ -9,9 +9,7 @@
 
 ## Exact write of MusePublic into userPickedId
 
-**File:line: `static/index.html` `selectService` — `userPickedId = it.id` when `opts.user`**
-
-(Pre-v0766 ~L1807; still the sole assignment of a new Hub pick id.)
+**Exact assignment: `static/index.html:1853`** — `userPickedId = it.id` inside `selectService` when `opts.user` (sole Hub pick write; pre-v0766 was ~L1807).
 
 ```js
 if (opts.user && it && it.id && !(goBusy || generateLockId)) {
