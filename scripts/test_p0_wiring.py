@@ -181,6 +181,43 @@ def main() -> int:
     assert not ms_up({"id": "org/some-4x-model", "name": "some 4x model"})
     assert not hf_up({"id": "black-forest-labs/FLUX.1-schnell", "name": "FLUX.1 schnell"})
 
+    # v0759: NMKD / VAE / ControlNet / GGUF / LoRA out of image; Z-Image stays image
+    from providers.hub_classify import apply_hub_category, hub_utility_blob
+    nmkd = {"id": "org/NMKD_Siax_200k_x4", "name": "NMKD_Siax_200k_x4", "category": "image"}
+    assert ms_up(nmkd) and hf_up(nmkd), nmkd
+    assert ms_apply(dict(nmkd))["category"] == "upscale"
+    assert hf_apply(dict(nmkd))["category"] == "upscale"
+    assert _hub_row(nmkd, "image", "text-to-image", ["t2i"], False, False)["category"] == "upscale"
+    assert apply_hub_category(dict(nomos, category="image"))["category"] == "upscale"
+
+    nmkd2 = {"id": "org/NMKDSuperscale15000G8x", "name": "NMKDSuperscale15000G8x", "category": "image"}
+    assert apply_hub_category(dict(nmkd2))["category"] == "upscale"
+
+    cnet = {"id": "lllyasviel/sd-controlnet-canny", "name": "ControlNet Canny", "category": "image"}
+    assert hub_utility_blob(cnet)
+    assert apply_hub_category(dict(cnet))["category"] == "utility"
+    assert ms_apply(dict(cnet))["category"] != "image"
+    assert hf_apply(dict(cnet))["category"] != "image"
+
+    fvae = {"id": "black-forest-labs/flux_vae", "name": "flux_vae", "category": "image"}
+    assert hub_utility_blob(fvae)
+    assert apply_hub_category(dict(fvae))["category"] == "utility"
+    assert ms_apply(dict(fvae))["category"] != "image"
+
+    gguf = {"id": "org/weights-gguf", "name": "model.gguf", "category": "image"}
+    assert apply_hub_category(dict(gguf))["category"] == "utility"
+
+    lora = {"id": "user/cool-style_lora", "name": "cool-style_lora", "category": "image"}
+    assert apply_hub_category(dict(lora))["category"] == "utility"
+
+    assert apply_hub_category({"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image-Turbo", "category": "image"})["category"] == "image"
+    assert _hub_row(
+        {"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z-Image-Turbo"},
+        "image", "text-to-image", ["t2i"], False, False,
+    )["category"] == "image"
+    assert _hf_row("Qwen/Qwen-Image", "Qwen-Image", "text-to-image")["category"] == "image"
+    assert _hf_row("black-forest-labs/FLUX.1-schnell", "FLUX.1 schnell", "text-to-image")["category"] == "image"
+
     print("PASS p0 wiring")
     return 0
 
