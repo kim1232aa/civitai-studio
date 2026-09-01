@@ -243,6 +243,21 @@ def main() -> int:
     bare_nomos = {"id": "muse/nomos", "name": "nomos", "category": "image"}
     assert hub_up(bare_nomos) and ms_up(bare_nomos) and hf_up(bare_nomos), bare_nomos
 
+    # v0761: video-tagged VAE / wan_2.1_vae → utility; categories include utility
+    wan_vae = {"id": "Wan-AI/wan_2.1_vae", "name": "wan_2.1_vae", "category": "video", "tags": ["t2v"]}
+    assert hub_utility_blob(wan_vae), wan_vae
+    assert apply_hub_category(dict(wan_vae))["category"] == "utility", wan_vae
+    assert apply_hub_category(dict(wan_vae))["category"] != "video"
+    vid_vae = {"id": "org/some_video_vae", "name": "video_vae", "category": "video"}
+    assert apply_hub_category(dict(vid_vae))["category"] == "utility"
+    # leave real video models alone
+    real_vid = {"id": "tencent/HunyuanVideo", "name": "HunyuanVideo", "category": "video", "task": "text-to-video"}
+    assert apply_hub_category(dict(real_vid))["category"] == "video"
+    ms = ModelScopeProvider("ai")
+    assert "utility" in ms.categories()
+    from providers.huggingface import HuggingFaceProvider
+    assert "utility" in HuggingFaceProvider().categories()
+
     print("PASS p0 wiring")
     return 0
 

@@ -766,7 +766,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0760</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0761</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1008,9 +1008,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0760" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0761" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0760</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。 · v0761</div>
   </div>
 </aside>
 
@@ -1048,13 +1048,25 @@ window.__studioGo = function (ev) {
   try { if (typeof setDock === 'function') setDock('已点到生成'); } catch (e) {}
   if (window.__goOnce && (Date.now() - window.__goOnce) < 400) return false;
   window.__goOnce = Date.now();
+  const boom = (e) => {
+    lastGoFail = Date.now();
+    try { goBusy = false; } catch (e0) {}
+    const msg = "生成出错 " + (e && e.message || e);
+    try { console.error('[studioGo]', e); } catch (e1) {}
+    try { setDock(msg, 'bad'); } catch (e2) {
+      const d = document.getElementById("dockStatus");
+      if (d) { d.className = 'bad'; d.textContent = msg; }
+    }
+  };
   if (typeof onGenerate === 'function') {
-    try { return onGenerate(ev); } catch (e) {
-      lastGoFail = Date.now();
-      try { setDock("生成出错 " + (e && e.message || e), 'bad'); } catch (e2) {
-        const d = document.getElementById("dockStatus");
-        if (d) { d.className = 'bad'; d.textContent = "生成出错 " + (e && e.message || e); }
+    try {
+      const ret = onGenerate(ev);
+      if (ret && typeof ret.then === 'function') {
+        ret.catch(boom);
       }
+      return ret;
+    } catch (e) {
+      boom(e);
     }
   }
   return false;
@@ -1254,7 +1266,8 @@ function hubUpscaleBlob(it) {
   const family = 'nomos|esrgan|apisr|realesr(?:gan)?|cugan|ultrasharp|remacri|swinir|hat(?:-?l)?|dat(?:-?2)?|span|animesharp|animevig|schat|compact|latent.?upscaler|lds?r|upscaler?|nmkd|siax|superscale';
   if (/onnx|upscal|apisr|realesr|esrgan|super.?res|generator-onnx/.test(blob)) return true;
   if (/\bnomos\d|nomos8k|4xnomos|8xnomos|\d+x[_-]?nomos|\bnomos\b/.test(blob)) return true;
-  if (/\b(?:siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|hat-l|dat-2|span)\b|nmkd[_-]?siax|nmkd[_-]?superscale|nmkdsuperscale/.test(blob)) return true;
+  // Same _UPSCALE_FAMILY_TOKENS word-boundary set as hub_classify.py
+  if (/\b(?:siax|superscale|remacri|ultrasharp|animevig|ldsr|swinir|hat-l|dat-2|span|nomos|apisr|esrgan|realesr(?:gan)?|cugan|animesharp|schat|compact|latent.?upscaler)\b|nmkd[_-]?siax|nmkd[_-]?superscale|nmkdsuperscale|4xnomos|8xnomos|\bnomos\d|nomos8k/.test(blob)) return true;
   if (new RegExp('\\d+x[_-]?(?:' + family + ')').test(blob)) return true;
   if (new RegExp('\\d+x.{0,20}(?:' + family + ')|(?:' + family + ').{0,20}\\d+x').test(blob)) return true;
   return false;
@@ -1292,19 +1305,19 @@ function matchRecipe(it, r) {
   if (!it) return false;
   if (r === 'workflow') return false;
   if (backend !== 'civitai' || it.backend) {
+    const cat = (it.category || '');
+    // Utility blobs never belong in any recipe tab (video must not list VAE weights).
+    if (hubUtilityBlob(it) || cat === 'utility') return false;
+    // Upscale blobs / category only on upscale tab.
+    if (hubUpscaleBlob(it) || cat === 'upscale') return r === 'upscale';
     if (r === 'image') {
-      if ((it.category || '') !== 'image') return false;
-      // Always drop onnx/apisr/upscale/utility rows from 文生图 (APISR sorts into CAP 60).
-      if (hubUpscaleBlob(it) || hubUtilityBlob(it)) return false;
+      if (cat !== 'image') return false;
       // Hub catalogs: also drop needsSource i2i so 「需要源图」 cannot steal generate.
       if ((isModelscope() || backend === 'huggingface') && isBadAutoPick(it)) return false;
       return true;
     }
-    if (r === 'upscale') {
-      if ((it.category || '') === 'upscale') return true;
-      return hubUpscaleBlob(it);
-    }
-    return (it.category || '') === r;
+    if (r === 'upscale') return false;
+    return cat === r;
   }
   if (r === 'image') return it.category === 'image' && it.step === 'imageGen';
   if (r === 'video') return it.category === 'video' && it.step === 'videoGen';
@@ -1616,6 +1629,7 @@ function svcRow(it, tags) {
   </button>`;
 }
 function findCatalogItem(id) {
+  // Exact string equality only — never includes()/substring (Qwen-Image ≠ Qwen-Image-2512).
   id = String(id == null ? '' : id);
   if (!id) return null;
   return catalog.find(x => String(x.id) === id) || catalog.find(x => String(x.serviceId || '') === id) || null;
@@ -2029,6 +2043,21 @@ function syncImportChrome() {
   else if (backend === 'huggingface' || isModelscope() || isNanogpt()) inp.placeholder = 'Civitai 图 id / 链接，也可本地 PNG';
   else inp.placeholder = 'Civitai 图 id / 链接';
 }
+function catalogIdMatchesWant(it, want) {
+  // Exact id OR exact name. Includes only when want is a full id prefix ending at `/`
+  // (foo/bar matches foo/bar/baz) — NOT substring cousins (Qwen-Image ↛ Qwen-Image-2512).
+  if (!it || want == null || want === '') return false;
+  const id = String(it.id || '');
+  const name = String(it.name || '');
+  const w = String(want);
+  if (id === w || name === w) return true;
+  const idl = id.toLowerCase();
+  const namel = name.toLowerCase();
+  const wl = w.toLowerCase();
+  if (idl === wl || namel === wl) return true;
+  if (wl && idl.startsWith(wl + '/')) return true;
+  return false;
+}
 function selectFirstInCatalog(want) {
   const list = catalog.filter(it => matchRecipe(it, recipe));
   const has = (id) => list.some(x => x.id === id);
@@ -2036,8 +2065,7 @@ function selectFirstInCatalog(want) {
     if (has(id) && selectServiceById(id)) return true;
   }
   for (const id of want) {
-    const nl = String(id || '').toLowerCase();
-    const hit = list.find(it => ((it.id || '') + ' ' + (it.name || '')).toLowerCase().includes(nl.split('/').pop()));
+    const hit = list.find(it => catalogIdMatchesWant(it, id));
     if (hit && selectServiceById(hit.id)) return true;
   }
   return false;
@@ -2731,6 +2759,11 @@ async function onGenerate(ev) {
   goClickLock = true;
   try {
     await runGenerate();
+  } catch (e) {
+    lastGoFail = Date.now();
+    try { goBusy = false; } catch (e0) {}
+    try { console.error('[onGenerate]', e); } catch (e1) {}
+    try { setDock('生成出错 ' + (e && e.message || e), 'bad'); } catch (e2) {}
   } finally {
     goClickLock = false;
   }
@@ -2741,9 +2774,12 @@ async function runGenerate() {
   const label = (window._providerLabel && window._providerLabel[backend]) || backend;
   lastGoClick = Date.now();
   lastGoStart = Date.now();
+  // Freeze user pick for this run — never fuzzy-replace with a cousin id.
+  const frozenPick = userPickedId ? String(userPickedId) : null;
   const fail = (msg) => {
     lastGoFail = Date.now();
     lastGoClick = Date.now();
+    try { console.error('[runGenerate:fail]', msg); } catch (e0) {}
     setDock(msg, 'bad');
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = '生成'; }
   };
@@ -2774,18 +2810,30 @@ async function runGenerate() {
         return;
       }
     } else {
-      // Force sticky user pick without clearing userPickedId (selectService is non-user).
-      if (userPickedId) {
-        const keep = findCatalogItem(userPickedId);
-        if (keep) selectService(keep);
+      // Exact restore of frozen user pick — never pickForBackend / cousin when set.
+      if (frozenPick) {
+        const keep = findCatalogItem(frozenPick);
+        if (!keep) { fail('已选模型不在目录：' + frozenPick + '（请重新点选）'); return; }
+        selectService(keep);
+        if (!selected || String(selected.id) !== frozenPick) {
+          fail('无法固定已选模型：要 ' + frozenPick + ' 现 ' + (selected && selected.id));
+          return;
+        }
+        if (picked) picked.serviceId = frozenPick;
       }
-      if (!currentServiceId() && backend !== 'civitai' && !userPickedId && !selectionLocked()) pickForBackend();
+      if (!currentServiceId() && backend !== 'civitai' && !frozenPick && !userPickedId && !selectionLocked()) pickForBackend();
       if (!currentServiceId()) { fail('先点列表里的一个模型'); return; }
       if (picked && !picked.serviceId) picked.serviceId = currentServiceId();
-      // Re-assert after any sync work — upscale/onnx must not replace imageGen pick.
-      if (userPickedId && selected && selected.id !== userPickedId) {
-        const keep = findCatalogItem(userPickedId);
-        if (keep) selectService(keep);
+      // Re-assert exact freeze — cousin / auto-pick must not replace.
+      if (frozenPick && selected && String(selected.id) !== frozenPick) {
+        const keep = findCatalogItem(frozenPick);
+        if (!keep) { fail('选中漂移且原模型丢失：' + frozenPick); return; }
+        selectService(keep);
+        if (!selected || String(selected.id) !== frozenPick) {
+          fail('选中被替换，已取消生成（要 ' + frozenPick + ' 现 ' + (selected && selected.id) + '）');
+          return;
+        }
+        if (picked) picked.serviceId = frozenPick;
       }
       if (recipe === 'image' && isBadAutoPick(selected)) {
         fail('请重新点选文生图模型，当前是超分/需要源图的模型');
@@ -2810,17 +2858,46 @@ async function runGenerate() {
     const srcNeed = needsSource(selected) && !needsFirstFrame(selected);
     if (srcNeed && !$('sourceImage').value.trim()) { fail('这个服务需要源图'); return; }
     if (needsFirstFrame(selected) && !$('firstFrame').value.trim()) { fail('这个服务需要首帧图'); return; }
+    // Final cousin-guard before POST
+    if (frozenPick && (!selected || String(selected.id) !== frozenPick || String(currentServiceId()) !== frozenPick)) {
+      fail('提交前选中漂移：要 ' + frozenPick + ' 现 ' + currentServiceId());
+      return;
+    }
     try { fetch('/api/go?t=' + Date.now()); } catch (e) {}
     goBusy = true;
     if (go) { go.disabled = false; go.removeAttribute('disabled'); go.textContent = "提交中…"; }
     setDock("正在提交…");
     await afterPaint();
     const pl = payload();
+    if (frozenPick && pl && String(pl.serviceId || '') !== frozenPick) {
+      fail('payload 模型漂移：要 ' + frozenPick + ' 现 ' + (pl && pl.serviceId));
+      return;
+    }
     const syncGen = pl.backend === 'huggingface' || (pl.backend === 'nano-gpt' && pl.kind !== 'video');
     setDock(syncGen ? '正在生成…' : '正在提交到队列…');
     await startWait(syncGen ? '正在生成' : '正在提交到队列');
     if (syncGen) tickWait('同步等待模型返回，请稍候');
-    const j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl), timeoutMs: syncGen ? 300000 : 180000 });
+    let j;
+    try {
+      j = await api('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pl), timeoutMs: syncGen ? 300000 : 180000 });
+    } catch (e) {
+      stopWait();
+      const snip = e && e.data ? JSON.stringify(e.data).slice(0, 240) : (e && e.message) || String(e);
+      const st = (e && e.status) != null ? e.status : '?';
+      try { console.error('[runGenerate:POST]', st, snip, e); } catch (e2) {}
+      fail('生成失败 HTTP ' + st + ' ' + snip);
+      return;
+    }
+    if (j == null || (typeof j === 'object' && !Object.keys(j).length)) {
+      stopWait();
+      fail('提交失败：空响应');
+      return;
+    }
+    if (j.error || j.detail) {
+      stopWait();
+      fail('提交失败 ' + String(j.error || j.detail).slice(0, 300));
+      return;
+    }
     const jobId = j.id || j.workflowId || j.token;
     const saved = j.saved || [];
     if (saved.length) saved.forEach(s => addCard(s.url, jobId || s.file, s.kind === 'video' || /\.(mp4|webm)$/i.test(s.file || s.url || '')));
@@ -2830,7 +2907,7 @@ async function runGenerate() {
       else setDock('好了', 'ok');
       return;
     }
-    if (!jobId) { stopWait(); lastGoFail = Date.now(); setDock('提交失败 ' + JSON.stringify(j).slice(0, 300), 'bad'); return; }
+    if (!jobId) { stopWait(); fail('提交失败 ' + JSON.stringify(j).slice(0, 300)); return; }
     waitJobId = jobId;
     const cancelBtn = $('waitCancel');
     if (cancelBtn) cancelBtn.disabled = false;
@@ -2840,7 +2917,8 @@ async function runGenerate() {
     await poll(jobId);
   } catch (e) {
     lastGoFail = Date.now();
-    setDock('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : e.message), 'bad');
+    try { console.error('[runGenerate]', e && e.status, e && e.data || e && e.message, e); } catch (e2) {}
+    setDock('生成失败 ' + (e.data ? JSON.stringify(e.data).slice(0, 240) : (e && e.message) || e), 'bad');
     stopWait();
   } finally {
     goBusy = false;

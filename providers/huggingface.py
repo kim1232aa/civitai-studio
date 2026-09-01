@@ -435,7 +435,9 @@ class HuggingFaceProvider(Provider):
         return search_loras(q)
 
     def categories(self) -> list:
-        return sorted({x.get("category") for x in load_items() if x.get("category")})
+        cats = {x.get("category") for x in load_items() if x.get("category")}
+        cats.update({"image", "video", "upscale", "utility"})
+        return sorted(cats)
 
     def catalog(self, q, category, status) -> dict:
         qn = (q or "").strip()

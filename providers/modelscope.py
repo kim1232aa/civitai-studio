@@ -349,7 +349,7 @@ class ModelScopeProvider(Provider):
         return f"{self.label} 地址 {self._base} 连不上。AI 和 CN 是两套接口，不会改走另一边。"
 
     def categories(self) -> list:
-        return ["image", "video", "upscale"]
+        return ["image", "video", "upscale", "utility"]
 
     def catalog(self, q, category, status) -> dict:
         qn = (q or "").strip()

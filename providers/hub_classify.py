@@ -181,11 +181,12 @@ def hub_utility_blob(it) -> bool:
 
 
 def apply_hub_category(row: dict) -> dict:
-    """upscale → category upscale; adapter/vae/controlnet/gguf/lora → utility; else leave."""
+    """upscale → category upscale; adapter/vae/controlnet/gguf/lora → utility; else leave.
+
+    Always reclassify upscale/utility blobs even when Hub already tagged category
+    as video (or other non-image) — otherwise wan_2.1_vae slips into the video tab.
+    """
     if not isinstance(row, dict):
-        return row
-    cat = row.get("category") or "image"
-    if cat != "image":
         return row
     if hub_upscale_blob(row):
         row = dict(row)
