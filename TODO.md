@@ -1,5 +1,5 @@
 # Night Lab 代办清单
-更新：2026-09-01 · v0745
+更新：2026-09-02 · v0753
 
 原则：不造幻觉功能、不删已有功能、只接官方已有字段。
 
@@ -9,7 +9,7 @@
 
 - [ ] 不要加 xAI 后端 / xAI 出图
 - [ ] 不要用 Civitai 公开 `/api/v1/images` 冒充完整导入（`meta` 经常是 null）
-- [ ] 不要给 HF / 魔搭发明 `loras` 槽（`/v1/images/generations` 没有这个字段）
+- [ ] 不要给 HF OpenAI 兼容通道发明 `loras`（那条通道忽略）。Fal 路由 mapped turbo 可带 `loras[]`；魔搭只要 Hub `owner/repo`。细则见 `docs/provider-lora.md`
 - [ ] 不要删除 Fal LoRA（搜索、导入、payload、发送）。Fal 官方有 `loras` 参数
 - [ ] 不要给 Fal / HF / 魔搭做黄 Buzz
 - [ ] 不要导入后代点生成
@@ -96,6 +96,25 @@
 - [ ] Fal 本地目录离线可筛服务
 
 ---
+
+
+
+---
+
+## 越权复盘（v0737→v0753，用户纠正后）
+
+**不算越权**
+
+- NanoGPT：用户明确要加。
+- HF / 魔搭 LoRA：官方可用。见 [`docs/provider-lora.md`](docs/provider-lora.md)。不要再写成「发明字段」。
+- v0753 已撤：魔搭 Civitai→Hub 自动换 Asian-beauty。
+
+**还算偏歪 / 待收**
+
+1. **`static_patch.py` 旁路**  
+   启动时改 HTML。v0753 源文件上已是 no-op，但仍挂在 `providers/__init__.py` / `run.sh`。应收进 `static/index.html` 后删掉旁路，避免再 silently 改 hash / persist。
+2. **Nano 宽高静默收成目录 resolution token**  
+   接线必须用 token（文档已写）。偏歪点是 UI 没让人看见改成了啥。应在 dock / 表单显示实际提交的 `resolution` / `aspect_ratio`。
 
 ## 验收用例
 

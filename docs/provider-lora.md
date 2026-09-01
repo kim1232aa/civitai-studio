@@ -119,6 +119,7 @@ v0752 曾把 `3231694` 静默换成 `laonansheng/Asian-beauty-Z-Image-Turbo-Tong
 代表问题（已在 v0749 修接线）：
 
 - 分辨率若按「第一个 token」会落到 `256*256`。
+- 宽高会收成目录 resolution token / aspect_ratio（接线合理）。**UI 必须让人看见实际提交的 token**，不要静默改完不提示。
 - 图生图同时塞 `image` / `imageUrl` / `imageDataUrl` / `input_references` 会被拒。
 - denoise 曾在 slim 时被删，strength 出不去。
 

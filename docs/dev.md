@@ -18,6 +18,10 @@
 | 能力/缓存文档 | `docs/` |
 | AIR 缓存 | `docs/air-cache/files.json` `docs/air-cache/packs.json` |
 | 工作流 fixture | `docs/workflows/<versionId>.json` |
+| 启动时 HTML 旁路（待删） | `static_patch.py`（`providers/__init__.py` / `run.sh`） |
+
+
+`static_patch.py` 是 v0738 应急旁路。源 `static/index.html` 已含点击/`/api/go` 修复后应删掉旁路，不要再靠它改 hash 或 stamp。
 
 绑定：`127.0.0.1:8765`。不要改成 `0.0.0.0`。浏览器地址栏用 `http://127.0.0.1:8765/#<backend>`。
 
