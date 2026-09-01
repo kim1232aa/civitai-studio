@@ -8,6 +8,7 @@
 - 开发约定：[`docs/dev.md`](docs/dev.md)
 - 审查规范：[`docs/review-spec.md`](docs/review-spec.md)
 - 供应商插件：[`docs/providers.md`](docs/providers.md)
+- 各家 LoRA / 自定义参数 / 代表问题：[`docs/provider-lora.md`](docs/provider-lora.md)
 
 ## 待解决问题（按提到的次数）
 
@@ -23,14 +24,16 @@
    zip 能导入后：对照表曾被 HF 模型列表挤掉（`.svc-list{display:flex}` 盖掉 `hidden`）；刷新会丢导入；sidecar `config.json` / 纯 PNG 版本曾报「不是合法 JSON」。完整 Comfy 图（社区节点）仍不能当本地 Comfy 跑。
 6. **P2 还没做完的能力**  
    Civitai 剩余配方进 UI（音频 / 3D / 试穿等）；Fal `request_id` + PNG 元数据反查；Fal 大目录一次渲染过多曾整页 `GET /` 并跳回 Civitai（已限 60 条，仍要防回归）。
+7. **P2 LoRA 假信心**  
+   魔搭丢掉 Civitai 下载链后仍出底模，页面只显示「好了」。HF 把 `loras[]` 附在没有 `/lora` 的 turbo 上，sidecar 有字段不等于上游加载。详见 [`docs/provider-lora.md`](docs/provider-lora.md)。
 
 ## 能干什么
 
 - **Civitai**：图 / 视频 / customComfy。导入 Civitai 图抽参数。工作流按文件名和节点查 AIR，查不到就列 unmatched，不编 URN。
-- **Fal.ai**：图、视频、放大、3D、音频。LoRA 走 `loras: [{path, scale}]`。目录不要一次画出全部按钮。
-- **Hugging Face**：FLUX、Qwen、Z-Image-Turbo、HunyuanVideo。同步返回文件。
-- **NanoGPT**：图 / 视频。官方目录 200+ 图模、LoRA、图生图、seed、比例。密钥 `~/.config/nano-gpt/token`。
-- **魔搭 AI** 与 **魔搭 CN** 是两家，**禁止互相 fallback**。AI 连不上就报连接错误，不要改走 CN。
+- **Fal.ai**：图、视频、放大、3D、音频。LoRA 走 `loras: [{path, scale}]`，无该字段时切目录里的 `/lora` 兄弟端点。目录不要一次画出全部按钮。
+- **Hugging Face**：FLUX、Qwen、Z-Image-Turbo、HunyuanVideo。同步返回文件。路由没有 Fal `/lora` 端点；Civitai 链会塞进 mapped turbo 的 `loras[]`，是否生效未证实。
+- **NanoGPT**：图 / 视频。官方目录 200+ 图模、LoRA、图生图、seed、比例。密钥 `~/.config/nano-gpt/token`。LoRA 用带 `-lora` 的模型 + Civitai/HF path。
+- **魔搭 AI** 与 **魔搭 CN** 是两家，**禁止互相 fallback**。AI 连不上就报连接错误，不要改走 CN。LoRA 只要 Hub `owner/repo`，Civitai 下载链不能用。
 
 ## 跑起来
 
@@ -67,3 +70,4 @@ chmod +x run.sh
 - 不要代点「生成 / 预估 / 导入」。审查只截图、读代码、点页面，不调生成 API。
 - 成人内容默认开。
 - 不要把 token、`out/`、测试草稿 `docs/_p*.md` 提交进 git。
+- 不要把「找替代 LoRA」写进产品代码当自动映射。
