@@ -45,6 +45,14 @@ catalog 覆盖：仅当服务 `task`/`tags` 含 i2v 才抬；`provider.i2v=none`
 4. 并行多个**终端**汇点（彼此无 image 真边串起）→ 阻断。
 5. wiring 断言：物化图有 `firstFrame`/`sourceImage` URL；Nano 无 `width`/`height`；无边不得出现图字段。
 
+## UI demo（cloud-nodes.html）
+
+| 入口 | 图 | 校验后 |
+|---|---|---|
+| `/cloud-nodes.html` 或 `?demo=i2v` / 「单步 demo」 | image→i2v | 绿 ok · 生成可点 |
+| `/cloud-nodes.html?demo=chain` / 「链式 demo」 | t2i→i2v（同 `scripts/demo_graph_chain.py`） | 琥珀 info · `multiStep` · 生成灰 |
+| `?demo=chain3` | t2i→i2i→i2v | 同上 |
+
 ## 不做
 
 - 一次点击串跑 t2i+i2v 假装整链出片（无 stages / 无真边）

@@ -3,6 +3,12 @@
 
 Prints compile summaries for allowed staged chains and still-blocked fakes.
 Does not call /api/generate (staged plans must not one-shot fake-run).
+
+UI (static/cloud-nodes.html) loads the same graphs via:
+  /cloud-nodes.html?demo=chain   → t2i→i2v (multiStep / execute=staged)
+  /cloud-nodes.html?demo=chain3  → t2i→i2i→i2v
+  /cloud-nodes.html?demo=i2v     → single-step image→i2v
+Or dock buttons 「链式 demo」 / 「单步 demo」.
 """
 from __future__ import annotations
 

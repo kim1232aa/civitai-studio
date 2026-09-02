@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Cloud Nodes POC · Night Lab · v0778-chain</title>
+<title>Cloud Nodes POC · Night Lab · v0779-chain-demo</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -47,7 +47,7 @@
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 t2i/i2i/i2v</span>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain</span>
     <a href="/">← 回主台</a>
   </header>
   <div class="wrap">
@@ -77,45 +77,110 @@
     </main>
   </div>
   <div class="dock">
+    <button class="btn ghost" type="button" id="btnDemoSingle" title="单步 image→i2v · ?demo=i2v">单步 demo</button>
+    <button class="btn ghost" type="button" id="btnDemoChain" title="多步 t2i→i2v · ?demo=chain">链式 demo</button>
     <button class="btn ghost" type="button" id="btnValidate">校验图</button>
     <button class="btn ghost" type="button" id="btnBreakImage" title="拆掉 image→i2v 边">断 image 边</button>
     <button class="btn ghost" type="button" id="btnBreakPrompt" title="拆掉 prompt→i2v 边">断 prompt 边</button>
     <button class="btn" type="button" id="btnGen">生成</button>
-    <span class="muted" id="dockMsg">主路径 image→i2v；缺 image 边红字阻断，禁止偷成片栏。</span>
+    <span class="muted" id="dockMsg">主路径 image→i2v；多步链请开 链式 demo 或 /cloud-nodes.html?demo=chain</span>
   </div>
 <script>
-const nodes = [
-  { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'https://example.com/frame.png' } },
-  { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:280, bd:'可选连入 i2v', params:{ text:'camera slowly pans left, cinematic' } },
-  { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:420, bd:'只认连线', params:{ value: 4924112 } },
-  { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'', duration:5, resolution:'1280x720' } },
-];
-// Main path: image→i2v (+ optional prompt/seed). Missing image → blocked.
-const DEFAULT_EDGES = [
-  { from:'img', fromPort:'image', to:'v', toPort:'image' },
-  { from:'p', fromPort:'prompt', to:'v', toPort:'prompt' },
-  { from:'s', fromPort:'seed', to:'v', toPort:'seed' },
-];
-const EDGE_STORE_KEY = 'cloud-nodes-poc-edges-v1';
+/** Demos mirror scripts/demo_graph_chain.py (real image edges → multiStep/staged). */
+const DEMO_I2V = {
+  id: 'i2v',
+  label: '单步 image→i2v',
+  backend: 'nano-gpt',
+  serviceId: 'vidu-q2-pro',
+  selected: 'v',
+  hint: '单步 demo · /cloud-nodes.html?demo=i2v · 校验应绿 · 生成可点',
+  nodes: [
+    { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'https://example.com/frame.png' } },
+    { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:280, bd:'可选连入 i2v', params:{ text:'camera slowly pans left, cinematic' } },
+    { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:420, bd:'只认连线', params:{ value: 4924112 } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+  ],
+  edges: [
+    { from:'img', fromPort:'image', to:'v', toPort:'image' },
+    { from:'p', fromPort:'prompt', to:'v', toPort:'prompt' },
+    { from:'s', fromPort:'seed', to:'v', toPort:'seed' },
+  ],
+};
+/** t2i→i2v from demo_graph_chain.py — compile → multiStep + execute=staged */
+const DEMO_CHAIN = {
+  id: 'chain',
+  label: '链式 t2i→i2v',
+  backend: 'nano-gpt',
+  serviceId: 'vidu-q2-pro',
+  selected: 'v',
+  hint: '链式 demo · /cloud-nodes.html?demo=chain · 校验琥珀(多步) · 生成保持灰',
+  nodes: [
+    { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:200, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
+    { id:'g', op:'t2i', title:'文生图', cls:'', x:300, y:180, bd:'image → i2v', params:{ serviceId:'flux', resolution:'1024x1024' } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:560, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+  ],
+  edges: [
+    { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
+    { from:'g', fromPort:'image', to:'v', toPort:'image' },
+  ],
+};
+/** Longer chain also in demo_graph_chain.py */
+const DEMO_CHAIN3 = {
+  id: 'chain3',
+  label: '链式 t2i→i2i→i2v',
+  backend: 'nano-gpt',
+  serviceId: 'vidu-q2-pro',
+  selected: 'v',
+  hint: '链式 demo · /cloud-nodes.html?demo=chain3 · 校验琥珀(多步) · 生成保持灰',
+  nodes: [
+    { id:'p', op:'prompt', title:'提示词', cls:'', x:20, y:120, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
+    { id:'p2', op:'prompt', title:'精修词', cls:'', x:20, y:280, bd:'→ i2i', params:{ text:'refine details, film grain' } },
+    { id:'g', op:'t2i', title:'文生图', cls:'', x:240, y:100, bd:'image → i2i', params:{ serviceId:'flux', resolution:'1024x1024' } },
+    { id:'g2', op:'i2i', title:'图生图', cls:'', x:460, y:180, bd:'image → i2v', params:{ serviceId:'flux-i2i' } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:680, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+  ],
+  edges: [
+    { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
+    { from:'p2', fromPort:'prompt', to:'g2', toPort:'prompt' },
+    { from:'g', fromPort:'image', to:'g2', toPort:'image' },
+    { from:'g2', fromPort:'image', to:'v', toPort:'image' },
+  ],
+};
+const DEMOS = { i2v: DEMO_I2V, single: DEMO_I2V, chain: DEMO_CHAIN, chain3: DEMO_CHAIN3 };
+function demoFromQuery(){
+  try {
+    const q = new URLSearchParams(location.search).get('demo');
+    if (q && DEMOS[q]) return q;
+  } catch (_) {}
+  return 'i2v';
+}
+let activeDemoId = demoFromQuery();
+let nodes = [];
+let edges = [];
+const EDGE_STORE_KEY = 'cloud-nodes-poc-edges-v2';
 const DISCONNECT_MSG = '已断开一条边 · 校验红 · 生成灰';
-function loadEdges(){
+function cloneEdges(list){
+  return (list || []).map(e => ({ from:e.from, fromPort:e.fromPort, to:e.to, toPort:e.toPort }));
+}
+function cloneNodes(list){
+  return (list || []).map(n => Object.assign({}, n, { params: Object.assign({}, n.params || {}) }));
+}
+function loadEdgesForDemo(demo){
   try {
     const raw = sessionStorage.getItem(EDGE_STORE_KEY);
-    if (!raw) return DEFAULT_EDGES.map(e => Object.assign({}, e));
+    if (!raw) return cloneEdges(demo.edges);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return DEFAULT_EDGES.map(e => Object.assign({}, e));
-    // Persist mid-session disconnects across live-reload; ignore corrupt entries
-    return parsed.filter(e => e && e.from && e.to && e.fromPort && e.toPort).map(e => ({
+    if (!parsed || parsed.demo !== demo.id || !Array.isArray(parsed.edges)) return cloneEdges(demo.edges);
+    return parsed.edges.filter(e => e && e.from && e.to && e.fromPort && e.toPort).map(e => ({
       from: e.from, fromPort: e.fromPort, to: e.to, toPort: e.toPort
     }));
   } catch (_) {
-    return DEFAULT_EDGES.map(e => Object.assign({}, e));
+    return cloneEdges(demo.edges);
   }
 }
 function saveEdges(){
-  try { sessionStorage.setItem(EDGE_STORE_KEY, JSON.stringify(edges)); } catch (_) {}
+  try { sessionStorage.setItem(EDGE_STORE_KEY, JSON.stringify({ demo: activeDemoId, edges })); } catch (_) {}
 }
-let edges = loadEdges();
 let selected = 'v';
 let lastCompile = null;
 /** Bumped on any graph change that invalidates compile (edge disconnect, backend/serviceId). */
@@ -153,7 +218,13 @@ function buildGraph(){
   const sid = $('serviceId').value.trim();
   const ns = nodes.map(n => {
     const params = Object.assign({}, n.params);
-    if (n.op === 't2i' || n.op === 'i2i' || n.op === 'i2v') params.serviceId = sid || params.serviceId;
+    if (n.op === 'i2v') {
+      // Rail drives the sink i2v serviceId
+      params.serviceId = sid || params.serviceId;
+    } else if (n.op === 't2i' || n.op === 'i2i') {
+      // Multi-step: keep node-local serviceId (do not overwrite t2i with vidu)
+      if (!params.serviceId) params.serviceId = sid;
+    }
     return { id:n.id, op:n.op, params };
   });
   return { backend: $('backend').value, nodes: ns, edges: edges.map(e => Object.assign({}, e)) };
@@ -166,18 +237,20 @@ function renderChips(){
   if (!n) return;
   const bits = [];
   if (n.op === 'i2v') {
-    bits.push(['model', $('serviceId').value || '—']);
+    bits.push(['model', $('serviceId').value || n.params.serviceId || '—']);
     bits.push(['dur', n.params.duration != null ? String(n.params.duration) : '—']);
-    const imgEdge = edges.find(e => e.to === 'v' && e.toPort === 'image');
+    const imgEdge = edges.find(e => e.to === n.id && e.toPort === 'image');
     bits.push(['image', imgEdge ? '已连' : '未连·阻断']);
-    const seedEdge = edges.find(e => e.to === 'v' && e.toPort === 'seed');
+    const seedEdge = edges.find(e => e.to === n.id && e.toPort === 'seed');
     bits.push(['seed', seedEdge ? String(nodes.find(x=>x.id===seedEdge.from)?.params?.value ?? '…') : '未连']);
     if (lastCompile && lastCompile.ok && lastCompile.wiring && lastCompile.wiring.out) {
       bits.push(['map', Object.keys(lastCompile.wiring.out).join(',') || '—']);
     }
-  } else if (n.op === 't2i') {
-    bits.push(['model', $('serviceId').value || '—']);
+  } else if (n.op === 't2i' || n.op === 'i2i') {
+    bits.push(['model', n.params.serviceId || '—']);
     bits.push(['res', n.params.resolution || '—']);
+    const imgEdge = edges.find(e => e.to === n.id && e.toPort === 'image');
+    if (n.op === 'i2i') bits.push(['image', imgEdge ? '已连' : '未连·阻断']);
   } else {
     bits.push([n.op, n.title]);
   }
@@ -267,20 +340,21 @@ function drawWires(badKeys){
 function renderNodes(){
   const canvas = $('canvas');
   [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
-  const imgMissing = !edges.some(e => e.to === 'v' && e.toPort === 'image');
   nodes.forEach(n => {
+    const imgMissing = (n.op === 'i2v' || n.op === 'i2i') && !edges.some(e => e.to === n.id && e.toPort === 'image');
     if (n.op === 'i2v') {
       const map = (lastCompile && lastCompile.wiring && lastCompile.wiring.out)
         ? JSON.stringify(lastCompile.wiring.out) : '(校验后显示映射字段)';
-      n.bd = `${$('serviceId').value || '?'} · dur ${n.params.duration||'?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}<br/><span style="color:#8b93a7">${map}</span>`;
+      n.bd = `${$('serviceId').value || n.params.serviceId || '?'} · dur ${n.params.duration||'?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}<br/><span style="color:#8b93a7">${map}</span>`;
     }
-    if (n.op === 't2i') n.bd = `${$('serviceId').value || '?'} · ${n.params.resolution||''}<br/>seed/LoRA 来自连线`;
+    if (n.op === 't2i') n.bd = `${n.params.serviceId || '?'} · ${n.params.resolution||''}<br/>seed/LoRA 来自连线`;
+    if (n.op === 'i2i') n.bd = `${n.params.serviceId || '?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}`;
     const d = document.createElement('div');
     d.className = 'node ' + (n.cls||'') + (n.id===selected?' sel':'');
     d.dataset.id = n.id;
     d.style.left = n.x + 'px';
     d.style.top = n.y + 'px';
-    const inBad = n.op === 'i2v' && imgMissing;
+    const inBad = (n.op === 'i2v' || n.op === 'i2i') && imgMissing;
     d.innerHTML = `<div class="bar"></div><div class="hd">${n.title}</div><div class="bd">${n.bd||''}</div>
       ${OP_HAS_IN[n.op]?`<i class="port in ${inBad?'bad':'live'}"></i>`:''}
       ${OP_HAS_OUT[n.op]?'<i class="port out live"></i>':''}`;
@@ -409,11 +483,35 @@ const DEFAULT_SID = {
 };
 
 $('btnGen').disabled = true;
-// Cold-start: align serviceId with selected backend (never leave fal SID on nano-gpt).
-(function syncColdStartServiceId(){
-  const b = $('backend').value;
-  if (DEFAULT_SID[b]) $('serviceId').value = DEFAULT_SID[b];
-})();
+
+function setDemoUrl(id){
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set('demo', id);
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch (_) {}
+}
+
+function applyDemo(id, opts){
+  const demo = DEMOS[id] || DEMO_I2V;
+  activeDemoId = demo.id;
+  nodes = cloneNodes(demo.nodes);
+  const forceEdges = !!(opts && opts.resetEdges);
+  edges = forceEdges ? cloneEdges(demo.edges) : loadEdgesForDemo(demo);
+  selected = demo.selected || (nodes[0] && nodes[0].id) || 'v';
+  $('backend').value = demo.backend;
+  $('serviceId').value = demo.serviceId || DEFAULT_SID[demo.backend] || '';
+  saveEdges();
+  setDemoUrl(demo.id);
+  invalidateCompile(demo.hint);
+  $('dockMsg').textContent = demo.hint;
+  $('dockMsg').className = 'muted';
+  render();
+}
+
+$('btnDemoSingle').onclick = () => applyDemo('i2v', { resetEdges: true });
+$('btnDemoChain').onclick = () => applyDemo('chain', { resetEdges: true });
+
 $('backend').onchange = () => {
   const b = $('backend').value;
   if (DEFAULT_SID[b]) $('serviceId').value = DEFAULT_SID[b];
@@ -422,7 +520,15 @@ $('backend').onchange = () => {
 };
 $('serviceId').oninput = () => { invalidateCompile('serviceId 已变更 · 请重新校验'); render(); };
 window.addEventListener('resize', () => drawWires());
-render();
+// Boot: ?demo=chain|chain3|i2v (default i2v).
+// Hard-refresh with ?demo=chain|chain3 always resets to the full multi-step graph (ignore stale disconnects).
+// Single-step i2v keeps session edges across live-reload for disconnect-race QA.
+(function bootDemo(){
+  let q = null;
+  try { q = new URLSearchParams(location.search).get('demo'); } catch (_) {}
+  const force = (q === 'chain' || q === 'chain3');
+  applyDemo(activeDemoId, { resetEdges: force });
+})();
 </script>
 </body>
 </html>

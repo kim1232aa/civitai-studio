@@ -1176,14 +1176,16 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "sourceImage" not in (i2v_steal.get("payload") or {})
     assert "imageUrl" not in (i2v_steal.get("payload") or {})
 
-    # UI demo markers for image→i2v
+    # UI demo markers: single-step image→i2v + multi-step ?demo=chain
     cn_html = (Path(__file__).resolve().parent.parent / "static" / "cloud-nodes.html").read_text()
     assert "op:'i2v'" in cn_html
     assert "btnBreakImage" in cn_html
     assert "image→i2v" in cn_html
     assert "toPort:'image'" in cn_html
+    assert "btnDemoChain" in cn_html and "demo=chain" in cn_html
+    assert "DEMO_CHAIN" in cn_html and "applyDemo" in cn_html
     # Cold-start: serviceId must match default backend family (not fal SID on nano-gpt)
-    assert "syncColdStartServiceId" in cn_html
+    assert "DEFAULT_SID" in cn_html
     assert 'value="vidu-q2-pro"' in cn_html
     assert "i2v" in OP_SPEC, "server must register i2v or UI shows 未知 op: i2v"
     # Default demo graph (image→i2v + prompt/seed) must compile green on nano-gpt
@@ -1202,7 +1204,23 @@ console.log('PASS isMusePublicQwenImageCousin');
         ],
     })
     assert demo.get("ok"), demo
+    assert demo.get("execute") == "single"
+    assert not demo.get("multiStep")
     assert "未知 op" not in (demo.get("error") or "")
+    # HTML chain demo graph (t2i→i2v) must compile staged / multiStep
+    demo_chain = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "cinematic portrait, soft light"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "flux", "resolution": "1024x1024"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vidu-q2-pro", "duration": 5, "resolution": "1280x720"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "g", "fromPort": "image", "to": "v", "toPort": "image"},
+        ],
+    })
+    assert demo_chain.get("ok") and demo_chain.get("multiStep") and demo_chain.get("execute") == "staged", demo_chain
 
     print("PASS p0 wiring")
 
