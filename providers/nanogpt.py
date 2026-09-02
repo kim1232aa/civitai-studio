@@ -442,6 +442,9 @@ def sanitize_submitted_for_persist(body: dict, lora_meta: list | None = None) ->
             m = meta[i - 1] if i - 1 < len(meta) and isinstance(meta[i - 1], dict) else {}
             vid = m.get("versionId") or ""
             out[k] = persist_safe_lora_path(out.get(k) or "", vid)
+    # Never persist free WxH alongside catalog resolution tokens.
+    out.pop("width", None)
+    out.pop("height", None)
     return out
 
 
@@ -790,16 +793,11 @@ def _image_body(payload: dict, spec: dict) -> dict:
     if res:
         body["resolution"] = res
         body["size"] = res
+    # width/height are only for picking the catalog token / aspect — never POST or persist them
+    # (FE hint: 导入尺寸仅参考，不进 POST).
     ar = closest_aspect(w or 1024, h or 1024)
     if ar:
         body["aspect_ratio"] = ar
-    try:
-        if w:
-            body["width"] = int(w)
-        if h:
-            body["height"] = int(h)
-    except (TypeError, ValueError):
-        pass
     seed = _clamp_seed(payload.get("seed"))
     if seed is not None:
         body["seed"] = seed
@@ -843,7 +841,7 @@ def _core_image_body(full: dict) -> dict:
         "model", "prompt", "n", "nImages", "resolution", "size", "aspect_ratio",
         "seed", "negative_prompt", "input_references", "imageDataUrl", "imageUrl",
         "image", "strength", "loras", "guidance_scale", "num_inference_steps",
-        "response_format", "width", "height",
+        "response_format",
     )
     return {k: full[k] for k in keep if k in full}
 

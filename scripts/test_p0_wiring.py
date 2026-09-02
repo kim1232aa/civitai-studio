@@ -126,6 +126,10 @@ def main() -> int:
     assert body["model"] == "wavespeed-ai/krea-v2/turbo-lora"
     assert body["loras"][0]["path"].startswith("https://")
     assert body["resolution"] == "1k"
+    assert "width" not in body and "height" not in body
+    from providers.nanogpt import sanitize_submitted_for_persist
+    persisted = sanitize_submitted_for_persist({**body, "width": 960, "height": 1440})
+    assert "width" not in persisted and "height" not in persisted
     i2i = _image_body({
         "serviceId": "wavespeed-ai/krea-v2/turbo-lora",
         "prompt": "x",
@@ -486,7 +490,7 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0775"' in html
+    assert 'title="v0776"' in html
     assert 'aria-label="生成"' in html
     assert 'aria-label="v0772"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
@@ -542,7 +546,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0775"' in html
+    assert 'title="v0776"' in html
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -697,7 +701,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "truncateNanoPrompt" in html
     assert "syncNanoPromptHint" in html
     assert "nanoPromptHint" in html
-    assert 'title="v0775"' in html
+    assert 'title="v0776"' in html
     assert "prompt_length_error" in nano_src
     assert "NANO_PROMPT_MAX = 1200" in nano_src
 
@@ -714,7 +718,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "固定种子会复现同一张图；要新图请清空种子" in html
     assert "seedRaw === '' ? null" in html or "seedRaw === \'\' ? null" in html
     assert "seedHint" in html
-    assert 'title="v0775"' in html
+    assert 'title="v0776"' in html
     from providers.nanogpt import _response_seed, _clamp_seed as _ns, _seed_clamp_meta
     assert _ns(891104780613135) == 2146323191
     assert _seed_clamp_meta(891104780613135) == {"seedOriginal": 891104780613135, "seedClamped": True}
