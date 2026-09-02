@@ -18,6 +18,7 @@ PORT_TYPES = {
     "seed": "seed",
     "negative": "prompt",
     "loras": "loras",
+    "video": "video",
 }
 
 OP_SPEC = {
@@ -28,6 +29,8 @@ OP_SPEC = {
     "image": {"ins": [], "outs": ["image"], "required": []},
     "t2i": {"ins": ["prompt", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt"]},
     "i2i": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt", "image"]},
+    # image→video main path; prompt optional; chain t2i→i2v blocked (two-step)
+    "i2v": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["video"], "required": ["image"]},
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
 }
 
@@ -289,10 +292,96 @@ def compile_graph(graph: dict | None) -> dict:
             candidate_sinks.append((nid, payload))
             continue
 
+
+        if op == "i2v":
+            if caps.get("i2v") in (None, "none") or not caps.get("video"):
+                return _err(
+                    f"后端 {backend} 不支持图生视频（i2v）",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            raw_img = inputs.get("image")
+            if isinstance(raw_img, dict) and raw_img.get("__pending__"):
+                return _err(
+                    "禁止一次假跑通 t2i→i2v；请先出图，再把成片写入 image 源做第二刀",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            img, bundled_loras = _unwrap_image(raw_img)
+            if not img:
+                return _err(f"i2v {nid} 的 image 口无有效图，禁止偷成片栏", blocked=True, nodeId=nid)
+
+            payload = {
+                "backend": backend,
+                "serviceId": params.get("serviceId") or g.get("serviceId"),
+                "kind": "video",
+                "recipe": "video",
+                "sourceImage": img,
+                "firstFrame": img,
+            }
+            if not payload["serviceId"]:
+                return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
+            if "prompt" in inputs:
+                payload["prompt"] = inputs["prompt"]
+            elif params.get("prompt") or params.get("text"):
+                return _err(
+                    f"节点 {nid} 的 prompt 只认连线，请用 prompt 节点接入",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            if "seed" in inputs:
+                payload["seed"] = inputs["seed"]
+            if "seed" in params and "seed" not in inputs:
+                return _err(
+                    f"节点 {nid} 的 seed 只认连线，请用 seed 节点接入；禁止 params.seed 旁路",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            if "negative" in inputs:
+                payload["negativePrompt"] = inputs["negative"]
+            if ("negativePrompt" in params or "negative" in params) and "negative" not in inputs:
+                return _err(
+                    f"节点 {nid} 的负面词只认连线，请用 negative 节点接入",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            for k in ("resolution", "duration", "aspectRatio", "width", "height"):
+                if k in params:
+                    payload[k] = deepcopy(params[k])
+            wired_loras = inputs.get("loras")
+            merged = _merge_loras(bundled_loras, wired_loras)
+            if "loras" in params and "loras" not in inputs and not bundled_loras:
+                return _err(
+                    f"节点 {nid} 的 LoRA 只认连线，禁止 params.loras 旁路",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            if merged:
+                payload["loras"] = merged
+            if caps.get("resolution") == "catalog_token":
+                payload.pop("width", None)
+                payload.pop("height", None)
+            if caps.get("lora") == "none":
+                payload.pop("loras", None)
+            if caps.get("promptMax") and isinstance(payload.get("prompt"), str):
+                mx = int(caps["promptMax"])
+                if len(payload["prompt"]) > mx:
+                    return _err(f"提示词超过 promptMax={mx}", blocked=True, nodeId=nid)
+            values[(nid, "video")] = {"__pending__": True, "from": nid, "media": "video"}
+            video_wired_on = any(e.get("fromPort") == "video" for e in outgoing.get(nid, []))
+            if video_wired_on:
+                return _err(
+                    f"线性 POC 不支持把 i2v {nid} 的 video 再接到下游；请只留一个汇点",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            candidate_sinks.append((nid, payload))
+            continue
+
         return _err(f"未实现 op: {op}", nodeId=nid)
 
     if not candidate_sinks:
-        return _err("图中没有可生成的 t2i/i2i 汇点")
+        return _err("图中没有可生成的 t2i/i2i/i2v 汇点")
     if len(candidate_sinks) > 1:
         ids = [s[0] for s in candidate_sinks]
         return _err(

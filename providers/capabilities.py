@@ -16,6 +16,7 @@ RESOLUTION = ("free_wh", "catalog_token", "aspect", "none")
 PROGRESS = ("rate", "queue", "status_only", "none")
 ESTIMATE = ("buzz", "pricing_api", "catalog_price", "none")
 I2I = ("source", "first_frame", "input_references", "none")
+I2V = ("sourceImage", "image_url", "first_frame", "fal_endpoint", "none")
 SEED_CLAMP = ("reject", "mod", "none")
 
 _WEAK_LORA_RANK = {"none": 0, "hub_repo": 1, "path": 2, "air": 3}
@@ -42,6 +43,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": True,
         "i2i": "source",
         "video": True,
+        "i2v": "sourceImage",
     },
     "fal": {
         "lora": "path",
@@ -57,6 +59,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": False,
         "i2i": "first_frame",
         "video": True,
+        "i2v": "fal_endpoint",
     },
     "huggingface": {
         "lora": "path",
@@ -72,6 +75,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": False,
         "i2i": "none",
         "video": True,
+        "i2v": "none",
     },
     "modelscope-ai": {
         "lora": "hub_repo",
@@ -86,7 +90,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "estimate": "none",
         "sampler": False,
         "i2i": "source",
-        "video": False,
+        "video": True,
+        "i2v": "image_url",
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -101,7 +106,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "estimate": "none",
         "sampler": False,
         "i2i": "source",
-        "video": False,
+        "video": True,
+        "i2v": "image_url",
     },
     "nano-gpt": {
         "lora": "path",
@@ -117,6 +123,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": False,
         "i2i": "input_references",
         "video": True,
+        "i2v": "image_url",
     },
 }
 
@@ -134,6 +141,7 @@ REQUIRED_KEYS = (
     "sampler",
     "i2i",
     "video",
+    "i2v",
 )
 
 
@@ -155,6 +163,7 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
             "sampler": False,
             "i2i": "none",
             "video": False,
+            "i2v": "none",
         }
     return deepcopy(base)
 
@@ -233,6 +242,15 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
             p == "free_wh" and c == "catalog_token"
         ):
             out["resolution"] = c
+
+    # --- i2v: none weakest; catalog cannot invent i2v if provider has none ---
+    if "i2v" in o:
+        p0, c = out.get("i2v", "none"), o["i2v"]
+        if p0 == "none":
+            out["i2v"] = "none"
+        elif c == "none" or c == p0:
+            out["i2v"] = c
+        # else reject raise / swap to invented shape
 
     for k in (
         "resolutionTokens",

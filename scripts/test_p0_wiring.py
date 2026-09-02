@@ -959,6 +959,86 @@ console.log('PASS isMusePublicQwenImageCousin');
     })
     assert not _bypass.get("ok") and _bypass.get("blocked")
 
+    # --- i2v: image→video main path ---
+    assert pub["civitai"]["capabilities"]["i2v"] == "sourceImage"
+    assert pub["fal"]["capabilities"]["i2v"] == "fal_endpoint"
+    assert pub["huggingface"]["capabilities"]["i2v"] == "none"
+    assert pub["nano-gpt"]["capabilities"]["i2v"] == "image_url"
+    # cannot raise i2v from none
+    bad_i2v = merge_catalog_override(get_provider_capabilities("huggingface"), {"i2v": "image_url"})
+    assert bad_i2v["i2v"] == "none", bad_i2v
+
+    i2v_ok = compile_graph({
+        "backend": "civitai",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/frame.png"}},
+            {"id": "p", "op": "prompt", "params": {"text": "pan left"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "video/minimax-h3-comfy/imageToVideo", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "v", "toPort": "image"},
+            {"from": "p", "fromPort": "prompt", "to": "v", "toPort": "prompt"},
+        ],
+    })
+    assert i2v_ok.get("ok"), i2v_ok
+    pl = i2v_ok["payload"]
+    assert pl.get("kind") == "video" and pl.get("recipe") == "video"
+    assert pl.get("sourceImage") == "https://ex/frame.png"
+    assert pl.get("firstFrame") == "https://ex/frame.png"
+    assert pl.get("prompt") == "pan left"
+    assert pl.get("duration") == 5
+
+    # missing image edge → blocked, no gallery steal
+    i2v_steal = compile_graph({
+        "backend": "civitai",
+        "nodes": [{"id": "v", "op": "i2v", "params": {"serviceId": "video/x"}}],
+        "edges": [],
+    })
+    assert not i2v_steal.get("ok") and i2v_steal.get("blocked")
+    assert "未连线" in i2v_steal.get("error", "")
+
+    # HF i2v=none → blocked
+    i2v_hf = compile_graph({
+        "backend": "huggingface",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "x"}},
+        ],
+        "edges": [{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
+    })
+    assert not i2v_hf.get("ok") and i2v_hf.get("blocked")
+    assert "不支持图生视频" in i2v_hf.get("error", "")
+
+    # fake chain t2i→i2v in one compile → blocked
+    fake_chain = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vid"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "g", "fromPort": "image", "to": "v", "toPort": "image"},
+        ],
+    })
+    assert not fake_chain.get("ok") and fake_chain.get("blocked")
+    # either intermediate sink block or pending chain block
+    assert ("不支持把" in fake_chain.get("error", "") or "第二刀" in fake_chain.get("error", "") or "链式" in fake_chain.get("error", ""))
+
+    # Nano i2v strips WxH when catalog_token
+    i2v_nano = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vid", "width": 1, "height": 2, "resolution": "1280x720"}},
+        ],
+        "edges": [{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
+    })
+    assert i2v_nano.get("ok"), i2v_nano
+    assert "width" not in i2v_nano["payload"] and "height" not in i2v_nano["payload"]
+    assert i2v_nano["payload"].get("resolution") == "1280x720"
+
     print("PASS p0 wiring")
 
 
