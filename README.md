@@ -4,15 +4,17 @@
 
 - 地址：<http://127.0.0.1:8765>（只绑回环）
 - 仓库：<https://github.com/kim1232aa/civitai-studio>
-- 当前界面版本戳：标题栏 `v0774`（每次修 UI/行为都要改这个数字并 push main）
+- 当前界面版本戳：标题栏 `v0776`（每次修 UI/行为都要改这个数字并 push main）
 - 种子：空=随机；填了会复现同一张图（Nano 尤甚）。Nano 超 int32 会取模写回并提示「原 M → N」。生成后 dock 显示「已用种子 N / 随机种子」。
-- 审查夹具：只用 `https://civitai.red/images/136741732`（不要用苹果提示词 / apple fixture）
+- 审查夹具：只从 [hinablue 图库](https://civitai.red/user/hinablue/images) 自选真帖；每次不同、须带 LoRA；禁止苹果夹具
 - 开发约定：[`docs/dev.md`](docs/dev.md)
 - 审查规范：[`docs/review-spec.md`](docs/review-spec.md)
 - 供应商插件：[`docs/providers.md`](docs/providers.md)
 - 各家 LoRA / 自定义参数 / 代表问题：[`docs/provider-lora.md`](docs/provider-lora.md)
 
 ## 待解决问题（按提到的次数）
+
+> 下面 1–4 多为早期账；Nano LoRA / seed 取模 / 去 WxH / 审查分工已在 v0769–v0776 过关。仍开的 P1：waitPane 假进度、vSeed 折叠、poll 双写。以 [`docs/review-spec.md`](docs/review-spec.md) 为准。
 
 1. **P0 点生成必须出新成片**  
    Fal / Hugging Face / 魔搭 AI / 魔搭 CN 还没有一次「导入 + 写提示词 + 点生成」在成片栏出现新图。空提示词弹出「先写提示词」**不算过关**。这是产品标准。
@@ -34,7 +36,7 @@
 - **Civitai**：图 / 视频 / customComfy。导入 Civitai 图抽参数。工作流按文件名和节点查 AIR，查不到就列 unmatched，不编 URN。
 - **Fal.ai**：图、视频、放大、3D、音频。LoRA 走 `loras: [{path, scale}]`，无该字段时切目录里的 `/lora` 兄弟端点。目录不要一次画出全部按钮。
 - **Hugging Face**：FLUX、Qwen、Z-Image-Turbo、HunyuanVideo。同步返回文件。路由没有 Fal `/lora` 端点；Civitai 链会塞进 mapped turbo 的 `loras[]`，是否生效未证实。
-- **NanoGPT**：图 / 视频。官方目录 200+ 图模、LoRA、图生图、seed、比例。密钥 `~/.config/nano-gpt/token`。LoRA 用带 `-lora` 的模型 + Civitai/HF path。
+- **NanoGPT**：图 / 视频。官方目录 200+ 图模、LoRA、图生图、seed、比例。密钥 `~/.config/nano-gpt/token`。LoRA 用带 `-lora` 的模型 + Civitai 链（生成时现解 B2）。提交只用目录 `resolution` token，导入 WxH 仅参考不进 POST/落盘。
 - **魔搭 AI** 与 **魔搭 CN** 是两家，**禁止互相 fallback**。AI 连不上就报连接错误，不要改走 CN。LoRA 只要 Hub `owner/repo`，Civitai 下载链不能用。
 
 ## 跑起来

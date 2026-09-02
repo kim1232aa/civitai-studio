@@ -2,67 +2,69 @@
 
 常驻规则。一次审查的截图和结论写在 [`review.md`](review.md)，不要把本文件改成流水账。
 
-审查员：质量审查员。**功能没改好不要叫。** 只在页面上声称的行为已经能用（新成片、hash 不漂、工作流规则）之后才叫。纯文档、空提示词弹窗、未过关的 P0 都不要叫。开发约定见 [`dev.md`](dev.md)。
+审查分工：**功能没改好、没推到可交付，不要叫审查。** 开发约定见 [`dev.md`](dev.md)。
 
 ## 谁做什么
 
 | 角色 | 做 | 不做 |
 | --- | --- | --- |
-| 审查员 | 硬刷新页面、读代码、截图 UI、**自己点** 导入 / 预估 / 生成 | 用 curl / Python / 自己的工具调生成 API；代点；开第二路浏览器或桌面自动化抢 `8765` |
-| 开发 | 修完改标题戳、commit、push、告诉审查员当前戳 | 点测进行中改 `static/index.html`、重启 `8765`、对同一端口开 browserUse |
+| **代码审查员** | 读代码、跑静态检查/`test_p0_wiring`、列 P0/P1 | 改代码；代跑生成堆图；点 UI 当验收 |
+| **UI审查员** | 硬刷新、只点界面、只截图找茬；自选 hinablue 夹具 | 读仓库/源码；curl/Python 代跑 `POST /api/generate`；同轮多次生成堆同类图；开第二路抢 `8765` |
+| 开发（civitai 开发） | 修完改标题戳、commit、push；**改 `providers/*.py` 后必须重启**再叫审 | 点测进行中热改页面 / 重启抢端口；对 8765 开 browserUse |
+| 质量审查员 | **已停用**，勿再派活 | — |
 
 密钥不进页面。审查截图不要带 token 明文。
 
 ## 认哪一版
 
 - **只认标题栏** `Civitai Studio v0xxx`。Dock 会被「已加载 N 个模型」盖掉，不能当版本。
-- 关掉旧标签，硬刷新。v0721 / v0731 这类旧戳直接打回，不论功能看起来对不对。
+- 关掉旧标签，硬刷新。旧戳直接打回。
 - 开发口头「已经修了」不算。截图标题必须等于当时仓库最新戳。
-- 文档-only 提交不改戳。改了 UI / 行为必须 +1。
+- 文档-only 提交可不改戳。改了 UI / 行为必须 +1。
+- **HTML 戳对了不等于 Python 已加载。** 改适配器后须 `python3 scripts/restart.py && ./run.sh`，再叫 UI。否则会出现「标题 v0776、JSON 仍是旧逻辑」的假失败（例：作废 out `nano-gpt_img_a1811e357469`）。
+
+## 夹具（生成过关）
+
+- 只从 [hinablue 图库](https://civitai.red/user/hinablue/images) **自选真帖**；每次过关/挑刺必须换不同帖，禁止复用。
+- **过关生图必须带 LoRA**：帖无 LoRA 就换同类带 LoRA 的帖；禁止无 LoRA 纯底模当过关证明。
+- 禁止苹果 / 「a red apple」/ 编造夹具。不要写死单一旧 id（含曾用的 `136741732`、`139791102`、`138912997` 等）。
+- 导入后尽量复现原图（提示词 / 底模 / LoRA / 尺寸对齐）。导入不得代点生成。
 
 ## 点测期间
 
-- 一路标签。不要第二窗口、第二 agent 抢 `http://127.0.0.1:8765`。
+- 一路独占。不要第二窗口、第二 agent、多路叠点抢 `http://127.0.0.1:8765`。
 - 开发不重启、不热改页面。审查员说点测开始之后，P1 先记账，等点测结束再改。
-- 不要代跑 `POST /api/generate`。`GET /api/go` 只证明点击到了前端，**不等于出图**。
+- 不要代跑 `POST /api/generate`。同轮只点一次「生成」。
+- 旧 out / 重启前产物不能当本轮证据。
 
-## 生成过关（产品标准）
+## Nano 过关核对（额外）
 
-空提示词弹出「先写提示词」**不算过关**。必须成片栏出现**新文件**（`out/` 多一张，画廊能看见）。
+1. 硬刷新，标题 = 当前戳；确认本机已重启过现网。
+2. 导入新 hinablue 带 LoRA 帖 → 选 Nano `*-lora` 模 → 超长提示词先截断到 1200。
+3. 只生成一次。成片 `out/nano-gpt_img_*_0.json` 的 `submittedInput`：**有** `resolution`（或 `size` token），**无** `width` / `height`。
+4. UI 种子框 = JSON `seed`（超 int32 时应已取模写回）。
+5. UI 文案「导入尺寸仅参考，不进 POST」必须与 JSON 一致。
 
-步骤：
+## 其它配方字面合同
 
-1. 硬刷新，确认标题戳。
-2. 导入 `https://civitai.red/images/139791102`（hinablue，Z Image Turbo）。提示词应被填上。
-3. 文生图：`sourceImage` / `firstFrame` **必须空**。不要把导入的 `mediaUrl` 填进去。
-4. 底模应对上：
-   - Fal：`fal-ai/z-image/turbo`；有 LoRA 用 `fal-ai/z-image/turbo/lora`
-   - Hugging Face / 魔搭 AI / 魔搭 CN：`Tongyi-MAI/Z-Image-Turbo`
-5. 审查员自己点四家：**Fal、Hugging Face、魔搭 AI、魔搭 CN**。每家都要新成片。
-6. 魔搭 AI 若 `api-inference.modelscope.ai` 解析失败：必须报连接错误。**静默切到魔搭 CN 算失败。**
-7. 点「魔搭」后 URL 自己漂到 `#fal` / `#huggingface`（没有再点）算失败。
-8. 点生成不得因为旧 hash / `persistBackend` 把供应商改走。
-
-Civitai 本家导入文案始终是「导入 Civitai 图/视频」，四家都能导入这张 Civitai 图。
-
-## 工作流过关（代码 + 页面）
-
-- `.yaml`、sidecar `config.json` 不当 Comfy 图。
-- zip 优先于 sidecar JSON；解析失败试下一个附件。
-- PNG 走 `parse_png_text`（tEXt / iTXt 的 `workflow` / `prompt`），不要对 PNG 直接 `json.loads`。
-- `customComfy.comfyImage` 只接受已是 `urn:air:…comfyimage…` 的 AIR，禁止把 `firstFrame` 写进去。
-- 工作流 tab 必须藏模型列表（`.hidden` + `[hidden] { display:none !important }`）。
-- 刷新：不要单靠 `sessionStorage` 把工作流 tab 打开。hash 已有 `&recipe=workflow` 时，应恢复 `#wfAir`，boot `persistBackend` 不得把 `&recipe=workflow` 抹掉。
-- 对照表第一列用 **filename**，不是模型 title。未匹配行不要画两遍。matched nodepacks 要有行。
+1. 点「图片」出图；「视频」出视频；超分变清楚；去背景去背景；3D/音频/工作流各干各的。
+2. 点 Civitai / Fal / HF / 魔搭，目录和底模必须是这家，不能挂上一家残留。
+3. 「导入」= 填左侧配方，看得出在导；对不上原图或干等无反馈 = 失败。
+4. 「生成」= 按当前配方出片；要点有进度/报错；静默 / 漂模 / 成片不符 = 失败。
 
 ## 其它禁区
 
-- 不要为了过关删已有能力（五家后端、七个配方 tab、导入 / 预估 / 生成、目录、Night Lab）。
+- 不要为了过关删已有能力。
 - 不要把魔搭 AI 和魔搭 CN 重新合成一家，不要 token / base URL 交叉。
-- 不要用苹果提示词当夹具。夹具就是 `139791102`。
-- 选中模型后，目录刷新不得冲掉「已选 …」。橙框 hover 不算选中。
+- 选中模型后，目录刷新不得冲掉「已选 …」。
 - Fal 目录一次最多画出约 60 条，禁止整页重载跳回 Civitai。
 
 ## 怎么交卷
 
-每条结论配：标题戳截图 + 对应证据（hash、已选模型、成片文件名、或代码位置）。没有新成片就写失败，不要把「按钮变提交中」或「dock 先写提示词」写成通过。
+每条结论配：标题戳截图 + 证据（hash、已选模型、成片文件名、JSON 关键字段）。没有新成片就写失败。P1 记账即可，不挡主线过关。
+
+## 记账中的 P1（下轮）
+
+- waitPane 假进度 / 0.0 秒：无真实进度字段时禁止假百分比（Civitai 才映射 `estimatedProgressRate`；Fal 只 queue；魔搭/Nano/HF 同步或粗状态只文案）。
+- 视频 `vSeed` 仍在高级折叠里。
+- poll 失败路径仍可能双写 status。

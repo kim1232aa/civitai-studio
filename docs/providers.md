@@ -26,6 +26,8 @@ JSON 请求、落盘 `out/`、任务 id `{provider}|其余`、目录过滤、`GE
 | `modelscope-ai` / `modelscope-cn` | Hub `owner/repo` | 不能用（500 空 modelName，现跳过） |
 | `nano-gpt` | `loras[{path,scale}]` | 在 `*-lora` 模型上可用 |
 
+Nano 出站 / `submittedInput` **只带目录 `resolution` token**，禁止 persist 自由 `width`/`height`（导入 WxH 仅 FE 挑 token）。改 `nanogpt.py` 后必须重启 `8765`。
+
 不要做 Civitai→Hub 自动换模。
 
 ## 加一家

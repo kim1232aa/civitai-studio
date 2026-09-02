@@ -111,19 +111,24 @@ v0752 曾把 `3231694` 静默换成 `laonansheng/Asian-beauty-Z-Image-Turbo-Tong
 - `model` `prompt` `n` / `nImages`
 - `resolution` / `size`（必须是该模型 `supported_parameters.resolutions` 里的 token：`1k`/`2k` 或 `1024*1536` 这种）
 - `aspect_ratio`（`2:3` 等）
-- `seed`（同样钳 int32）
+- `seed`（钳 int32：`n % 2147483647`；超大导入 seed 会立刻写回输入框并 dock 提示「原 M → N」）
 - `negative_prompt`
 - 图生图：只发 `input_references` + `strength`（denoise 映射过来，默认 0.65）
-- LoRA：`loras: [{path, scale}]`
+- LoRA：`loras: [{path, scale}]`（生成当下把 Civitai 链现解成新鲜 B2 直链；钥匙不出门；sidecar 只落稳定 versionId/download API，不落签名 URL）
 
-实测能带 Civitai 链的模型：`z-image-turbo-lora`、`wavespeed-ai/krea-v2/turbo-lora`。普通 `z-image-turbo` 不保证吃 LoRA。
+**出站 / 落盘禁止 `width`/`height`（v0776）：** FE 可用导入宽高只挑最近目录 token；`_image_body` / `_core_image_body` / `sanitize_submitted_for_persist` 都不把自由 WxH 写进 Nano POST 或 `submittedInput`。UI 文案「导入尺寸仅参考，不进 POST」必须与 JSON 一致。
 
-代表问题（已在 v0749 修接线）：
+提示词上限 **1200** 字符（FE 预检 + 可截断；server 再拦）。
 
-- 分辨率若按「第一个 token」会落到 `256*256`。
-- 宽高会收成目录 resolution token / aspect_ratio（接线合理）。**UI 必须让人看见实际提交的 token**，不要静默改完不提示。
+实测能带 Civitai 链的模型：`z-image-turbo-lora`、`wavespeed-ai/krea-v2/turbo-lora`。普通 `z-image-turbo` 不保证吃 LoRA。过关生图优先选目录里带 `*-lora` 的端点。
+
+代表问题：
+
+- 分辨率若按「第一个 token」会落到 `256*256`（已修接线）。
+- 宽高收成目录 resolution token / aspect_ratio。**UI 必须让人看见实际提交的 token**（v0775：Nano 藏自由宽高行，只显 resolution 下拉）。
 - 图生图同时塞 `image` / `imageUrl` / `imageDataUrl` / `input_references` 会被拒。
 - denoise 曾在 slim 时被删，strength 出不去。
+- 改 `providers/nanogpt.py` 后必须 `python3 scripts/restart.py && ./run.sh`；只硬刷 HTML 不够（旧进程会导致 JSON 仍带 WxH，如作废 out `nano-gpt_img_a1811e357469`）。
 
 ## 不要做的
 

@@ -129,12 +129,16 @@ git 身份只用环境变量：`GIT_AUTHOR_NAME=kim1232aa`，`GIT_AUTHOR_EMAIL=1
 
 ## 审查
 
-完整规则：[`review-spec.md`](review-spec.md)。流水账不要写进那份，写 [`review.md`](review.md)。
+完整规则：[`review-spec.md`](review-spec.md)。流水账写 [`review.md`](review.md)。
 
+- 角色：代码审查员过代码 → UI审查员只点截；质量审查员已停用。
 - 过关截图标题 = 当前戳。旧标签直接打回。
-- 审查员自己点页面；禁止代跑生成 API；禁止第二路抢 `8765`。
+- 夹具：hinablue 图库自选、每次不同、须带 LoRA；禁止苹果/写死旧 id。
+- 改 `providers/*.py`（或任何会被 `server.py` 加载的逻辑）后：**先** `python3 scripts/restart.py && ./run.sh`，再叫 UI。只硬刷 HTML 不够。
+- 审查员自己点页面；禁止代跑生成 API；禁止第二路抢 `8765`；同轮只生成一次。
 - 点测进行中开发不改页面、不重启。
-- 生成过关 = 成片栏新文件。空提示词「先写提示词」不算。夹具 `https://civitai.red/images/139791102`。
+- 生成过关 = 成片栏新文件。空提示词「先写提示词」不算。
+- Nano：`submittedInput` 只认目录 `resolution` token，禁止 persist `width`/`height`。
 - 不要对 8765 开 browserUse / 桌面自动化（抢焦点）。
 - 魔搭 AI 用 `api-inference.modelscope.ai`（旧 `api.modelscope.ai` 已 NXDOMAIN）。解析失败应 502/连接错误，不是切 CN。
 
@@ -146,4 +150,4 @@ GIT_AUTHOR_EMAIL=193197560+kim1232aa@users.noreply.github.com \
 git commit ... && git push origin HEAD
 ```
 
-不要提交：`out/`、token、`docs/_p*.md` 测试草稿、`docs/p0-hinablue.png` 这类审查截图（除非明确当 fixture）。
+不要提交：`out/`、token。`docs/_p*.md` / 审查截图仅在明确要归档时再提交；日常草稿可留未跟踪。
