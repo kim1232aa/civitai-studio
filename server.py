@@ -729,6 +729,13 @@ class Handler(BaseHTTPRequestHandler):
             if not fp.exists():
                 return self._json(404, {"error": "cloud-nodes.html missing"})
             return self._bytes(200, fp.read_bytes(), "text/html; charset=utf-8")
+        # Cache-bust entry: always land on multi-step chain demo (forces ?demo=chain)
+        if path in ("/cloud-nodes-chain.html", "/cloud-nodes-chain"):
+            self.send_response(302)
+            self.send_header("Location", "/cloud-nodes.html?demo=chain&v=0780")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
         if path.startswith("/static/"):
             name = Path(path.split("/static/", 1)[1]).name
             fp = STATIC / name
