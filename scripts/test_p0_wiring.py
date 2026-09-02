@@ -810,6 +810,20 @@ console.log('PASS isMusePublicQwenImageCousin');
     # path provider can set supportsLora false (narrow)
     merged2 = merge_catalog_override(get_provider_capabilities("fal"), {"supportsLora": False})
     assert merged2["supportsLora"] is False
+    # P0: must not raise confidence / progress / promptMax
+    hf = get_provider_capabilities("huggingface")
+    assert hf["loraConfidence"] == "unverified"
+    bad_conf = merge_catalog_override(hf, {"loraConfidence": "official"})
+    assert bad_conf["loraConfidence"] == "unverified", bad_conf
+    nano = get_provider_capabilities("nano-gpt")
+    assert nano["promptMax"] == 1200 and nano["progress"] == "none"
+    bad_prog = merge_catalog_override(nano, {"progress": "rate"})
+    assert bad_prog["progress"] == "none", bad_prog
+    bad_max = merge_catalog_override(nano, {"promptMax": None})
+    assert bad_max["promptMax"] == 1200, bad_max
+    # narrowing still ok
+    ok_max = merge_catalog_override(nano, {"promptMax": 800})
+    assert ok_max["promptMax"] == 800
 
 
     print("PASS p0 wiring")

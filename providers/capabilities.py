@@ -160,39 +160,75 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
 
 
 def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
-    """Catalog may specialize; must not raise weaker provider limits."""
+    """Catalog may specialize / narrow; must never raise a weaker provider limit.
+
+    Raise examples that must be rejected:
+    - loraConfidence: unverified → official
+    - progress: none → rate|queue|status_only
+    - promptMax: 1200 → None (unlimited is weaker constraint / raise)
+    - lora: none → path|air|hub_repo
+    - supportsLora True when provider lora is none
+    """
     out = deepcopy(provider_caps or {})
     if not override:
         return out
     o = dict(override)
 
-    # lora: only allow equal or weaker rank
+    # --- lora ---
     if "lora" in o:
         p, c = out.get("lora", "none"), o["lora"]
-        if _WEAK_LORA_RANK.get(c, -1) > _WEAK_LORA_RANK.get(p, 0):
-            o.pop("lora", None)  # reject raise
-        else:
+        if _WEAK_LORA_RANK.get(c, -1) <= _WEAK_LORA_RANK.get(p, 0):
             out["lora"] = c
             if c == "none":
                 out["loraConfidence"] = "none"
+        # else reject raise
 
     if "supportsLora" in o:
-        # supportsLora true forbidden when provider lora is none
-        if out.get("lora") == "none" and o["supportsLora"] is True:
-            o["supportsLora"] = False
-        out["supportsLora"] = bool(o["supportsLora"])
+        want = bool(o["supportsLora"])
+        if out.get("lora") == "none" and want:
+            want = False
+        out["supportsLora"] = want
 
+    # --- loraConfidence: official > unverified > none; only allow equal or weaker ---
+    _CONF_RANK = {"none": 0, "unverified": 1, "official": 2}
     if "loraConfidence" in o:
-        # unverified/none can downgrade official; cannot upgrade none→official via catalog alone if provider none
-        conf = o["loraConfidence"]
         if out.get("lora") == "none":
             out["loraConfidence"] = "none"
         else:
-            out["loraConfidence"] = conf
+            p = out.get("loraConfidence", "none")
+            c = o["loraConfidence"]
+            if _CONF_RANK.get(c, -1) <= _CONF_RANK.get(p, 0):
+                out["loraConfidence"] = c
+            # else reject raise (keep provider)
 
+    # --- progress: none is weakest; cannot raise to rate/queue/status_only ---
+    _PROG_RANK = {"none": 0, "status_only": 1, "queue": 2, "rate": 3}
+    if "progress" in o:
+        p = out.get("progress", "none")
+        c = o["progress"]
+        if _PROG_RANK.get(c, -1) <= _PROG_RANK.get(p, 0):
+            out["progress"] = c
+
+    # --- promptMax: smaller is stricter; None means unlimited = raise if provider had a finite max ---
+    if "promptMax" in o:
+        p = out.get("promptMax", None)
+        c = o["promptMax"]
+        if p is None:
+            # provider unlimited: catalog may set a finite max (narrow) or stay None
+            out["promptMax"] = c
+        elif c is None:
+            # reject raise to unlimited
+            pass
+        else:
+            try:
+                if int(c) <= int(p):
+                    out["promptMax"] = int(c)
+            except (TypeError, ValueError):
+                pass
+
+    # --- resolution: allow specialize free_wh → catalog_token; none is weakest ---
     if "resolution" in o:
         p, c = out.get("resolution", "none"), o["resolution"]
-        # catalog_token is not "higher" than free_wh — treat as specialize; allow if provider is free_wh or catalog_token
         if c == "none" or _WEAK_RES_RANK.get(c, 0) <= _WEAK_RES_RANK.get(p, 0) or (
             p == "free_wh" and c == "catalog_token"
         ):
@@ -204,9 +240,7 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
         "aspectRatioField",
         "durationField",
         "promptField",
-        "progress",
         "loraShape",
-        "promptMax",
     ):
         if k in o:
             out[k] = o[k]
