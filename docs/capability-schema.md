@@ -9,6 +9,9 @@
 2. **缺省显式**：未知字段 = `null` / `"none"`，禁止静默当成「全支持」或「全关」。
 3. **出站同源**：`compile(graph|form) → body` 只许带能力表允许的键；禁止 persist 发明字段（例：Nano 禁 `width`/`height`）。
 4. **图/视频共用同一 schema**，用 `media` / `progress` 区分。
+5. **覆盖不得抬高**：catalog 覆盖 provider 时，只能收紧（`supportsLora` 只能从 true→false；`lora=none` 的家禁止模级抬成有 LoRA）。弱能力被悄悄抬高 = P0。
+6. **`loraConfidence` 正式字段**：`"official" | "unverified" | "none"`；HF 硬塞 path 必须 `unverified`，UI 禁止当已加载绿勾，出站仍可带但提示「未官方验证」。
+7. **真连线**：边 = 数据依赖；`compile(graph)` 只沿连线取 prompt/image/seed；未连口禁止偷全局/左侧残留；断线/跨家类型不兼容 → 生成前红字阻断。假连线（画布好看、出站旁路表单）= 打回。
 
 ## Provider 级（`/api/providers`）
 
@@ -18,6 +21,7 @@
 | `label` | string | 已有 | NanoGPT |
 | `capabilities.lora` | `"air" \| "path" \| "hub_repo" \| "none"` | LoRA 官方形态 | Civitai=`air`；Fal/Nano=`path`；魔搭=`hub_repo`；无=`none` |
 | `capabilities.loraPath` | `"http" \| "civitai_download" \| "hub_owner_repo" \| "none"` | path 允许什么 | 魔搭不要 http |
+| `capabilities.loraConfidence` | `"official" \| "unverified" \| "none"` | LoRA 声明可信度 | Civitai/Fal/Nano=`official`；HF=`unverified`；`lora=none`→`none` |
 | `capabilities.resolution` | `"free_wh" \| "catalog_token" \| "aspect" \| "none"` | 尺寸怎么交 | Nano=`catalog_token`；Civitai/Fal 图常 `free_wh` |
 | `capabilities.seed` | `{ min, max, clamp: "reject"\|"mod"\|"none" }` | 种子域 | Nano int32 + `mod` |
 | `capabilities.promptMax` | number \| null | 提示词上限字符 | Nano `1200`；无上限 `null` |
@@ -53,30 +57,33 @@
 - `progress=none` → waitPane **禁止**假百分比
 - `promptMax` → 超长生成前截断或阻断（与现 Nano 红字一致，文案要诚实）
 
-## 现网六家初填（待核实后冻结）
+## 现网六家初填（`GET /api/providers` 断言目标；缺字段或静默当全支持 = P0）
 
-| id | lora | resolution | seed | progress | cancel | estimate |
-|---|---|---|---|---|---|---|
-| civitai | air | free_wh | none clamp | rate | yes | buzz |
-| fal | path | free_wh (+aspect 字段) | none | queue | yes | pricing_api |
-| huggingface | path* | free_wh | mod int32 | none | no | none |
-| modelscope-ai | hub_repo | free_wh (`size`) | mod int32 | status_only | no | none |
-| modelscope-cn | hub_repo | free_wh (`size`) | mod int32 | status_only | no | none |
-| nano-gpt | path | catalog_token | mod int32 | none | no | catalog_price |
+| id | lora | loraConfidence | resolution | seed | progress | cancel | estimate |
+|---|---|---|---|---|---|---|---|
+| civitai | air | official | free_wh | none clamp | rate | yes | buzz |
+| fal | path | official | free_wh (+aspect 字段) | none | queue | yes | pricing_api |
+| huggingface | path | **unverified** | free_wh | mod int32 | none | no | none |
+| modelscope-ai | hub_repo | official | free_wh (`size`) | mod int32 | status_only | no | none |
+| modelscope-cn | hub_repo | official | free_wh (`size`) | mod int32 | status_only | no | none |
+| nano-gpt | path | official | catalog_token | mod int32 | none | no | catalog_price |
 
-\*HF：路由硬塞 path≠官方 `/lora`；能力表应标 `loraConfidence: "unverified"`，UI 不得当「已加载」绿勾。
+`test_p0_wiring` / providers 契约：六家每行必出；布尔/枚举缺省不得省略成「隐式全开」。
 
-## 画布节点（后挂，线性 POC）
+## 画布节点（后挂，线性 POC · 真连线）
 
 节点 `op` ∈ 能力表云操作：`t2i` `i2i` `t2v` `i2v` `upscale` `bg` `lora_apply`…  
 连线端口类型：`prompt` `image` `seed` `latent?`（先不做 latent）。  
-`compile(linear)` → 有序 `Provider.generate` 调用；与表单模式共用同一 compile。
+**编译唯一真相**：`compile(graph)` 只沿边取输入 → `Provider.generate`；表单模式走同一 `compile`，禁止 UI 另拼旁路 payload。  
+未连口 = 空 / 阻断，禁止偷左侧全局残留。跨家能力不兼容（例 image→纯文本口）生成前红字。
 
 ## 验收（审查合同）
 
 - 声明 = 渲染 = 出站；缺能力显式藏/红，不静默
 - 芯片 = 节点同值；缺挂 P0
-- `test_p0_wiring`：图/表单 JSON → body 字段断言（Nano 无 WxH 已有样板）
+- 覆盖不得抬高弱能力；`loraConfidence=unverified` 不得绿勾
+- `GET /api/providers` 六家初填断言齐全（含 `none`）
+- `test_p0_wiring`：图 JSON → 出站 body 只含连线供给字段（Nano 无 WxH 已有样板）；假边旁路 = 打回
 
 ## 不做
 
