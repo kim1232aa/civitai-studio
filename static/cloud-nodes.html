@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
-<title>Cloud Nodes POC · Night Lab · v0783-preview-lightbox</title>
+<title>Cloud Nodes POC · Night Lab · v0784-dock-labels</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -91,7 +91,7 @@
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain · <b id="stampVer">v0783-preview-lightbox</b></span>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain · <b id="stampVer">v0784-dock-labels</b></span>
     <span class="demo-badge" id="demoBadge" title="active demo (from URL + boot)">demo=… · nodes: …</span>
     <a href="/">← 回主台</a>
   </header>
@@ -122,13 +122,13 @@
     </main>
   </div>
   <div class="dock">
-    <button class="btn ghost" type="button" id="btnDemoSingle" title="单步 image→i2v · ?demo=i2v">单步 demo</button>
-    <button class="btn ghost" type="button" id="btnDemoChain" title="多步 t2i→i2v · ?demo=chain">链式 demo</button>
-    <button class="btn ghost" type="button" id="btnValidate">校验图</button>
-    <button class="btn ghost" type="button" id="btnBreakImage" title="拆掉 image→i2v 边">断 image 边</button>
-    <button class="btn ghost" type="button" id="btnBreakPrompt" title="拆掉 prompt→i2v 边">断 prompt 边</button>
+    <button class="btn ghost" type="button" id="btnDemoSingle" title="加载单步示例：图片→视频（?demo=i2v）">加载：图→视频</button>
+    <button class="btn ghost" type="button" id="btnDemoChain" title="加载多步示例：文生图→视频（?demo=chain）">加载：文生图→视频</button>
+    <button class="btn ghost" type="button" id="btnValidate" title="编译校验当前连线与参数">校验连线</button>
+    <button class="btn ghost" type="button" id="btnBreakImage" title="断开图片输入线（测缺边阻断）">断开图片线</button>
+    <button class="btn ghost" type="button" id="btnBreakPrompt" title="断开提示词输入线（测缺边阻断）">断开提示词线</button>
     <button class="btn" type="button" id="btnGen">生成</button>
-    <span class="muted" id="dockMsg">主路径 image→i2v；多步链请开 链式 demo 或 /cloud-nodes.html?demo=chain</span>
+    <span class="muted" id="dockMsg">当前：图→视频示例。要看文生图再视频，点「加载：文生图→视频」</span>
   </div>
 <div class="lb" id="mediaLightbox" hidden aria-modal="true" role="dialog">
   <div class="lb-card" role="document">
@@ -145,7 +145,7 @@ const DEMO_I2V = {
   backend: 'nano-gpt',
   serviceId: 'vidu-q2-pro',
   selected: 'v',
-  hint: '单步 demo · /cloud-nodes.html?demo=i2v · 校验应绿 · 生成可点',
+  hint: '已加载：图→视频 · 校验连线应通过 · 生成可点',
   nodes: [
     { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg' } },
     { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:280, bd:'可选连入 i2v', params:{ text:'camera slowly pans left, cinematic' } },
@@ -165,7 +165,7 @@ const DEMO_CHAIN = {
   backend: 'nano-gpt',
   serviceId: 'vidu-q2-pro',
   selected: 'v',
-  hint: '链式 demo · /cloud-nodes.html?demo=chain · 校验琥珀(多步) · 生成保持灰',
+  hint: '已加载：文生图→视频（多步）· 校验后生成保持禁用（需分步）',
   nodes: [
     { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:200, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
     { id:'g', op:'t2i', title:'文生图', cls:'', x:300, y:180, bd:'image → i2v', params:{ serviceId:'flux', resolution:'1024x1024', previewUrl:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg', previewKind:'image' } },
@@ -183,7 +183,7 @@ const DEMO_CHAIN3 = {
   backend: 'nano-gpt',
   serviceId: 'vidu-q2-pro',
   selected: 'v',
-  hint: '链式 demo · /cloud-nodes.html?demo=chain3 · 校验琥珀(多步) · 生成保持灰',
+  hint: '已加载：文生图→图生图→视频（多步）· 校验后生成保持禁用（需分步）',
   nodes: [
     { id:'p', op:'prompt', title:'提示词', cls:'', x:20, y:120, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
     { id:'p2', op:'prompt', title:'精修词', cls:'', x:20, y:280, bd:'→ i2i', params:{ text:'refine details, film grain' } },
