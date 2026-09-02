@@ -826,6 +826,29 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert ok_max["promptMax"] == 800
 
 
+
+    # --- graph_compile linear real-edges ---
+    from providers.graph_compile import compile_graph
+    g = {
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hello"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z-image-turbo-lora", "width": 1, "height": 2, "resolution": "1024*1536"}},
+        ],
+        "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    }
+    cg = compile_graph(g)
+    assert cg.get("ok"), cg
+    assert cg["payload"]["prompt"] == "hello"
+    assert "width" not in cg["payload"] and "height" not in cg["payload"]
+    steal = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [{"id": "g", "op": "t2i", "params": {"serviceId": "z", "prompt": "steal-me"}}],
+        "edges": [],
+    })
+    assert not steal.get("ok") and steal.get("blocked")
+    assert "未连线" in steal.get("error", "")
+
     print("PASS p0 wiring")
 
 
