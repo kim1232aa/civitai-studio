@@ -828,7 +828,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # --- graph_compile linear real-edges ---
-    from providers.graph_compile import compile_graph, OP_SPEC
+    from providers.graph_compile import compile_graph, reject_staged_generate, payload_has_stage_out, OP_SPEC
     g = {
         "backend": "nano-gpt",
         "nodes": [
@@ -1108,6 +1108,18 @@ console.log('PASS isMusePublicQwenImageCousin');
     })
     assert not fake_parallel.get("ok") and fake_parallel.get("blocked"), fake_parallel
     assert "终端生成汇点" in fake_parallel.get("error", "") or "汇点" in fake_parallel.get("error", "")
+
+    # /api/generate hard-block: staged compile body + sink payload with __stageOut__
+    blocked_plan = reject_staged_generate(chain_t2i_i2v)
+    assert blocked_plan and blocked_plan.get("blocked") and blocked_plan.get("execute") == "staged", blocked_plan
+    blocked_sink = reject_staged_generate(chain_t2i_i2v["payload"])
+    assert blocked_sink and blocked_sink.get("blocked") and blocked_sink.get("stageOut"), blocked_sink
+    assert payload_has_stage_out(chain_t2i_i2v["payload"])
+    assert reject_staged_generate({"execute": "staged", "payload": {"prompt": "x"}})
+    assert reject_staged_generate({"multiStep": True, "ok": True})
+    # Materialized single-step sink must pass (no stage-out, not staged)
+    assert reject_staged_generate({"prompt": "x", "imageUrl": "https://ex/a.png"}) is None
+    assert reject_staged_generate({"ok": True, "execute": "single", "multiStep": False, "payload": {"imageUrl": "https://ex/a.png"}}) is None
 
     # Nano i2v strips WxH when catalog_token + imageUrl/mode
     i2v_nano = compile_graph({

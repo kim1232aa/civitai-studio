@@ -40,6 +40,7 @@
   .warn{color:var(--bad);font-size:12px}
   .ok{color:var(--ok);font-size:12px}
   .muted{color:var(--muted);font-size:12px}
+  .info{color:#f0c36a;font-size:12px}
   pre{background:#12151d;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:10px;max-height:180px;overflow:auto;margin:0}
 </style>
 </head>
@@ -138,8 +139,14 @@ function invalidateCompile(reason){
   $('dockMsg').className = 'warn';
 }
 
+function isStagedCompile(j){
+  return !!(j && (j.multiStep || j.execute === 'staged'));
+}
+
+/** Generate only for single-step ok compiles. Staged/multiStep stay disabled (compile ok ≠ green light). */
 function syncGenEnabled(){
-  $('btnGen').disabled = !(lastCompile && lastCompile.ok && lastCompileEpoch === graphEpoch);
+  const ready = !!(lastCompile && lastCompile.ok && lastCompileEpoch === graphEpoch && !isStagedCompile(lastCompile));
+  $('btnGen').disabled = !ready;
 }
 
 function buildGraph(){
@@ -313,16 +320,17 @@ async function validate(){
   $('outBox').textContent = JSON.stringify(j, null, 2);
   if (j.ok) {
     const map = j.wiring && j.wiring.out ? ' · map ' + JSON.stringify(j.wiring.out) : '';
-    if (j.multiStep || j.execute === 'staged') {
+    if (isStagedCompile(j)) {
       const n = (j.stages || []).length;
-      $('dockMsg').textContent = '校验通过 · 多步链 ' + n + ' stages（execute=staged，禁止一次假跑通）' + map;
-      // Keep Generate grey for staged plans — must materialize upstream first
-      $('btnGen').disabled = true;
+      // Compile ok for staged ≠ runnable: warn/info, never green fake-run check
+      $('dockMsg').textContent = '编译通过 · 多步链 ' + n + ' stages · 需 step runner 按序物化（尚未接入）· 生成保持禁用' + map;
+      $('dockMsg').className = 'info';
+      syncGenEnabled();
     } else {
       $('dockMsg').textContent = '校验通过 · i2v payload 已编译' + map;
+      $('dockMsg').className = 'ok';
       syncGenEnabled();
     }
-    $('dockMsg').className = 'ok';
     render();
   } else {
     $('dockMsg').textContent = (j.error || '校验失败') + (j.blocked ? ' · 已阻断' : '');
@@ -338,10 +346,10 @@ async function generate(){
   // Generate only from a fresh compile that matches current graphEpoch.
   if (!j || !j.ok || lastCompileEpoch !== graphEpoch) j = await validate();
   if (!j || !j.ok || j.stale || lastCompileEpoch !== graphEpoch) return;
-  if (j.multiStep || j.execute === 'staged') {
-    $('dockMsg').textContent = (j.note || '多步链请按 stages 顺序物化；禁止一次假跑通');
-    $('dockMsg').className = 'warn';
-    $('btnGen').disabled = true;
+  if (isStagedCompile(j)) {
+    $('dockMsg').textContent = (j.note || '多步链请按 stages 顺序物化；step runner 尚未接入 · 禁止一次假跑通');
+    $('dockMsg').className = 'info';
+    syncGenEnabled();
     return;
   }
   const epochAtStart = graphEpoch;

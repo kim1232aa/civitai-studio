@@ -3,6 +3,8 @@
 
 Mirrors the graphEpoch / compileSeq guard in static/cloud-nodes.html so an in-flight
 compile cannot re-enable Generate after removeEdge / 「断开」 / 「断 prompt 边」.
+
+Also: staged/multiStep compile ok must KEEP Generate disabled (compile ≠ green light).
 """
 from __future__ import annotations
 
@@ -26,6 +28,11 @@ def assert_source_guards() -> None:
         "DISCONNECT_MSG",
         "lastCompileEpoch === graphEpoch",
         "function syncGenEnabled(",
+        "function isStagedCompile(",
+        "isStagedCompile(lastCompile)",
+        "execute === 'staged'",
+        "step runner",
+        "className = 'info'",
     ]
     for needle in required:
         assert needle in HTML, f"missing guard in cloud-nodes.html: {needle!r}"
@@ -39,6 +46,12 @@ def assert_source_guards() -> None:
     # second break click must reuse DISCONNECT_MSG (not muted "边已不在")
     assert "image 边已不在" not in HTML
     assert "prompt 边已不在" not in HTML
+    # syncGenEnabled must not enable on ok alone — staged stays grey
+    assert "!isStagedCompile(lastCompile)" in HTML or "&& !isStagedCompile(lastCompile)" in HTML
+
+
+def is_staged_compile(j: dict | None) -> bool:
+    return bool(j and (j.get("multiStep") or j.get("execute") == "staged"))
 
 
 class FakeUI:
@@ -53,6 +66,15 @@ class FakeUI:
         self.outBox = "prior compile json"
         self.dockMsg = ""
         self.dockClass = "muted"
+
+    def sync_gen_enabled(self) -> None:
+        ready = bool(
+            self.lastCompile
+            and self.lastCompile.get("ok")
+            and self.lastCompileEpoch == self.graphEpoch
+            and not is_staged_compile(self.lastCompile)
+        )
+        self.btnGen_disabled = not ready
 
     def invalidate_compile(self, reason: str = "") -> None:
         self.graphEpoch += 1
@@ -70,10 +92,13 @@ class FakeUI:
         self.lastCompileEpoch = epoch_at_start
         self.outBox = str(j)
         if j.get("ok"):
-            self.dockClass = "ok"
-            self.btnGen_disabled = not (
-                self.lastCompile and self.lastCompile.get("ok") and self.lastCompileEpoch == self.graphEpoch
-            )
+            if is_staged_compile(j):
+                n = len(j.get("stages") or [])
+                self.dockMsg = f"编译通过 · 多步链 {n} stages · 需 step runner"
+                self.dockClass = "info"
+            else:
+                self.dockClass = "ok"
+            self.sync_gen_enabled()
         else:
             self.dockClass = "warn"
             self.btnGen_disabled = True
@@ -107,17 +132,42 @@ def test_fresh_compile_enables() -> None:
     ui.invalidate_compile("disconnect")  # blocked
     epoch_at_start = ui.graphEpoch
     seq = ui.compileSeq = ui.compileSeq + 1
-    applied = ui.apply_compile_response(epoch_at_start, seq, {"ok": True, "payload": {}})
+    applied = ui.apply_compile_response(epoch_at_start, seq, {"ok": True, "payload": {}, "execute": "single", "multiStep": False})
     assert applied and applied.get("ok") is True
     assert ui.btnGen_disabled is False
     assert ui.lastCompileEpoch == ui.graphEpoch
+    assert ui.dockClass == "ok"
+
+
+def test_staged_compile_keeps_gen_disabled() -> None:
+    """Compile ok for staged/multiStep must NOT green-light Generate."""
+    ui = FakeUI()
+    epoch_at_start = ui.graphEpoch
+    seq = ui.compileSeq = ui.compileSeq + 1
+    j = {
+        "ok": True,
+        "execute": "staged",
+        "multiStep": True,
+        "stages": [{"id": "g"}, {"id": "v"}],
+        "payload": {"sourceImage": {"__stageOut__": "g"}},
+        "note": "多步链…",
+    }
+    applied = ui.apply_compile_response(epoch_at_start, seq, j)
+    assert applied and applied.get("ok") is True
+    assert ui.btnGen_disabled is True, "staged ok must keep Generate disabled"
+    assert ui.dockClass == "info", "staged dock must not be green ok"
+    assert "step runner" in ui.dockMsg
+    # syncGenEnabled alone must not flip to enabled
+    ui.sync_gen_enabled()
+    assert ui.btnGen_disabled is True
 
 
 def main() -> int:
     assert_source_guards()
     test_stale_ok_after_disconnect()
     test_fresh_compile_enables()
-    print("ok: cloud-nodes disconnect-edge race guards")
+    test_staged_compile_keeps_gen_disabled()
+    print("ok: cloud-nodes disconnect-edge race guards + staged gen gate")
     return 0
 
 

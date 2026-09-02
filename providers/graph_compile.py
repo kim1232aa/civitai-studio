@@ -505,3 +505,38 @@ def compile_graph(graph: dict | None) -> dict:
     else:
         out["execute"] = "single"
     return out
+
+
+def payload_has_stage_out(obj: Any) -> bool:
+    """True if obj (nested dict/list) still carries unresolved __stageOut__ refs."""
+    if isinstance(obj, dict):
+        if "__stageOut__" in obj:
+            return True
+        return any(payload_has_stage_out(v) for v in obj.values())
+    if isinstance(obj, list):
+        return any(payload_has_stage_out(v) for v in obj)
+    return False
+
+
+def reject_staged_generate(payload: Any) -> dict | None:
+    """Hard-block one-shot /api/generate for staged plans or unresolved stage-outs.
+
+    Returns an error dict for the HTTP handler, or None if the payload may proceed.
+    Accepts either a sink payload or a full compile result body.
+    """
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("execute") == "staged" or payload.get("multiStep") is True:
+        return {
+            "error": "多步链（execute=staged / multiStep）禁止一次提交假跑通；请按 stages 顺序物化上游后再生成下游（step runner 尚未接入）",
+            "blocked": True,
+            "execute": "staged",
+            "multiStep": True,
+        }
+    if payload_has_stage_out(payload):
+        return {
+            "error": "payload 含未物化的 __stageOut__ 占位，禁止假跑通；请先跑上游 stage（step runner 尚未接入）",
+            "blocked": True,
+            "stageOut": True,
+        }
+    return None
