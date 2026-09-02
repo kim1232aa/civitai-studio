@@ -828,7 +828,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # --- graph_compile linear real-edges ---
-    from providers.graph_compile import compile_graph
+    from providers.graph_compile import compile_graph, OP_SPEC
     g = {
         "backend": "nano-gpt",
         "nodes": [
@@ -1087,6 +1087,27 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "btnBreakImage" in cn_html
     assert "image→i2v" in cn_html
     assert "toPort:'image'" in cn_html
+    # Cold-start: serviceId must match default backend family (not fal SID on nano-gpt)
+    assert "syncColdStartServiceId" in cn_html
+    assert 'value="vidu-q2-pro"' in cn_html
+    assert "i2v" in OP_SPEC, "server must register i2v or UI shows 未知 op: i2v"
+    # Default demo graph (image→i2v + prompt/seed) must compile green on nano-gpt
+    demo = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://example.com/frame.png"}},
+            {"id": "p", "op": "prompt", "params": {"text": "camera slowly pans left, cinematic"}},
+            {"id": "s", "op": "seed", "params": {"value": 4924112}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vidu-q2-pro", "duration": 5, "resolution": "1280x720"}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "v", "toPort": "image"},
+            {"from": "p", "fromPort": "prompt", "to": "v", "toPort": "prompt"},
+            {"from": "s", "fromPort": "seed", "to": "v", "toPort": "seed"},
+        ],
+    })
+    assert demo.get("ok"), demo
+    assert "未知 op" not in (demo.get("error") or "")
 
     print("PASS p0 wiring")
 
