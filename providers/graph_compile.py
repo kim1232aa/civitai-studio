@@ -2,7 +2,7 @@
 
 Truth: edges are data deps. compile(graph) only reads ports via edges.
 Unconnected required ports → error. Never steal leftover form/global bags.
-Form mode can call compile_form → same outbound shape later; this module is graph-only.
+negative / seed / loras on generators: wire-only (no params bypass).
 """
 from __future__ import annotations
 
@@ -12,17 +12,22 @@ from typing import Any
 
 from .capabilities import get_provider_capabilities
 
-# Port types for linear POC
-PORT_TYPES = {"prompt": "prompt", "image": "image", "seed": "seed", "negative": "prompt", "loras": "loras"}
+PORT_TYPES = {
+    "prompt": "prompt",
+    "image": "image",
+    "seed": "seed",
+    "negative": "prompt",
+    "loras": "loras",
+}
 
-# op → required input ports / output ports
 OP_SPEC = {
     "prompt": {"ins": [], "outs": ["prompt"], "required": []},
     "negative": {"ins": [], "outs": ["negative"], "required": []},
     "seed": {"ins": [], "outs": ["seed"], "required": []},
+    # image source for i2i (url / dataUrl in params)
+    "image": {"ins": [], "outs": ["image"], "required": []},
     "t2i": {"ins": ["prompt", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt"]},
     "i2i": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt", "image"]},
-    # lora_apply emits a loras bag for t2i/i2i; may also pass image through for i2i chains
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
 }
 
@@ -58,7 +63,6 @@ def _topo(nodes: list[dict], edges: list[dict]) -> tuple[list[str] | None, str |
 
 
 def _unwrap_image(v: Any) -> tuple[Any, list]:
-    """Image wire may carry bundled loras from lora_apply pass-through."""
     if isinstance(v, dict) and v.get("__wire__") == "image":
         return v.get("value"), list(v.get("loras") or [])
     return v, []
@@ -69,19 +73,16 @@ def _merge_loras(*bags: Any) -> list:
     for b in bags:
         if not b:
             continue
-        if isinstance(b, list):
-            out.extend(deepcopy(b))
-        else:
+        if isinstance(b, dict):
             out.append(deepcopy(b))
+        elif isinstance(b, list):
+            for x in b:
+                if x:
+                    out.append(deepcopy(x))
     return out
 
 
 def compile_graph(graph: dict | None) -> dict:
-    """Compile a linear-capable cloud graph into one generate payload (single sink).
-
-    Returns {ok, payload?, steps?, error?, blocked?}.
-    Never mutates the caller's graph dict.
-    """
     g = graph or {}
     backend = (g.get("backend") or "").strip()
     if not backend:
@@ -94,7 +95,7 @@ def compile_graph(graph: dict | None) -> dict:
     if not isinstance(edges, list):
         return _err("edges 必须是数组")
 
-    by_id = {}
+    by_id: dict[str, dict] = {}
     for n in nodes:
         if not isinstance(n, dict) or not n.get("id"):
             return _err("节点缺少 id")
@@ -105,7 +106,8 @@ def compile_graph(graph: dict | None) -> dict:
             return _err(f"重复节点 id: {n['id']}")
         by_id[n["id"]] = n
 
-    incoming = defaultdict(list)
+    incoming: dict[str, list] = defaultdict(list)
+    outgoing: dict[str, list] = defaultdict(list)
     for e in edges:
         if not isinstance(e, dict):
             return _err("边格式错误")
@@ -124,13 +126,14 @@ def compile_graph(graph: dict | None) -> dict:
         if PORT_TYPES.get(fp) != PORT_TYPES.get(tp):
             return _err(f"类型不兼容: {fr}.{fp} → {to}.{tp}", blocked=True)
         incoming[to].append(e)
+        outgoing[fr].append(e)
 
     order, terr = _topo(nodes, edges)
     if terr:
         return _err(terr, blocked=True)
 
     values: dict[tuple[str, str], Any] = {}
-    sinks: list[tuple[str, dict]] = []  # (nodeId, payload) — exactly one allowed
+    candidate_sinks: list[tuple[str, dict]] = []
 
     for nid in order:
         n = by_id[nid]
@@ -163,11 +166,17 @@ def compile_graph(graph: dict | None) -> dict:
                     return _err(f"seed 节点 {nid} 缺少 params.value", nodeId=nid)
                 val = params.get("value", params.get("seed"))
             else:
-                val = params.get("text", params.get("prompt"))
+                val = params.get("text", params.get("prompt", params.get("negativePrompt")))
                 if val in (None, ""):
                     return _err(f"{op} 节点 {nid} 缺少文本", nodeId=nid)
-            out_port = OP_SPEC[op]["outs"][0]
-            values[(nid, out_port)] = val
+            values[(nid, OP_SPEC[op]["outs"][0])] = val
+            continue
+
+        if op == "image":
+            url = params.get("url") or params.get("value") or params.get("sourceImage") or params.get("image")
+            if not url:
+                return _err(f"image 节点 {nid} 缺少 params.url", nodeId=nid, blocked=True)
+            values[(nid, "image")] = {"__wire__": "image", "value": url, "loras": []}
             continue
 
         if op == "lora_apply":
@@ -177,7 +186,6 @@ def compile_graph(graph: dict | None) -> dict:
                 return _err(f"后端 {backend} 不支持 LoRA", blocked=True)
             loras = deepcopy(params["loras"])
             values[(nid, "loras")] = loras
-            # Optional image pass-through: bundle loras so a lone image→i2i edge still carries them
             if "image" in inputs:
                 img, prior = _unwrap_image(inputs["image"])
                 values[(nid, "image")] = {
@@ -185,9 +193,27 @@ def compile_graph(graph: dict | None) -> dict:
                     "value": img,
                     "loras": _merge_loras(prior, loras),
                 }
+            # Must feed a sink — silent orphan is P1→block
+            outs_used = {e["fromPort"] for e in outgoing.get(nid, [])}
+            if not outs_used.intersection({"loras", "image"}):
+                return _err(
+                    f"lora_apply {nid} 未连到汇点（loras/image），禁止静默无效",
+                    blocked=True,
+                    nodeId=nid,
+                )
             continue
 
         if op in ("t2i", "i2i"):
+            # Chained t2i→i2i not in linear POC if upstream image is pending generate
+            if op == "i2i":
+                raw_img = inputs.get("image")
+                if isinstance(raw_img, dict) and raw_img.get("__pending__"):
+                    return _err(
+                        "线性 POC 暂不支持 t2i→i2i 链式生成；i2i 请用 image 源节点",
+                        blocked=True,
+                        nodeId=nid,
+                    )
+
             payload = {
                 "backend": backend,
                 "serviceId": params.get("serviceId") or g.get("serviceId"),
@@ -196,28 +222,47 @@ def compile_graph(graph: dict | None) -> dict:
             if not payload["serviceId"]:
                 return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
 
-            # seed: ONLY from wired seed port — no params.seed bypass on generator
+            # wire-only for seed / negative / loras on generator
             if "seed" in inputs:
                 payload["seed"] = inputs["seed"]
-
             if "negative" in inputs:
                 payload["negativePrompt"] = inputs["negative"]
-            elif "negativePrompt" in params:
-                payload["negativePrompt"] = params["negativePrompt"]
+            # reject params bypass if present without wire (honest error)
+            if "seed" in params and "seed" not in inputs:
+                return _err(
+                    f"节点 {nid} 的 seed 只认连线，请用 seed 节点接入；禁止 params.seed 旁路",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            if ("negativePrompt" in params or "negative" in params) and "negative" not in inputs:
+                return _err(
+                    f"节点 {nid} 的负面词只认连线，请用 negative 节点接入",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            if "loras" in params and "loras" not in inputs:
+                # also allow image-bundled loras without separate loras port
+                pass  # checked after unwrap
 
             bundled_loras: list = []
             if op == "i2i":
                 img, bundled_loras = _unwrap_image(inputs["image"])
+                if not img:
+                    return _err(f"i2i {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
                 payload["sourceImage"] = img
 
             for k in ("resolution", "width", "height", "steps", "cfgScale", "quantity"):
                 if k in params:
                     payload[k] = deepcopy(params[k])
 
-            # loras: wired loras port + image-bundled + node-local params (merged, not dropped)
             wired_loras = inputs.get("loras")
-            param_loras = params.get("loras")
-            merged = _merge_loras(bundled_loras, wired_loras, param_loras)
+            merged = _merge_loras(bundled_loras, wired_loras)
+            if "loras" in params and "loras" not in inputs and not bundled_loras:
+                return _err(
+                    f"节点 {nid} 的 LoRA 只认连线（lora_apply→loras 或 image 打包），禁止 params.loras 旁路",
+                    blocked=True,
+                    nodeId=nid,
+                )
             if merged:
                 payload["loras"] = merged
 
@@ -232,22 +277,31 @@ def compile_graph(graph: dict | None) -> dict:
                     return _err(f"提示词超过 promptMax={mx}", blocked=True, nodeId=nid)
 
             values[(nid, "image")] = {"__pending__": True, "from": nid}
-            sinks.append((nid, payload))
+            # Only a sink if image out is not wired onward
+            image_wired_on = any(e.get("fromPort") == "image" for e in outgoing.get(nid, []))
+            if image_wired_on:
+                # intermediate generate not supported in linear POC
+                return _err(
+                    f"线性 POC 不支持把 {op} {nid} 的 image 再接到下游；请只留一个汇点",
+                    blocked=True,
+                    nodeId=nid,
+                )
+            candidate_sinks.append((nid, payload))
             continue
 
         return _err(f"未实现 op: {op}", nodeId=nid)
 
-    if not sinks:
+    if not candidate_sinks:
         return _err("图中没有可生成的 t2i/i2i 汇点")
-    if len(sinks) > 1:
-        ids = [s[0] for s in sinks]
+    if len(candidate_sinks) > 1:
+        ids = [s[0] for s in candidate_sinks]
         return _err(
-            f"线性 POC 只允许一个生成汇点，当前 {len(sinks)} 个: {', '.join(ids)}",
+            f"线性 POC 只允许一个生成汇点，当前 {len(candidate_sinks)} 个: {', '.join(ids)}",
             blocked=True,
             sinks=ids,
         )
 
-    sink_id, payload = sinks[0]
+    sink_id, payload = candidate_sinks[0]
     return {
         "ok": True,
         "payload": payload,

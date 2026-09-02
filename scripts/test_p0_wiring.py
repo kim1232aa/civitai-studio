@@ -922,6 +922,43 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert set(g2.keys()) == keys_before
     assert "_last_payload" not in g2 and "_last_sink" not in g2
 
+
+    # --- graph_compile: image source, orphan lora, wire-only neg/loras ---
+    from providers.graph_compile import compile_graph as _cg
+    _i2i = _cg({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
+            {"id": "g", "op": "i2i", "params": {"serviceId": "z-image-turbo-lora"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "img", "fromPort": "image", "to": "g", "toPort": "image"},
+        ],
+    })
+    assert _i2i.get("ok"), _i2i
+    assert _i2i["payload"].get("sourceImage")
+    _orphan = _cg({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "l", "op": "lora_apply", "params": {"loras": [{"path": "a", "scale": 1}]}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+        ],
+        "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    })
+    assert not _orphan.get("ok") and "静默无效" in _orphan.get("error", "")
+    _bypass = _cg({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z", "loras": [{"path": "a"}], "negativePrompt": "n"}},
+        ],
+        "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    })
+    assert not _bypass.get("ok") and _bypass.get("blocked")
+
     print("PASS p0 wiring")
 
 
