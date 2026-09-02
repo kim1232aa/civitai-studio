@@ -849,6 +849,79 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert not steal.get("ok") and steal.get("blocked")
     assert "未连线" in steal.get("error", "")
 
+    # P1: params.seed must NOT bypass missing seed edge
+    seed_bypass = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z", "seed": 999}},
+        ],
+        "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    })
+    assert seed_bypass.get("ok"), seed_bypass
+    assert "seed" not in seed_bypass["payload"], seed_bypass["payload"]
+
+    # wired seed still works
+    seed_ok = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "s", "op": "seed", "params": {"value": 42}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "s", "fromPort": "seed", "to": "g", "toPort": "seed"},
+        ],
+    })
+    assert seed_ok.get("ok") and seed_ok["payload"]["seed"] == 42
+
+    # P1: lora_apply must merge into sink loras
+    lora_g = compile_graph({
+        "backend": "civitai",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "l", "op": "lora_apply", "params": {"loras": [{"air": "urn:air:x", "strength": 0.8}]}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "ckpt"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "l", "fromPort": "loras", "to": "g", "toPort": "loras"},
+        ],
+    })
+    assert lora_g.get("ok"), lora_g
+    assert lora_g["payload"].get("loras") and lora_g["payload"]["loras"][0]["air"] == "urn:air:x"
+
+    # P1: multi-sink must block (no silent last-wins)
+    multi = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g1", "op": "t2i", "params": {"serviceId": "a"}},
+            {"id": "g2", "op": "t2i", "params": {"serviceId": "b"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g1", "toPort": "prompt"},
+            {"from": "p", "fromPort": "prompt", "to": "g2", "toPort": "prompt"},
+        ],
+    })
+    assert not multi.get("ok") and multi.get("blocked")
+    assert "一个生成汇点" in multi.get("error", "")
+
+    # P1: must not mutate caller graph
+    g2 = {
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hello"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z", "resolution": "1024*1536"}},
+        ],
+        "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    }
+    keys_before = set(g2.keys())
+    assert compile_graph(g2).get("ok")
+    assert set(g2.keys()) == keys_before
+    assert "_last_payload" not in g2 and "_last_sink" not in g2
+
     print("PASS p0 wiring")
 
 
