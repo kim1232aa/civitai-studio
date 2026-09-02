@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>Cloud Nodes POC · Night Lab · v0777-branch</title>
+<style>
+  :root {
+    --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
+    --coral:#e85d4c; --ok:#3dd68c; --bad:#ff5c5c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 "PingFang SC","Noto Sans SC",system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header a{color:var(--muted);text-decoration:none}
+  header strong{font-size:14px}
+  .wrap{flex:1;display:flex;min-height:0}
+  .rail{width:280px;background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+  .rail h2{margin:0;font-size:14px}
+  .chip{display:flex;gap:8px;flex-wrap:wrap}
+  .chip span{background:#1e2430;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11px;color:var(--muted)}
+  .chip span.on{border-color:var(--coral);color:#fff}
+  .canvas{flex:1;position:relative;overflow:hidden;background:radial-gradient(circle at 1px 1px, #1a1f2b 1px, transparent 0) 0 0/20px 20px}
+  .node{position:absolute;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;user-select:none}
+  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
+  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--coral)}
+  .node.lora .bar{background:#7c6cff}
+  .node.seed .bar{background:#f0c36a}
+  .node.img .bar{background:#3dd68c}
+  .node .hd{display:flex;justify-content:space-between;padding:10px 12px 4px;font-weight:650}
+  .node .bd{padding:4px 12px 12px;color:var(--muted);font-size:11px;word-break:break-all}
+  .port{position:absolute;width:10px;height:10px;border-radius:50%;background:#4a5163;border:2px solid var(--panel);top:42px}
+  .port.in{left:-6px}.port.out{right:-6px}
+  .port.live{background:var(--coral)}
+  .port.bad{background:var(--bad)}
+  svg.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .dock{padding:10px 16px;background:rgba(14,16,22,.96);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{border:0;border-radius:999px;padding:8px 16px;background:var(--coral);color:#fff;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.ghost{background:#1e2430;color:var(--text);border:1px solid var(--line)}
+  .warn{color:var(--bad);font-size:12px}
+  .ok{color:var(--ok);font-size:12px}
+  .muted{color:var(--muted);font-size:12px}
+  pre{background:#12151d;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:10px;max-height:180px;overflow:auto;margin:0}
+</style>
+</head>
+<body>
+  <header>
+    <strong>Cloud Nodes POC</strong>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真连线 compile</span>
+    <a href="/">← 回主台</a>
+  </header>
+  <div class="wrap">
+    <aside class="rail">
+      <h2>配方检视</h2>
+      <div class="chip" id="chips"></div>
+      <p class="muted" id="railHint">点节点查看；校验走 compile，未连口禁止偷残留。</p>
+      <label class="muted">backend
+        <select id="backend" style="width:100%;margin-top:4px;background:#1e2430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px">
+          <option value="nano-gpt">nano-gpt</option>
+          <option value="fal">fal</option>
+          <option value="civitai">civitai</option>
+        </select>
+      </label>
+      <label class="muted">serviceId
+        <input id="serviceId" value="z-image-turbo-lora" style="width:100%;margin-top:4px;background:#1e2430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px"/>
+      </label>
+      <pre id="outBox">compile 结果会显示在这里</pre>
+    </aside>
+    <main class="canvas" id="canvas">
+      <svg class="wires" id="wires"></svg>
+    </main>
+  </div>
+  <div class="dock">
+    <button class="btn ghost" type="button" id="btnValidate">校验图</button>
+    <button class="btn" type="button" id="btnGen">生成</button>
+    <span class="muted" id="dockMsg">先点「校验图」；假边/未连会红字阻断。</span>
+  </div>
+<script>
+const nodes = [
+  { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:110, bd:'正向文本 · 源节点', params:{ text:'a girl, detailed face' } },
+  { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:250, bd:'只认连线进文生图', params:{ value: 4924112 } },
+  { id:'l', op:'lora_apply', title:'LoRA', cls:'lora', x:40, y:380, bd:'AnimeEnhance · 0.8', params:{ loras:[{ path:'https://civitai.com/api/download/models/3203007', scale:0.8, name:'AnimeEnhance' }] } },
+  { id:'g', op:'t2i', title:'文生图', cls:'', x:390, y:160, bd:'', params:{ serviceId:'', resolution:'1024*1536' } },
+];
+// Good edges: prompt→t2i, seed→t2i, lora→t2i.loras
+let edges = [
+  { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
+  { from:'s', fromPort:'seed', to:'g', toPort:'seed' },
+  { from:'l', fromPort:'loras', to:'g', toPort:'loras' },
+];
+let selected = 'g';
+let lastCompile = null;
+
+function $(id){ return document.getElementById(id); }
+
+function buildGraph(){
+  const sid = $('serviceId').value.trim();
+  const ns = nodes.map(n => {
+    const params = Object.assign({}, n.params);
+    if (n.op === 't2i' || n.op === 'i2i') params.serviceId = sid || params.serviceId;
+    return { id:n.id, op:n.op, params };
+  });
+  return { backend: $('backend').value, nodes: ns, edges: edges.map(e => Object.assign({}, e)) };
+}
+
+function renderChips(){
+  const n = nodes.find(x => x.id === selected);
+  const box = $('chips');
+  box.innerHTML = '';
+  if (!n) return;
+  const bits = [];
+  if (n.op === 't2i') {
+    bits.push(['model', $('serviceId').value || '—']);
+    bits.push(['res', n.params.resolution || '—']);
+    const seedEdge = edges.find(e => e.to === 'g' && e.toPort === 'seed');
+    bits.push(['seed', seedEdge ? String(nodes.find(x=>x.id===seedEdge.from)?.params?.value ?? '…') : '未连']);
+    const loraEdge = edges.find(e => e.to === 'g' && e.toPort === 'loras');
+    bits.push(['lora', loraEdge ? '已连' : '未连']);
+  } else {
+    bits.push([n.op, n.title]);
+  }
+  bits.forEach(([k,v]) => {
+    const s = document.createElement('span');
+    s.className = 'on';
+    s.textContent = v;
+    s.title = k;
+    box.appendChild(s);
+  });
+  $('railHint').textContent = `选中「${n.title}」· 芯片须与节点一致`;
+}
+
+function portPos(nodeId, which){
+  const n = nodes.find(x => x.id === nodeId);
+  const el = document.querySelector(`[data-id="${nodeId}"]`);
+  if (!n || !el) return {x:0,y:0};
+  const r = el.getBoundingClientRect();
+  const c = $('canvas').getBoundingClientRect();
+  return {
+    x: (which === 'in' ? r.left : r.right) - c.left,
+    y: r.top - c.top + 42
+  };
+}
+
+function drawWires(badKeys){
+  const svg = $('wires');
+  const cr = $('canvas').getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${cr.width} ${cr.height}`);
+  svg.innerHTML = '';
+  edges.forEach((e, i) => {
+    const a = portPos(e.from, 'out');
+    const b = portPos(e.to, 'in');
+    const mid = (a.x + b.x) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const bad = badKeys && badKeys.has(i);
+    path.setAttribute('d', `M ${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`);
+    path.setAttribute('stroke', bad ? '#ff5c5c' : '#e85d4c');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    if (bad) path.setAttribute('stroke-dasharray', '4 4');
+    svg.appendChild(path);
+  });
+}
+
+function renderNodes(){
+  const canvas = $('canvas');
+  [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  nodes.forEach(n => {
+    if (n.op === 't2i') n.bd = `${$('serviceId').value || '?'} · ${n.params.resolution||''}<br/>seed/LoRA 来自连线`;
+    const d = document.createElement('div');
+    d.className = 'node ' + (n.cls||'') + (n.id===selected?' sel':'');
+    d.dataset.id = n.id;
+    d.style.left = n.x + 'px';
+    d.style.top = n.y + 'px';
+    d.innerHTML = `<div class="bar"></div><div class="hd">${n.title}</div><div class="bd">${n.bd||''}</div>
+      ${OP_HAS_IN[n.op]?'<i class="port in live"></i>':''}
+      ${OP_HAS_OUT[n.op]?'<i class="port out live"></i>':''}`;
+    d.onclick = () => { selected = n.id; render(); };
+    canvas.appendChild(d);
+  });
+}
+
+const OP_HAS_IN = { t2i:1, i2i:1, lora_apply:1 };
+const OP_HAS_OUT = { prompt:1, seed:1, negative:1, image:1, lora_apply:1, t2i:1, i2i:1 };
+
+function render(badKeys){
+  renderNodes();
+  renderChips();
+  requestAnimationFrame(() => drawWires(badKeys));
+}
+
+async function validate(){
+  const graph = buildGraph();
+  $('dockMsg').textContent = '校验中…';
+  $('dockMsg').className = 'muted';
+  const res = await fetch('/api/graph/compile', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ graph })
+  });
+  const j = await res.json();
+  lastCompile = j;
+  $('outBox').textContent = JSON.stringify(j, null, 2);
+  if (j.ok) {
+    $('dockMsg').textContent = '校验通过 · 可点生成（payload 已编译）';
+    $('dockMsg').className = 'ok';
+    $('btnGen').disabled = false;
+    render();
+  } else {
+    $('dockMsg').textContent = (j.error || '校验失败') + (j.blocked ? ' · 已阻断' : '');
+    $('dockMsg').className = 'warn';
+    $('btnGen').disabled = true;
+    render();
+  }
+  return j;
+}
+
+async function generate(){
+  let j = lastCompile;
+  if (!j || !j.ok) j = await validate();
+  if (!j || !j.ok) return;
+  $('dockMsg').textContent = '提交生成…';
+  $('dockMsg').className = 'muted';
+  $('btnGen').disabled = true;
+  const res = await fetch('/api/generate', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(j.payload)
+  });
+  const body = await res.json().catch(() => ({}));
+  $('outBox').textContent = JSON.stringify({ compile: j, generate: { status: res.status, body } }, null, 2);
+  if (res.ok) {
+    $('dockMsg').textContent = '已提交 · 看主台画廊 / out/';
+    $('dockMsg').className = 'ok';
+  } else {
+    $('dockMsg').textContent = '生成失败: ' + (body.error || res.status);
+    $('dockMsg').className = 'warn';
+  }
+  $('btnGen').disabled = false;
+}
+
+$('btnValidate').onclick = () => validate();
+$('btnGen').onclick = () => generate();
+$('btnGen').disabled = true;
+$('backend').onchange = () => { lastCompile = null; $('btnGen').disabled = true; render(); };
+$('serviceId').oninput = () => { lastCompile = null; render(); };
+window.addEventListener('resize', () => drawWires());
+render();
+</script>
+</body>
+</html>

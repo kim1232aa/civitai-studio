@@ -724,6 +724,11 @@ class Handler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path in ("/cloud-nodes.html", "/cloud-nodes"):
+            fp = STATIC / "cloud-nodes.html"
+            if not fp.exists():
+                return self._json(404, {"error": "cloud-nodes.html missing"})
+            return self._bytes(200, fp.read_bytes(), "text/html; charset=utf-8")
         if path.startswith("/static/"):
             name = Path(path.split("/static/", 1)[1]).name
             fp = STATIC / name
@@ -939,6 +944,11 @@ class Handler(BaseHTTPRequestHandler):
                 endpoint=payload.get("endpoint") or payload.get("serviceId"),
             )
             return self._json(code, data)
+        if path == "/api/graph/compile":
+            from providers.graph_compile import compile_graph
+            result = compile_graph(payload.get("graph") if isinstance(payload.get("graph"), dict) else payload)
+            code = 200 if result.get("ok") else 400
+            return self._json(code, result)
         if path in ("/api/generate", "/api/whatif"):
             prov = providers.resolve_from_payload(payload)
             if path == "/api/whatif":
