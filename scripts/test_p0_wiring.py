@@ -775,6 +775,43 @@ console.log('PASS isMusePublicQwenImageCousin');
                     assert body3.get("seedOriginal") == 891104780613135, body3
 
 
+
+    # --- v0777-branch: provider capabilities on /api/providers ---
+    from providers.capabilities import (
+        PROVIDER_CAPS,
+        REQUIRED_KEYS,
+        get_provider_capabilities,
+        merge_catalog_override,
+    )
+    import providers as prov_mod
+    prov_mod.load()
+    pub = {x["id"]: x for x in prov_mod.list_public()}
+    for pid in ("civitai", "fal", "huggingface", "modelscope-ai", "modelscope-cn", "nano-gpt"):
+        assert pid in pub, pid
+        caps = pub[pid].get("capabilities")
+        assert isinstance(caps, dict), pid
+        for k in REQUIRED_KEYS:
+            assert k in caps, f"{pid} missing capabilities.{k}"
+        # never silent full-support for unknown
+        assert caps["lora"] in ("air", "path", "hub_repo", "none")
+        assert caps["loraConfidence"] in ("official", "unverified", "none")
+        assert caps["progress"] in ("rate", "queue", "status_only", "none")
+    assert pub["huggingface"]["capabilities"]["loraConfidence"] == "unverified"
+    assert pub["nano-gpt"]["capabilities"]["resolution"] == "catalog_token"
+    assert pub["nano-gpt"]["capabilities"]["promptMax"] == 1200
+    # override must not raise: provider lora=none cannot get supportsLora true
+    weak = get_provider_capabilities("huggingface")
+    # simulate a none provider
+    none_caps = get_provider_capabilities("___missing___")
+    assert none_caps["lora"] == "none"
+    merged = merge_catalog_override(none_caps, {"supportsLora": True, "lora": "path"})
+    assert merged["supportsLora"] is False
+    assert merged["lora"] == "none"
+    # path provider can set supportsLora false (narrow)
+    merged2 = merge_catalog_override(get_provider_capabilities("fal"), {"supportsLora": False})
+    assert merged2["supportsLora"] is False
+
+
     print("PASS p0 wiring")
 
 
