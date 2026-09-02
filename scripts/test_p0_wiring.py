@@ -858,8 +858,8 @@ console.log('PASS isMusePublicQwenImageCousin');
         ],
         "edges": [{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
     })
-    assert seed_bypass.get("ok"), seed_bypass
-    assert "seed" not in seed_bypass["payload"], seed_bypass["payload"]
+    assert not seed_bypass.get("ok") and seed_bypass.get("blocked"), seed_bypass
+    assert "params.seed" in seed_bypass.get("error", "") or "只认连线" in seed_bypass.get("error", "")
 
     # wired seed still works
     seed_ok = compile_graph({
