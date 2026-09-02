@@ -94,8 +94,30 @@ let edges = [
 ];
 let selected = 'g';
 let lastCompile = null;
+/** Bumped on any graph change that invalidates compile (edge disconnect, backend/serviceId). */
+let graphEpoch = 0;
+/** Monotonic id of the latest validate/compile request; stale responses must not apply. */
+let compileSeq = 0;
+/** graphEpoch value that lastCompile was produced for (must match to enable Generate). */
+let lastCompileEpoch = -1;
 
 function $(id){ return document.getElementById(id); }
+
+/** Clear compile cache + UI: gen grey, dock red/blocked, outBox wiped. Bumps graphEpoch so in-flight ok:true cannot revive. */
+function invalidateCompile(reason){
+  graphEpoch += 1;
+  lastCompile = null;
+  lastCompileEpoch = -1;
+  $('btnGen').disabled = true;
+  const box = $('outBox');
+  if (box) box.textContent = '';
+  $('dockMsg').textContent = reason || '图已变更 · 请重新校验';
+  $('dockMsg').className = 'warn';
+}
+
+function syncGenEnabled(){
+  $('btnGen').disabled = !(lastCompile && lastCompile.ok && lastCompileEpoch === graphEpoch);
+}
 
 function buildGraph(){
   const sid = $('serviceId').value.trim();
@@ -148,10 +170,8 @@ function portPos(nodeId, which){
 function removeEdge(i){
   if (i < 0 || i >= edges.length) return;
   edges.splice(i, 1);
-  lastCompile = null;
-  $('btnGen').disabled = true;
-  $('dockMsg').textContent = '已断开一条边 · 请重新校验';
-  $('dockMsg').className = 'muted';
+  // 断边后须清 lastCompile、清 outBox、校验红、生成灰 — bump graphEpoch so in-flight compile cannot race back ok:true
+  invalidateCompile('已断开一条边 · 校验红 · 生成灰 · 请重新校验');
   render();
 }
 
@@ -237,6 +257,8 @@ function render(badKeys){
 
 async function validate(){
   const graph = buildGraph();
+  const epochAtStart = graphEpoch;
+  const seq = ++compileSeq;
   $('dockMsg').textContent = '校验中…';
   $('dockMsg').className = 'muted';
   const res = await fetch('/api/graph/compile', {
@@ -244,12 +266,18 @@ async function validate(){
     body: JSON.stringify({ graph })
   });
   const j = await res.json();
+  // Race guard: ignore stale in-flight response after disconnect / newer validate.
+  // Never overwrite post-disconnect blocked state with an old ok:true.
+  if (epochAtStart !== graphEpoch || seq !== compileSeq) {
+    return { ok:false, stale:true, blocked:true, error:'stale compile ignored' };
+  }
   lastCompile = j;
+  lastCompileEpoch = epochAtStart;
   $('outBox').textContent = JSON.stringify(j, null, 2);
   if (j.ok) {
     $('dockMsg').textContent = '校验通过 · 可点生成（payload 已编译）';
     $('dockMsg').className = 'ok';
-    $('btnGen').disabled = false;
+    syncGenEnabled();
     render();
   } else {
     $('dockMsg').textContent = (j.error || '校验失败') + (j.blocked ? ' · 已阻断' : '');
@@ -262,8 +290,10 @@ async function validate(){
 
 async function generate(){
   let j = lastCompile;
-  if (!j || !j.ok) j = await validate();
-  if (!j || !j.ok) return;
+  // Generate only from a fresh compile that matches current graphEpoch.
+  if (!j || !j.ok || lastCompileEpoch !== graphEpoch) j = await validate();
+  if (!j || !j.ok || j.stale || lastCompileEpoch !== graphEpoch) return;
+  const epochAtStart = graphEpoch;
   $('dockMsg').textContent = '提交生成…';
   $('dockMsg').className = 'muted';
   $('btnGen').disabled = true;
@@ -272,6 +302,10 @@ async function generate(){
     body: JSON.stringify(j.payload)
   });
   const body = await res.json().catch(() => ({}));
+  if (epochAtStart !== graphEpoch) {
+    // Edge disconnected mid-generate: keep blocked UI; do not restore gen or outBox ok state.
+    return;
+  }
   $('outBox').textContent = JSON.stringify({ compile: j, generate: { status: res.status, body } }, null, 2);
   if (res.ok) {
     $('dockMsg').textContent = '已提交 · 看主台画廊 / out/';
@@ -280,7 +314,7 @@ async function generate(){
     $('dockMsg').textContent = '生成失败: ' + (body.error || res.status);
     $('dockMsg').className = 'warn';
   }
-  $('btnGen').disabled = false;
+  syncGenEnabled();
 }
 
 $('btnValidate').onclick = () => validate();
@@ -292,8 +326,8 @@ $('btnBreakPrompt').onclick = () => {
 };
 
 $('btnGen').disabled = true;
-$('backend').onchange = () => { lastCompile = null; $('btnGen').disabled = true; render(); };
-$('serviceId').oninput = () => { lastCompile = null; render(); };
+$('backend').onchange = () => { invalidateCompile('backend 已变更 · 请重新校验'); render(); };
+$('serviceId').oninput = () => { invalidateCompile('serviceId 已变更 · 请重新校验'); render(); };
 window.addEventListener('resize', () => drawWires());
 render();
 </script>
