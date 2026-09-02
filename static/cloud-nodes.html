@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Cloud Nodes POC · Night Lab · v0779-chain-demo</title>
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Cloud Nodes POC · Night Lab · v0780-chain-demo</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -42,12 +45,16 @@
   .muted{color:var(--muted);font-size:12px}
   .info{color:#f0c36a;font-size:12px}
   pre{background:#12151d;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:10px;max-height:180px;overflow:auto;margin:0}
+  .demo-badge{margin-left:auto;font:600 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0e1016;background:#f0c36a;border:1px solid #d4a84a;border-radius:8px;padding:6px 12px;letter-spacing:.02em;max-width:min(520px,55vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .demo-badge.chain{background:#f0c36a;color:#0e1016}
+  .demo-badge.single{background:#3dd68c;color:#0e1016}
 </style>
 </head>
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain</span>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain · <b id="stampVer">v0780-chain-demo</b></span>
+    <span class="demo-badge" id="demoBadge" title="active demo (from URL + boot)">demo=… · nodes: …</span>
     <a href="/">← 回主台</a>
   </header>
   <div class="wrap">
@@ -370,6 +377,7 @@ function render(badKeys){
   renderNodes();
   renderChips();
   renderEdgeList();
+  updateDemoBadge();
   requestAnimationFrame(() => drawWires(badKeys));
 }
 
@@ -394,9 +402,18 @@ async function validate(){
   $('outBox').textContent = JSON.stringify(j, null, 2);
   if (j.ok) {
     const map = j.wiring && j.wiring.out ? ' · map ' + JSON.stringify(j.wiring.out) : '';
-    if (isStagedCompile(j)) {
+    // Client-side chain shape: treat as staged even if API omits multiStep (never green Gen for chain).
+    const chainShape = nodes.some(n => n.op === 't2i' || n.op === 'i2i') && nodes.some(n => n.op === 'i2v');
+    const staged = isStagedCompile(j) || chainShape;
+    if (staged) {
+      // Force staged flags on cached compile so syncGenEnabled / generate stay blocked.
+      if (!isStagedCompile(j)) {
+        j = Object.assign({}, j, { multiStep: true, execute: j.execute || 'staged' });
+        lastCompile = j;
+        console.warn('[cloud-nodes] compile ok but missing multiStep; treating as staged (chain shape)');
+      }
       const n = (j.stages || []).length;
-      // Compile ok for staged ≠ runnable: warn/info, never green fake-run check
+      // Compile ok for staged ≠ runnable: warn/info (amber), never green fake-run check
       $('dockMsg').textContent = '编译通过 · 多步链 ' + n + ' stages · 需 step runner 按序物化（尚未接入）· 生成保持禁用' + map;
       $('dockMsg').className = 'info';
       syncGenEnabled();
@@ -492,6 +509,31 @@ function setDemoUrl(id){
   } catch (_) {}
 }
 
+function updateDemoBadge(){
+  const el = $('demoBadge');
+  if (!el) return;
+  const ops = nodes.map(n => n.op).join(',');
+  const n = nodes.length;
+  el.textContent = 'demo=' + activeDemoId + ' · nodes(' + n + '): ' + (ops || '—');
+  el.title = 'activeDemoId=' + activeDemoId + ' · ops=[' + ops + '] · edges=' + edges.length;
+  const isChain = (activeDemoId === 'chain' || activeDemoId === 'chain3');
+  el.className = 'demo-badge ' + (isChain ? 'chain' : 'single');
+}
+
+/** Chain demos must include a t2i or i2i generator (not single-sink i2v alone). */
+function assertChainNodes(reason){
+  const isChain = (activeDemoId === 'chain' || activeDemoId === 'chain3');
+  if (!isChain) return true;
+  const ops = nodes.map(n => n.op);
+  const ok = ops.includes('t2i') || ops.includes('i2i');
+  if (!ok) {
+    console.error('[cloud-nodes] chain boot assert failed:', reason, {
+      activeDemoId, ops, edgeCount: edges.length, url: location.href
+    });
+  }
+  return ok;
+}
+
 function applyDemo(id, opts){
   const demo = DEMOS[id] || DEMO_I2V;
   activeDemoId = demo.id;
@@ -506,6 +548,7 @@ function applyDemo(id, opts){
   invalidateCompile(demo.hint);
   $('dockMsg').textContent = demo.hint;
   $('dockMsg').className = 'muted';
+  updateDemoBadge();
   render();
 }
 
@@ -523,11 +566,21 @@ window.addEventListener('resize', () => drawWires());
 // Boot: ?demo=chain|chain3|i2v (default i2v).
 // Hard-refresh with ?demo=chain|chain3 always resets to the full multi-step graph (ignore stale disconnects).
 // Single-step i2v keeps session edges across live-reload for disconnect-race QA.
+// If chain nodes somehow lack t2i/i2i after apply, re-apply with resetEdges and console.error.
 (function bootDemo(){
   let q = null;
   try { q = new URLSearchParams(location.search).get('demo'); } catch (_) {}
-  const force = (q === 'chain' || q === 'chain3');
+  // Prefer live URL over closed-over activeDemoId (defensive if query parsed oddly).
+  if (q && DEMOS[q]) activeDemoId = DEMOS[q].id;
+  const force = (activeDemoId === 'chain' || activeDemoId === 'chain3' || q === 'chain' || q === 'chain3');
   applyDemo(activeDemoId, { resetEdges: force });
+  if (force && !assertChainNodes('after first applyDemo')) {
+    applyDemo(activeDemoId, { resetEdges: true });
+    if (!assertChainNodes('after re-applyDemo')) {
+      console.error('[cloud-nodes] FATAL: chain demo still missing t2i/i2i after re-apply');
+    }
+  }
+  updateDemoBadge();
 })();
 </script>
 </body>
