@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>Cloud Nodes · Night Lab</title>
+<style>
+  :root {
+    --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
+    --coral:#e85d4c; --ok:#3dd68c; --bad:#ff5c5c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 "PingFang SC","Noto Sans SC",system-ui,sans-serif;display:flex;height:100vh}
+  .rail{width:280px;background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px}
+  .rail h2{margin:0;font-size:14px}
+  .chip{display:flex;gap:8px;flex-wrap:wrap}
+  .chip span{background:#1e2430;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11px;color:var(--muted)}
+  .chip span.on{border-color:var(--coral);color:#fff}
+  .canvas{flex:1;position:relative;background:
+    radial-gradient(circle at 1px 1px, #1a1f2b 1px, transparent 0) 0 0/20px 20px}
+  .node{position:absolute;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
+  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--coral)}
+  .node.lora .bar{background:#7c6cff}
+  .node.up .bar{background:#3db9e8}
+  .node .hd{display:flex;justify-content:space-between;padding:10px 12px 4px;font-weight:650}
+  .node .bd{padding:4px 12px 12px;color:var(--muted);font-size:11px}
+  .port{position:absolute;width:10px;height:10px;border-radius:50%;background:#4a5163;border:2px solid var(--panel);top:42px}
+  .port.in{left:-6px}.port.out{right:-6px}
+  .port.live{background:var(--coral)}
+  .port.bad{background:var(--bad)}
+  svg.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .dock{position:absolute;left:0;right:0;bottom:0;padding:10px 16px;background:rgba(14,16,22,.92);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .btn{border:0;border-radius:999px;padding:8px 16px;background:var(--coral);color:#fff;font-weight:600;cursor:pointer}
+  .btn.ghost{background:#1e2430;color:var(--text);border:1px solid var(--line)}
+  .warn{color:var(--bad);font-size:12px}
+  .tag{font-size:10px;color:var(--ok);margin-left:6px}
+</style>
+</head>
+<body>
+  <aside class="rail">
+    <h2>配方检视 <span class="tag">= 选中节点</span></h2>
+    <div class="chip">
+      <span class="on">z-image-turbo</span>
+      <span class="on">AnimeEnhance</span>
+      <span>1024*1536</span>
+      <span>seed 4924…</span>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin:8px 0 0">选中「文生图」时芯片必须同值；对不上节点头红点。</p>
+  </aside>
+  <main class="canvas">
+    <svg class="wires" viewBox="0 0 900 600" preserveAspectRatio="none">
+      <path d="M 250 160 C 320 160, 320 160, 390 160" stroke="#e85d4c" stroke-width="2" fill="none"/>
+      <path d="M 610 160 C 680 160, 680 260, 750 260" stroke="#e85d4c" stroke-width="2" fill="none"/>
+      <path d="M 250 280 C 320 280, 360 200, 390 180" stroke="#ff5c5c" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+    </svg>
+    <div class="node" style="left:40px;top:110px">
+      <div class="bar"></div><div class="hd">提示词</div>
+      <div class="bd">正向 / 反向 · 可编辑</div>
+      <i class="port out live"></i>
+    </div>
+    <div class="node sel" style="left:390px;top:110px">
+      <div class="bar"></div><div class="hd">文生图</div>
+      <div class="bd">z-image-turbo · 1024*1536<br/>seed 来自连线</div>
+      <i class="port in live"></i><i class="port out live"></i>
+    </div>
+    <div class="node lora" style="left:40px;top:230px">
+      <div class="bar"></div><div class="hd">LoRA</div>
+      <div class="bd">AnimeEnhance · weight 0.8</div>
+      <i class="port out bad"></i>
+    </div>
+    <div class="node up" style="left:750px;top:210px">
+      <div class="bar"></div><div class="hd">超分</div>
+      <div class="bd">未接类型不符口会红</div>
+      <i class="port in live"></i>
+    </div>
+    <div class="dock">
+      <button class="btn ghost">校验图</button>
+      <button class="btn">生成</button>
+      <span class="warn">虚线红边：LoRA→文生图类型/口未对齐，点生成前阻断</span>
+    </div>
+  </main>
+</body>
+</html>
