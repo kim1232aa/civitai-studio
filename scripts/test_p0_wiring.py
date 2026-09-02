@@ -841,6 +841,8 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert cg.get("ok"), cg
     assert cg["payload"]["prompt"] == "hello"
     assert "width" not in cg["payload"] and "height" not in cg["payload"]
+    assert cg.get("execute") == "single" and cg.get("multiStep") is False
+    assert len(cg.get("stages") or []) == 1
     steal = compile_graph({
         "backend": "nano-gpt",
         "nodes": [{"id": "g", "op": "t2i", "params": {"serviceId": "z", "prompt": "steal-me"}}],
@@ -906,7 +908,7 @@ console.log('PASS isMusePublicQwenImageCousin');
         ],
     })
     assert not multi.get("ok") and multi.get("blocked")
-    assert "一个生成汇点" in multi.get("error", "")
+    assert ("终端生成汇点" in multi.get("error", "") or "一个生成汇点" in multi.get("error", ""))
 
     # P1: must not mutate caller graph
     g2 = {
@@ -1009,8 +1011,8 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert not i2v_hf.get("ok") and i2v_hf.get("blocked")
     assert "不支持图生视频" in i2v_hf.get("error", "")
 
-    # fake chain t2i→i2v in one compile → blocked
-    fake_chain = compile_graph({
+    # real-edge chain t2i→i2v → multi-step staged (not one-shot fake run)
+    chain_t2i_i2v = compile_graph({
         "backend": "nano-gpt",
         "nodes": [
             {"id": "p", "op": "prompt", "params": {"text": "hi"}},
@@ -1022,9 +1024,90 @@ console.log('PASS isMusePublicQwenImageCousin');
             {"from": "g", "fromPort": "image", "to": "v", "toPort": "image"},
         ],
     })
-    assert not fake_chain.get("ok") and fake_chain.get("blocked")
-    # either intermediate sink block or pending chain block
-    assert ("不支持把" in fake_chain.get("error", "") or "第二刀" in fake_chain.get("error", "") or "链式" in fake_chain.get("error", ""))
+    assert chain_t2i_i2v.get("ok"), chain_t2i_i2v
+    assert chain_t2i_i2v.get("multiStep") is True
+    assert chain_t2i_i2v.get("execute") == "staged"
+    assert [s["id"] for s in chain_t2i_i2v["stages"]] == ["g", "v"]
+    assert chain_t2i_i2v["stages"][1].get("needs") == ["g"]
+    assert chain_t2i_i2v["payload"].get("sourceImage") == {"__stageOut__": "g"}
+    assert chain_t2i_i2v.get("wiring", {}).get("pendingImage") is True
+
+    # t2i→i2i real edge
+    chain_t2i_i2i = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "p2", "op": "prompt", "params": {"text": "refine"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+            {"id": "g2", "op": "i2i", "params": {"serviceId": "z2"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "p2", "fromPort": "prompt", "to": "g2", "toPort": "prompt"},
+            {"from": "g", "fromPort": "image", "to": "g2", "toPort": "image"},
+        ],
+    })
+    assert chain_t2i_i2i.get("ok") and chain_t2i_i2i.get("execute") == "staged", chain_t2i_i2i
+    assert [s["op"] for s in chain_t2i_i2i["stages"]] == ["t2i", "i2i"]
+    assert chain_t2i_i2i["payload"].get("sourceImage") == {"__stageOut__": "g"}
+
+    # i2i→i2v (materialized image → i2i → i2v)
+    chain_i2i_i2v = compile_graph({
+        "backend": "civitai",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g", "op": "i2i", "params": {"serviceId": "ckpt"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "video/x"}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "g", "toPort": "image"},
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "g", "fromPort": "image", "to": "v", "toPort": "image"},
+        ],
+    })
+    assert chain_i2i_i2v.get("ok") and chain_i2i_i2v.get("multiStep"), chain_i2i_i2v
+    assert chain_i2i_i2v["payload"].get("sourceImage") == {"__stageOut__": "g"}
+
+    # t2i→i2i→i2v three-stage
+    chain3 = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "p2", "op": "prompt", "params": {"text": "refine"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+            {"id": "g2", "op": "i2i", "params": {"serviceId": "z2"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vid", "width": 1, "height": 2, "resolution": "1280x720"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "p2", "fromPort": "prompt", "to": "g2", "toPort": "prompt"},
+            {"from": "g", "fromPort": "image", "to": "g2", "toPort": "image"},
+            {"from": "g2", "fromPort": "image", "to": "v", "toPort": "image"},
+        ],
+    })
+    assert chain3.get("ok") and chain3.get("execute") == "staged", chain3
+    assert [s["id"] for s in chain3["stages"]] == ["g", "g2", "v"]
+    assert chain3["stages"][1].get("needs") == ["g"] and chain3["stages"][2].get("needs") == ["g2"]
+    assert chain3["payload"].get("sourceImage") == {"__stageOut__": "g2"}
+    assert "width" not in chain3["payload"] and "height" not in chain3["payload"]
+
+    # true fake chain: parallel terminal sinks with no image edge between them → blocked
+    fake_parallel = compile_graph({
+        "backend": "nano-gpt",
+        "nodes": [
+            {"id": "p", "op": "prompt", "params": {"text": "hi"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "z"}},
+            {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "vid"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "img", "fromPort": "image", "to": "v", "toPort": "image"},
+        ],
+    })
+    assert not fake_parallel.get("ok") and fake_parallel.get("blocked"), fake_parallel
+    assert "终端生成汇点" in fake_parallel.get("error", "") or "汇点" in fake_parallel.get("error", "")
 
     # Nano i2v strips WxH when catalog_token + imageUrl/mode
     i2v_nano = compile_graph({

@@ -1,13 +1,13 @@
 # 图→视频（i2v）真连线对照
 
 用户主路径：**image 口 → i2v 节点 → 出视频**。  
-链式 `t2i→i2v` = **两步两刀 compile**，禁止一次假跑通。
+链式 `t2i→i2v` / `t2i→i2i→i2v` = **真边多步 stages**，禁止一次假跑通（单次 generate 假装整链出片）。
 
 ## 画布端口（建议）
 
 | 端口 | 类型 | 谁出 | 谁吃 |
 |---|---|---|---|
-| `image` | image | `image` 源 / 上一步成片（仅第二刀） | `i2v` 必连 |
+| `image` | image | `image` 源 / 上游 t2i·i2i 成片口（真边） | `i2i` / `i2v` 必连 |
 | `prompt` | prompt | `prompt` 节点 | `i2v` 按家可选/必填 |
 | `seed` | seed | `seed` 节点 | 只认连线 |
 | `negative` | prompt | `negative` 节点 | 只认连线 |
@@ -37,15 +37,16 @@ capabilities.videoAspect: bool
 
 catalog 覆盖：仅当服务 `task`/`tags` 含 i2v 才抬；`provider.i2v=none` 禁止模级抬高。
 
-## compile 契约（线性 POC）
+## compile 契约
 
-1. 单汇点 `i2v`：必边 `image→i2v.image`；payload.`kind`/`recipe`=`video`；出片媒体 = video。
-2. 缺边 / 类型不兼容 → `blocked`，生成按钮不可用。
-3. `t2i` 与 `i2v` 同图两汇点 → 阻断；要链式则 **先 compile+generate 出图，再新图把成片 URL 写入 `image` 源做第二刀**。
-4. wiring 断言：有 `firstFrame`/`sourceImage`；Nano 无 `width`/`height`；无边不得出现图字段。
+1. **单汇点**（`image` 源 → `i2v`）：必边 `image→i2v.image`；payload.`kind`/`recipe`=`video`；`execute=single`。
+2. **真边多步链**（`t2i→i2i` / `i2i→i2v` / `t2i→i2v` / `t2i→i2i→i2v`）：上游 image 出口接到下游 image 入口即合法。compile 返回 `stages[]` + `multiStep:true` + `execute:"staged"`；下游 `sourceImage` 可为 `{__stageOut__: <上游节点id>}`（待物化）。**不是**一次 generate 假跑通整链。
+3. 缺边 / 类型不兼容 / 未连必口 → `blocked`，生成按钮不可用；**禁止**偷 form/gallery。
+4. 并行多个**终端**汇点（彼此无 image 真边串起）→ 阻断。
+5. wiring 断言：物化图有 `firstFrame`/`sourceImage` URL；Nano 无 `width`/`height`；无边不得出现图字段。
 
 ## 不做
 
-- 一次点击串跑 t2i+i2v 假装整链
+- 一次点击串跑 t2i+i2v 假装整链出片（无 stages / 无真边）
 - 未连图口偷 gallery / 左栏
 - HF 无官方 i2v 时画可点绿节点

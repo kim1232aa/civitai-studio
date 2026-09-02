@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Cloud Nodes POC · Night Lab · v0777-branch</title>
+<title>Cloud Nodes POC · Night Lab · v0778-chain</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -46,7 +46,7 @@
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · image→i2v 真连线</span>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 t2i/i2i/i2v</span>
     <a href="/">← 回主台</a>
   </header>
   <div class="wrap">
@@ -90,11 +90,31 @@ const nodes = [
   { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'', duration:5, resolution:'1280x720' } },
 ];
 // Main path: image→i2v (+ optional prompt/seed). Missing image → blocked.
-let edges = [
+const DEFAULT_EDGES = [
   { from:'img', fromPort:'image', to:'v', toPort:'image' },
   { from:'p', fromPort:'prompt', to:'v', toPort:'prompt' },
   { from:'s', fromPort:'seed', to:'v', toPort:'seed' },
 ];
+const EDGE_STORE_KEY = 'cloud-nodes-poc-edges-v1';
+const DISCONNECT_MSG = '已断开一条边 · 校验红 · 生成灰';
+function loadEdges(){
+  try {
+    const raw = sessionStorage.getItem(EDGE_STORE_KEY);
+    if (!raw) return DEFAULT_EDGES.map(e => Object.assign({}, e));
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_EDGES.map(e => Object.assign({}, e));
+    // Persist mid-session disconnects across live-reload; ignore corrupt entries
+    return parsed.filter(e => e && e.from && e.to && e.fromPort && e.toPort).map(e => ({
+      from: e.from, fromPort: e.fromPort, to: e.to, toPort: e.toPort
+    }));
+  } catch (_) {
+    return DEFAULT_EDGES.map(e => Object.assign({}, e));
+  }
+}
+function saveEdges(){
+  try { sessionStorage.setItem(EDGE_STORE_KEY, JSON.stringify(edges)); } catch (_) {}
+}
+let edges = loadEdges();
 let selected = 'v';
 let lastCompile = null;
 /** Bumped on any graph change that invalidates compile (edge disconnect, backend/serviceId). */
@@ -180,7 +200,8 @@ function removeEdge(i){
   if (i < 0 || i >= edges.length) return;
   edges.splice(i, 1);
   // 断边后须清 lastCompile、清 outBox、校验红、生成灰 — bump graphEpoch so in-flight compile cannot race back ok:true
-  invalidateCompile('已断开一条边 · 校验红 · 生成灰 · 请重新校验');
+  invalidateCompile(DISCONNECT_MSG);
+  saveEdges();
   render();
 }
 
@@ -292,9 +313,16 @@ async function validate(){
   $('outBox').textContent = JSON.stringify(j, null, 2);
   if (j.ok) {
     const map = j.wiring && j.wiring.out ? ' · map ' + JSON.stringify(j.wiring.out) : '';
-    $('dockMsg').textContent = '校验通过 · i2v payload 已编译' + map;
+    if (j.multiStep || j.execute === 'staged') {
+      const n = (j.stages || []).length;
+      $('dockMsg').textContent = '校验通过 · 多步链 ' + n + ' stages（execute=staged，禁止一次假跑通）' + map;
+      // Keep Generate grey for staged plans — must materialize upstream first
+      $('btnGen').disabled = true;
+    } else {
+      $('dockMsg').textContent = '校验通过 · i2v payload 已编译' + map;
+      syncGenEnabled();
+    }
     $('dockMsg').className = 'ok';
-    syncGenEnabled();
     render();
   } else {
     $('dockMsg').textContent = (j.error || '校验失败') + (j.blocked ? ' · 已阻断' : '');
@@ -310,6 +338,12 @@ async function generate(){
   // Generate only from a fresh compile that matches current graphEpoch.
   if (!j || !j.ok || lastCompileEpoch !== graphEpoch) j = await validate();
   if (!j || !j.ok || j.stale || lastCompileEpoch !== graphEpoch) return;
+  if (j.multiStep || j.execute === 'staged') {
+    $('dockMsg').textContent = (j.note || '多步链请按 stages 顺序物化；禁止一次假跑通');
+    $('dockMsg').className = 'warn';
+    $('btnGen').disabled = true;
+    return;
+  }
   const epochAtStart = graphEpoch;
   $('dockMsg').textContent = '提交生成…';
   $('dockMsg').className = 'muted';
@@ -338,12 +372,23 @@ $('btnValidate').onclick = () => validate();
 $('btnGen').onclick = () => generate();
 $('btnBreakImage').onclick = () => {
   const i = edges.findIndex(e => e.to === 'v' && e.toPort === 'image');
-  if (i < 0) { $('dockMsg').textContent = 'image 边已不在'; $('dockMsg').className = 'muted'; return; }
+  if (i < 0) {
+    // Second click: same copy as first disconnect (not a different muted string)
+    $('dockMsg').textContent = DISCONNECT_MSG;
+    $('dockMsg').className = 'warn';
+    $('btnGen').disabled = true;
+    return;
+  }
   removeEdge(i);
 };
 $('btnBreakPrompt').onclick = () => {
   const i = edges.findIndex(e => e.from === 'p' && e.to === 'v' && e.toPort === 'prompt');
-  if (i < 0) { $('dockMsg').textContent = 'prompt 边已不在'; $('dockMsg').className = 'muted'; return; }
+  if (i < 0) {
+    $('dockMsg').textContent = DISCONNECT_MSG;
+    $('dockMsg').className = 'warn';
+    $('btnGen').disabled = true;
+    return;
+  }
   removeEdge(i);
 };
 

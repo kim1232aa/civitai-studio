@@ -22,7 +22,8 @@ def assert_source_guards() -> None:
         "box.textContent = ''",
         "epochAtStart !== graphEpoch || seq !== compileSeq",
         "stale compile ignored",
-        "invalidateCompile('已断开一条边",
+        "invalidateCompile(DISCONNECT_MSG)",
+        "DISCONNECT_MSG",
         "lastCompileEpoch === graphEpoch",
         "function syncGenEnabled(",
     ]
@@ -32,6 +33,12 @@ def assert_source_guards() -> None:
     assert "removeEdge(i)" in HTML
     assert "btnBreakPrompt" in HTML
     assert HTML.count("invalidateCompile(") >= 3  # def + removeEdge + backend/serviceId
+    assert "EDGE_STORE_KEY" in HTML and "sessionStorage" in HTML
+    assert "DISCONNECT_MSG" in HTML
+    assert "已断开一条边 · 校验红 · 生成灰" in HTML
+    # second break click must reuse DISCONNECT_MSG (not muted "边已不在")
+    assert "image 边已不在" not in HTML
+    assert "prompt 边已不在" not in HTML
 
 
 class FakeUI:
@@ -79,7 +86,7 @@ def test_stale_ok_after_disconnect() -> None:
     epoch_at_start = ui.graphEpoch
     seq = ui.compileSeq = ui.compileSeq + 1
     # User disconnects edge while request is in flight
-    ui.invalidate_compile("已断开一条边 · 校验红 · 生成灰 · 请重新校验")
+    ui.invalidate_compile("已断开一条边 · 校验红 · 生成灰")
     assert ui.lastCompile is None
     assert ui.outBox == ""
     assert ui.btnGen_disabled is True

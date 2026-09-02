@@ -1,8 +1,12 @@
-"""Linear cloud-node graph compile (feat/cloud-nodes-poc).
+"""Cloud-node graph compile (feat/cloud-nodes-poc).
 
 Truth: edges are data deps. compile(graph) only reads ports via edges.
 Unconnected required ports → error. Never steal leftover form/global bags.
 negative / seed / loras on generators: wire-only (no params bypass).
+
+Real image edges may chain t2i/i2i → i2i/i2v. Intermediate generators become
+explicit stages (multi-step plan); pending image is a stage-out ref, never a
+fake one-shot single generate that invents gallery/form pixels.
 """
 from __future__ import annotations
 
@@ -29,7 +33,7 @@ OP_SPEC = {
     "image": {"ins": [], "outs": ["image"], "required": []},
     "t2i": {"ins": ["prompt", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt"]},
     "i2i": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt", "image"]},
-    # image→video main path; prompt optional; chain t2i→i2v blocked (two-step)
+    # image→video main path; prompt optional; may chain from upstream image out
     "i2v": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["video"], "required": ["image"]},
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
 }
@@ -84,6 +88,28 @@ def _merge_loras(*bags: Any) -> list:
                     out.append(deepcopy(x))
     return out
 
+
+
+def _is_pending_image(v: Any) -> bool:
+    return isinstance(v, dict) and bool(v.get("__pending__"))
+
+
+def _stage_image_ref(from_nid: str, loras: list | None = None) -> dict:
+    """Image wire value produced by an upstream generator not yet materialized."""
+    return {
+        "__wire__": "image",
+        "__pending__": True,
+        "from": from_nid,
+        "value": {"__stageOut__": from_nid},
+        "loras": list(loras or []),
+    }
+
+
+def _image_payload_value(img: Any) -> Any:
+    """Pass through stage-out refs; unwrap plain urls."""
+    if isinstance(img, dict) and img.get("__stageOut__"):
+        return {"__stageOut__": img["__stageOut__"]}
+    return img
 
 
 def _map_i2v_image_fields(payload: dict, img: Any, backend: str, caps: dict) -> dict:
@@ -194,6 +220,7 @@ def compile_graph(graph: dict | None) -> dict:
     values: dict[tuple[str, str], Any] = {}
     candidate_sinks: list[tuple[str, dict]] = []
     sink_wiring: dict[str, dict] = {}
+    stages: list[dict] = []
 
     for nid in order:
         n = by_id[nid]
@@ -248,11 +275,15 @@ def compile_graph(graph: dict | None) -> dict:
             values[(nid, "loras")] = loras
             if "image" in inputs:
                 img, prior = _unwrap_image(inputs["image"])
-                values[(nid, "image")] = {
+                wire = {
                     "__wire__": "image",
                     "value": img,
                     "loras": _merge_loras(prior, loras),
                 }
+                if _is_pending_image(inputs["image"]):
+                    wire["__pending__"] = True
+                    wire["from"] = inputs["image"].get("from")
+                values[(nid, "image")] = wire
             # Must feed a sink — silent orphan is P1→block
             outs_used = {e["fromPort"] for e in outgoing.get(nid, [])}
             if not outs_used.intersection({"loras", "image"}):
@@ -264,16 +295,6 @@ def compile_graph(graph: dict | None) -> dict:
             continue
 
         if op in ("t2i", "i2i"):
-            # Chained t2i→i2i not in linear POC if upstream image is pending generate
-            if op == "i2i":
-                raw_img = inputs.get("image")
-                if isinstance(raw_img, dict) and raw_img.get("__pending__"):
-                    return _err(
-                        "线性 POC 暂不支持 t2i→i2i 链式生成；i2i 请用 image 源节点",
-                        blocked=True,
-                        nodeId=nid,
-                    )
-
             payload = {
                 "backend": backend,
                 "serviceId": params.get("serviceId") or g.get("serviceId"),
@@ -305,8 +326,15 @@ def compile_graph(graph: dict | None) -> dict:
                 pass  # checked after unwrap
 
             bundled_loras: list = []
+            needs: list[str] = []
             if op == "i2i":
                 img, bundled_loras = _unwrap_image(inputs["image"])
+                if _is_pending_image(inputs["image"]):
+                    # Real edge from upstream generator → stage-out ref (multi-step plan)
+                    up = inputs["image"].get("from")
+                    if up:
+                        needs.append(up)
+                    img = _image_payload_value(img)
                 if not img:
                     return _err(f"i2i {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
                 payload["sourceImage"] = img
@@ -336,16 +364,16 @@ def compile_graph(graph: dict | None) -> dict:
                 if len(payload["prompt"]) > mx:
                     return _err(f"提示词超过 promptMax={mx}", blocked=True, nodeId=nid)
 
-            values[(nid, "image")] = {"__pending__": True, "from": nid}
-            # Only a sink if image out is not wired onward
+            # Propagate pending image wire so downstream i2i/i2v can chain via real edges
+            values[(nid, "image")] = _stage_image_ref(nid, merged if merged else [])
             image_wired_on = any(e.get("fromPort") == "image" for e in outgoing.get(nid, []))
+            stage = {"id": nid, "op": op, "payload": deepcopy(payload), "produces": "image"}
+            if needs:
+                stage["needs"] = needs
+            stages.append(stage)
             if image_wired_on:
-                # intermediate generate not supported in linear POC
-                return _err(
-                    f"线性 POC 不支持把 {op} {nid} 的 image 再接到下游；请只留一个汇点",
-                    blocked=True,
-                    nodeId=nid,
-                )
+                # Intermediate in a real-edge chain — not a terminal sink
+                continue
             candidate_sinks.append((nid, payload))
             continue
 
@@ -358,13 +386,14 @@ def compile_graph(graph: dict | None) -> dict:
                     nodeId=nid,
                 )
             raw_img = inputs.get("image")
-            if isinstance(raw_img, dict) and raw_img.get("__pending__"):
-                return _err(
-                    "禁止一次假跑通 t2i→i2v；请先出图，再把成片写入 image 源做第二刀",
-                    blocked=True,
-                    nodeId=nid,
-                )
             img, bundled_loras = _unwrap_image(raw_img)
+            needs: list[str] = []
+            if _is_pending_image(raw_img):
+                # Real edge from upstream t2i/i2i → multi-step stage ref (not gallery steal)
+                up = raw_img.get("from") if isinstance(raw_img, dict) else None
+                if up:
+                    needs.append(up)
+                img = _image_payload_value(img)
             if not img:
                 return _err(f"i2v {nid} 的 image 口无有效图，禁止偷成片栏", blocked=True, nodeId=nid)
 
@@ -379,6 +408,9 @@ def compile_graph(graph: dict | None) -> dict:
             if not payload["serviceId"]:
                 return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
             wiring = _map_i2v_image_fields(payload, img, backend, caps)
+            if needs:
+                wiring["stageNeeds"] = list(needs)
+                wiring["pendingImage"] = True
             if "prompt" in inputs:
                 payload["prompt"] = inputs["prompt"]
             elif params.get("prompt") or params.get("text"):
@@ -429,10 +461,14 @@ def compile_graph(graph: dict | None) -> dict:
             video_wired_on = any(e.get("fromPort") == "video" for e in outgoing.get(nid, []))
             if video_wired_on:
                 return _err(
-                    f"线性 POC 不支持把 i2v {nid} 的 video 再接到下游；请只留一个汇点",
+                    f"POC 暂不支持把 i2v {nid} 的 video 再接到下游；请只留一个视频汇点",
                     blocked=True,
                     nodeId=nid,
                 )
+            stage = {"id": nid, "op": "i2v", "payload": deepcopy(payload), "produces": "video"}
+            if needs:
+                stage["needs"] = needs
+            stages.append(stage)
             sink_wiring[nid] = wiring
             candidate_sinks.append((nid, payload))
             continue
@@ -444,19 +480,28 @@ def compile_graph(graph: dict | None) -> dict:
     if len(candidate_sinks) > 1:
         ids = [s[0] for s in candidate_sinks]
         return _err(
-            f"线性 POC 只允许一个生成汇点，当前 {len(candidate_sinks)} 个: {', '.join(ids)}",
+            f"只允许一个终端生成汇点（并行未连汇点禁止），当前 {len(candidate_sinks)} 个: {', '.join(ids)}",
             blocked=True,
             sinks=ids,
         )
 
     sink_id, payload = candidate_sinks[0]
+    multi = len(stages) > 1
     out = {
         "ok": True,
         "payload": payload,
         "sink": sink_id,
         "backend": backend,
         "capabilities": caps,
+        "stages": stages,
+        "multiStep": multi,
     }
     if sink_id in sink_wiring:
         out["wiring"] = sink_wiring[sink_id]
+    if multi:
+        # Honest: one generate call must not pretend to run the whole chain
+        out["execute"] = "staged"
+        out["note"] = "多步链已按真边编译为 stages；请按序物化上游成片后再跑下游（禁止一次假跑通）"
+    else:
+        out["execute"] = "single"
     return out
