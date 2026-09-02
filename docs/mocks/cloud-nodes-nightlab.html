@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Cloud Nodes · Night Lab</title>
+<title>Cloud Nodes · Night Lab · readable cards</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -15,22 +15,38 @@
   .chip{display:flex;gap:8px;flex-wrap:wrap}
   .chip span{background:#1e2430;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11px;color:var(--muted)}
   .chip span.on{border-color:var(--coral);color:#fff}
-  .canvas{flex:1;position:relative;background:
-    radial-gradient(circle at 1px 1px, #1a1f2b 1px, transparent 0) 0 0/20px 20px}
-  .node{position:absolute;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
-  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--coral)}
-  .node.lora .bar{background:#7c6cff}
-  .node.up .bar{background:#3db9e8}
-  .node .hd{display:flex;justify-content:space-between;padding:10px 12px 4px;font-weight:650}
-  .node .bd{padding:4px 12px 12px;color:var(--muted);font-size:11px}
+  .canvas{flex:1;position:relative;background:radial-gradient(circle at 1px 1px, #1a1f2b 1px, transparent 0) 0 0/20px 20px}
+  .node{position:absolute;width:232px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);--op:var(--coral)}
+  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral),0 12px 36px rgba(232,93,76,.18)}
+  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--op)}
+  .node.op-prompt{--op:#e85d4c}.node.op-seed{--op:#f0c36a}.node.op-image{--op:#3dd68c}
+  .node.op-t2i{--op:#e85d4c}.node.op-i2i{--op:#3db9e8}.node.op-i2v{--op:#c45be8}
+  .node.op-lora{--op:#7c6cff}.node.op-up{--op:#3db9e8}
+  .node .hd{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
+  .node .type{display:inline-flex;align-items:center;gap:6px;flex:1;min-width:0}
+  .node .ico{width:22px;height:22px;border-radius:7px;background:color-mix(in srgb, var(--op) 22%, #1e2430);color:var(--op);display:grid;place-items:center;font-size:12px;font-weight:700}
+  .node .ttl{font-weight:650;font-size:13px}
+  .node .more{color:var(--muted);opacity:.7}
+  .node .bd{padding:0 12px 12px;display:flex;flex-direction:column;gap:5px}
+  .node .sum{display:flex;gap:8px;font-size:11px}
+  .node .sum .k{color:#6b7388;min-width:2.2em}
+  .node .sum .v{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .node .sum .v.em{color:var(--text)}
+  .node .pill{align-self:flex-start;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:#1e2430;border:1px solid var(--line);color:var(--muted)}
+  .node .pill.ok{color:var(--ok);border-color:color-mix(in srgb, var(--ok) 40%, var(--line))}
+  .node .pill.bad{color:var(--bad);border-color:color-mix(in srgb, var(--bad) 45%, var(--line));background:color-mix(in srgb, var(--bad) 12%, #1e2430)}
+  .node .prev{margin-top:2px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#0c0e14;aspect-ratio:16/10;position:relative}
+  .node .prev img{display:block;width:100%;height:100%;object-fit:cover}
+  .node .prev .ph{position:absolute;inset:0;display:grid;place-items:center;color:#5a6278;font-size:10px;font-weight:600;background:repeating-linear-gradient(-45deg,#12151d,#12151d 6px,#0e1016 6px,#0e1016 12px)}
+  .node .prev .badge{position:absolute;left:6px;bottom:6px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;background:rgba(14,16,22,.82);border:1px solid var(--line);color:var(--muted)}
+  .node .prev .badge.vid{color:#c45be8}.node .prev .badge.img{color:var(--ok)}
   .port{position:absolute;width:10px;height:10px;border-radius:50%;background:#4a5163;border:2px solid var(--panel);top:42px}
   .port.in{left:-6px}.port.out{right:-6px}
   .port.live{background:var(--coral)}
   .port.bad{background:var(--bad)}
   svg.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .dock{position:absolute;left:0;right:0;bottom:0;padding:10px 16px;background:rgba(14,16,22,.92);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
-  .btn{border:0;border-radius:999px;padding:8px 16px;background:var(--coral);color:#fff;font-weight:600;cursor:pointer}
+  .btn{border:0;border-radius:999px;padding:8px 16px;background:var(--coral);color:#fff;font-weight:600}
   .btn.ghost{background:#1e2430;color:var(--text);border:1px solid var(--line)}
   .warn{color:var(--bad);font-size:12px}
   .tag{font-size:10px;color:var(--ok);margin-left:6px}
@@ -40,37 +56,48 @@
   <aside class="rail">
     <h2>配方检视 <span class="tag">= 选中节点</span></h2>
     <div class="chip">
-      <span class="on">z-image-turbo</span>
-      <span class="on">AnimeEnhance</span>
-      <span>1024*1536</span>
-      <span>seed 4924…</span>
+      <span class="on">flux</span>
+      <span class="on">1024x1024</span>
+      <span>seed 连线</span>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:8px 0 0">选中「文生图」时芯片必须同值；对不上节点头红点。</p>
+    <p style="color:var(--muted);font-size:12px;margin:8px 0 0">可读卡：类型色块 + 图标 + 短摘要；wiring JSON 只在检视/outBox。</p>
   </aside>
   <main class="canvas">
     <svg class="wires" viewBox="0 0 900 600" preserveAspectRatio="none">
-      <path d="M 250 160 C 320 160, 320 160, 390 160" stroke="#e85d4c" stroke-width="2" fill="none"/>
-      <path d="M 610 160 C 680 160, 680 260, 750 260" stroke="#e85d4c" stroke-width="2" fill="none"/>
-      <path d="M 250 280 C 320 280, 360 200, 390 180" stroke="#ff5c5c" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+      <path d="M 262 150 C 320 150, 320 150, 390 150" stroke="#e85d4c" stroke-width="2" fill="none"/>
+      <path d="M 622 150 C 690 150, 690 250, 750 250" stroke="#e85d4c" stroke-width="2" fill="none"/>
+      <path d="M 262 290 C 330 290, 360 190, 390 170" stroke="#ff5c5c" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
     </svg>
-    <div class="node" style="left:40px;top:110px">
-      <div class="bar"></div><div class="hd">提示词</div>
-      <div class="bd">正向 / 反向 · 可编辑</div>
+    <div class="node op-prompt" style="left:40px;top:100px">
+      <div class="bar"></div>
+      <div class="hd"><span class="type"><span class="ico">✎</span><span class="ttl">提示词</span></span><span class="more">···</span></div>
+      <div class="bd"><div class="sum"><span class="k">文案</span><span class="v em">cinematic portrait, soft light</span></div></div>
       <i class="port out live"></i>
     </div>
-    <div class="node sel" style="left:390px;top:110px">
-      <div class="bar"></div><div class="hd">文生图</div>
-      <div class="bd">z-image-turbo · 1024*1536<br/>seed 来自连线</div>
+    <div class="node op-t2i sel" style="left:390px;top:100px">
+      <div class="bar"></div>
+      <div class="hd"><span class="type"><span class="ico">✦</span><span class="ttl">文生图</span></span><span class="more">···</span></div>
+      <div class="bd">
+        <div class="sum"><span class="k">模型</span><span class="v em">flux</span></div>
+        <div class="sum"><span class="k">尺寸</span><span class="v">1024x1024</span></div>
+        <span class="pill">seed / LoRA 来自连线</span>
+        <div class="prev"><img src="/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg" alt=""/><span class="badge img">图片</span></div>
+      </div>
       <i class="port in live"></i><i class="port out live"></i>
     </div>
-    <div class="node lora" style="left:40px;top:230px">
-      <div class="bar"></div><div class="hd">LoRA</div>
-      <div class="bd">AnimeEnhance · weight 0.8</div>
+    <div class="node op-lora" style="left:40px;top:230px">
+      <div class="bar"></div>
+      <div class="hd"><span class="type"><span class="ico">λ</span><span class="ttl">LoRA</span></span><span class="more">···</span></div>
+      <div class="bd">
+        <div class="sum"><span class="k">名称</span><span class="v em">AnimeEnhance</span></div>
+        <div class="sum"><span class="k">权重</span><span class="v">0.8</span></div>
+      </div>
       <i class="port out bad"></i>
     </div>
-    <div class="node up" style="left:750px;top:210px">
-      <div class="bar"></div><div class="hd">超分</div>
-      <div class="bd">未接类型不符口会红</div>
+    <div class="node op-up" style="left:750px;top:200px">
+      <div class="bar"></div>
+      <div class="hd"><span class="type"><span class="ico">↗</span><span class="ttl">超分</span></span><span class="more">···</span></div>
+      <div class="bd"><span class="pill bad">类型/口未对齐</span><div class="prev"><div class="ph">待成片 · 图片</div></div></div>
       <i class="port in live"></i>
     </div>
     <div class="dock">

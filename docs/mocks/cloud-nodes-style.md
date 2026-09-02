@@ -7,13 +7,22 @@
 - 强调：珊瑚 `#e85d4c`（选中边、主按钮）
 - **禁止** CheckpointLoader / KSampler 等假 Comfy 类名；节点标题用能力名：文生图、LoRA、超分、视频、提示词…
 
-## 节点卡
+## 节点卡（可读卡，禁止纯文字堆）
 | 元素 | 规格 |
 |---|---|
-| 尺寸 | 宽 200–240px，圆角 12px |
-| 头 | 能力色条 3px + 标题 + 右侧 `…` |
-| 身 | 关键参数摘要（模型短名、resolution token、seed） |
-| 口 | 左入右出，圆点 10px；未连=灰，已连=珊瑚，类型不符=红 |
+| 尺寸 | 宽 232px，圆角 12px |
+| 顶条 | 3px 能力色（按 op：prompt/t2i 珊瑚、seed 金、image 绿、i2i/超分 青、i2v 紫、LoRA 靛） |
+| 头 | **类型色块图标** 22×22 + 标题 + 右侧 `···`；选中边框珊瑚 |
+| 身 | **短摘要行** `键 · 值`（模型 / 尺寸 / 文案截断）；状态用 pill（image 已连 / 缺 image·阻断），**不**把 wiring JSON 堆在卡上 |
+| 口 | 左入右出，圆点 10px；未连=灰，已连=珊瑚，缺必连=红 |
+
+落地：`static/cloud-nodes.html` `v0782-node-preview`（`OP_ICON` / `OP_CLS` / `nodeBodyHtml` / `previewHtml`）。门闩 / validate / Gen 行为勿动。
+
+## 节点预览（卡上挂缩略）
+- **有成片/首帧就显示**：`params.url`（image 源）、`params.previewUrl` / `resultUrl`（t2i / i2i / i2v）
+- 预览槽：16:10、圆角 8px；图片 `object-fit:cover`；视频可用 `<video>` 或静帧 +「视频」badge
+- 无资源：斜纹占位「待成片 · 图片/视频」——像常见 Comfy/工作流台节点预览，**不是**纯文字堆
+- wiring JSON 仍只在左栏 outBox，不进卡面
 
 ## 芯片 = 节点
 - 选中节点时，左侧（或检视抽屉）芯片必须同值：底模 / LoRA / seed / resolution

@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
-<title>Cloud Nodes POC · Night Lab · v0780-chain-demo</title>
+<title>Cloud Nodes POC · Night Lab · v0782-node-preview</title>
 <style>
   :root {
     --bg:#0e1016; --panel:#161922; --line:#2a2f3a; --text:#e8eaef; --muted:#8b93a7;
@@ -23,14 +23,38 @@
   .chip span{background:#1e2430;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11px;color:var(--muted)}
   .chip span.on{border-color:var(--coral);color:#fff}
   .canvas{flex:1;position:relative;overflow:hidden;background:radial-gradient(circle at 1px 1px, #1a1f2b 1px, transparent 0) 0 0/20px 20px}
-  .node{position:absolute;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;user-select:none}
-  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
-  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--coral)}
-  .node.lora .bar{background:#7c6cff}
-  .node.seed .bar{background:#f0c36a}
-  .node.img .bar{background:#3dd68c}
-  .node .hd{display:flex;justify-content:space-between;padding:10px 12px 4px;font-weight:650}
-  .node .bd{padding:4px 12px 12px;color:var(--muted);font-size:11px;word-break:break-all}
+  .node{position:absolute;width:232px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);cursor:pointer;user-select:none;overflow:visible}
+  .node.sel{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral),0 12px 36px rgba(232,93,76,.18)}
+  .node .bar{height:3px;border-radius:12px 12px 0 0;background:var(--op)}
+  .node{--op:var(--coral)}
+  .node.op-prompt{--op:#e85d4c}
+  .node.op-seed{--op:#f0c36a}
+  .node.op-image,.node.img{--op:#3dd68c}
+  .node.op-t2i{--op:#e85d4c}
+  .node.op-i2i{--op:#3db9e8}
+  .node.op-i2v{--op:#c45be8}
+  .node.op-lora,.node.lora{--op:#7c6cff}
+  .node.op-up,.node.up{--op:#3db9e8}
+  .node .hd{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
+  .node .type{display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1}
+  .node .ico{flex:0 0 auto;width:22px;height:22px;border-radius:7px;background:color-mix(in srgb, var(--op) 22%, #1e2430);color:var(--op);display:grid;place-items:center;font-size:12px;font-weight:700;line-height:1}
+  .node .ttl{font-weight:650;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .more{color:var(--muted);font-size:14px;padding:0 2px;opacity:.7}
+  .node .bd{padding:0 12px 12px;display:flex;flex-direction:column;gap:5px}
+  .node .sum{display:flex;align-items:baseline;gap:8px;font-size:11px;line-height:1.35;min-width:0}
+  .node .sum .k{flex:0 0 auto;color:#6b7388;min-width:2.2em}
+  .node .sum .v{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .node .sum .v.em{color:var(--text)}
+  .node .pill{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:#1e2430;border:1px solid var(--line);color:var(--muted)}
+  .node .pill.ok{color:var(--ok);border-color:color-mix(in srgb, var(--ok) 40%, var(--line))}
+  .node .pill.bad{color:var(--bad);border-color:color-mix(in srgb, var(--bad) 45%, var(--line));background:color-mix(in srgb, var(--bad) 12%, #1e2430)}
+  .node .pill.warn{color:#f0c36a;border-color:color-mix(in srgb, #f0c36a 40%, var(--line))}
+  .node .prev{margin-top:2px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#0c0e14;aspect-ratio:16/10;position:relative}
+  .node .prev img,.node .prev video{display:block;width:100%;height:100%;object-fit:cover;background:#0c0e14}
+  .node .prev .ph{position:absolute;inset:0;display:grid;place-items:center;color:#5a6278;font-size:10px;font-weight:600;letter-spacing:.02em;background:repeating-linear-gradient(-45deg,#12151d,#12151d 6px,#0e1016 6px,#0e1016 12px)}
+  .node .prev .badge{position:absolute;left:6px;bottom:6px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;background:rgba(14,16,22,.82);border:1px solid var(--line);color:var(--muted);backdrop-filter:blur(4px)}
+  .node .prev .badge.vid{color:#c45be8;border-color:color-mix(in srgb,#c45be8 40%,var(--line))}
+  .node .prev .badge.img{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
   .port{position:absolute;width:10px;height:10px;border-radius:50%;background:#4a5163;border:2px solid var(--panel);top:42px}
   .port.in{left:-6px}.port.out{right:-6px}
   .port.live{background:var(--coral)}
@@ -53,7 +77,7 @@
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain · <b id="stampVer">v0780-chain-demo</b></span>
+    <span class="muted">分支 feat/cloud-nodes-poc · 真边可链 · 多步见 ?demo=chain · <b id="stampVer">v0782-node-preview</b></span>
     <span class="demo-badge" id="demoBadge" title="active demo (from URL + boot)">demo=… · nodes: …</span>
     <a href="/">← 回主台</a>
   </header>
@@ -102,10 +126,10 @@ const DEMO_I2V = {
   selected: 'v',
   hint: '单步 demo · /cloud-nodes.html?demo=i2v · 校验应绿 · 生成可点',
   nodes: [
-    { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'https://example.com/frame.png' } },
+    { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg' } },
     { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:280, bd:'可选连入 i2v', params:{ text:'camera slowly pans left, cinematic' } },
     { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:420, bd:'只认连线', params:{ value: 4924112 } },
-    { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720', previewUrl:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg', previewKind:'video' } },
   ],
   edges: [
     { from:'img', fromPort:'image', to:'v', toPort:'image' },
@@ -123,8 +147,8 @@ const DEMO_CHAIN = {
   hint: '链式 demo · /cloud-nodes.html?demo=chain · 校验琥珀(多步) · 生成保持灰',
   nodes: [
     { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:200, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
-    { id:'g', op:'t2i', title:'文生图', cls:'', x:300, y:180, bd:'image → i2v', params:{ serviceId:'flux', resolution:'1024x1024' } },
-    { id:'v', op:'i2v', title:'图生视频', cls:'', x:560, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+    { id:'g', op:'t2i', title:'文生图', cls:'', x:300, y:180, bd:'image → i2v', params:{ serviceId:'flux', resolution:'1024x1024', previewUrl:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg', previewKind:'image' } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:560, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720', previewUrl:'/out/modelscope-ai_0dc2e62f-3a9d-4535-bc5f-9ee7cac702cf_0.png', previewKind:'video' } },
   ],
   edges: [
     { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
@@ -142,9 +166,9 @@ const DEMO_CHAIN3 = {
   nodes: [
     { id:'p', op:'prompt', title:'提示词', cls:'', x:20, y:120, bd:'→ t2i', params:{ text:'cinematic portrait, soft light' } },
     { id:'p2', op:'prompt', title:'精修词', cls:'', x:20, y:280, bd:'→ i2i', params:{ text:'refine details, film grain' } },
-    { id:'g', op:'t2i', title:'文生图', cls:'', x:240, y:100, bd:'image → i2i', params:{ serviceId:'flux', resolution:'1024x1024' } },
-    { id:'g2', op:'i2i', title:'图生图', cls:'', x:460, y:180, bd:'image → i2v', params:{ serviceId:'flux-i2i' } },
-    { id:'v', op:'i2v', title:'图生视频', cls:'', x:680, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720' } },
+    { id:'g', op:'t2i', title:'文生图', cls:'', x:240, y:100, bd:'image → i2i', params:{ serviceId:'flux', resolution:'1024x1024', previewUrl:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg', previewKind:'image' } },
+    { id:'g2', op:'i2i', title:'图生图', cls:'', x:460, y:180, bd:'image → i2v', params:{ serviceId:'flux-i2i', previewUrl:'/out/modelscope-ai_0dc2e62f-3a9d-4535-bc5f-9ee7cac702cf_0.png', previewKind:'image' } },
+    { id:'v', op:'i2v', title:'图生视频', cls:'', x:680, y:180, bd:'', params:{ serviceId:'vidu-q2-pro', duration:5, resolution:'1280x720', previewUrl:'/out/fal_fal-ai_flux_schnell_01a05e2c-f6ec-7e02-a359-e31953848a8d_0.jpg', previewKind:'video' } },
   ],
   edges: [
     { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
@@ -344,25 +368,108 @@ function drawWires(badKeys){
   });
 }
 
+const OP_ICON = {
+  prompt: '✎', seed: '#', image: '▣', t2i: '✦', i2i: '⇄', i2v: '▶',
+  lora: 'λ', lora_apply: 'λ', negative: '⊖', upscale: '↗'
+};
+const OP_CLS = {
+  prompt: 'op-prompt', seed: 'op-seed', image: 'op-image',
+  t2i: 'op-t2i', i2i: 'op-i2i', i2v: 'op-i2v',
+  lora: 'op-lora', lora_apply: 'op-lora', upscale: 'op-up', negative: 'op-prompt'
+};
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function shortText(s, n){
+  s = String(s == null ? '' : s).replace(/\s+/g,' ').trim();
+  if (!s) return '—';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+function sumRow(k, v, em){
+  return `<div class="sum"><span class="k">${esc(k)}</span><span class="v${em?' em':''}">${esc(v)}</span></div>`;
+}
+function mediaPreviewOf(n){
+  const p = n.params || {};
+  // Prefer explicit result/preview; image source uses url
+  let url = n.previewUrl || p.previewUrl || p.resultUrl || '';
+  let kind = n.previewKind || p.previewKind || '';
+  if (!url && n.op === 'image' && p.url) { url = p.url; kind = kind || 'image'; }
+  if (!kind) {
+    if (n.op === 'i2v') kind = 'video';
+    else if (url && /\.(mp4|webm|mov)(\?|$)/i.test(url)) kind = 'video';
+    else kind = 'image';
+  }
+  const showSlot = (n.op === 'image' || n.op === 't2i' || n.op === 'i2i' || n.op === 'i2v' || n.op === 'upscale');
+  return { showSlot, url, kind };
+}
+function previewHtml(n){
+  const { showSlot, url, kind } = mediaPreviewOf(n);
+  if (!showSlot) return '';
+  const badge = kind === 'video' ? '<span class="badge vid">视频</span>' : '<span class="badge img">图片</span>';
+  if (url) {
+    if (kind === 'video' && /\.(mp4|webm|mov)(\?|$)/i.test(url)) {
+      return `<div class="prev"><video src="${esc(url)}" muted playsinline preload="metadata"></video>${badge}</div>`;
+    }
+    // poster / still (incl. i2v demo using still as stand-in)
+    return `<div class="prev"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>${badge}</div>`;
+  }
+  return `<div class="prev"><div class="ph">${kind === 'video' ? '待成片 · 视频' : '待成片 · 图片'}</div></div>`;
+}
+function nodeBodyHtml(n, imgMissing){
+  const p = n.params || {};
+  const rows = [];
+  if (n.op === 'prompt' || n.op === 'negative') {
+    rows.push(sumRow('文案', shortText(p.text, 42), true));
+  } else if (n.op === 'seed') {
+    rows.push(sumRow('值', String(p.value ?? '—'), true));
+    rows.push('<span class="pill">只认连线</span>');
+  } else if (n.op === 'image') {
+    const u = p.url || '';
+    const leaf = u.split('/').pop() || u || '—';
+    rows.push(sumRow('资源', shortText(leaf, 28), true));
+    rows.push('<span class="pill ok">image 源</span>');
+  } else if (n.op === 't2i') {
+    rows.push(sumRow('模型', p.serviceId || '?', true));
+    rows.push(sumRow('尺寸', p.resolution || '—'));
+    rows.push('<span class="pill">seed / LoRA 来自连线</span>');
+  } else if (n.op === 'i2i') {
+    rows.push(sumRow('模型', p.serviceId || '?', true));
+    rows.push(imgMissing
+      ? '<span class="pill bad">缺 image · 阻断</span>'
+      : '<span class="pill ok">image 已连</span>');
+  } else if (n.op === 'i2v') {
+    const sid = $('serviceId').value || p.serviceId || '?';
+    rows.push(sumRow('模型', sid, true));
+    rows.push(sumRow('规格', `${p.duration != null ? p.duration + 's' : '?'} · ${p.resolution || '—'}`));
+    rows.push(imgMissing
+      ? '<span class="pill bad">缺 image · 阻断</span>'
+      : '<span class="pill ok">image 已连</span>');
+    // wiring map stays in rail outBox — not dumped on the card
+  } else if (n.op === 'lora' || n.op === 'lora_apply') {
+    rows.push(sumRow('名称', p.name || p.serviceId || '—', true));
+    if (p.weight != null) rows.push(sumRow('权重', String(p.weight)));
+  } else {
+    rows.push(sumRow('op', n.op || '?', true));
+  }
+  return rows.join('');
+}
 function renderNodes(){
   const canvas = $('canvas');
   [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
   nodes.forEach(n => {
     const imgMissing = (n.op === 'i2v' || n.op === 'i2i') && !edges.some(e => e.to === n.id && e.toPort === 'image');
-    if (n.op === 'i2v') {
-      const map = (lastCompile && lastCompile.wiring && lastCompile.wiring.out)
-        ? JSON.stringify(lastCompile.wiring.out) : '(校验后显示映射字段)';
-      n.bd = `${$('serviceId').value || n.params.serviceId || '?'} · dur ${n.params.duration||'?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}<br/><span style="color:#8b93a7">${map}</span>`;
-    }
-    if (n.op === 't2i') n.bd = `${n.params.serviceId || '?'} · ${n.params.resolution||''}<br/>seed/LoRA 来自连线`;
-    if (n.op === 'i2i') n.bd = `${n.params.serviceId || '?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}`;
     const d = document.createElement('div');
-    d.className = 'node ' + (n.cls||'') + (n.id===selected?' sel':'');
+    const opCls = OP_CLS[n.op] || '';
+    d.className = ('node ' + opCls + ' ' + (n.cls||'') + (n.id===selected?' sel':'')).replace(/\s+/g,' ').trim();
     d.dataset.id = n.id;
     d.style.left = n.x + 'px';
     d.style.top = n.y + 'px';
     const inBad = (n.op === 'i2v' || n.op === 'i2i') && imgMissing;
-    d.innerHTML = `<div class="bar"></div><div class="hd">${n.title}</div><div class="bd">${n.bd||''}</div>
+    const ico = OP_ICON[n.op] || '·';
+    d.innerHTML = `<div class="bar"></div>
+      <div class="hd"><span class="type"><span class="ico" aria-hidden="true">${ico}</span><span class="ttl">${esc(n.title||n.op)}</span></span><span class="more">···</span></div>
+      <div class="bd">${nodeBodyHtml(n, imgMissing)}${previewHtml(n)}</div>
       ${OP_HAS_IN[n.op]?`<i class="port in ${inBad?'bad':'live'}"></i>`:''}
       ${OP_HAS_OUT[n.op]?'<i class="port out live"></i>':''}`;
     d.onclick = () => { selected = n.id; render(); };
@@ -460,6 +567,22 @@ async function generate(){
   if (res.ok) {
     $('dockMsg').textContent = '已提交 · 看主台画廊 / out/';
     $('dockMsg').className = 'ok';
+    // Hang first saved media on the sink node card (preview only; does not touch latch).
+    try {
+      const saved = (body && body.saved) || (body && body.files) || [];
+      const first = Array.isArray(saved) && saved.length ? saved[0] : null;
+      const url = first && (first.url || first.path || first.file);
+      if (url) {
+        const abs = String(url).startsWith('/') || String(url).startsWith('http') ? String(url) : ('/out/' + String(url).replace(/^.*\//, ''));
+        const sink = nodes.find(x => x.id === selected) || nodes.find(x => x.op === 'i2v' || x.op === 't2i' || x.op === 'i2i');
+        if (sink) {
+          sink.params = sink.params || {};
+          sink.params.previewUrl = abs;
+          sink.params.previewKind = (first.kind === 'video' || /\.(mp4|webm)(\?|$)/i.test(abs) || sink.op === 'i2v') ? 'video' : 'image';
+          render();
+        }
+      }
+    } catch (_) {}
   } else {
     $('dockMsg').textContent = '生成失败: ' + (body.error || res.status);
     $('dockMsg').className = 'warn';
