@@ -46,7 +46,7 @@
 <body>
   <header>
     <strong>Cloud Nodes POC</strong>
-    <span class="muted">分支 feat/cloud-nodes-poc · 真连线 compile</span>
+    <span class="muted">分支 feat/cloud-nodes-poc · image→i2v 真连线</span>
     <a href="/">← 回主台</a>
   </header>
   <div class="wrap">
@@ -59,10 +59,12 @@
           <option value="nano-gpt">nano-gpt</option>
           <option value="fal">fal</option>
           <option value="civitai">civitai</option>
+          <option value="modelscope-ai">modelscope-ai</option>
+          <option value="huggingface">huggingface (i2v=none)</option>
         </select>
       </label>
       <label class="muted">serviceId
-        <input id="serviceId" value="z-image-turbo-lora" style="width:100%;margin-top:4px;background:#1e2430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px"/>
+        <input id="serviceId" value="fal-ai/kling-video/v2.5-turbo/standard/image-to-video" style="width:100%;margin-top:4px;background:#1e2430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px"/>
       </label>
       <h2 style="margin-top:12px">连线</h2>
       <div id="edgeList" class="muted" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -75,24 +77,25 @@
   </div>
   <div class="dock">
     <button class="btn ghost" type="button" id="btnValidate">校验图</button>
-    <button class="btn ghost" type="button" id="btnBreakPrompt" title="拆掉 prompt→文生图 边">断 prompt 边</button>
+    <button class="btn ghost" type="button" id="btnBreakImage" title="拆掉 image→i2v 边">断 image 边</button>
+    <button class="btn ghost" type="button" id="btnBreakPrompt" title="拆掉 prompt→i2v 边">断 prompt 边</button>
     <button class="btn" type="button" id="btnGen">生成</button>
-    <span class="muted" id="dockMsg">先点「校验图」；假边/未连会红字阻断。</span>
+    <span class="muted" id="dockMsg">主路径 image→i2v；缺 image 边红字阻断，禁止偷成片栏。</span>
   </div>
 <script>
 const nodes = [
-  { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:110, bd:'正向文本 · 源节点', params:{ text:'a girl, detailed face' } },
-  { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:250, bd:'只认连线进文生图', params:{ value: 4924112 } },
-  { id:'l', op:'lora_apply', title:'LoRA', cls:'lora', x:40, y:380, bd:'AnimeEnhance · 0.8', params:{ loras:[{ path:'https://civitai.com/api/download/models/3203007', scale:0.8, name:'AnimeEnhance' }] } },
-  { id:'g', op:'t2i', title:'文生图', cls:'', x:390, y:160, bd:'', params:{ serviceId:'', resolution:'1024*1536' } },
+  { id:'img', op:'image', title:'首帧图', cls:'img', x:40, y:120, bd:'image 源 · 必连 i2v', params:{ url:'https://example.com/frame.png' } },
+  { id:'p', op:'prompt', title:'提示词', cls:'', x:40, y:280, bd:'可选连入 i2v', params:{ text:'camera slowly pans left, cinematic' } },
+  { id:'s', op:'seed', title:'种子', cls:'seed', x:40, y:420, bd:'只认连线', params:{ value: 4924112 } },
+  { id:'v', op:'i2v', title:'图生视频', cls:'', x:390, y:180, bd:'', params:{ serviceId:'', duration:5, resolution:'1280x720' } },
 ];
-// Good edges: prompt→t2i, seed→t2i, lora→t2i.loras
+// Main path: image→i2v (+ optional prompt/seed). Missing image → blocked.
 let edges = [
-  { from:'p', fromPort:'prompt', to:'g', toPort:'prompt' },
-  { from:'s', fromPort:'seed', to:'g', toPort:'seed' },
-  { from:'l', fromPort:'loras', to:'g', toPort:'loras' },
+  { from:'img', fromPort:'image', to:'v', toPort:'image' },
+  { from:'p', fromPort:'prompt', to:'v', toPort:'prompt' },
+  { from:'s', fromPort:'seed', to:'v', toPort:'seed' },
 ];
-let selected = 'g';
+let selected = 'v';
 let lastCompile = null;
 /** Bumped on any graph change that invalidates compile (edge disconnect, backend/serviceId). */
 let graphEpoch = 0;
@@ -123,7 +126,7 @@ function buildGraph(){
   const sid = $('serviceId').value.trim();
   const ns = nodes.map(n => {
     const params = Object.assign({}, n.params);
-    if (n.op === 't2i' || n.op === 'i2i') params.serviceId = sid || params.serviceId;
+    if (n.op === 't2i' || n.op === 'i2i' || n.op === 'i2v') params.serviceId = sid || params.serviceId;
     return { id:n.id, op:n.op, params };
   });
   return { backend: $('backend').value, nodes: ns, edges: edges.map(e => Object.assign({}, e)) };
@@ -135,13 +138,19 @@ function renderChips(){
   box.innerHTML = '';
   if (!n) return;
   const bits = [];
-  if (n.op === 't2i') {
+  if (n.op === 'i2v') {
+    bits.push(['model', $('serviceId').value || '—']);
+    bits.push(['dur', n.params.duration != null ? String(n.params.duration) : '—']);
+    const imgEdge = edges.find(e => e.to === 'v' && e.toPort === 'image');
+    bits.push(['image', imgEdge ? '已连' : '未连·阻断']);
+    const seedEdge = edges.find(e => e.to === 'v' && e.toPort === 'seed');
+    bits.push(['seed', seedEdge ? String(nodes.find(x=>x.id===seedEdge.from)?.params?.value ?? '…') : '未连']);
+    if (lastCompile && lastCompile.ok && lastCompile.wiring && lastCompile.wiring.out) {
+      bits.push(['map', Object.keys(lastCompile.wiring.out).join(',') || '—']);
+    }
+  } else if (n.op === 't2i') {
     bits.push(['model', $('serviceId').value || '—']);
     bits.push(['res', n.params.resolution || '—']);
-    const seedEdge = edges.find(e => e.to === 'g' && e.toPort === 'seed');
-    bits.push(['seed', seedEdge ? String(nodes.find(x=>x.id===seedEdge.from)?.params?.value ?? '…') : '未连']);
-    const loraEdge = edges.find(e => e.to === 'g' && e.toPort === 'loras');
-    bits.push(['lora', loraEdge ? '已连' : '未连']);
   } else {
     bits.push([n.op, n.title]);
   }
@@ -230,23 +239,30 @@ function drawWires(badKeys){
 function renderNodes(){
   const canvas = $('canvas');
   [...canvas.querySelectorAll('.node')].forEach(n => n.remove());
+  const imgMissing = !edges.some(e => e.to === 'v' && e.toPort === 'image');
   nodes.forEach(n => {
+    if (n.op === 'i2v') {
+      const map = (lastCompile && lastCompile.wiring && lastCompile.wiring.out)
+        ? JSON.stringify(lastCompile.wiring.out) : '(校验后显示映射字段)';
+      n.bd = `${$('serviceId').value || '?'} · dur ${n.params.duration||'?'}<br/>${imgMissing ? '<span style="color:#ff5c5c">缺 image 边 · 阻断</span>' : 'image 已连'}<br/><span style="color:#8b93a7">${map}</span>`;
+    }
     if (n.op === 't2i') n.bd = `${$('serviceId').value || '?'} · ${n.params.resolution||''}<br/>seed/LoRA 来自连线`;
     const d = document.createElement('div');
     d.className = 'node ' + (n.cls||'') + (n.id===selected?' sel':'');
     d.dataset.id = n.id;
     d.style.left = n.x + 'px';
     d.style.top = n.y + 'px';
+    const inBad = n.op === 'i2v' && imgMissing;
     d.innerHTML = `<div class="bar"></div><div class="hd">${n.title}</div><div class="bd">${n.bd||''}</div>
-      ${OP_HAS_IN[n.op]?'<i class="port in live"></i>':''}
+      ${OP_HAS_IN[n.op]?`<i class="port in ${inBad?'bad':'live'}"></i>`:''}
       ${OP_HAS_OUT[n.op]?'<i class="port out live"></i>':''}`;
     d.onclick = () => { selected = n.id; render(); };
     canvas.appendChild(d);
   });
 }
 
-const OP_HAS_IN = { t2i:1, i2i:1, lora_apply:1 };
-const OP_HAS_OUT = { prompt:1, seed:1, negative:1, image:1, lora_apply:1, t2i:1, i2i:1 };
+const OP_HAS_IN = { t2i:1, i2i:1, i2v:1, lora_apply:1 };
+const OP_HAS_OUT = { prompt:1, seed:1, negative:1, image:1, lora_apply:1, t2i:1, i2i:1, i2v:1 };
 
 function render(badKeys){
   renderNodes();
@@ -275,7 +291,8 @@ async function validate(){
   lastCompileEpoch = epochAtStart;
   $('outBox').textContent = JSON.stringify(j, null, 2);
   if (j.ok) {
-    $('dockMsg').textContent = '校验通过 · 可点生成（payload 已编译）';
+    const map = j.wiring && j.wiring.out ? ' · map ' + JSON.stringify(j.wiring.out) : '';
+    $('dockMsg').textContent = '校验通过 · i2v payload 已编译' + map;
     $('dockMsg').className = 'ok';
     syncGenEnabled();
     render();
@@ -319,14 +336,32 @@ async function generate(){
 
 $('btnValidate').onclick = () => validate();
 $('btnGen').onclick = () => generate();
+$('btnBreakImage').onclick = () => {
+  const i = edges.findIndex(e => e.to === 'v' && e.toPort === 'image');
+  if (i < 0) { $('dockMsg').textContent = 'image 边已不在'; $('dockMsg').className = 'muted'; return; }
+  removeEdge(i);
+};
 $('btnBreakPrompt').onclick = () => {
-  const i = edges.findIndex(e => e.from === 'p' && e.to === 'g' && e.toPort === 'prompt');
+  const i = edges.findIndex(e => e.from === 'p' && e.to === 'v' && e.toPort === 'prompt');
   if (i < 0) { $('dockMsg').textContent = 'prompt 边已不在'; $('dockMsg').className = 'muted'; return; }
   removeEdge(i);
 };
 
+const DEFAULT_SID = {
+  'nano-gpt': 'vidu-q2-pro',
+  'fal': 'fal-ai/kling-video/v2.5-turbo/standard/image-to-video',
+  'civitai': 'video/minimax-h3-comfy/imageToVideo',
+  'modelscope-ai': 'Wan-AI/Wan2.1-I2V-14B-480P',
+  'huggingface': 'tencent/HunyuanVideo',
+};
+
 $('btnGen').disabled = true;
-$('backend').onchange = () => { invalidateCompile('backend 已变更 · 请重新校验'); render(); };
+$('backend').onchange = () => {
+  const b = $('backend').value;
+  if (DEFAULT_SID[b]) $('serviceId').value = DEFAULT_SID[b];
+  invalidateCompile('backend 已变更 · 请重新校验');
+  render();
+};
 $('serviceId').oninput = () => { invalidateCompile('serviceId 已变更 · 请重新校验'); render(); };
 window.addEventListener('resize', () => drawWires());
 render();

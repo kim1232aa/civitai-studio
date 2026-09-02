@@ -21,6 +21,7 @@ SEED_CLAMP = ("reject", "mod", "none")
 
 _WEAK_LORA_RANK = {"none": 0, "hub_repo": 1, "path": 2, "air": 3}
 _WEAK_RES_RANK = {"none": 0, "aspect": 1, "catalog_token": 2, "free_wh": 3}
+_WEAK_I2V_RANK = {"none": 0, "first_frame": 1, "image_url": 2, "sourceImage": 2, "fal_endpoint": 2}
 
 
 def _seed(min_v=None, max_v=None, clamp="none"):
@@ -44,6 +45,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "source",
         "video": True,
         "i2v": "sourceImage",
+        "videoDuration": True,
+        "videoAspect": True,
     },
     "fal": {
         "lora": "path",
@@ -60,6 +63,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "first_frame",
         "video": True,
         "i2v": "fal_endpoint",
+        "videoDuration": True,
+        "videoAspect": True,
     },
     "huggingface": {
         "lora": "path",
@@ -76,6 +81,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "none",
         "video": True,
         "i2v": "none",
+        "videoDuration": False,
+        "videoAspect": False,
     },
     "modelscope-ai": {
         "lora": "hub_repo",
@@ -92,6 +99,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "source",
         "video": True,
         "i2v": "image_url",
+        "videoDuration": False,
+        "videoAspect": True,
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -108,6 +117,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "source",
         "video": True,
         "i2v": "image_url",
+        "videoDuration": False,
+        "videoAspect": True,
     },
     "nano-gpt": {
         "lora": "path",
@@ -124,6 +135,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2i": "input_references",
         "video": True,
         "i2v": "image_url",
+        "videoDuration": "string_seconds",
+        "videoAspect": True,
     },
 }
 
@@ -142,6 +155,8 @@ REQUIRED_KEYS = (
     "i2i",
     "video",
     "i2v",
+    "videoDuration",
+    "videoAspect",
 )
 
 
@@ -164,6 +179,8 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
             "i2i": "none",
             "video": False,
             "i2v": "none",
+            "videoDuration": False,
+            "videoAspect": False,
         }
     return deepcopy(base)
 
@@ -251,6 +268,20 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
         elif c == "none" or c == p0:
             out["i2v"] = c
         # else reject raise / swap to invented shape
+
+    if "videoDuration" in o:
+        p = out.get("videoDuration", False)
+        c = o["videoDuration"]
+        if p in (False, 0, None):
+            out["videoDuration"] = False
+        else:
+            out["videoDuration"] = c
+
+    if "videoAspect" in o:
+        if not out.get("videoAspect"):
+            out["videoAspect"] = False
+        else:
+            out["videoAspect"] = bool(o["videoAspect"])
 
     for k in (
         "resolutionTokens",

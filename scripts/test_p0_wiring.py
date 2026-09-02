@@ -1026,7 +1026,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     # either intermediate sink block or pending chain block
     assert ("不支持把" in fake_chain.get("error", "") or "第二刀" in fake_chain.get("error", "") or "链式" in fake_chain.get("error", ""))
 
-    # Nano i2v strips WxH when catalog_token
+    # Nano i2v strips WxH when catalog_token + imageUrl/mode
     i2v_nano = compile_graph({
         "backend": "nano-gpt",
         "nodes": [
@@ -1038,6 +1038,55 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert i2v_nano.get("ok"), i2v_nano
     assert "width" not in i2v_nano["payload"] and "height" not in i2v_nano["payload"]
     assert i2v_nano["payload"].get("resolution") == "1280x720"
+    assert i2v_nano["payload"].get("imageUrl") == "https://ex/a.png"
+    assert i2v_nano["payload"].get("image_url") == "https://ex/a.png"
+    assert i2v_nano["payload"].get("mode") == "image-to-video"
+    assert i2v_nano.get("wiring", {}).get("out", {}).get("mode") == "image-to-video"
+
+    # Fal i2v maps endpoint first-frame field (not silent source steal)
+    i2v_fal = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/f.png"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "fal-ai/kling-video/v2.5-turbo/standard/image-to-video"}},
+        ],
+        "edges": [{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
+    })
+    assert i2v_fal.get("ok"), i2v_fal
+    assert i2v_fal["payload"].get("image_url") == "https://ex/f.png"
+    assert i2v_fal["payload"].get("firstFrame") == "https://ex/f.png"
+    assert "image_url" in (i2v_fal.get("wiring") or {}).get("out", {})
+
+    # Modelscope i2v → image_url
+    i2v_ms = compile_graph({
+        "backend": "modelscope-ai",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "https://ex/m.png"}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "Wan-AI/Wan2.1-I2V-14B-480P"}},
+        ],
+        "edges": [{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
+    })
+    assert i2v_ms.get("ok"), i2v_ms
+    assert i2v_ms["payload"].get("image_url") == "https://ex/m.png"
+    assert i2v_ms.get("wiring", {}).get("out", {}).get("image_url") == "https://ex/m.png"
+
+    # Civitai keeps sourceImage (no Nano mode, no fal invent)
+    assert i2v_ok["payload"].get("sourceImage") and "mode" not in i2v_ok["payload"]
+    assert pub["modelscope-cn"]["capabilities"]["i2v"] == "image_url"
+    assert "videoDuration" in pub["nano-gpt"]["capabilities"]
+    assert pub["nano-gpt"]["capabilities"]["videoDuration"] == "string_seconds"
+    assert pub["huggingface"]["capabilities"]["videoAspect"] is False
+
+    # no image edge must not invent image fields on payload
+    assert "sourceImage" not in (i2v_steal.get("payload") or {})
+    assert "imageUrl" not in (i2v_steal.get("payload") or {})
+
+    # UI demo markers for image→i2v
+    cn_html = (Path(__file__).resolve().parent.parent / "static" / "cloud-nodes.html").read_text()
+    assert "op:'i2v'" in cn_html
+    assert "btnBreakImage" in cn_html
+    assert "image→i2v" in cn_html
+    assert "toPort:'image'" in cn_html
 
     print("PASS p0 wiring")
 

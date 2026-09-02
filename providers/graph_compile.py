@@ -85,6 +85,62 @@ def _merge_loras(*bags: Any) -> list:
     return out
 
 
+
+def _map_i2v_image_fields(payload: dict, img: Any, backend: str, caps: dict) -> dict:
+    """Stamp provider-correct outbound image fields onto Studio payload.
+
+    Unified inbound aliases (sourceImage/firstFrame) stay for provider generate().
+    Returns a wiring preview dict for compile UI / tests.
+    """
+    mode = caps.get("i2v") or "none"
+    wiring: dict[str, Any] = {
+        "i2v": mode,
+        "inbound": {"sourceImage": img, "firstFrame": img},
+        "out": {},
+    }
+    if mode == "sourceImage":
+        # Civitai official video frame field
+        wiring["out"] = {"sourceImage": img}
+    elif mode == "fal_endpoint":
+        sid = (payload.get("serviceId") or "").strip()
+        fields: list = []
+        try:
+            from .fal import FIRST_IMAGE_FIELDS, find_model, infer_image_fields
+
+            spec = find_model(sid) or {}
+            fields = list(spec.get("imageFields") or infer_image_fields(sid))
+        except Exception:
+            fields = []
+        wiring["imageFields"] = fields
+        first = None
+        for name in fields:
+            if name in FIRST_IMAGE_FIELDS:
+                payload[name] = img
+                first = name
+                break
+        if first is None and "image_urls" in fields:
+            payload["image_urls"] = [img]
+            first = "image_urls"
+        wiring["out"] = {first: img} if first else {"firstFrame": img}
+    elif mode == "image_url":
+        if backend == "nano-gpt":
+            if isinstance(img, str) and str(img).startswith("data:"):
+                payload["imageDataUrl"] = img
+                wiring["out"] = {"imageDataUrl": "(dataUrl)", "mode": "image-to-video"}
+            else:
+                payload["imageUrl"] = img
+                payload["image_url"] = img
+                wiring["out"] = {"imageUrl": img, "mode": "image-to-video"}
+            payload["mode"] = "image-to-video"
+        else:
+            # modelscope-ai / modelscope-cn Hub i2v
+            payload["image_url"] = img
+            wiring["out"] = {"image_url": img}
+    elif mode == "first_frame":
+        wiring["out"] = {"firstFrame": img}
+    return wiring
+
+
 def compile_graph(graph: dict | None) -> dict:
     g = graph or {}
     backend = (g.get("backend") or "").strip()
@@ -137,6 +193,7 @@ def compile_graph(graph: dict | None) -> dict:
 
     values: dict[tuple[str, str], Any] = {}
     candidate_sinks: list[tuple[str, dict]] = []
+    sink_wiring: dict[str, dict] = {}
 
     for nid in order:
         n = by_id[nid]
@@ -294,7 +351,7 @@ def compile_graph(graph: dict | None) -> dict:
 
 
         if op == "i2v":
-            if caps.get("i2v") in (None, "none") or not caps.get("video"):
+            if caps.get("i2v") in (None, "none"):
                 return _err(
                     f"后端 {backend} 不支持图生视频（i2v）",
                     blocked=True,
@@ -321,6 +378,7 @@ def compile_graph(graph: dict | None) -> dict:
             }
             if not payload["serviceId"]:
                 return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
+            wiring = _map_i2v_image_fields(payload, img, backend, caps)
             if "prompt" in inputs:
                 payload["prompt"] = inputs["prompt"]
             elif params.get("prompt") or params.get("text"):
@@ -375,6 +433,7 @@ def compile_graph(graph: dict | None) -> dict:
                     blocked=True,
                     nodeId=nid,
                 )
+            sink_wiring[nid] = wiring
             candidate_sinks.append((nid, payload))
             continue
 
@@ -391,10 +450,13 @@ def compile_graph(graph: dict | None) -> dict:
         )
 
     sink_id, payload = candidate_sinks[0]
-    return {
+    out = {
         "ok": True,
         "payload": payload,
         "sink": sink_id,
         "backend": backend,
         "capabilities": caps,
     }
+    if sink_id in sink_wiring:
+        out["wiring"] = sink_wiring[sink_id]
+    return out
