@@ -39,6 +39,7 @@ def shot_graph(op, prompt, image_url=None, service=None):
 
 
 def test_t2i_no_ref():
+    """Picture mode, no connected asset → t2i. Dangling @ stays text."""
     r = compile(shot_graph("t2i", "【镜头1】场景：@温馨现代卧室\n画面：室内。", image_url=None))
     assert_true(r.get("ok") is True, r)
     assert_true(r.get("execute") == "single", r)
@@ -72,10 +73,95 @@ def test_i2v_missing_frame_blocked():
 
 
 def test_mention_without_edge_is_not_i2i():
+    """@ in prompt alone must not invent an image wire."""
     r = compile(shot_graph("t2i", "@家用机器人 在卧室", image_url=None))
     assert_true(r.get("ok") is True, r)
     assert_true("sourceImage" not in r["payload"], r)
 
+
+def normalize_prompt(text, linked_titles):
+    """Payload-only: linked @中文名 → @图片N. Unlinked @ stays."""
+    out = text or ""
+    for i, title in enumerate(linked_titles, 1):
+        tag = "@" + title
+        if tag in out:
+            out = out.replace(tag, "@图片%d" % i)
+    return out
+
+
+def test_payload_normalize_linked_only():
+    text = "场景：@温馨现代卧室 画面：@家用机器人 和 @没连上的角色"
+    got = normalize_prompt(text, ["温馨现代卧室", "家用机器人"])
+    assert_true("@图片1" in got and "@图片2" in got, got)
+    assert_true("@没连上的角色" in got, got)
+    assert_true("@温馨现代卧室" not in got, got)
+
+
+def test_i2v_first_frame_pick_second_ref():
+    """Two linked images; compile image port is the chosen first-frame, not always [0]."""
+    g = {
+        "backend": "fal",
+        "nodes": [
+            {"id": "p-shot-1", "op": "prompt", "params": {"text": "固定镜头"}},
+            {"id": "a-bot", "op": "image", "params": {"url": "/out/bot.jpg"}},
+            {"id": "a-bed", "op": "image", "params": {"url": "/out/bed.jpg"}},
+            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "p-shot-1", "fromPort": "prompt", "to": "shot-1", "toPort": "prompt"},
+            {"from": "a-bed", "fromPort": "image", "to": "shot-1", "toPort": "image"},
+        ],
+    }
+    r = compile(g)
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("sourceImage") == "/out/bed.jpg", r["payload"])
+    assert_true(r["payload"].get("firstFrame") == "/out/bed.jpg", r["payload"])
+
+
+def test_shot_result_as_image_node():
+    """Finished shot.url can be an image node for the next shot (t2i → i2i)."""
+    g = {
+        "backend": "fal",
+        "nodes": [
+            {"id": "p-2", "op": "prompt", "params": {"text": "同一场景继续"}},
+            {"id": "shot-1", "op": "image", "params": {"url": "/out/shot1.jpg"}},
+            {"id": "shot-2", "op": "i2i", "params": {"serviceId": "fal-ai/flux/dev", "resolution": "1280x720"}},
+        ],
+        "edges": [
+            {"from": "p-2", "fromPort": "prompt", "to": "shot-2", "toPort": "prompt"},
+            {"from": "shot-1", "fromPort": "image", "to": "shot-2", "toPort": "image"},
+        ],
+    }
+    r = compile(g)
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("sourceImage") == "/out/shot1.jpg", r["payload"])
+
+
+def test_first_frame_from_promoted_asset():
+    """i2v first frame can be a promoted shot result, not only a library character."""
+    g = {
+        "backend": "fal",
+        "nodes": [
+            {"id": "p-v", "op": "prompt", "params": {"text": "固定镜头轻微转动"}},
+            {"id": "shot-1", "op": "image", "params": {"url": "/out/shot1.jpg"}},
+            {"id": "shot-3", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "p-v", "fromPort": "prompt", "to": "shot-3", "toPort": "prompt"},
+            {"from": "shot-1", "fromPort": "image", "to": "shot-3", "toPort": "image"},
+        ],
+    }
+    r = compile(g)
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("firstFrame") == "/out/shot1.jpg", r["payload"])
+    assert_true(r["payload"].get("sourceImage") == "/out/shot1.jpg", r["payload"])
+
+
+def test_rail_history_not_in_compile():
+    """/api/outs history stays in the rail; compile only sees wired image nodes."""
+    r = compile(shot_graph("t2i", "空镜", image_url=None))
+    assert_true(r.get("ok") is True, r)
+    assert_true("sourceImage" not in (r.get("payload") or {}), r)
 
 def main():
     tests = [
@@ -84,6 +170,11 @@ def main():
         test_i2v_with_first_frame,
         test_i2v_missing_frame_blocked,
         test_mention_without_edge_is_not_i2i,
+        test_payload_normalize_linked_only,
+        test_i2v_first_frame_pick_second_ref,
+        test_shot_result_as_image_node,
+        test_first_frame_from_promoted_asset,
+        test_rail_history_not_in_compile,
     ]
     failed = 0
     for fn in tests:
@@ -95,6 +186,7 @@ def main():
             print("FAIL", fn.__name__, e)
     print("result", len(tests) - failed, "/", len(tests))
     return 1 if failed else 0
+
 
 
 if __name__ == "__main__":

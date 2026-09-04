@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0790-seko</title>
+<title>画布 · Night Lab · v0791-seko</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -96,15 +96,29 @@
   .picker button{display:flex;gap:8px;align-items:center;width:100%;background:transparent;border:0;color:#ddd;padding:6px;border-radius:8px}
   .picker button:hover{background:#222}
   .picker img{width:36px;height:36px;object-fit:cover;border-radius:6px}
-  .rail{position:absolute;left:14px;top:170px;z-index:12;width:132px;max-height:calc(100% - 230px);overflow:auto;
+
+  .rail{position:absolute;left:14px;top:170px;z-index:12;width:148px;max-height:calc(100% - 230px);overflow:auto;
     display:flex;flex-direction:column;gap:6px;padding-right:2px}
   .rail-h{font-size:11px;color:#8b8b94;padding:0 4px}
+  .rail-tabs{display:flex;gap:4px;padding:0 2px}
+  .rail-tabs button{flex:1;border:1px solid #2a2a30;background:#141416;color:#8b8b94;border-radius:8px;padding:4px 0;font-size:11px}
+  .rail-tabs button.on{color:#fff;border-color:#4a4a54;background:#1c1c22}
   .rail-item{display:flex;align-items:center;gap:6px;width:100%;border:1px solid #2a2a30;background:#141416;
     color:#ddd;border-radius:10px;padding:4px;text-align:left}
   .rail-item img{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0}
   .rail-item.on{border-color:#5ee0c5}
-  .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+  .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;flex:1}
   .rail-item.add{justify-content:center;color:#9a9aa3}
+  .rail-item .pin{flex:0 0 auto;width:22px;height:22px;border:0;background:transparent;color:#8b8b94;font-size:12px;padding:0}
+  .rail-item .pin:hover{color:#5ee0c5}
+  .ghost{position:fixed;pointer-events:none;z-index:40;width:72px;height:72px;border-radius:10px;overflow:hidden;
+    border:1px solid #5ee0c5;box-shadow:0 12px 32px rgba(0,0,0,.45);display:none;background:#141416}
+  .ghost.show{display:block}
+  .ghost img{width:100%;height:100%;object-fit:cover}
+  .frame-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid #2e2e36;background:#1a1a1f;
+    color:#ddd;border-radius:8px;padding:2px 6px 2px 2px;font-size:11px}
+  .frame-chip img{width:28px;height:28px;object-fit:cover;border-radius:6px}
+  .frame-chip.on{border-color:#5ee0c5;color:#fff}
   .atbox{position:absolute;left:50%;bottom:250px;transform:translateX(-50%);z-index:19;width:min(420px,80vw);
     background:#16161a;border:1px solid #2c2c34;border-radius:12px;padding:8px;display:none;max-height:200px;overflow:auto}
   .atbox.show{display:block}
@@ -119,14 +133,14 @@
     <div class="logo" aria-hidden="true"></div>
     <div class="title" id="projTitle">错位人生：我的扫地机器人同事（副本）</div>
     <nav class="tabs" aria-label="工作流">
-      <a href="/">剧本策划</a>
+      <span class="off" title="本版只做画布，剧本策划入口保留">剧本策划</span>
       <a class="on" href="/storyboard.html" aria-current="page">画布</a>
       <span class="off" title="本版不做剪辑时间线">编辑器</span>
     </nav>
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/cloud-nodes.html">LiteGraph</a>
-      <span class="stamp">v0790-seko</span>
+      <span class="stamp">v0791-seko</span>
     </div>
   </header>
   <div class="stage">
@@ -183,6 +197,7 @@
   </div>
 </div>
 <input class="hidden-file" id="file" type="file" accept="image/*" />
+<div class="ghost" id="ghost" aria-hidden="true"></div>
 <script src="/static/storyboard.js"></script>
 </body>
 </html>
