@@ -6,8 +6,688 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
 <title>节点画布 · Night Lab · LiteGraph · v0787</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/css/litegraph.css" />
+<link rel="stylesheet" href="/static/litegraph.css" />
+<style>
+  :root {
+    --bg:#0e1016; --panel:#161922; --elev:#1e2430; --line:#2a2f3a;
+    --text:#e8eaef; --muted:#8b93a7; --coral:#e85d4c; --ok:#3dd68c;
+    --bad:#ff5c5c; --buzz:#f0c36a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:13px/1.45 "PingFang SC","Noto Sans SC",system-ui,sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 14px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0}
+  header strong{font-size:14px}
+  .muted{color:var(--muted);font-size:12px}
+  .mode-switch{display:inline-flex;background:var(--elev);border:1px solid var(--line);
+    border-radius:999px;padding:2px}
+  .mode-switch a{color:var(--muted);text-decoration:none;font-size:11px;
+    padding:4px 12px;border-radius:999px}
+  .mode-switch a.on{background:#12151d;color:#fff}
+  .stamp{margin-left:auto;font:600 11px/1.3 ui-monospace,Menlo,monospace;color:var(--buzz)}
+  .wrap{flex:1;display:flex;min-height:0}
+  .rail{width:292px;background:var(--panel);border-right:1px solid var(--line);
+    padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;flex-shrink:0}
+  .rail h2{margin:8px 0 0;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:650}
+  .rail h2:first-child{margin-top:0}
+  .pal{display:flex;flex-wrap:wrap;gap:6px}
+  .pal button{border:1px solid var(--line);background:var(--elev);color:var(--text);
+    border-radius:8px;padding:6px 8px;font-size:11px;cursor:pointer}
+  .pal button:hover{border-color:var(--coral)}
+  .canvas-wrap{flex:1;position:relative;min-width:0;background:#0c0e14}
+  #graph-canvas{width:100%;height:100%;display:block}
+  .dock{padding:10px 16px;background:rgba(14,16,22,.96);border-top:1px solid var(--line);
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{border:0;border-radius:999px;padding:8px 14px;background:var(--coral);
+    color:#fff;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.ghost{background:var(--elev);color:var(--text);border:1px solid var(--line)}
+  select,input,textarea{width:100%;margin-top:4px;background:var(--elev);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+  textarea{min-height:64px;resize:vertical}
+  pre{background:#12151d;border:1px solid var(--line);border-radius:8px;padding:8px;
+    font-size:10px;max-height:140px;overflow:auto;margin:0;white-space:pre-wrap}
+  .ok{color:var(--ok)} .warn{color:var(--buzz)} .bad{color:var(--bad)}
+  .hint{color:var(--muted);font-size:11px;line-height:1.45;margin:0}
+  .preview{border:1px solid var(--line);border-radius:8px;background:#0c0e14;
+    min-height:88px;display:grid;place-items:center;overflow:hidden}
+  .preview img,.preview video{max-width:100%;max-height:140px;display:block}
+  .litemenu-panel,.litegraph-search,.graphdialog{z-index:60 !important}
+</style>
 </head>
 <body>
-<p>placeholder-should-not-ship</p>
+  <header>
+    <strong>Night Lab</strong>
+    <nav class="mode-switch" aria-label="工作台">
+      <a href="/">配方台</a>
+      <a class="on" href="/cloud-nodes.html" aria-current="page">节点画布</a>
+    </nav>
+    <span class="muted">LiteGraph · 双击搜节点 · 端口拖线 · 执行走云 API</span>
+    <span class="stamp">v0787-ship</span>
+  </header>
+  <div class="wrap">
+    <aside class="rail">
+      <h2>供应商</h2>
+      <select id="backend">
+        <option value="fal">fal</option>
+        <option value="civitai">civitai</option>
+        <option value="nano-gpt">nano-gpt</option>
+        <option value="modelscope-ai">modelscope-ai</option>
+        <option value="modelscope-cn">modelscope-cn</option>
+        <option value="huggingface">huggingface（无官方 i2v）</option>
+      </select>
+      <p class="hint" id="capHint">HF 不能图生视频。LoRA 只认连线。</p>
+      <h2>添加节点</h2>
+      <div class="pal" id="palette"></div>
+      <p class="hint">双击画布搜索中文名。空格/中键平移，滚轮缩放。Ctrl+Z 撤销，Delete 删除。</p>
+      <h2>选中节点</h2>
+      <div id="inspector"><p class="hint">点节点后在这里改参数。</p></div>
+      <h2>成片</h2>
+      <div class="preview" id="preview"><span class="hint">运行后显示在这里</span></div>
+      <h2>校验</h2>
+      <pre id="outBox">校验结果会显示在这里</pre>
+    </aside>
+    <div class="canvas-wrap"><canvas id="graph-canvas"></canvas></div>
+  </div>
+  <div class="dock">
+    <button class="btn ghost" type="button" id="btnValidate">校验连线</button>
+    <button class="btn" type="button" id="btnGen" disabled>运行此步</button>
+    <button class="btn ghost" type="button" id="btnUndo">撤销</button>
+    <span class="muted" id="dockMsg">先加载示例或双击加节点</span>
+    <span style="flex:1"></span>
+    <button class="btn ghost" type="button" id="btnDemo">图→视频</button>
+    <button class="btn ghost" type="button" id="btnChain">文生图→视频</button>
+    <button class="btn ghost" type="button" id="btnFit">适配</button>
+    <button class="btn ghost" type="button" id="btnExport">导出</button>
+    <button class="btn ghost" type="button" id="btnClear">清空</button>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/build/litegraph.min.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const STORE = "cloud-nodes-litegraph-v2";
+
+  LiteGraph.NODE_TITLE_COLOR = "#e8eaef";
+  LiteGraph.NODE_TEXT_COLOR = "#c8cdd8";
+  LiteGraph.NODE_DEFAULT_COLOR = "#1e2430";
+  LiteGraph.NODE_DEFAULT_BGCOLOR = "#161922";
+  LiteGraph.NODE_DEFAULT_BOXCOLOR = "#e85d4c";
+  LiteGraph.WIDGET_BGCOLOR = "#12151d";
+  LiteGraph.WIDGET_OUTLINE_COLOR = "#2a2f3a";
+  LiteGraph.WIDGET_TEXT_COLOR = "#e8eaef";
+  LiteGraph.WIDGET_SECONDARY_TEXT_COLOR = "#8b93a7";
+  LiteGraph.LINK_COLOR = "#e85d4c";
+  LiteGraph.CONNECTING_LINK_COLOR = "#f0c36a";
+
+  const NODE_DEFS = [
+    { type:"cloud/prompt", title:"提示词", ins:[], outs:[["prompt","prompt"]], props:{ text:"cinematic portrait, soft light" }, color:"#e85d4c" },
+    { type:"cloud/negative", title:"负面词", ins:[], outs:[["negative","prompt"]], props:{ text:"blurry, watermark" }, color:"#8b93a7" },
+    { type:"cloud/seed", title:"种子", ins:[], outs:[["seed","seed"]], props:{ value:4924112 }, color:"#f0c36a" },
+    { type:"cloud/image", title:"首帧图", ins:[], outs:[["image","image"]], props:{ url:"/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg" }, color:"#3dd68c" },
+    { type:"cloud/t2i", title:"文生图", ins:[["prompt","prompt"],["seed","seed"],["negative","prompt"],["loras","loras"]], outs:[["image","image"]], props:{ serviceId:"fal-ai/flux/schnell", resolution:"1024x1024" }, color:"#e85d4c" },
+    { type:"cloud/i2i", title:"图生图", ins:[["prompt","prompt"],["image","image"],["seed","seed"],["negative","prompt"],["loras","loras"]], outs:[["image","image"]], props:{ serviceId:"fal-ai/flux/dev" }, color:"#3db9e8" },
+    { type:"cloud/i2v", title:"图生视频", ins:[["image","image"],["prompt","prompt"],["seed","seed"],["negative","prompt"],["loras","loras"]], outs:[["video","video"]], props:{ serviceId:"fal-ai/minimax/video-01", duration:5, resolution:"1280x720" }, color:"#c45be8" },
+    { type:"cloud/lora", title:"LoRA", ins:[["image","image"]], outs:[["loras","loras"],["image","image"]], props:{ loras:"owner/repo" }, color:"#7c6cff" },
+  ];
+
+  function opOf(type) {
+    const t = String(type || "");
+    if (t === "cloud/lora") return "lora_apply";
+    return t.replace(/^cloud\//, "");
+  }
+
+  NODE_DEFS.forEach((def) => {
+    function Node() {
+      (def.ins || []).forEach(([name, t]) => this.addInput(name, t));
+      (def.outs || []).forEach(([name, t]) => this.addOutput(name, t));
+      this.properties = Object.assign({}, def.props);
+      this.serialize_widgets = true;
+      Object.keys(this.properties).forEach((k) => {
+        const v = this.properties[k];
+        const kind = typeof v === "number" ? "number" : "text";
+        this.addWidget(kind, k, v, (nv) => {
+          this.properties[k] = nv;
+          invalidate("节点参数已改");
+          renderInspector();
+        }, { property: k });
+      });
+      this.color = def.color;
+      this.bgcolor = "#161922";
+      this.boxcolor = def.color;
+    }
+    Node.title = def.title;
+    Node.desc = def.title + " · 云能力";
+    Node.prototype.onExecute = function () {};
+    LiteGraph.registerNodeType(def.type, Node);
+  });
+
+  const keep = {};
+  Object.keys(LiteGraph.registered_node_types || {}).forEach((k) => {
+    if (k.startsWith("cloud/")) keep[k] = LiteGraph.registered_node_types[k];
+  });
+  LiteGraph.registered_node_types = keep;
+  LiteGraph.searchbox_extras = {};
+  NODE_DEFS.forEach((def) => {
+    LiteGraph.searchbox_extras[def.title] = { type: def.type };
+    LiteGraph.searchbox_extras[def.type.replace("cloud/", "")] = { type: def.type };
+  });
+
+  const graph = new LGraph();
+  const canvas = new LGraphCanvas("#graph-canvas", graph);
+  canvas.background_image = null;
+  canvas.render_canvas_border = false;
+  canvas.clear_background_color = "#0c0e14";
+  canvas.allow_searchbox = true;
+  if (canvas.link_type_colors) {
+    canvas.link_type_colors.prompt = "#e85d4c";
+    canvas.link_type_colors.image = "#3dd68c";
+    canvas.link_type_colors.seed = "#f0c36a";
+    canvas.link_type_colors.loras = "#7c6cff";
+    canvas.link_type_colors.video = "#c45be8";
+  }
+
+  let lastCompile = null;
+  let lastEpoch = -1;
+  let epoch = 0;
+  let undo = [];
+  let stageUrls = {};
+  let persistTimer = 0;
+
+  function snapshot() {
+    try { undo.push(JSON.stringify(graph.serialize())); } catch (_) {}
+    if (undo.length > 40) undo.shift();
+  }
+  function persist() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      try {
+        sessionStorage.setItem(STORE, JSON.stringify({
+          backend: $("backend").value,
+          graph: graph.serialize(),
+        }));
+      } catch (_) {}
+    }, 200);
+  }
+
+  function invalidate(reason) {
+    epoch += 1;
+    lastCompile = null;
+    lastEpoch = -1;
+    $("btnGen").disabled = true;
+    $("btnGen").textContent = "运行此步";
+    $("dockMsg").textContent = reason || "图已变更 · 请重新校验";
+    $("dockMsg").className = "warn";
+    persist();
+  }
+
+  graph.onNodeAdded = () => { snapshot(); invalidate("已加节点"); };
+  graph.onNodeRemoved = () => { snapshot(); invalidate("已删节点"); };
+  graph.onConnectionChange = () => { snapshot(); invalidate("连线已变"); };
+
+  canvas.onNodeSelected = function () { renderInspector(); };
+  canvas.onNodeDeselected = function () { renderInspector(); };
+
+  function slotName(node, isOut, idx) {
+    const slots = isOut ? node.outputs : node.inputs;
+    return (slots && slots[idx] && slots[idx].name) || String(idx);
+  }
+
+  function toCompileGraph() {
+    const nodes = (graph._nodes || []).map((n) => {
+      const params = Object.assign({}, n.properties || {});
+      delete params.previewUrl;
+      if (opOf(n.type) === "lora_apply" && typeof params.loras === "string") {
+        params.loras = params.loras.split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+          return (s.startsWith("http") || s.includes("/")) ? { path: s } : { name: s };
+        });
+      }
+      return { id: String(n.id), op: opOf(n.type), params };
+    });
+    const edges = [];
+    const links = graph.links || {};
+    Object.keys(links).forEach((k) => {
+      const L = links[k];
+      if (!L) return;
+      const src = graph.getNodeById(L.origin_id);
+      const dst = graph.getNodeById(L.target_id);
+      if (!src || !dst) return;
+      edges.push({
+        from: String(src.id),
+        fromPort: slotName(src, true, L.origin_slot),
+        to: String(dst.id),
+        toPort: slotName(dst, false, L.target_slot),
+      });
+    });
+    return { backend: $("backend").value, nodes, edges };
+  }
+
+  let catalog = [];
+  let outs = [];
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  async function loadCatalog() {
+    catalog = [];
+    try {
+      const r = await fetch("/api/catalog?backend=" + encodeURIComponent($("backend").value));
+      const j = await r.json();
+      catalog = j.items || j.models || [];
+    } catch (_) { catalog = []; }
+    renderInspector();
+  }
+
+  async function loadOuts() {
+    outs = [];
+    try {
+      const r = await fetch("/api/outs");
+      const j = await r.json();
+      outs = (j.items || []).filter((it) => it.kind === "image");
+    } catch (_) { outs = []; }
+  }
+
+  function renderInspector() {
+    const box = $("inspector");
+    const n = canvas.selected_nodes ? Object.values(canvas.selected_nodes)[0] : null;
+    if (!n) {
+      box.innerHTML = '<p class="hint">点画布上的节点编辑参数。</p>';
+      return;
+    }
+    const props = n.properties || {};
+    const rows = Object.keys(props).filter((k) => k !== "previewUrl").map((k) => {
+      const v = props[k];
+      if (k === "serviceId" && catalog.length) {
+        const opts = catalog.slice(0, 80).map((it) => {
+          const id = it.id || it.name || "";
+          const sel = String(id) === String(v) ? " selected" : "";
+          return `<option value="${esc(id)}"${sel}>${esc(it.name || id)}</option>`;
+        }).join("");
+        return `<label class="hint">${esc(k)}<select data-k="${esc(k)}">${opts}</select></label>`;
+      }
+      if (k === "url" && outs.length) {
+        const opts = [`<option value="${esc(v)}">${esc(v || "当前")}</option>`]
+          .concat(outs.slice(0, 24).map((it) => `<option value="${esc(it.url)}">${esc(it.file)}</option>`))
+          .join("");
+        return `<label class="hint">${esc(k)}<select data-k="${esc(k)}">${opts}</select><textarea data-k="${esc(k)}">${esc(v)}</textarea></label>`;
+      }
+      if (typeof v === "number") {
+        return `<label class="hint">${esc(k)}<input data-k="${esc(k)}" type="number" value="${esc(v)}"></label>`;
+      }
+      if (k === "text" || k === "url" || k === "loras") {
+        return `<label class="hint">${esc(k)}<textarea data-k="${esc(k)}">${esc(v)}</textarea></label>`;
+      }
+      return `<label class="hint">${esc(k)}<input data-k="${esc(k)}" value="${esc(v)}"></label>`;
+    }).join("");
+    const prev = props.previewUrl ? `<p class="hint">成片 ${esc(props.previewUrl)}</p>` : "";
+    box.innerHTML = `<p class="hint">${esc(n.title || n.type)} · #${n.id}</p>${rows}${prev}`;
+    box.querySelectorAll("[data-k]").forEach((el) => {
+      el.addEventListener("input", () => {
+        const k = el.getAttribute("data-k");
+        let val = el.value;
+        if (typeof n.properties[k] === "number") val = Number(val);
+        n.properties[k] = val;
+        if (n.widgets) n.widgets.forEach((w) => { if (w.name === k) w.value = val; });
+        graph.setDirtyCanvas(true, true);
+        invalidate("节点参数已改");
+      });
+    });
+  }
+
+  function capHint() {
+    const b = $("backend").value;
+    if (b === "huggingface") {
+      $("capHint").textContent = "Hugging Face 无官方 i2v，图生视频校验会红。LoRA 为未验证。";
+    } else if (b.indexOf("modelscope") === 0) {
+      $("capHint").textContent = "魔搭 LoRA 只要 Hub owner/repo，不要 Civitai 下载链。";
+    } else if (b === "nano-gpt") {
+      $("capHint").textContent = "Nano 出站只用 resolution token，不要宽高。提示词最多 1200 字。";
+    } else {
+      $("capHint").textContent = "校验只认真连线。seed / 提示词 / LoRA 未连则空，不偷配方台。";
+    }
+  }
+
+  function showMedia(url) {
+    const box = $("preview");
+    if (!url) {
+      box.innerHTML = '<span class="hint">没有成片地址</span>';
+      return;
+    }
+    const lower = String(url).split("?")[0].toLowerCase();
+    if (/\.(mp4|webm|mov)$/.test(lower)) {
+      box.innerHTML = `<video src="${esc(url)}" controls autoplay muted playsinline></video>`;
+    } else {
+      box.innerHTML = `<img src="${esc(url)}" alt="result">`;
+    }
+  }
+
+  function pickUrl(data) {
+    if (!data) return "";
+    if (typeof data.url === "string") return data.url;
+    if (Array.isArray(data.saved) && data.saved[0]) return data.saved[0].url || data.saved[0].path || "";
+    if (Array.isArray(data.files) && data.files[0]) return data.files[0].url || data.files[0].path || "";
+    if (Array.isArray(data.urls) && data.urls[0]) return data.urls[0];
+    if (Array.isArray(data.images) && data.images[0]) return data.images[0].url || data.images[0];
+    if (Array.isArray(data.videos) && data.videos[0]) return data.videos[0].url || data.videos[0];
+    if (data.image) return data.image.url || data.image;
+    if (data.video) return data.video.url || data.video;
+    if (data.result && data.result.url) return data.result.url;
+    return "";
+  }
+
+  function attachPreview(nodeId, url) {
+    const n = graph.getNodeById(Number(nodeId)) || graph.getNodeById(nodeId);
+    if (n && n.properties) n.properties.previewUrl = url;
+  }
+
+  function fillStageRefs(payload) {
+    const p = JSON.parse(JSON.stringify(payload || {}));
+    function fill(v) {
+      if (v && typeof v === "object" && v.__stageOut__) {
+        const u = stageUrls[String(v.__stageOut__)];
+        return u || v;
+      }
+      return v;
+    }
+    ["sourceImage", "firstFrame", "imageUrl", "image_url", "image"].forEach((k) => {
+      if (p[k] != null) p[k] = fill(p[k]);
+    });
+    return p;
+  }
+
+  function nextRunnableStage(j) {
+    const stages = (j && j.stages) || [];
+    for (let i = 0; i < stages.length; i++) {
+      const s = stages[i];
+      if (stageUrls[String(s.id)]) continue;
+      const needs = s.needs || [];
+      if (needs.every((id) => stageUrls[String(id)])) return s;
+    }
+    return null;
+  }
+
+  async function validate() {
+    const body = toCompileGraph();
+    capHint();
+    let j;
+    try {
+      const r = await fetch("/api/graph/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      j = await r.json();
+    } catch (e) {
+      j = { ok: false, error: String(e) };
+    }
+    lastCompile = j;
+    lastEpoch = epoch;
+    $("outBox").textContent = JSON.stringify(j, null, 2);
+    if (!(j && j.ok && lastEpoch === epoch)) {
+      $("btnGen").disabled = true;
+      $("btnGen").textContent = "运行此步";
+      $("dockMsg").textContent = (j && j.error) || "校验未通过";
+      $("dockMsg").className = "bad";
+      return;
+    }
+    if (j.multiStep || j.execute === "staged") {
+      const nxt = nextRunnableStage(j);
+      if (nxt) {
+        $("btnGen").disabled = false;
+        $("btnGen").textContent = "运行下一步 · " + nxt.op;
+        $("dockMsg").textContent = "多步链：按 stages 逐步跑，不假装一次出片";
+        $("dockMsg").className = "warn";
+      } else {
+        $("btnGen").disabled = true;
+        $("btnGen").textContent = "运行此步";
+        $("dockMsg").textContent = "多步链已全部有成片，或还缺上游";
+        $("dockMsg").className = "ok";
+      }
+      return;
+    }
+    $("btnGen").disabled = false;
+    $("btnGen").textContent = "运行此步";
+    $("dockMsg").textContent = "单步校验通过，可运行此步";
+    $("dockMsg").className = "ok";
+  }
+
+  async function generate() {
+    if (!lastCompile || !lastCompile.ok || lastEpoch !== epoch) return;
+    let payload = null;
+    let stage = null;
+    if (lastCompile.multiStep || lastCompile.execute === "staged") {
+      stage = nextRunnableStage(lastCompile);
+      if (!stage || !stage.payload) {
+        $("dockMsg").textContent = "没有可跑的下一步（上游还没成片）";
+        $("dockMsg").className = "warn";
+        return;
+      }
+      payload = fillStageRefs(stage.payload);
+      if (payload.sourceImage && typeof payload.sourceImage === "object" && payload.sourceImage.__stageOut__) {
+        $("dockMsg").textContent = "上游还没有成片地址，不能偷配方台图";
+        $("dockMsg").className = "bad";
+        return;
+      }
+    } else {
+      payload = lastCompile.payload;
+    }
+    if (!payload) {
+      $("dockMsg").textContent = "校验结果没有 payload";
+      $("dockMsg").className = "bad";
+      return;
+    }
+    $("btnGen").disabled = true;
+    $("dockMsg").textContent = "正在请求云 API…";
+    $("dockMsg").className = "muted";
+    try {
+      const r = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let j = await r.json();
+      $("outBox").textContent = JSON.stringify(j, null, 2);
+      if (!r.ok || j.error) {
+        $("dockMsg").textContent = j.error || ("HTTP " + r.status);
+        $("dockMsg").className = "bad";
+        $("btnGen").disabled = false;
+        return;
+      }
+      const jobId = j.id || j.jobId || j.workflowId;
+      if (jobId && !pickUrl(j) && (j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status)) {
+        $("dockMsg").textContent = "云端排队中…";
+        for (let i = 0; i < 40; i++) {
+          await new Promise((res) => setTimeout(res, 2500));
+          const jr = await fetch("/api/jobs/" + encodeURIComponent(jobId));
+          const st = await jr.json();
+          $("outBox").textContent = JSON.stringify(st, null, 2);
+          if (st.error || st.status === "failed" || st.status === "error") {
+            throw new Error(st.error || "任务失败");
+          }
+          if (pickUrl(st) || st.status === "done" || st.status === "succeeded" || st.status === "completed") {
+            j = st;
+            break;
+          }
+          $("dockMsg").textContent = "云端进行中 " + (i + 1) + "/40";
+        }
+      }
+      const url = pickUrl(j);
+      showMedia(url);
+      if (url && stage) {
+        stageUrls[String(stage.id)] = url;
+        attachPreview(stage.id, url);
+      } else if (url && lastCompile.sink) {
+        attachPreview(lastCompile.sink, url);
+      }
+      $("dockMsg").textContent = url ? (stage ? ("完成 " + stage.op + " · 可再校验跑下一步") : "此步完成") : "云端已返回，没有可预览地址";
+      $("dockMsg").className = url ? "ok" : "warn";
+      if (lastCompile.multiStep) {
+        const nxt = nextRunnableStage(lastCompile);
+        $("btnGen").disabled = !nxt;
+        $("btnGen").textContent = nxt ? ("运行下一步 · " + nxt.op) : "运行此步";
+      } else {
+        $("btnGen").disabled = false;
+      }
+    } catch (e) {
+      $("dockMsg").textContent = String(e);
+      $("dockMsg").className = "bad";
+      $("btnGen").disabled = false;
+    }
+  }
+
+  function add(type, x, y) {
+    const n = LiteGraph.createNode(type);
+    n.pos = [x, y];
+    graph.add(n);
+    return n;
+  }
+
+  function loadDemo(kind) {
+    snapshot();
+    graph.clear();
+    stageUrls = {};
+    if (kind === "chain") {
+      const p = add("cloud/prompt", 70, 180);
+      const g = add("cloud/t2i", 340, 160);
+      const v = add("cloud/i2v", 640, 160);
+      p.connect(0, g, 0);
+      g.connect(0, v, 0);
+      $("dockMsg").textContent = "已加载：文生图→视频。先校验，再逐步跑上游。";
+    } else {
+      const img = add("cloud/image", 70, 90);
+      const p = add("cloud/prompt", 70, 280);
+      const s = add("cloud/seed", 70, 460);
+      const v = add("cloud/i2v", 420, 200);
+      img.connect(0, v, 0);
+      p.connect(0, v, 1);
+      s.connect(0, v, 2);
+      $("dockMsg").textContent = "已加载：图→视频。校验通过后可运行此步。";
+    }
+    $("dockMsg").className = "muted";
+    lastCompile = null;
+    $("btnGen").disabled = true;
+    $("btnGen").textContent = "运行此步";
+    graph.setDirtyCanvas(true, true);
+    renderInspector();
+    persist();
+  }
+
+  function undoOnce() {
+    const raw = undo.pop();
+    if (!raw) return;
+    try {
+      graph.configure(JSON.parse(raw));
+      invalidate("已撤销");
+      renderInspector();
+    } catch (_) {}
+  }
+
+  function fitView() {
+    if (canvas.ds) {
+      canvas.ds.offset = [40, 24];
+      canvas.ds.scale = 0.92;
+    }
+    graph.setDirtyCanvas(true, true);
+  }
+
+  $("btnDemo").onclick = () => loadDemo("i2v");
+  $("btnChain").onclick = () => loadDemo("chain");
+  $("btnUndo").onclick = undoOnce;
+  $("btnFit").onclick = fitView;
+  $("btnExport").onclick = () => {
+    const blob = new Blob([JSON.stringify({ backend: $("backend").value, graph: graph.serialize() }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "cloud-nodes.json";
+    a.click();
+  };
+  $("btnClear").onclick = () => { snapshot(); graph.clear(); stageUrls = {}; invalidate("画布已清空"); renderInspector(); };
+  $("btnValidate").onclick = () => validate();
+  $("btnGen").onclick = () => generate();
+  $("backend").onchange = () => { capHint(); invalidate("供应商已换"); loadCatalog(); };
+
+  NODE_DEFS.forEach((def) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = def.title;
+    b.onclick = () => {
+      snapshot();
+      const n = add(def.type, 90 + Math.random() * 60, 90 + Math.random() * 60);
+      canvas.selectNode(n);
+      renderInspector();
+    };
+    $("palette").appendChild(b);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      if (!typing) { e.preventDefault(); undoOnce(); }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      if (!$("btnGen").disabled) generate();
+      else validate();
+      return;
+    }
+    if (!typing && (e.key === "Delete" || e.key === "Backspace")) {
+      const nodes = Object.values(canvas.selected_nodes || {});
+      if (!nodes.length) return;
+      e.preventDefault();
+      snapshot();
+      nodes.forEach((n) => graph.remove(n));
+      renderInspector();
+    }
+    if (!typing && e.code === "Space") {
+      canvas.dragging_canvas = true;
+      e.preventDefault();
+    }
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.code === "Space") canvas.dragging_canvas = false;
+  });
+
+  function fitCanvas() {
+    const el = $("graph-canvas");
+    const wrap = el.parentElement;
+    el.width = wrap.clientWidth;
+    el.height = wrap.clientHeight;
+    if (canvas.resize) canvas.resize();
+    graph.setDirtyCanvas(true, true);
+  }
+  window.addEventListener("resize", fitCanvas);
+  fitCanvas();
+  capHint();
+
+  let restored = false;
+  try {
+    const raw = sessionStorage.getItem(STORE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.backend) $("backend").value = parsed.backend;
+      if (parsed.graph) {
+        graph.configure(parsed.graph);
+        restored = true;
+      }
+    }
+  } catch (_) {}
+  if (!restored) loadDemo("i2v");
+  capHint();
+  loadCatalog();
+  loadOuts();
+  if (canvas.ds) {
+    canvas.ds.offset = [30, 16];
+    canvas.ds.scale = 0.92;
+  }
+  renderInspector();
+})();
+</script>
 </body>
 </html>
