@@ -193,8 +193,8 @@
     const canPin = shot && shot.kind === "shot";
     const tabAssets = state.railTab !== "history";
     const tabs = '<div class="rail-tabs">' +
-      '<button type="button" data-tab="assets"' + (tabAssets ? ' class="on"' : "") + ">资产</button>' +
-      '<button type="button" data-tab="history"' + (!tabAssets ? ' class="on"' : "") + ">历史</button></div>';
+      '<button type="button" data-tab="assets"' + (tabAssets ? ' class="on"' : "") + '>资产</button>' +
+      '<button type="button" data-tab="history"' + (!tabAssets ? ' class="on"' : "") + '>历史</button></div>';
     let body;
     if (tabAssets) {
       const list = assets();
