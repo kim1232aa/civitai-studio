@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0789-seko</title>
+<title>画布 · Night Lab · v0790-seko</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -96,6 +96,21 @@
   .picker button{display:flex;gap:8px;align-items:center;width:100%;background:transparent;border:0;color:#ddd;padding:6px;border-radius:8px}
   .picker button:hover{background:#222}
   .picker img{width:36px;height:36px;object-fit:cover;border-radius:6px}
+  .rail{position:absolute;left:14px;top:170px;z-index:12;width:132px;max-height:calc(100% - 230px);overflow:auto;
+    display:flex;flex-direction:column;gap:6px;padding-right:2px}
+  .rail-h{font-size:11px;color:#8b8b94;padding:0 4px}
+  .rail-item{display:flex;align-items:center;gap:6px;width:100%;border:1px solid #2a2a30;background:#141416;
+    color:#ddd;border-radius:10px;padding:4px;text-align:left}
+  .rail-item img{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0}
+  .rail-item.on{border-color:#5ee0c5}
+  .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+  .rail-item.add{justify-content:center;color:#9a9aa3}
+  .atbox{position:absolute;left:50%;bottom:250px;transform:translateX(-50%);z-index:19;width:min(420px,80vw);
+    background:#16161a;border:1px solid #2c2c34;border-radius:12px;padding:8px;display:none;max-height:200px;overflow:auto}
+  .atbox.show{display:block}
+  .atbox button{display:flex;gap:8px;align-items:center;width:100%;background:transparent;border:0;color:#ddd;padding:6px;border-radius:8px}
+  .atbox button:hover{background:#222}
+  .atbox img{width:28px;height:28px;object-fit:cover;border-radius:6px}
 </style>
 </head>
 <body>
@@ -105,12 +120,13 @@
     <div class="title" id="projTitle">错位人生：我的扫地机器人同事（副本）</div>
     <nav class="tabs" aria-label="工作流">
       <a href="/">剧本策划</a>
-      <a class="on" href="/cloud-nodes.html" aria-current="page">画布</a>
+      <a class="on" href="/storyboard.html" aria-current="page">画布</a>
       <span class="off" title="本版不做剪辑时间线">编辑器</span>
     </nav>
     <div class="mode-mini">
       <a href="/">配方台</a>
-      <span class="stamp">v0789-seko</span>
+      <a href="/cloud-nodes.html">LiteGraph</a>
+      <span class="stamp">v0790-seko</span>
     </div>
   </header>
   <div class="stage">
@@ -119,6 +135,8 @@
       <button class="tool" id="btnAuto" title="自动布局">▦</button>
       <button class="tool" id="btnFit" title="适配">◎</button>
     </div>
+    <aside class="rail" id="assetRail" aria-label="资产索引"></aside>
+    <div class="atbox" id="atbox"></div>
     <div class="viewport" id="viewport">
       <div class="world" id="world">
         <div class="grid"></div>
