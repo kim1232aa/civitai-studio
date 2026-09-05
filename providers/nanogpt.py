@@ -27,6 +27,7 @@ BASE = "https://nano-gpt.com"
 API = BASE + "/api/v1"
 IMG_MODELS = API + "/images/models"
 VID_MODELS = API + "/video-models"
+TEXT_MODELS = API + "/models?detailed=true"
 GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
 GEN_VIDEO = BASE + "/api/generate-video"
@@ -729,6 +730,49 @@ def _row_video(it: dict) -> dict:
     return row
 
 
+def _row_text(it: dict) -> dict:
+    """Normalize official GET /api/v1/models rows for model selectors."""
+    mid = str(it.get("id") or "").strip()
+    name = str(it.get("name") or mid.rsplit("/", 1)[-1] or mid).strip()
+    caps = it.get("capabilities") or {}
+    tags = [str(t).lower() for t in (it.get("tags") or []) if t]
+    return {
+        "id": mid,
+        "name": name,
+        "category": "text",
+        "backend": "nano-gpt",
+        "status": "available",
+        "task": "text-generation",
+        "tags": tags,
+        "pricing": it.get("pricing") or {},
+        "supported_parameters": it.get("supported_parameters") or {},
+        "capabilities": caps,
+        "description": it.get("description") or "",
+        "owned_by": it.get("owned_by") or "",
+    }
+
+
+def fetch_text_catalog(force=False) -> list:
+    """Fetch official NanoGPT text model IDs; never infer chat models from image/video rows."""
+    now = time.time()
+    cache = _CACHE.setdefault("text", {"at": 0.0, "items": None})
+    if not force and cache.get("items") is not None and now - (cache.get("at") or 0) < _TTL:
+        return list(cache["items"])
+    code, data = json_call(TEXT_MODELS, headers={"Accept": "application/json", **_auth()}, timeout=30)
+    rows = data.get("data") if isinstance(data, dict) else None
+    items, seen = [], set()
+    if code == 200 and isinstance(rows, list):
+        for it in rows:
+            if not isinstance(it, dict) or not it.get("id"):
+                continue
+            row = _row_text(it)
+            if row["id"] not in seen:
+                seen.add(row["id"])
+                items.append(row)
+    cache["items"], cache["at"] = items, now
+    return list(items)
+
+
 def fetch_catalog(force=False) -> list:
     now = time.time()
     if not force and _CACHE.get("items") is not None and (now - (_CACHE.get("at") or 0)) < _TTL:
@@ -928,15 +972,20 @@ class NanoGptProvider(Provider):
         return bool(nano_key())
 
     def categories(self) -> list:
-        return sorted({x.get("category") for x in fetch_catalog() if x.get("category")})
+        return sorted(
+            {x.get("category") for x in fetch_catalog() if x.get("category")}
+            | {x.get("category") for x in fetch_text_catalog() if x.get("category")}
+        )
 
     def catalog(self, q, category, status) -> dict:
-        items = fetch_catalog()
+        # NanoGPT publishes text models from /models, separate from media catalogs.
+        items = fetch_text_catalog() if category in ("chat", "text") else fetch_catalog()
         qn = _alnum(q)
         if qn:
             items = [x for x in items if qn in _alnum((x.get("name") or "") + " " + (x.get("id") or "") + " " + " ".join(x.get("tags") or []))]
         if category:
-            items = [x for x in items if x.get("category") == category]
+            wanted_category = "text" if category == "chat" else category
+            items = [x for x in items if x.get("category") == wanted_category]
         if status:
             items = [x for x in items if x.get("status") == status]
         return {

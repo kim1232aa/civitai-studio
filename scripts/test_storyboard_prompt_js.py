@@ -97,17 +97,17 @@ def main():
     ok("光源描述 (选填)" in src, "lighting desc")
     ok("简单描述你想实现的灯光效果，或情绪风格" in src, "lighting placeholder")
     ok('op: "relight"' in src, "relight op")
-    ok("category=relight" in src, "relight catalog")
+    ok(
+        "category=text" in src,
+        "story catalog must hit text models",
+    )
     ok("消除 ◆1" in src, "eraser submit label")
     ok("该方向 fal 不支持" in src, "front/back lighting unsupported")
     ok("btnVideoBar" in src and "合成视频" in src, "compose-video shot-bar entry")
     ok("function classifySelected" in src, "selection classifier")
     ok("SHOTBAR_VIDEO_ITEMS" in src, "video toolbar variant")
     ok(
-        "截取帧" in src
-        and "视频增强" in src
-        and "去字幕" in src
-        and "音频分离" in src,
+        "截取帧" in src and "视频增强" in src and "去字幕" in src and "音频分离" in src,
         "video toolbar five labels",
     )
     ok(
@@ -131,6 +131,16 @@ def main():
     )
     ok('kind: "group"' in src, "group kind in classifier")
     ok("局部摘取" in src, "nine-grid toolbar")
+    ok("function isNineGridNode" in src, "nine-grid classifier helper")
+    ok("n.gridFrom" in src, "split cards keep image toolbar")
+    ok("function nineCellRect" in src, "sheet cell geometry")
+    ok("NINE_SHEET_GAP" in src, "compose/crop share gap")
+    ok("function startNineCrop" in src, "crop enters pick mode")
+    ok("function extractNineGridCell" in src, "crop extracts clicked cell")
+    ok("data-ninecell" in src, "clickable cell overlay")
+    ok("点宫格中的一格摘取" in src, "pick-cell instruction")
+    ok("已摘取左上格" not in src, "no always-top-left crop shell")
+    ok("nineType: toolUi.nineType" in src, "generated nine-grid tagged")
     ok("编辑文本" in src and "blankPill" in src, "blank-node pill")
     ok("描述你想要生成的图片，或输入 @ 引用角色" in src, "image placeholder")
     ok(
@@ -172,6 +182,19 @@ def main():
     ok("function planNineGridPrompts" in src, "ninegrid planner client")
     ok("function composeNineGridSheet" in src, "ninegrid canvas sheet")
     ok("function buildNineCellGraph" in src, "ninegrid per-cell t2i graph")
+    ok(
+        'if (state.mode === "text") return "chat"' not in src,
+        "text tab does not query chat",
+    )
+    ok(
+        'if (state.mode === "text" || toolUi.story) return "text"' in src,
+        "text/story catalog is category=text",
+    )
+    ok('option value="">默认模型' not in src, "no fake 默认模型 option")
+    ok("无可用模型" in src, "empty catalog is explicit")
+    ok("不会用默认假值生成" in src, "generate refuses blank serviceId")
+    ok("生图必须显式选择图片模型" in src, "text-to-shot requires image catalog")
+    ok("keepStory" in src, "story dock survives selecting its text node")
     ok('pickCatalogService(backend, "grid")' not in src, "no catalog grid dead-end")
     ok("category=grid" not in src, "no forged grid catalog filter")
     ok("没有九宫格模型" not in src, "no grid-model dead-end copy")
@@ -184,6 +207,34 @@ def main():
         and "btnNineGridBar" in src
         and "btnVideoBar" in src,
         "shot-bar ids",
+    )
+    ok("nodeContextMenu" in src, "node context menu exists")
+    ok(
+        'data-nodeact="copy"' in src
+        and 'data-nodeact="paste"' in src
+        and 'data-nodeact="delete"' in src,
+        "node context menu has copy/paste/delete",
+    )
+    ok("function deleteNode" in src, "deleteNode exists")
+    ok(
+        "e.from !== id && e.to !== id" in src,
+        "delete removes attached edges",
+    )
+    ok(
+        "n.memberIds.filter((memberId) => memberId !== id)" in src,
+        "delete removes group membership",
+    )
+    ok(
+        'e.key !== "Delete" && e.key !== "Backspace"' in src,
+        "Delete and Backspace hotkeys",
+    )
+    ok(
+        'e.target.closest("textarea,input,select,[contenteditable]")' in src,
+        "delete hotkeys ignore editable controls",
+    )
+    ok(
+        "localStorage.setItem(" in src and "localStorage.getItem(STORE)" in src,
+        "graph persists in localStorage",
     )
     print("ok prompt-js-contract")
     return 0
