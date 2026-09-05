@@ -88,6 +88,13 @@ def infer_image_fields(eid: str) -> list:
     # Imagen4 preview/fast/ultra OpenAPI 404 (deprecated). Do not invent fields.
     if "imagen4" in e:
         return []
+    # Verified via fal.ai public API docs (2026-09-05) — exact field names, not guessed.
+    if e in ("fal-ai/finegrain-eraser/mask", "fal-ai/object-removal/mask"):
+        return ["image_url", "mask_url"]
+    if e == "fal-ai/iclight-v2":
+        return ["image_url"]
+    if "multiple-angles" in e:
+        return ["image_urls"]
     if "video-to-video" in e and "/edit" in e:
         return ["video_url", "image_urls"]
     if "/edit" in e or "image-to-image" in e:
@@ -162,11 +169,18 @@ def overlay_image_fields(item: dict) -> dict:
     out = dict(item)
     out.setdefault("backend", "fal")
     eid = out.get("id") or ""
+    fcat = (out.get("falCategory") or "").lower()
+    # Cached catalog snapshots (docs/fal-models.json) predate relight/camera-angle/inpaint
+    # categorization — recompute category/step for the specific verified ids instead of
+    # trusting the stale generic "image" category baked into the snapshot.
+    if eid in ("fal-ai/finegrain-eraser/mask", "fal-ai/object-removal/mask", "fal-ai/iclight-v2") or "multiple-angles" in eid:
+        recipe2, step2 = fal_recipe(eid, fcat, out.get("name") or "")
+        out["category"] = recipe2
+        out["step"] = step2
     fields = list(out.get("imageFields") or infer_image_fields(eid))
     if fields:
         out["imageFields"] = fields
     recipe = (out.get("category") or "").lower()
-    fcat = (out.get("falCategory") or "").lower()
     blob = f"{eid} {fcat} {recipe}".lower()
     is_video = (
         recipe == "video"
@@ -178,7 +192,11 @@ def overlay_image_fields(item: dict) -> dict:
     )
     has_first = any(f in FIRST_IMAGE_FIELDS for f in fields)
     has_many = "image_urls" in fields
-    if is_video:
+    if recipe in ("relight", "camera-angle", "inpaint"):
+        out["needsSource"] = True
+        out["needsFirstFrame"] = False
+        out["needsMask"] = recipe == "inpaint"
+    elif is_video:
         out["needsSource"] = False
         out["needsFirstFrame"] = bool(
             has_first or "image-to-video" in blob or "first-last" in blob or "reference-to-video" in blob
@@ -340,6 +358,128 @@ def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
             inp["lora_scale"] = cleaned[0]["scale"]
 
 
+# --- 打光 (relight) --------------------------------------------------------
+# fal-ai/iclight-v2 的 initial_latent 只有这 5 个枚举。源站主光源是 3x2 六向,
+# 前方/后方在 fal 上没有对应 latent —— 不假写成 Left/Right (静默近似),
+# 而是不写 latent, 把方向显式写进 prompt, 并在 meta 里标 unsupported。
+ICLIGHT_LATENTS = ("None", "Left", "Right", "Top", "Bottom")
+
+# 源站主光源 6 向 -> (fal initial_latent | None, prompt 片段)
+LIGHT_DIRECTION_MAP = {
+    "left": ("Left", "key light from the left"),
+    "right": ("Right", "key light from the right"),
+    "top": ("Top", "key light from above"),
+    "bottom": ("Bottom", "key light from below"),
+    "front": (None, "key light from the front, frontal lighting"),
+    "back": (None, "key light from behind, backlit rim separation"),
+    "none": ("None", ""),
+}
+
+# 源站 12 预设 (DOM 原文, 顺序即面板 4x3 顺序) -> iclight prompt 片段。
+# 面板点预设只改描述/方向/色温, 后端这里保证预设名不被吞掉。
+LIGHT_PRESETS = {
+    "伦勃朗光": "Rembrandt lighting, 45-degree key, triangle of light on the cheek, deep chiaroscuro",
+    "黄金时刻": "golden hour sunlight, low warm sun, long soft shadows, hazy amber glow",
+    "蓝调时刻": "blue hour twilight, cool ambient dusk light, deep blue sky falloff",
+    "暖调光斑": "warm bokeh light spots, soft orange practicals behind subject",
+    "过曝胶片": "overexposed film look, blown highlights, washed halation, high-key grain",
+    "教父暗影": "low-key top light, eyes in shadow, heavy falloff, Godfather style",
+    "布达佩斯大饭店": "symmetrical pastel lighting, flat even fill, candy-colored art direction",
+    "沙丘救赎": "harsh desert sun, hard directional light, dust haze, monolithic contrast",
+    "商业蝴蝶光": "butterfly beauty lighting, on-axis key above lens, symmetric nose shadow, clean commercial look",
+    "产品聚光": "tight product spotlight, controlled gradient background, crisp specular highlights",
+    "香槟金高光": "champagne gold specular highlights, warm metallic sheen, luxury product light",
+    "光学焦散": "optical caustics, refracted light patterns through glass, prismatic dancing highlights",
+}
+
+
+def _norm_light_direction(payload: dict) -> tuple[str | None, str, str | None]:
+    """-> (initial_latent | None, prompt 片段, unsupported 方向名 | None)
+
+    前端传的是小写 id (left/right/top/bottom/front/back)。老代码只认大写,
+    结果任何方向都写不进 initial_latent —— 那是静默丢弃, 这里修掉。
+    """
+    raw = payload.get("initialLatent") or payload.get("lightDirection")
+    key = str(raw or "").strip()
+    if not key:
+        return None, "", None
+    # 已经是 fal 枚举 (大小写不敏感) 就直接用
+    for enum in ICLIGHT_LATENTS:
+        if key.lower() == enum.lower():
+            frag = LIGHT_DIRECTION_MAP.get(enum.lower(), (enum, ""))[1]
+            return (enum if enum != "None" else "None"), frag, None
+    hit = LIGHT_DIRECTION_MAP.get(key.lower())
+    if hit is None:
+        return None, "", key
+    latent, frag = hit
+    return latent, frag, (None if latent else key)
+
+
+def build_iclight_lighting(payload: dict) -> tuple[str | None, str]:
+    """把打光面板的全部控件折成 (initial_latent, prompt 片段)。
+
+    iclight 只有 3 个输入口, 面板有 8 组控件。收不进字段的一律进 prompt,
+    并且 payload 里出现过的控件必须在 prompt 里留下痕迹。
+    """
+    frags: list[str] = []
+    latent, dir_frag, unsupported = _norm_light_direction(payload)
+    if dir_frag:
+        frags.append(dir_frag)
+
+    preset = str(payload.get("lightPreset") or "").strip()
+    if preset:
+        frags.append(LIGHT_PRESETS.get(preset, preset))
+
+    quality = str(payload.get("lightQuality") or "").strip().lower()
+    if quality in ("soft", "柔光"):
+        frags.append("soft diffused light")
+    elif quality in ("hard", "硬光"):
+        frags.append("hard directional light, crisp shadow edges")
+
+    color = str(payload.get("lightColor") or "").strip()
+    if color and color.lower() not in ("#ffffff", "#fff", "white"):
+        frags.append(f"light color {color}")
+
+    kelvin = payload.get("colorTemperature")
+    if kelvin not in (None, ""):
+        try:
+            k = int(float(kelvin))
+        except (TypeError, ValueError):
+            k = None
+        if k:
+            tone = "warm tungsten" if k < 4500 else ("neutral" if k <= 5600 else "cool daylight")
+            frags.append(f"{k}K {tone} white balance")
+
+    bright = payload.get("brightness")
+    if bright not in (None, ""):
+        try:
+            b = int(float(bright))
+        except (TypeError, ValueError):
+            b = None
+        if b is not None:
+            if b <= 25:
+                frags.append(f"dim exposure, brightness {b}%")
+            elif b >= 75:
+                frags.append(f"bright exposure, brightness {b}%")
+            else:
+                frags.append(f"balanced exposure, brightness {b}%")
+
+    if payload.get("rimLight"):
+        frags.append("rim light separating subject from background")
+
+    persp = str(payload.get("perspective") or "").strip().lower()
+    if persp in ("front", "正面"):
+        frags.append("subject facing camera")
+    elif persp in ("perspective", "透视"):
+        frags.append("three-quarter perspective view")
+
+    if unsupported:
+        # 显式留痕: 方向没有 latent 可用, 已降级为纯 prompt 描述。
+        payload.setdefault("_unsupported", []).append(f"initial_latent:{unsupported}")
+
+    return latent, ", ".join([f for f in frags if f])
+
+
 def build_fal_input(payload: dict) -> dict:
     eid = (payload.get("serviceId") or payload.get("endpoint") or "").strip()
     spec = find_model(eid) or {}
@@ -356,9 +496,11 @@ def build_fal_input(payload: dict) -> dict:
         extra = [img] + extra
     FIRST = {"image_url", "start_image_url", "first_frame_url", "image"}
     LAST = {"end_image_url", "tail_image_url", "last_frame_url"}
+    MASK = {"mask_url", "mask_image_url"}
+    mask = (payload.get("maskUrl") or payload.get("mask_url") or payload.get("maskImageUrl") or "").strip()
     if not fields:
         for k in list(spec.get("required") or []) + list(spec.get("optional") or []):
-            if k in FIRST or k in LAST or k in ("image_urls", "video_url"):
+            if k in FIRST or k in LAST or k in MASK or k in ("image_urls", "video_url"):
                 fields.append(k)
     vid = (payload.get("videoUrl") or payload.get("video_url") or payload.get("sourceVideo") or "").strip()
     audio = (payload.get("audioUrl") or payload.get("audio_url") or "").strip()
@@ -372,6 +514,35 @@ def build_fal_input(payload: dict) -> dict:
             inp[name] = img
         elif name in LAST and last:
             inp[name] = last
+        elif name in MASK and mask:
+            inp[name] = mask
+    # 打光 fal-ai/iclight-v2: 模型只吃 image_url / prompt / initial_latent。
+    # 面板上的方向/柔硬/亮度/颜色/色温/轮廓光/预设一律显式降级进 prompt,
+    # 不允许静默丢弃, 也不允许把前方/后方假写成 Left。
+    if eid == "fal-ai/iclight-v2":
+        latent, extra_prompt = build_iclight_lighting(payload)
+        if latent:
+            inp["initial_latent"] = latent
+        desc = str(inp.get(prompt_key) or "").strip()
+        parts = [p for p in (desc, extra_prompt) if p]
+        inp[prompt_key] = ", ".join(parts) if parts else "improve the lighting naturally"
+    # 换机位 fal-ai/*multiple-angles: rotation/elevation/zoom sliders.
+    if "multiple-angles" in eid:
+        if payload.get("horizontalAngle") not in (None, ""):
+            try:
+                inp["horizontal_angle"] = float(payload["horizontalAngle"])
+            except (TypeError, ValueError):
+                pass
+        if payload.get("verticalAngle") not in (None, ""):
+            try:
+                inp["vertical_angle"] = float(payload["verticalAngle"])
+            except (TypeError, ValueError):
+                pass
+        if payload.get("zoom") not in (None, ""):
+            try:
+                inp["zoom"] = float(payload["zoom"])
+            except (TypeError, ValueError):
+                pass
     req_opt = list(spec.get("required") or []) + list(spec.get("optional") or [])
     if audio and (not spec.get("id") or "audio_url" in req_opt or "audio-to-video" in eid):
         inp["audio_url"] = audio
@@ -865,6 +1036,13 @@ def fal_recipe(eid, fcat, name):
         return "3d", "3d"
     if "video" in fcat:
         return "video", "videoGen"
+    # Verified via fal.ai public API docs (2026-09-05) — exact endpoint ids, not a keyword sweep.
+    if eid in ("fal-ai/finegrain-eraser/mask", "fal-ai/object-removal/mask"):
+        return "inpaint", "inpaint"
+    if eid == "fal-ai/iclight-v2":
+        return "relight", "relight"
+    if "multiple-angles" in eid:
+        return "camera-angle", "cameraAngle"
     return "image", "imageGen"
 
 
@@ -889,9 +1067,12 @@ def row_from_fal_api(it):
         "step": step,
         "backend": "fal",
         "tags": md.get("tags") or [],
-        "needsSource": recipe in ("image", "bg", "upscale", "3d") and (
-            fcat in ("image-to-image", "image-to-3d") or "/edit" in eid
+        "needsSource": recipe in ("relight", "camera-angle", "inpaint") or (
+            recipe in ("image", "bg", "upscale", "3d") and (
+                fcat in ("image-to-image", "image-to-3d") or "/edit" in eid
+            )
         ),
+        "needsMask": recipe == "inpaint",
         "needsFirstFrame": "image-to-video" in fcat or "image-to-video" in eid or "first-last" in eid,
         "imageFields": fields,
         "promptField": "prompt",

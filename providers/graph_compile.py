@@ -19,6 +19,7 @@ from .capabilities import get_provider_capabilities
 PORT_TYPES = {
     "prompt": "prompt",
     "image": "image",
+    "mask": "mask",
     "seed": "seed",
     "negative": "prompt",
     "loras": "loras",
@@ -31,6 +32,8 @@ OP_SPEC = {
     "seed": {"ins": [], "outs": ["seed"], "required": []},
     # image source for i2i (url / dataUrl in params)
     "image": {"ins": [], "outs": ["image"], "required": []},
+    # mask source for inpaint (brush-drawn or uploaded url / dataUrl in params)
+    "mask": {"ins": [], "outs": ["mask"], "required": []},
     "t2i": {"ins": ["prompt", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt"]},
     "i2i": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["image"], "required": ["prompt", "image"]},
     # image→video main path; prompt optional; may chain from upstream image out
@@ -38,6 +41,13 @@ OP_SPEC = {
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
     # image→image, no prompt required (超清/放大)
     "upscale": {"ins": ["prompt", "image"], "outs": ["image"], "required": ["image"]},
+    # image→image, direction/temperature params live in node params (打光)
+    "relight": {"ins": ["prompt", "image"], "outs": ["image"], "required": ["image"]},
+    # image→image, rotation/tilt/zoom params live in node params (多角度)
+    "camera-angle": {"ins": ["image"], "outs": ["image"], "required": ["image"]},
+    # image→image, real brush mask required (消除笔)。蒙版走 params.maskUrl（单节点方案）,
+    # mask 入口仅为兼容旧图的 op:mask 节点保留, 不作必连线口。
+    "inpaint": {"ins": ["prompt", "image", "mask"], "outs": ["image"], "required": ["image"]},
 }
 
 
@@ -268,6 +278,13 @@ def compile_graph(graph: dict | None) -> dict:
             values[(nid, "image")] = {"__wire__": "image", "value": url, "loras": []}
             continue
 
+        if op == "mask":
+            url = params.get("url") or params.get("value") or params.get("maskUrl") or params.get("mask")
+            if not url:
+                return _err(f"mask 节点 {nid} 缺少 params.url", nodeId=nid, blocked=True)
+            values[(nid, "mask")] = url
+            continue
+
         if op == "lora_apply":
             if "loras" not in params:
                 return _err(f"lora_apply {nid} 缺少 params.loras", nodeId=nid)
@@ -403,6 +420,75 @@ def compile_graph(graph: dict | None) -> dict:
             for k in ("scale", "resolution", "width", "height"):
                 if k in params:
                     payload[k] = deepcopy(params[k])
+
+            values[(nid, "image")] = _stage_image_ref(nid, [])
+            image_wired_on = any(e.get("fromPort") == "image" for e in outgoing.get(nid, []))
+            stage = {"id": nid, "op": op, "payload": deepcopy(payload), "produces": "image"}
+            if needs:
+                stage["needs"] = needs
+            stages.append(stage)
+            if image_wired_on:
+                continue
+            candidate_sinks.append((nid, payload))
+            continue
+
+        if op in ("relight", "camera-angle", "inpaint"):
+            cap_key = {"relight": "relight", "camera-angle": "cameraAngle", "inpaint": "inpaint"}[op]
+            label = {"relight": "打光", "camera-angle": "多角度", "inpaint": "消除笔"}[op]
+            if not caps.get(cap_key):
+                return _err(f"后端 {backend} 不支持{label}", blocked=True, nodeId=nid)
+            payload = {
+                "backend": backend,
+                "serviceId": params.get("serviceId") or g.get("serviceId"),
+            }
+            if not payload["serviceId"]:
+                return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
+            img, _ = _unwrap_image(inputs["image"])
+            needs: list[str] = []
+            if _is_pending_image(inputs["image"]):
+                up = inputs["image"].get("from")
+                if up:
+                    needs.append(up)
+                img = _image_payload_value(img)
+            if not img:
+                return _err(f"{op} {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
+            payload["sourceImage"] = img
+            if inputs.get("prompt"):
+                payload["prompt"] = inputs["prompt"]
+            if op == "inpaint":
+                # 单节点契约: 前端把画笔蒙版写进 params.maskUrl (已上传则是 URL,
+                # 未上传则是 dataURL)。inputs["mask"] 只是旧 op:mask 图的回退。
+                mask = params.get("maskUrl") or inputs.get("mask")
+                if isinstance(mask, dict):
+                    mask = mask.get("url") or mask.get("value")
+                if not isinstance(mask, str) or not mask.strip():
+                    return _err(
+                        f"inpaint {nid} 缺少蒙版: params.maskUrl 为空",
+                        blocked=True,
+                        nodeId=nid,
+                    )
+                payload["maskUrl"] = mask.strip()
+            if op == "relight":
+                # 打光面板的每个控件都要落到 payload。fal iclight 只吃
+                # image_url/prompt/initial_latent, 其余在 build_fal_input 里显式
+                # 降级进 prompt —— 收都不收才是静默丢弃。
+                for k in (
+                    "lightDirection",
+                    "lightColor",
+                    "colorTemperature",
+                    "brightness",
+                    "initialLatent",
+                    "lightQuality",
+                    "rimLight",
+                    "lightPreset",
+                    "perspective",
+                ):
+                    if k in params:
+                        payload[k] = deepcopy(params[k])
+            if op == "camera-angle":
+                for k in ("horizontalAngle", "verticalAngle", "zoom"):
+                    if k in params:
+                        payload[k] = deepcopy(params[k])
 
             values[(nid, "image")] = _stage_image_ref(nid, [])
             image_wired_on = any(e.get("fromPort") == "image" for e in outgoing.get(nid, []))

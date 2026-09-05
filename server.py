@@ -960,6 +960,16 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 code, data = prov.generate(payload)
             return self._json(code, data)
+        if path == "/api/story":
+            from providers.nanogpt import chat_story
+            code, data = chat_story(payload)
+            return self._json(code, data)
+        if path == "/api/grid/plan":
+            # 九宫格: catalog 里没有一次出多联图的模型, 所以先把 1 条提示词
+            # 拆成 N 条子提示词, 前端再跑 N 次 t2i 并 canvas 拼成一张卡。
+            from providers.nanogpt import plan_grid
+            code, data = plan_grid(payload)
+            return self._json(code, data)
         if path == "/api/catalog/refresh":
             try:
                 return self._json(200, refresh_catalog())

@@ -48,6 +48,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": True,
         "videoAspect": True,
         "upscale": False,  # only reachable via ComfyUI workflow builder, not a plain serviceId call
+        "relight": False,
+        "cameraAngle": False,
+        "inpaint": False,
+        "chat": False,
     },
     "fal": {
         "lora": "path",
@@ -67,6 +71,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": True,
         "videoAspect": True,
         "upscale": True,  # build_fal_input maps sourceImage generically off catalog imageFields
+        "relight": True,  # fal-ai/iclight-v2, real endpoint verified via fal.ai public API docs
+        "cameraAngle": True,  # fal-ai/qwen-image-edit-2511-multiple-angles, verified
+        "inpaint": True,  # fal-ai/finegrain-eraser/mask (image_url+mask_url), verified
+        "chat": False,
     },
     "huggingface": {
         "lora": "path",
@@ -86,6 +94,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": False,
         "videoAspect": False,
         "upscale": False,  # _call_bytes never sends an image field at all today
+        "relight": False,
+        "cameraAngle": False,
+        "inpaint": False,
+        "chat": False,
     },
     "modelscope-ai": {
         "lora": "hub_repo",
@@ -105,6 +117,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": False,
         "videoAspect": True,
         "upscale": True,  # generate() now uses wants_source_image(mid) = is_edit(mid) or hub_upscale_blob(mid); 8 real upscale models confirmed via /api/catalog
+        "relight": False,
+        "cameraAngle": False,
+        "inpaint": False,
+        "chat": False,
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -124,6 +140,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": False,
         "videoAspect": True,
         "upscale": True,  # same fix, same 8 models (AI/CN share one Hub catalog)
+        "relight": False,
+        "cameraAngle": False,
+        "inpaint": False,
+        "chat": False,
     },
     "nano-gpt": {
         "lora": "path",
@@ -143,6 +163,10 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "videoDuration": "string_seconds",
         "videoAspect": True,
         "upscale": True,  # _source_images() attaches sourceImage unconditionally, no model-id gate
+        "relight": False,
+        "cameraAngle": False,
+        "inpaint": False,
+        "chat": True,  # BASE + /v1/chat/completions, OpenAI-compatible; 8 real chat models seen in catalog (gpt-4o-mini, deepseek-v4-pro, qwen3-vl-8b-instruct, ...)
     },
 }
 
@@ -164,6 +188,10 @@ REQUIRED_KEYS = (
     "videoDuration",
     "videoAspect",
     "upscale",
+    "relight",
+    "cameraAngle",
+    "inpaint",
+    "chat",
 )
 
 
@@ -189,6 +217,10 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
             "videoDuration": False,
             "videoAspect": False,
             "upscale": False,
+            "relight": False,
+            "cameraAngle": False,
+            "inpaint": False,
+            "chat": False,
         }
     return deepcopy(base)
 
@@ -296,6 +328,13 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
             out["upscale"] = False
         else:
             out["upscale"] = bool(o["upscale"])
+
+    for _bool_key in ("relight", "cameraAngle", "inpaint", "chat"):
+        if _bool_key in o:
+            if not out.get(_bool_key):
+                out[_bool_key] = False
+            else:
+                out[_bool_key] = bool(o[_bool_key])
 
     for k in (
         "resolutionTokens",

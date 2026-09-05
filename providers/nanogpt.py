@@ -31,6 +31,15 @@ GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
 GEN_VIDEO = BASE + "/api/generate-video"
 VIDEO_STATUS = BASE + "/api/video/status"
+CHAT_COMPLETIONS = BASE + "/v1/chat/completions"
+
+STORY_DIRECTOR_SYSTEM = (
+    "你是一位专业的故事导演（story director）。"
+    "根据用户给出的主体、场景或设定，推演出一段适合分镜创作的故事梗概："
+    "包含起承转合、关键场景节拍、每个节拍的画面感（构图/情绪/光线线索），"
+    "以及可直接复用到下一步生图/生视频提示词的具体描述。"
+    "输出用中文，分点列出节拍，不要写成小说体大段散文。"
+)
 
 _CACHE = {"at": 0.0, "items": None}
 _TTL = 300
@@ -1203,6 +1212,159 @@ class NanoGptProvider(Provider):
             out["status"] = "failed"
             out["error"] = extract_error(data, f"HTTP {code}")
         return 200, out
+
+
+GRID_KINDS = {
+    "灵感风暴": "从不同创意方向发散同一主题, 每格换一种视觉概念/材质/情绪, 不要重复构图",
+    "故事叙述": "按时间顺序推进的连续叙事, 每格是下一个瞬间, 保持角色与场景一致",
+    "武打分镜": "一段打斗的连续分镜, 每格换动作节点与机位(全景/中景/特写/过肩), 强调动势",
+    "全景机位": "同一场景同一主体, 每格换机位与焦段(广角/中景/特写/俯拍/仰拍/侧面), 主体一致",
+}
+
+GRID_PLANNER_SYSTEM = (
+    "你是分镜策划。把用户的一句提示词拆成 N 条互不重复的子提示词, 用于并行出 N 张图再拼成宫格。\n"
+    "硬性要求:\n"
+    "1. 只输出 JSON 数组, 形如 [\"子提示词1\", \"子提示词2\", ...], 不要任何解释、编号或代码块围栏。\n"
+    "2. 数组长度必须严格等于要求的条数。\n"
+    "3. 每条都是可独立喂给文生图模型的完整画面描述, 自带主体、场景、光线、镜头。\n"
+    "4. 同一宫格内主体形象/服装/画风必须一致, 变化只发生在该宫格类型指定的维度上。"
+)
+
+
+def plan_grid(payload: dict):
+    """九宫格: 把 1 条提示词拆成 N 条子提示词。
+
+    catalog 304 项 + fal-models 1492 项里没有任何一次出多联/网格图的模型
+    (核查于 2026-09-06)。所以九宫格不是「找个 grid 模型」, 而是拆 N 次子提示词
+    -> N 次 t2i -> 前端 canvas 拼成一张卡。这个接口只负责「拆」。
+    """
+    payload = payload or {}
+    model = (payload.get("model") or "").strip()
+    if model.startswith("chat/"):
+        model = model[len("chat/"):]
+    if not model:
+        return 400, {"error": "缺少九宫格拆解模型 id"}
+    text = (payload.get("text") or payload.get("prompt") or "").strip()
+    if not text:
+        return 400, {"error": "缺少九宫格生成提示词"}
+    kind = (payload.get("kind") or payload.get("gridKind") or "").strip()
+    if kind and kind not in GRID_KINDS:
+        return 400, {"error": f"未知九宫格类型 {kind}", "allowed": list(GRID_KINDS)}
+    try:
+        count = int(payload.get("count") or 9)
+    except (TypeError, ValueError):
+        return 400, {"error": "count 必须是整数"}
+    if count < 2 or count > 25:
+        return 400, {"error": "count 超出范围 (2..25)"}
+    key = nano_key()
+    if not key:
+        return 401, {"error": "没有 NanoGPT API Key"}
+
+    rule = GRID_KINDS.get(kind, "")
+    user = f"主提示词: {text}\n条数: {count}"
+    if rule:
+        user += f"\n宫格类型: {kind} —— {rule}"
+    code, data = json_call(
+        CHAT_COMPLETIONS,
+        method="POST",
+        headers=_auth(),
+        body={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": GRID_PLANNER_SYSTEM},
+                {"role": "user", "content": user},
+            ],
+        },
+        timeout=60,
+    )
+    if code >= 400 or not isinstance(data, dict):
+        return code if code >= 400 else 502, {
+            "error": extract_error(data, f"NanoGPT chat HTTP {code}"),
+            "backend": "nano-gpt",
+        }
+    choices = data.get("choices") or []
+    content = ""
+    if choices and isinstance(choices[0], dict):
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    prompts = _parse_prompt_list(content, count)
+    if not prompts:
+        return 502, {"error": "九宫格拆解未返回可用子提示词", "backend": "nano-gpt", "raw": content[:400]}
+    return 200, {
+        "ok": True,
+        "backend": "nano-gpt",
+        "model": model,
+        "kind": kind,
+        "count": len(prompts),
+        "prompts": prompts,
+    }
+
+
+def _parse_prompt_list(content: str, count: int) -> list:
+    """LLM 回的 JSON 数组; 允许被 ```json 围栏包住; 兜底按行拆。"""
+    import json as _json
+    import re as _re
+
+    raw = (content or "").strip()
+    if raw.startswith("```"):
+        raw = _re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+        raw = _re.sub(r"\s*```$", "", raw).strip()
+    items = None
+    m = _re.search(r"\[.*\]", raw, _re.S)
+    if m:
+        try:
+            parsed = _json.loads(m.group(0))
+            if isinstance(parsed, list):
+                items = [str(x).strip() for x in parsed if str(x).strip()]
+        except ValueError:
+            items = None
+    if not items:
+        lines = [_re.sub(r"^\s*[-*\d.)、]+\s*", "", ln).strip() for ln in raw.splitlines()]
+        items = [ln for ln in lines if len(ln) > 4]
+    if not items:
+        return []
+    # 不足就报少, 不静默补空; 多了截断到 count。
+    return items[:count]
+
+
+def chat_story(payload: dict):
+    """故事推演: plain chat completion, not part of the image/video graph pipeline.
+
+    NanoGPT is the only one of the six backends with a real chat/completions surface
+    (verified: BASE + /v1/chat/completions, OpenAI-compatible, mirrors GEN_IMAGES_OAI).
+    Model must be picked explicitly by the caller — no hardcoded fallback model id.
+    """
+    key = nano_key()
+    if not key:
+        return 401, {"error": "没有 NanoGPT API Key"}
+    payload = payload or {}
+    model = (payload.get("model") or "").strip()
+    if model.startswith("chat/"):
+        model = model[len("chat/"):]
+    if not model:
+        return 400, {"error": "缺少故事推演模型 id"}
+    text = (payload.get("text") or payload.get("prompt") or "").strip()
+    if not text:
+        return 400, {"error": "缺少故事/场景/角色设定文本"}
+    messages = [
+        {"role": "system", "content": STORY_DIRECTOR_SYSTEM},
+        {"role": "user", "content": text},
+    ]
+    body = {"model": model, "messages": messages}
+    if payload.get("temperature") not in (None, ""):
+        try:
+            body["temperature"] = float(payload["temperature"])
+        except (TypeError, ValueError):
+            pass
+    code, data = json_call(CHAT_COMPLETIONS, method="POST", headers=_auth(), body=body, timeout=60)
+    if code >= 400 or not isinstance(data, dict):
+        return code if code >= 400 else 502, {"error": extract_error(data, f"NanoGPT chat HTTP {code}"), "backend": "nano-gpt"}
+    choices = data.get("choices") or []
+    content = ""
+    if choices and isinstance(choices[0], dict):
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    if not content:
+        return 502, {"error": "NanoGPT chat 未返回内容", "backend": "nano-gpt", "raw": data}
+    return 200, {"ok": True, "backend": "nano-gpt", "model": model, "text": content}
 
 
 from . import register  # noqa: E402
