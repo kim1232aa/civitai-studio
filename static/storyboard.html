@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0793-seko</title>
+<title>画布 · Night Lab · v0794-seko</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -55,12 +55,15 @@
   .shot .hint{font-size:11px}
   .shot.sel{border-color:#fff;box-shadow:0 0 0 1px #fff, 0 16px 40px rgba(0,0,0,.4)}
   .asset.sel{border-color:#5ee0c5}
-  .text{width:280px;min-height:200px;border-radius:12px;padding:10px 10px 28px;background:#141418}
+  .text{width:320px;height:280px;border-radius:12px;padding:10px 10px 36px;background:#141418}
   .text .label{position:absolute;top:-20px;left:0;font-size:11px;color:#9a9aa3}
-  .text .body{font-size:12px;color:#d8d8de;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:hidden;line-height:1.45}
+  .text textarea.editor,.text .body-edit{width:100%;height:calc(100% - 4px);resize:none;border:0;background:transparent;
+    color:#d8d8de;font-size:12px;line-height:1.45;padding:0;outline:none;white-space:pre-wrap}
   .text.sel{border-color:#5ee0c5;box-shadow:0 0 0 1px #5ee0c5, 0 12px 28px rgba(0,0,0,.35)}
   .text .port.in{left:-9px;top:50%;transform:translateY(-50%)}
   .text .port.out{right:-9px;top:50%;transform:translateY(-50%)}
+  .text .acts{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:4px;z-index:4}
+  .text .acts button{flex:1;border:1px solid #3a3a44;background:#111114cc;color:#eee;border-radius:7px;padding:3px 0;font-size:10px}
   .asset .acts{position:absolute;left:6px;right:6px;bottom:30px;display:none;gap:4px;z-index:4}
   .asset.sel .acts,.asset:hover .acts{display:flex}
   .asset .acts button{flex:1;border:1px solid #3a3a44;background:#111114cc;color:#eee;border-radius:7px;padding:3px 0;font-size:10px}
@@ -90,7 +93,7 @@
   .frame-slot{display:flex;align-items:center;gap:8px;flex:1 0 100%;margin:0 0 2px;color:#9a9aa3;font-size:12px}
   .frame-slot img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #2e2e36}
   .frame-slot.missing{color:#e85d4c}
-  .prompt{width:100%;min-height:92px;max-height:160px;resize:vertical;background:#121214;border:1px solid #2a2a30;
+  .prompt{width:100%;min-height:120px;max-height:220px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
   .mention{color:var(--teal)}
@@ -108,7 +111,6 @@
   .picker button{display:flex;gap:8px;align-items:center;width:100%;background:transparent;border:0;color:#ddd;padding:6px;border-radius:8px}
   .picker button:hover{background:#222}
   .picker img{width:36px;height:36px;object-fit:cover;border-radius:6px}
-
   .rail{position:absolute;left:14px;top:170px;z-index:12;width:148px;max-height:calc(100% - 230px);overflow:auto;
     display:flex;flex-direction:column;gap:6px;padding-right:2px}
   .rail-h{font-size:11px;color:#8b8b94;padding:0 4px}
@@ -152,7 +154,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/cloud-nodes.html">LiteGraph</a>
-      <span class="stamp">v0793-seko</span>
+      <span class="stamp">v0794-seko</span>
     </div>
   </header>
   <div class="stage">
@@ -207,7 +209,7 @@
         <span class="grow"></span>
         <button class="send" id="send" title="生成">↑</button>
       </div>
-      <div class="msg" id="msg">点分镜卡编辑提示词。连上的资产会变成 @引用。</div>
+      <div class="msg" id="msg">提示词节点可直接改。反推会写完整设定，生图走现有 compile。</div>
     </aside>
   </div>
 </div>
