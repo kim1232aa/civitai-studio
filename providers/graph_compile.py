@@ -10,11 +10,30 @@ fake one-shot single generate that invents gallery/form pixels.
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Any
 
 from .capabilities import get_provider_capabilities
+
+WH_TOKEN = re.compile(r"^\s*(\d{2,5})\s*[x\u00d7*]\s*(\d{2,5})\s*$", re.I)
+
+
+def split_free_wh(payload: dict) -> None:
+    """free_wh 服务只认 width/height，`720x1280` 令牌原样透传会被下游整个丢掉。
+
+    显式 width/height 优先；非 WxH 的值（视频的 `720p` 等令牌）一律不动。
+    """
+    tok = payload.get("resolution")
+    m = WH_TOKEN.match(str(tok or ""))
+    if not m:
+        return
+    if not payload.get("width") and not payload.get("height"):
+        payload["width"] = int(m.group(1))
+        payload["height"] = int(m.group(2))
+    payload.pop("resolution", None)
+
 
 PORT_TYPES = {
     "prompt": "prompt",
@@ -376,6 +395,8 @@ def compile_graph(graph: dict | None) -> dict:
             if caps.get("resolution") == "catalog_token":
                 payload.pop("width", None)
                 payload.pop("height", None)
+            elif caps.get("resolution") == "free_wh":
+                split_free_wh(payload)
             if caps.get("lora") == "none":
                 payload.pop("loras", None)
             if caps.get("promptMax") and isinstance(payload.get("prompt"), str):
