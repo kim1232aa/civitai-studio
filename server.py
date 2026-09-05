@@ -960,7 +960,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 code, data = prov.generate(payload)
             return self._json(code, data)
-        if path == "/api/story":
+        if path in ("/api/story", "/api/story/plan"):
             from providers.nanogpt import chat_story
             code, data = chat_story(payload)
             return self._json(code, data)

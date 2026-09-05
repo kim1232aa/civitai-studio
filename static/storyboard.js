@@ -20,6 +20,7 @@
     nodes: [],
     edges: [],
     selected: null,
+    selectedEdge: null,
     drag: null,
     pan: null,
     link: null,
@@ -495,8 +496,30 @@
         b = nodeById(e.to);
       if (!a || !b) return;
       const p1 = portPos(a, "out"),
-        p2 = portPos(b, "in");
-      parts.push('<path d="' + bezier(p1.x, p1.y, p2.x, p2.y) + '" />');
+        p2 = portPos(b, "in"),
+        d = bezier(p1.x, p1.y, p2.x, p2.y),
+        selected =
+          state.selectedEdge &&
+          state.selectedEdge.from === e.from &&
+          state.selectedEdge.to === e.to;
+      parts.push(
+        '<path class="wire-hit" data-edge-from="' +
+          esc(e.from) +
+          '" data-edge-to="' +
+          esc(e.to) +
+          '" d="' +
+          d +
+          '" />',
+        '<path class="wire-line' +
+          (selected ? " sel" : "") +
+          '" data-edge-from="' +
+          esc(e.from) +
+          '" data-edge-to="' +
+          esc(e.to) +
+          '" d="' +
+          d +
+          '" />',
+      );
     });
     if (state.link && state.link.x2 != null) {
       parts.push(
@@ -713,9 +736,7 @@
     );
     if (n.kind === "text") {
       if ($("send")) $("send").disabled = false;
-      $("refs").innerHTML =
-        '<button class="chip-btn wide" type="button" data-act="gen-text">生图</button>' +
-        '<button class="chip-btn wide" type="button" data-act="rev-text">反推</button>';
+      setTextDockRefs(n);
       renderRail();
       return;
     }
@@ -783,8 +804,37 @@
     renderRail();
   }
 
+  function setTextDockRefs(n) {
+    const linked = connectedNodes(n.id).filter(isImageSource);
+    const list = assets();
+    $("refs").innerHTML =
+      '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
+      '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
+      linked
+        .concat(list.filter((a) => !linked.includes(a)))
+        .slice(0, 8)
+        .map((a) => {
+          const on = linked.some((x) => x.id === a.id) ? " on" : "";
+          return (
+            '<button class="chip' +
+            on +
+            '" type="button" data-asset="' +
+            esc(a.id) +
+            '" title="' +
+            esc(sourceTitle(a)) +
+            '">' +
+            (a.url
+              ? '<img src="' + esc(a.url) + '" alt="">'
+              : esc(sourceTitle(a).slice(0, 2))) +
+            "</button>"
+          );
+        })
+        .join("");
+  }
+
   function selectNode(id) {
     state.selected = id;
+    state.selectedEdge = null;
     renderCards();
     drawWires();
     renderDock();
@@ -868,6 +918,18 @@
     if (state.edges.some((e) => e.from === asset.id && e.to === shot.id))
       unlinkAssetFromShot(asset, shot);
     else linkAssetToShot(asset, shot);
+  }
+  function toggleAssetOnText(asset, text) {
+    if (!asset || !text || text.kind !== "text" || !isImageSource(asset)) return;
+    if (state.edges.some((e) => e.from === asset.id && e.to === text.id)) {
+      state.edges = state.edges.filter(
+        (e) => !(e.from === asset.id && e.to === text.id),
+      );
+      unmention(asset, text);
+    } else {
+      state.edges.push({ from: asset.id, to: text.id });
+      mention(asset, text);
+    }
   }
 
   function promoteResult(shot, url) {
@@ -1046,6 +1108,15 @@
       e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost")
     )
       return;
+    const edge = e.target.closest(
+      ".wire-hit[data-edge-from][data-edge-to]",
+    );
+    if (edge) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectEdge(edge.dataset.edgeFrom, edge.dataset.edgeTo);
+      return;
+    }
     const port = e.target.closest(".port");
     const card = e.target.closest(".card");
     if (port && card) {
@@ -1213,9 +1284,10 @@
     const assetBtn = e.target.closest("[data-asset]");
     if (assetBtn) {
       const asset = nodeById(assetBtn.dataset.asset);
-      const shot = nodeById(state.selected);
-      if (asset && shot) {
-        toggleAssetOnShot(asset, shot);
+      const target = nodeById(state.selected);
+      if (asset && target) {
+        if (target.kind === "shot") toggleAssetOnShot(asset, target);
+        else if (target.kind === "text") toggleAssetOnText(asset, target);
         renderCards();
         drawWires();
         renderDock();
@@ -1859,12 +1931,33 @@
   };
 
   function catalogCategory() {
+    if (state.mode === "text" || toolUi.story) return "text";
+    if (state.mode === "audio") return "audio";
     return state.mode === "video" ? "video" : "image";
+  }
+  function selectDefaultBackendForCategory(category) {
+    const el = $("backend");
+    if (!el) return "";
+    const wanted = category === "text" ? "nano-gpt" : "";
+    if (wanted && el.value !== wanted) {
+      if (!toolUi.prevBackend && el.value) toolUi.prevBackend = el.value;
+      el.value = wanted;
+    }
+    return el.value;
+  }
+  function dedupeCatalogItems(items) {
+    const seen = {};
+    return (items || []).filter((it) => {
+      const key = String((it && (it.id || it.name)) || "").trim();
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
   }
   async function loadCatalog() {
     const seq = ++state._catalogSeq;
-    const backend = $("backend") ? $("backend").value : "";
     const category = catalogCategory();
+    const backend = selectDefaultBackendForCategory(category);
     $("service").innerHTML = '<option value="">选择模型</option>';
     try {
       const r = await fetch(
@@ -1875,7 +1968,7 @@
       );
       const j = await r.json();
       if (seq !== state._catalogSeq) return;
-      const items = j.items || j.models || [];
+      const items = dedupeCatalogItems(j.items || j.models || []);
       items.slice(0, 60).forEach((it) => {
         const id = it.id || it.name || "";
         if (!id) return;
@@ -1903,6 +1996,8 @@
             (category === "text" ? "，文本/故事请用 nano-gpt" : ""),
           "warn",
         );
+      } else if ($("msg") && /目录为空|圈选消除|发送走/.test($("msg").textContent || "")) {
+        setMsg("");
       }
     } catch (_) {}
   }
@@ -1950,7 +2045,7 @@
   function mapSekoZoomToFal(slot) {
     const s = Number(slot);
     if (s <= 0) return 10; // 特写
-    if (s >= 2) return 0; // 广角
+    if (s >= 2) return 0;  // 广角
     return 5;
   }
 
@@ -2039,7 +2134,23 @@
       prompt: "back light",
     },
   ];
-  const LIGHT_PRESET_THUMBS = [];
+  const LIGHT_PRESET_THUMBS = [
+    DEMO_BOT,
+    DEMO_WORK,
+    DEMO_BED,
+    DEMO_BATH,
+    DEMO_BOT,
+    DEMO_WORK,
+    DEMO_BED,
+    DEMO_BATH,
+    DEMO_BOT,
+    DEMO_WORK,
+    DEMO_BED,
+    DEMO_BATH,
+  ];
+  function fallbackRealThumb(i) {
+    return LIGHT_PRESET_THUMBS[i % LIGHT_PRESET_THUMBS.length] || DEMO_BOT;
+  }
   const LIGHT_PRESETS = [
     {
       label: "伦勃朗光",
@@ -2164,6 +2275,18 @@
     storyText: "",
     prevBackend: "",
   };
+  const storyUi = {
+    backward: 5,
+    forward: 0,
+    aspect: "16:9",
+    modelType: "pro",
+  };
+  const STORY_ASPECTS = ["9:16", "16:9", "3:4", "4:3"];
+  const STORY_MODEL_TYPES = [
+    { id: "pro", label: "专业模型" },
+    { id: "general", label: "通用模型" },
+  ];
+  const STORY_PLAN_ENDPOINT = "/api/story/plan";
   const NINE_SHEET_GAP = 8;
   const PH_DEFAULT = "点击查看或编辑提示词";
   const PH_STORY = "输入你的故事、场景或角色设定";
@@ -2314,7 +2437,18 @@
       ".light-desc{width:100%;min-height:64px;resize:vertical;background:#121214;border:1px solid #2a2a30;border-radius:10px;padding:8px;color:#e8e8ec}",
       ".light-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}",
       ".light-presets button{border:1px solid rgba(255,255,255,.1);background:#1a1a1f;border-radius:8px;padding:0;overflow:hidden;color:#ddd}",
-      ".light-presets button .sw{display:block;height:44px}",
+      ".light-presets button img{display:block;width:100%;height:44px;object-fit:cover}",
+      ".light-presets button .lp0{filter:contrast(1.12) sepia(.2) saturate(1.15)}",
+      ".light-presets button .lp1{filter:sepia(.35) saturate(1.25) brightness(1.08)}",
+      ".light-presets button .lp2{filter:hue-rotate(190deg) saturate(1.15) brightness(.9)}",
+      ".light-presets button .lp3{filter:sepia(.45) brightness(1.08)}",
+      ".light-presets button .lp4{filter:brightness(1.35) contrast(.9)}",
+      ".light-presets button .lp5{filter:contrast(1.35) brightness(.72)}",
+      ".light-presets button .lp6{filter:saturate(1.35) hue-rotate(320deg)}",
+      ".light-presets button .lp7{filter:sepia(.35) saturate(1.4)}",
+      ".light-presets button .lp8{filter:grayscale(.25) contrast(1.45)}",
+      ".light-presets button .lp9{filter:sepia(.55) saturate(1.25) brightness(1.08)}",
+      ".light-presets button .lp10{filter:hue-rotate(170deg) saturate(1.45)}",
       ".light-presets button span{display:block;font-size:10px;padding:4px 3px 6px;line-height:1.25;white-space:normal}",
       ".light-presets button.on{border-color:#fff}",
       ".light-toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#cfcfd6}",
@@ -2335,6 +2469,14 @@
       ".nine-types button.on{background:rgba(255,255,255,.12);color:#fff}",
       ".story-skill{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:999px;border:1px solid #2e2e36;",
       "background:#1a1a1f;color:#9a9aa3;font-size:11px}",
+      ".story-controls{display:none;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 8px;color:#cfcfd6;font-size:12px}",
+      ".story-controls.show{display:flex}",
+      ".story-controls label{display:flex;align-items:center;gap:6px;background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:4px 8px}",
+      ".story-controls input[type=range]{width:86px}",
+      ".story-seg{display:flex;gap:2px;background:#1b1b1c;border-radius:999px;padding:3px}",
+      ".story-seg button{border:0;background:transparent;color:rgba(255,255,255,.65);border-radius:999px;padding:5px 8px;font-size:12px}",
+      ".story-seg button.on{background:rgba(255,255,255,.14);color:#fff}",
+      "#dock.story-mode .send{width:auto;min-width:82px;border-radius:999px;font-size:12px;font-weight:600;padding:0 12px}",
       ".modes button.off{opacity:.4;cursor:not-allowed}",
       ".shot-bar button.skip{opacity:.38}",
       ".blank-pill{min-width:72px;justify-content:center;padding:4px 14px;height:32px;cursor:pointer}",
@@ -2525,10 +2667,12 @@
         '<div class="light-row-h"><span>预设</span></div>' +
         '<div class="light-presets" id="lightPresets">' +
         LIGHT_PRESETS.map((pr, i) => {
-          const remote = LIGHT_PRESET_THUMBS[i];
-          const vis = remote
-            ? '<img src="' + remote + '" alt="">'
-            : '<i class="sw" style="background:' + pr.swatch + '"></i>';
+          const vis =
+            '<img class="lp' +
+            (i % 11) +
+            '" src="' +
+            esc(fallbackRealThumb(i)) +
+            '" alt="">';
           return (
             '<button type="button" data-lpreset="' +
             i +
@@ -2621,6 +2765,22 @@
       const refs = $("refs");
       if (refs && refs.parentNode) refs.parentNode.insertBefore(sp, refs);
     }
+    if (!$("storyControls")) {
+      const box = document.createElement("div");
+      box.id = "storyControls";
+      box.className = "story-controls";
+      box.innerHTML =
+        '<label>向后推演 <input id="storyBack" type="range" min="0" max="8" step="1" value="5"><b id="storyBackVal">5s</b></label>' +
+        '<label>向前推演 <input id="storyForward" type="range" min="0" max="8" step="1" value="0"><b id="storyForwardVal">0s</b></label>' +
+        '<div class="story-seg" id="storyAspectBtns">' +
+        STORY_ASPECTS.map((a) => '<button type="button" data-story-aspect="' + a + '">' + a + '</button>').join("") +
+        '</div>' +
+        '<div class="story-seg" id="storyModelBtns">' +
+        STORY_MODEL_TYPES.map((m) => '<button type="button" data-story-model="' + m.id + '">' + m.label + '</button>').join("") +
+        '</div>';
+      const refs = $("refs");
+      if (refs && refs.parentNode) refs.parentNode.insertBefore(box, refs);
+    }
     // da28a0d 把打光/多角度/消除/故事/切分写进左侧常驻 .tools。
     // 源站这些入口只在选中节点的 shot-bar 上，常驻轨会破坏未选中应收起。
     [
@@ -2679,28 +2839,105 @@
     hideNodeMenu();
   }
 
-  function deleteNode(id) {
-    if (!id || !nodeById(id)) return false;
+  function clearEdgeReferences(edge, removedIds) {
+    const source = nodeById(edge.from);
+    const target = nodeById(edge.to);
+    if (!target || removedIds.has(target.id)) return;
+    if (
+      source &&
+      isImageSource(source) &&
+      (target.kind === "shot" || target.kind === "text")
+    )
+      unmention(source, target);
+    if (target.kind === "shot") {
+      if (target.firstFrameId === edge.from) target.firstFrameId = "";
+      if (target.lastFrameId === edge.from) target.lastFrameId = "";
+    }
+  }
+
+  function selectEdge(from, to) {
+    if (!from || !to) return false;
+    if (!state.edges.some((e) => e.from === from && e.to === to)) return false;
     state.selected = null;
+    state.selectedEdge = { from: from, to: to };
+    renderCards();
+    drawWires();
+    renderDock();
+    return true;
+  }
+
+  function deleteEdge(from, to) {
+    if (!from || !to) return false;
+    const removed = state.edges.filter((e) => e.from === from && e.to === to);
+    if (!removed.length) return false;
+    const removedIds = new Set();
+    removed.forEach((edge) => clearEdgeReferences(edge, removedIds));
+    state.edges = state.edges.filter(
+      (e) => !(e.from === from && e.to === to),
+    );
+    state.selectedEdge = null;
+    renderCards();
+    drawWires();
+    renderDock();
+    persist();
+    setMsg("已删除连线", "ok");
+    return true;
+  }
+
+  function deleteNode(id) {
+    const target = nodeById(id);
+    if (!target) return false;
+    const removedIds = new Set([id]);
+    const pending = [target];
+    while (pending.length) {
+      const node = pending.pop();
+      if (node.kind !== "group" || !Array.isArray(node.memberIds)) continue;
+      node.memberIds.forEach((memberId) => {
+        const member = nodeById(memberId);
+        if (member && !removedIds.has(member.id)) {
+          removedIds.add(member.id);
+          pending.push(member);
+        }
+      });
+    }
+    state.selected = null;
+    state.selectedEdge = null;
     sekoSelKey = "";
     clearNodeTransientUi();
-    state.nodes = state.nodes.filter((n) => n.id !== id);
-    state.edges = state.edges.filter((e) => e.from !== id && e.to !== id);
+    state.edges
+      .filter((e) => removedIds.has(e.from) || removedIds.has(e.to))
+      .forEach((edge) => clearEdgeReferences(edge, removedIds));
+    state.nodes = state.nodes.filter((n) => !removedIds.has(n.id));
+    const incidentEdges = state.edges.filter(
+      (e) => e.from !== id && e.to !== id,
+    );
+    state.edges = incidentEdges.filter(
+      (e) => !removedIds.has(e.from) && !removedIds.has(e.to),
+    );
     state.nodes.forEach((n) => {
       if (n.kind === "group" && Array.isArray(n.memberIds)) {
         n.memberIds = n.memberIds.filter((memberId) => memberId !== id);
+        n.memberIds = n.memberIds.filter(
+          (memberId) => !removedIds.has(memberId),
+        );
         fitGroupBox(n);
       }
-      if (n.firstFrameId === id) n.firstFrameId = "";
-      if (n.lastFrameId === id) n.lastFrameId = "";
-      if (n.gridFrom === id) n.gridFrom = "";
-      if (n.fromGrid === id) n.fromGrid = "";
+      if (removedIds.has(n.firstFrameId)) n.firstFrameId = "";
+      if (removedIds.has(n.lastFrameId)) n.lastFrameId = "";
+      if (removedIds.has(n.gridFrom)) n.gridFrom = "";
+      if (removedIds.has(n.fromGrid)) n.fromGrid = "";
     });
     renderCards();
     drawWires();
     renderDock();
     persist();
-    setMsg("已删除节点", "ok");
+    const memberCount = removedIds.size - 1;
+    setMsg(
+      memberCount > 0
+        ? "已删除分组及" + memberCount + "个成员"
+        : "已删除节点",
+      "ok",
+    );
     return true;
   }
 
@@ -2745,14 +2982,24 @@
     const stage = document.querySelector(".stage");
     if (!menu || !stage) return;
     const card = e.target.closest(".card");
+    const edge = e.target.closest(
+      ".wire-hit[data-edge-from][data-edge-to]",
+    );
     const targetId = card ? card.dataset.id : "";
-    if (targetId && state.selected !== targetId) selectNode(targetId);
+    const targetEdge = edge
+      ? { from: edge.dataset.edgeFrom, to: edge.dataset.edgeTo }
+      : null;
+    if (targetEdge) selectEdge(targetEdge.from, targetEdge.to);
+    else if (targetId && state.selected !== targetId) selectNode(targetId);
     nodeMenuPoint = {
       targetId: targetId,
+      targetEdge: targetEdge,
       world: clientToWorld(e.clientX, e.clientY),
     };
     menu.querySelector('[data-nodeact="copy"]').disabled = !targetId;
-    menu.querySelector('[data-nodeact="delete"]').disabled = !targetId;
+    const deleteButton = menu.querySelector('[data-nodeact="delete"]');
+    deleteButton.disabled = !targetId && !targetEdge;
+    deleteButton.textContent = targetEdge ? "删除连线" : "删除";
     menu.querySelector('[data-nodeact="paste"]').disabled = !nodeClipboard;
     const sr = stage.getBoundingClientRect();
     menu.style.display = "block";
@@ -3079,6 +3326,7 @@
     menu.style.display = "block";
     menu.style.left = r.left - s.left + "px";
     menu.style.top = r.bottom - s.top + 6 + "px";
+    setMsg("画面切分：请选择 2×2 / 3×3 / 4×4 / 5×5", "ok");
   }
 
   function zoomLabel(slot) {
@@ -3191,6 +3439,7 @@
     placeCamPanel();
     syncCamControls();
     setCamMsg("");
+    setMsg("多角度：调整镜头后点击面板生成", "ok");
     placeShotBar();
   }
 
@@ -3544,6 +3793,9 @@
     if ($("lightKelvinVal"))
       $("lightKelvinVal").textContent = lightUi.kelvin + " K";
     if ($("lightRim")) $("lightRim").checked = !!lightUi.rim;
+    document.querySelectorAll("#lightPresets img").forEach((img, i) => {
+      img.src = shot && shotImageUrl(shot) ? shotImageUrl(shot) : fallbackRealThumb(i);
+    });
     if ($("lightDesc") && $("lightDesc") !== document.activeElement)
       $("lightDesc").value = lightUi.desc;
     if ($("lightHexRow"))
@@ -3625,6 +3877,7 @@
     placeLightPanel();
     setLightMsg("");
     syncLightControls();
+    setMsg("打光：选择光源方向、预设后点击面板生成", "ok");
     placeShotBar();
   }
   function closeLightPanel() {
@@ -4008,6 +4261,139 @@
     if (go) go.disabled = false;
   }
 
+  function storyResolution() {
+    const a = storyUi.aspect || "16:9";
+    if (a === "9:16") return "720x1280";
+    if (a === "3:4") return "768x1024";
+    if (a === "4:3") return "1024x768";
+    return "1280x720";
+  }
+  function syncStoryControls() {
+    if ($("storyBack")) $("storyBack").value = String(storyUi.backward);
+    if ($("storyForward")) $("storyForward").value = String(storyUi.forward);
+    if ($("storyBackVal")) $("storyBackVal").textContent = storyUi.backward + "s";
+    if ($("storyForwardVal")) $("storyForwardVal").textContent = storyUi.forward + "s";
+    document.querySelectorAll("[data-story-aspect]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.storyAspect === storyUi.aspect);
+    });
+    document.querySelectorAll("[data-story-model]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.storyModel === storyUi.modelType);
+    });
+  }
+  function storyFramePrompt(storyText, spec) {
+    const modelLabel = storyUi.modelType === "pro" ? "专业模型" : "通用模型";
+    return [
+      "故事导演分镜：" + spec.label + " " + spec.seconds + "s",
+      "画面比例：" + storyUi.aspect,
+      "模型档位：" + modelLabel,
+      "根据下面故事推演生成一个连续分镜画面，保持角色、场景、光线一致。",
+      storyText,
+    ].join("\n");
+  }
+  function buildStoryFrameGraph(backend, serviceId, promptText, frameId, seedShot) {
+    const source = seedShot && shotImageUrl(seedShot);
+    const nodes = [
+      { id: "p-" + frameId, op: "prompt", params: { text: promptText } },
+      {
+        id: frameId,
+        op: source ? "i2i" : "t2i",
+        params: { serviceId: serviceId, resolution: storyResolution() },
+      },
+    ];
+    const edges = [
+      {
+        from: "p-" + frameId,
+        fromPort: "prompt",
+        to: frameId,
+        toPort: "prompt",
+      },
+    ];
+    if (source) {
+      nodes.push({ id: "src-" + frameId, op: "image", params: { url: source } });
+      edges.push({
+        from: "src-" + frameId,
+        fromPort: "image",
+        to: frameId,
+        toPort: "image",
+      });
+    }
+    return { backend: backend, nodes: nodes, edges: edges };
+  }
+  function buildStoryGraph(seedShot, storyText, backend, serviceId) {
+    return storySpecs().map((spec, i) =>
+      buildStoryFrameGraph(
+        backend,
+        serviceId,
+        storyFramePrompt(storyText, spec),
+        "story-frame-" + i,
+        seedShot,
+      ),
+    );
+  }
+  function storySpecs() {
+    const out = [];
+    if (storyUi.backward > 0)
+      out.push({ id: "backward", label: "向后推演", seconds: storyUi.backward });
+    if (storyUi.forward > 0)
+      out.push({ id: "forward", label: "向前推演", seconds: storyUi.forward });
+    if (!out.length) out.push({ id: "backward", label: "向后推演", seconds: 5 });
+    return out;
+  }
+  async function planStoryText(model, text) {
+    const r = await fetch(STORY_PLAN_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backend: "nano-gpt", model: model, text: text }),
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
+    return j.text || j.story || j.content || j.message || "";
+  }
+  async function generateStoryFrames(seedShot, storyText, textNode) {
+    setMsg("故事推演：挑选图片模型…");
+    const svc = await pickNineT2i();
+    if (!svc.serviceId) throw new Error("故事推演找不到图片模型，不能只写文本空壳");
+    // buildGraph → compile → generate → poll: each story frame uses runCompiledGenerate().
+    const graphs = buildStoryGraph(seedShot, storyText, svc.backend, svc.serviceId);
+    const made = [];
+    for (let i = 0; i < graphs.length; i++) {
+      const spec = storySpecs()[i];
+      const id = uid("shot");
+      const graph = buildStoryFrameGraph(
+        svc.backend,
+        svc.serviceId,
+        storyFramePrompt(storyText, spec),
+        id,
+        seedShot,
+      );
+      const url = await runCompiledGenerate(graph, (t) =>
+        setMsg(spec.label + " " + t),
+      );
+      if (!url) throw new Error(spec.label + " 没有可预览地址");
+      const base = seedShot || textNode;
+      const node = {
+        id: id,
+        kind: "shot",
+        title: spec.label + " " + spec.seconds + "s",
+        x: base ? base.x + 720 * (i + 1) : 560 + 720 * i,
+        y: base ? base.y + 40 * i : 80,
+        url: url,
+        firstFrameId: "",
+        prompt: storyFramePrompt(storyText, spec),
+        storyFrom: (seedShot && seedShot.id) || (textNode && textNode.id) || "",
+      };
+      state.nodes.push(node);
+      if (seedShot) state.edges.push({ from: seedShot.id, to: id });
+      if (textNode) state.edges.push({ from: textNode.id, to: id });
+      promoteResult(node, url);
+      made.push(node);
+      renderCards();
+      drawWires();
+      persist();
+    }
+    return made;
+  }
+
   function applyDockChrome() {
     const ta = $("prompt");
     if (ta) {
@@ -4035,6 +4421,9 @@
       }
     }
     const isText = toolUi.story || state.mode === "text";
+    if (dock) dock.classList.toggle("story-mode", !!toolUi.story);
+    if ($("storyControls")) $("storyControls").classList.toggle("show", !!toolUi.story);
+    if (toolUi.story) syncStoryControls();
     const isVid = state.mode === "video";
     const isImg = state.mode === "image";
     if ($("duration"))
@@ -4054,13 +4443,18 @@
           : isImg
             ? "7"
             : isText
-              ? "1"
+              ? toolUi.story
+                ? "10"
+                : "1"
               : "";
     }
     if ($("storySkill"))
       $("storySkill").style.display = toolUi.story ? "inline-flex" : "none";
     if (toolUi.nine && $("aspect")) $("aspect").value = "16:9";
-    if ($("send")) $("send").title = "发送 (Cmd/Ctrl + Enter)";
+    if ($("send")) {
+      $("send").title = "发送 (Cmd/Ctrl + Enter)";
+      $("send").textContent = toolUi.story ? "生成 ◆10" : "↑";
+    }
     decorateVideoDock();
     placeDock();
     placeShotBar();
@@ -4097,7 +4491,7 @@
     applyDockChrome();
     loadStoryCatalog();
     setMsg(
-      "故事推演：文本 tab，人设 skill · 故事导演，发送走 /api/story",
+      "故事推演：LLM 写故事，再 buildGraph → compile → generate → poll 回填分镜",
       "ok",
     );
   }
@@ -4121,7 +4515,7 @@
       );
       const j = await r.json();
       if (seq !== state._catalogSeq) return;
-      (j.items || j.models || []).slice(0, 60).forEach((it) => {
+      dedupeCatalogItems(j.items || j.models || []).slice(0, 60).forEach((it) => {
         const id = it.id || it.name || "";
         const o = document.createElement("option");
         o.value = id;
@@ -4147,24 +4541,18 @@
       setMsg("故事推演必须显式选择模型，不会写死模型 id", "bad");
       return;
     }
+    const seed = nodeById(state.selected);
+    const seedShot = seed && seed.kind === "shot" ? seed : null;
     $("send").disabled = true;
     setMsg("故事导演撰写中…");
     try {
-      const r = await fetch("/api/story", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backend: "nano-gpt", model: model, text: text }),
-      });
-      const j = await r.json();
-      if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
-      const out = j.text || j.story || j.content || j.message || "";
+      const out = await planStoryText(model, text);
       if (!out) {
         setMsg("故事接口没有返回文本", "warn");
         $("send").disabled = false;
         return;
       }
-      const sel = nodeById(state.selected);
-      let node = sel && sel.kind === "text" ? sel : null;
+      let node = seed && seed.kind === "text" ? seed : null;
       if (node) {
         node.text = out;
       } else {
@@ -4172,18 +4560,25 @@
           id: uid("text"),
           kind: "text",
           title: "故事推演",
-          x: sel ? sel.x + 360 : 220,
-          y: sel ? sel.y : 24,
+          x: seed ? seed.x + 360 : 220,
+          y: seed ? seed.y : 24,
           text: out,
         };
         state.nodes.push(node);
-        if (sel) state.edges.push({ from: sel.id, to: node.id });
+        if (seed) state.edges.push({ from: seed.id, to: node.id });
       }
-      selectNode(node.id);
+      const frames = await generateStoryFrames(seedShot, out, node);
+      const last = frames[frames.length - 1] || node;
+      selectNode(last.id);
       persist();
-      setMsg("故事已写入文本节点，未走 /api/generate", "ok");
+      setMsg(
+        "故事推演完成：LLM 故事 + buildGraph → compile → generate → poll，已生成 " +
+          frames.length +
+          " 个分镜",
+        "ok",
+      );
     } catch (e) {
-      setMsg(String(e), "bad");
+      setMsg(String(e && e.message ? e.message : e), "bad");
     }
     $("send").disabled = false;
   }
@@ -4863,7 +5258,7 @@
             else ensureGroupWith([cur, id]);
             return;
           }
-          if (e.target.closest(".card,.port")) return;
+          if (e.target.closest(".card,.port,.wire-hit")) return;
           if (state.selected) selectNode(null);
         },
         true,
@@ -5120,6 +5515,30 @@
       $("eraseGo").onclick = () => generateInpaint();
       $("eraseClose").onclick = closeInpaintBar;
     }
+    const sc = $("storyControls");
+    if (sc && !sc._bound) {
+      sc._bound = true;
+      $("storyBack").addEventListener("input", () => {
+        storyUi.backward = parseInt($("storyBack").value, 10) || 0;
+        syncStoryControls();
+      });
+      $("storyForward").addEventListener("input", () => {
+        storyUi.forward = parseInt($("storyForward").value, 10) || 0;
+        syncStoryControls();
+      });
+      $("storyAspectBtns").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-story-aspect]");
+        if (!b) return;
+        storyUi.aspect = b.dataset.storyAspect;
+        syncStoryControls();
+      });
+      $("storyModelBtns").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-story-model]");
+        if (!b) return;
+        storyUi.modelType = b.dataset.storyModel;
+        syncStoryControls();
+      });
+    }
     const np = $("ninePicker");
     if (np && !np._bound) {
       np._bound = true;
@@ -5145,7 +5564,9 @@
         else if (btn.dataset.nodeact === "paste")
           pasteNode(point && point.world);
         else if (btn.dataset.nodeact === "delete")
-          deleteNode(point && point.targetId);
+          if (point && point.targetEdge)
+            deleteEdge(point.targetEdge.from, point.targetEdge.to);
+          else deleteNode(point && point.targetId);
       });
     }
     if (vp && !vp._sekoNodeMenu) {
@@ -5172,6 +5593,11 @@
             e.target.closest("textarea,input,select,[contenteditable]"))
         )
           return;
+        if (state.selectedEdge) {
+          e.preventDefault();
+          deleteEdge(state.selectedEdge.from, state.selectedEdge.to);
+          return;
+        }
         if (!state.selected) return;
         e.preventDefault();
         deleteNode(state.selected);
@@ -5489,11 +5915,13 @@
 
   bindCamOnce();
   window.__sekoSelect = selectNode;
+  window.__sekoSelectEdge = selectEdge;
   window.__sekoClassify = classifySelected;
   window.__sekoIsNineGrid = isNineGridNode;
   window.__sekoNineCellRect = nineCellRect;
   window.__sekoPanTo = panTo;
   window.__sekoDeleteNode = deleteNode;
+  window.__sekoDeleteEdge = deleteEdge;
   window.__sekoCopyNode = copyNode;
   window.__sekoPasteNode = pasteNode;
   window.__sekoState = state;
@@ -5524,7 +5952,13 @@
   applyCam();
   renderCards();
   drawWires();
-  loadCatalog();
+  if (state.selected) {
+    selectNode(state.selected);
+  } else {
+    state.mode = "text";
+    selectDefaultBackendForCategory("text");
+    renderDock();
+    loadCatalog();
+  }
   loadOuts();
-  selectNode(state.selected || "shot-1");
 })();

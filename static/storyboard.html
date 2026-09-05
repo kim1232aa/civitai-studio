@@ -43,6 +43,9 @@
     background-size:28px 28px;pointer-events:none;opacity:.55}
   svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
   svg.wires path{fill:none;stroke:#cfcfd6;stroke-width:1.4;opacity:.55}
+  svg.wires path.wire-hit{stroke:transparent;stroke-width:18;pointer-events:stroke;opacity:0}
+  svg.wires path.wire-line{pointer-events:none}
+  svg.wires path.wire-line.sel{stroke:var(--teal);stroke-width:2.8;opacity:1}
   .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28)}
   .asset{width:132px;border-radius:10px;overflow:hidden}
   .asset .thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%}

@@ -2,6 +2,7 @@
 """Static checks that storyboard.js actually implements the prompt contract."""
 
 from pathlib import Path
+import re
 
 JS = Path(__file__).resolve().parents[1] / "static" / "storyboard.js"
 src = JS.read_text(encoding="utf-8")
@@ -57,18 +58,12 @@ def main():
     )
     ok("category=cameraAngle" in src, "cameraAngle catalog filter")
     ok('op: "camera-angle"' in src, "camera-angle op")
-    ok(
-        'id: "fisheye", label: "鱼眼镜头", yaw: 0, pitch: 30, zoom: 1' in src,
-        "fisheye tab preset",
-    )
-    ok(
-        'id: "reverse", label: "反打镜头", yaw: 180, pitch: 0, zoom: 1' in src,
-        "reverse tab preset",
-    )
-    ok(
-        'id: "dutch", label: "荷兰角镜头", yaw: 45, pitch: -30, zoom: 1' in src,
-        "dutch tab preset",
-    )
+    for preset in (
+        r'id:\s*"fisheye"[\s\S]*?label:\s*"鱼眼镜头"[\s\S]*?yaw:\s*0[\s\S]*?pitch:\s*30[\s\S]*?zoom:\s*1',
+        r'id:\s*"reverse"[\s\S]*?label:\s*"反打镜头"[\s\S]*?yaw:\s*180[\s\S]*?pitch:\s*0[\s\S]*?zoom:\s*1',
+        r'id:\s*"dutch"[\s\S]*?label:\s*"荷兰角镜头"[\s\S]*?yaw:\s*45[\s\S]*?pitch:\s*-30[\s\S]*?zoom:\s*1',
+    ):
+        ok(re.search(preset, src), "camera tab preset")
     ok(
         "四宫格" in src
         and "九宫格" in src
@@ -93,7 +88,7 @@ def main():
         "伦勃朗光" in src and "光学焦散" in src and "布达佩斯大饭店" in src,
         "12 lighting preset names",
     )
-    ok("LIGHT_PRESET_THUMBS = []" in src, "no remote lighting thumbs")
+    ok("function fallbackRealThumb" in src and "LIGHT_PRESET_THUMBS = []" not in src, "lighting thumbnails are real image refs")
     ok("光源描述 (选填)" in src, "lighting desc")
     ok("简单描述你想实现的灯光效果，或情绪风格" in src, "lighting placeholder")
     ok('op: "relight"' in src, "relight op")
@@ -166,9 +161,9 @@ def main():
     ok('op: "mask"' not in src, "inpaint is single node, no mask op")
     ok("maskUrl: maskUrl" in src, "inpaint params.maskUrl")
     ok("window.__sekoUploadMask" in src, "mask upload hook name")
-    ok("输入你的故事、场景或角色设定" in src, "story placeholder")
-    ok("/api/story" in src, "story endpoint")
-    ok("skill · 故事导演" in src, "story director skill chip")
+    ok("输入你的故事、场景或角色设定" in src and "向后推演" in src and "向前推演" in src, "story placeholder and sliders")
+    ok("STORY_PLAN_ENDPOINT" in src and "buildStoryFrameGraph" in src, "story endpoint plans then generates frames")
+    ok("skill · 故事导演" in src and "生成 ◆10" in src, "story director controls")
     ok("GMLM" not in src, "do not show GMLM")
     ok("请输入九宫格生成提示词..." in src, "ninegrid placeholder")
     ok(
