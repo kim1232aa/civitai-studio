@@ -1,12 +1,18 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0791";
-  const STORE_OLD = "nl-storyboard-v0790";
+  const STORE = "nl-storyboard-v0794";
+  const STORE_OLD = "nl-storyboard-v0793";
+  // v0791-v0793 shared this single URL across all six demo nodes. If a restored
+  // session still carries it, the cache predates the prompt-node contract — drop it.
+  const STALE_SHARED_DEMO = "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
+  const DEMO_BOT = "/static/demo-bot.jpg";
+  const DEMO_WORK = "/static/demo-work.jpg";
+  const DEMO_BED = "/static/demo-bed.jpg";
+  const DEMO_BATH = "/static/demo-bath.jpg";
   const vp = $("viewport");
   const world = $("world");
   const wires = $("wires");
   const dock = $("dock");
-  const DEMO = "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
 
   const state = {
     cam: { x: 90, y: 36, s: 0.3 },
@@ -22,6 +28,83 @@
     history: [],
     railTab: "assets",
     atFilter: "",
+    _atTarget: null,
+    _pendingService: "",
+  };
+
+  const CHAR_LIB = {
+    "家用机器人": {
+      subject: "一台白色圆润的家用陪伴机器人",
+      look: "哑光白外壳，圆润流线造型，胸口有柔光屏幕",
+      outfit: "无服装，机身自带浅蓝色反光饰条",
+      scene: "现代家居室内",
+      light: "柔和顶光，暖色补光",
+      composition: "居中偏左，留白给人物",
+      frame: "中景",
+      camera: "固定镜头",
+      constraints: "外壳造型与反光饰条保持一致，禁止更改机身比例",
+      negative: "生锈，破损，多余肢体，畸变，水印",
+    },
+    "大白-居家装": {
+      subject: "机器人管家「大白」，居家便服造型",
+      look: "圆润白色外壳，佩戴米色围裙式外装甲",
+      outfit: "居家围裙外装甲，脚踝处有软垫轮",
+      scene: "温馨现代卧室",
+      light: "自然窗光，暖黄补光",
+      composition: "三分法构图，靠近窗边",
+      frame: "中近景",
+      camera: "缓慢推进",
+      constraints: "围裙颜色与家居风格统一，禁止更换材质",
+      negative: "模糊，畸变，多余肢体，水印",
+    },
+    "大白-职场装": {
+      subject: "机器人管家「大白」，职场西装造型",
+      look: "圆润白色外壳，佩戴深灰色简约职场装甲",
+      outfit: "简约西装式装甲，胸前佩戴身份牌",
+      scene: "现代办公室",
+      light: "冷白顶光，专业感强",
+      composition: "居中构图，背景虚化",
+      frame: "中景",
+      camera: "固定镜头",
+      constraints: "装甲版型不变，保持职场感配色",
+      negative: "模糊，畸变，多余肢体，水印，卡通化",
+    },
+    "扫地机器人": {
+      subject: "小型圆盘状扫地机器人",
+      look: "黑色哑光圆盘，顶部一圈激光雷达",
+      outfit: "无服装，机身贴有品牌反光条",
+      scene: "室内地面视角",
+      light: "低角度自然光",
+      composition: "低机位特写",
+      frame: "特写",
+      camera: "固定镜头",
+      constraints: "圆盘比例与雷达位置保持一致",
+      negative: "模糊，畸变，多余部件，水印",
+    },
+    "温馨现代卧室": {
+      subject: "一间温馨现代风格卧室",
+      look: "原木色家具，米白色墙面，绿植点缀",
+      outfit: "—",
+      scene: "卧室内景，靠窗床铺",
+      light: "清晨自然光透过纱帘",
+      composition: "对称构图，床铺居中",
+      frame: "全景",
+      camera: "固定镜头，轻微横摇",
+      constraints: "家具摆位与色调保持一致",
+      negative: "杂乱，畸变家具，水印",
+    },
+    "现代感洗手间": {
+      subject: "一间现代简约风格洗手间",
+      look: "灰白瓷砖，黑色金属五金件",
+      outfit: "—",
+      scene: "洗手间内景，台盆与镜面",
+      light: "顶部射灯，冷白光",
+      composition: "居中对称，镜面反射",
+      frame: "中景",
+      camera: "固定镜头",
+      constraints: "瓷砖纹理与五金件保持一致",
+      negative: "潮湿污渍，畸变，水印",
+    },
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -34,11 +117,15 @@
   function isVideoUrl(u) { return /\.(mp4|webm|mov)(\?|$)/i.test(u || ""); }
   function isImageSource(n) { return !!(n && n.url && !isVideoUrl(n.url)); }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
-  function box(n) { return n.kind === "shot" ? { w: 640, h: 360 } : { w: 132, h: 208 }; }
-  function assets() { return state.nodes.filter((n) => n.kind !== "shot"); }
+  function box(n) {
+    if (n.kind === "shot") return { w: 640, h: 360 };
+    if (n.kind === "text") return { w: 320, h: 280 };
+    return { w: 132, h: 208 };
+  }
+  function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
-  function connectedNodes(shotId) {
-    return state.edges.filter((e) => e.to === shotId).map((e) => nodeById(e.from)).filter(Boolean);
+  function connectedNodes(id) {
+    return state.edges.filter((e) => e.to === id).map((e) => nodeById(e.from)).filter(Boolean);
   }
   function connectedAssets(shotId) {
     return connectedNodes(shotId).filter(isImageSource);
@@ -56,38 +143,138 @@
     if (n.kind === "shot") return (n.title || "分镜") + "成片";
     return n.title || "资产";
   }
+  function promptOf(node) {
+    if (!node) return "";
+    return node.kind === "text" ? (node.text || "") : (node.prompt || "");
+  }
+
+  function describePrompt(asset, caption) {
+    const bible = CHAR_LIB[(asset && asset.title) || ""] || {};
+    const subject = (caption && String(caption).trim()) || bible.subject || (asset ? asset.title : "主体");
+    return [
+      "主体：" + subject,
+      "外观：" + (bible.look || "参照参考图"),
+      "服装：" + (bible.outfit || "参照参考图"),
+      "场景：" + (bible.scene || "参照参考图"),
+      "光线：" + (bible.light || "自然光"),
+      "构图：" + (bible.composition || "居中"),
+      "画面：" + (bible.frame || "中景"),
+      "运镜：" + (bible.camera || "固定镜头"),
+      "约束：" + (bible.constraints || "保持一致性，禁止畸变"),
+      "负面：" + (bible.negative || "模糊，畸变，多余肢体，水印"),
+    ].join("\n");
+  }
+
+  async function captionFromAsset(asset) {
+    if (!asset || !asset.url) return "";
+    try {
+      const r = await fetch("/api/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: asset.url }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const cap = j && (j.caption || j.text || j.prompt);
+        if (cap) return String(cap);
+      }
+    } catch (_) {}
+    try {
+      const sidecar = asset.url.replace(/\.[a-zA-Z0-9]+(\?|$)/, ".json$1");
+      if (sidecar !== asset.url) {
+        const r2 = await fetch(sidecar);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          const cap2 = j2 && (j2.caption || j2.text || j2.prompt);
+          if (cap2) return String(cap2);
+        }
+      }
+    } catch (_) {}
+    return "";
+  }
+
+  async function reverseFromImage(asset) {
+    if (!asset) return null;
+    let caption = "";
+    try { caption = await captionFromAsset(asset); } catch (_) { caption = ""; }
+    const text = describePrompt(asset, caption);
+    let node = state.nodes.find((n) => n.kind === "text" && state.edges.some((e) => e.from === asset.id && e.to === n.id));
+    if (!node) {
+      node = { id: uid("text"), kind: "text", title: "反推·" + sourceTitle(asset), x: asset.x + 220, y: asset.y, text: text };
+      state.nodes.push(node);
+      state.edges.push({ from: asset.id, to: node.id });
+    } else {
+      node.text = text;
+    }
+    selectNode(node.id);
+    renderCards(); drawWires(); renderDock(); persist();
+    return node;
+  }
+
+  async function generateFromText(node) {
+    if (!node || node.kind !== "text") return;
+    let shot = shots().find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id));
+    if (!shot) {
+      const i = shots().length;
+      shot = {
+        id: uid("shot"), kind: "shot", title: "分镜" + (i + 1),
+        x: node.x + 420, y: node.y, url: "", firstFrameId: "", prompt: "",
+      };
+      state.nodes.push(shot);
+      state.edges.push({ from: node.id, to: shot.id });
+    }
+    shot.prompt = node.text || "";
+    connectedNodes(node.id).filter(isImageSource).forEach((img) => {
+      if (!state.edges.some((e) => e.from === img.id && e.to === shot.id)) {
+        state.edges.push({ from: img.id, to: shot.id });
+      }
+      if (!shot.firstFrameId) shot.firstFrameId = img.id;
+    });
+    state.mode = "text";
+    selectNode(shot.id);
+    renderCards(); drawWires(); renderDock(); persist();
+    await generate();
+  }
 
   function loadDemo() {
-    const list = [
-      { id: "a-bot", kind: "character", title: "家用机器人", x: 48, y: 24, url: DEMO },
-      { id: "a-home", kind: "character", title: "大白-居家装", x: 48, y: 260, url: DEMO },
-      { id: "a-work", kind: "character", title: "大白-职场装", x: 48, y: 496, url: DEMO },
-      { id: "a-vac", kind: "character", title: "扫地机器人", x: 48, y: 732, url: DEMO },
-      { id: "s-bed", kind: "scene", title: "温馨现代卧室", x: 48, y: 992, url: DEMO },
-      { id: "s-bath", kind: "scene", title: "现代感洗手间", x: 48, y: 1228, url: DEMO },
+    const assetsSeed = [
+      { id: "a-bot", kind: "character", title: "家用机器人", x: 48, y: 24, url: DEMO_BOT },
+      { id: "a-home", kind: "character", title: "大白-居家装", x: 48, y: 260, url: DEMO_BOT },
+      { id: "a-work", kind: "character", title: "大白-职场装", x: 48, y: 496, url: DEMO_WORK },
+      { id: "a-vac", kind: "character", title: "扫地机器人", x: 48, y: 732, url: DEMO_BOT },
+      { id: "s-bed", kind: "scene", title: "温馨现代卧室", x: 48, y: 992, url: DEMO_BED },
+      { id: "s-bath", kind: "scene", title: "现代感洗手间", x: 48, y: 1228, url: DEMO_BATH },
     ];
+    const shotSeeds = [
+      { assets: ["a-bot", "a-home", "s-bed"] },
+      { assets: ["a-bot", "s-bed"] },
+      { assets: ["a-work"] },
+      { assets: ["a-vac"] },
+      { assets: ["s-bed"] },
+      { assets: ["s-bath"] },
+    ];
+    const textNodes = [];
     const shotNodes = [];
-    for (let i = 0; i < 6; i++) {
+    const edges = [];
+    shotSeeds.forEach((seed, i) => {
+      const shotId = "shot-" + (i + 1);
+      const textId = "text-" + (i + 1);
+      const col = i % 2, row = Math.floor(i / 2);
+      const textX = 560 + col * 900;
+      const textY = 80 + row * 430;
+      const primary = assetsSeed.find((a) => a.id === seed.assets[0]);
+      const text = describePrompt(primary, "");
+      textNodes.push({ id: textId, kind: "text", title: "分镜" + (i + 1) + "提示词", x: textX, y: textY, text: text });
       shotNodes.push({
-        id: "shot-" + (i + 1),
-        kind: "shot",
-        title: "分镜" + (i + 1),
-        x: 560 + (i % 2) * 720,
-        y: 80 + Math.floor(i / 2) * 430,
-        url: "",
-        firstFrameId: "",
-        prompt: "【镜头" + (i + 1) + "】\n场景：@温馨现代卧室\n画面：室内固定镜头，人物与家用机器人同框，晨光从窗帘缝里进来。\n运镜：固定镜头。",
+        id: shotId, kind: "shot", title: "分镜" + (i + 1),
+        x: textX + 380, y: textY, url: "", firstFrameId: seed.assets[0], prompt: text,
       });
-    }
-    state.nodes = list.concat(shotNodes);
-    state.edges = [
-      { from: "a-bot", to: "shot-1" }, { from: "a-home", to: "shot-1" }, { from: "s-bed", to: "shot-1" },
-      { from: "a-bot", to: "shot-2" }, { from: "s-bed", to: "shot-2" },
-      { from: "a-work", to: "shot-3" }, { from: "a-vac", to: "shot-4" },
-      { from: "s-bed", to: "shot-5" }, { from: "s-bath", to: "shot-6" },
-    ];
-    const s1 = nodeById("shot-1");
-    if (s1) s1.firstFrameId = "a-bot";
+      seed.assets.forEach((aid) => edges.push({ from: aid, to: shotId }));
+      edges.push({ from: seed.assets[0], to: textId });
+      edges.push({ from: textId, to: shotId });
+    });
+    state.nodes = assetsSeed.concat(textNodes, shotNodes);
+    state.edges = edges;
   }
 
   function persist() {
@@ -105,8 +292,10 @@
   }
   function restore() {
     try {
-      const p = JSON.parse(sessionStorage.getItem(STORE) || sessionStorage.getItem(STORE_OLD) || "null");
+      const raw = sessionStorage.getItem(STORE) || sessionStorage.getItem(STORE_OLD) || "null";
+      const p = JSON.parse(raw);
       if (!p || !p.nodes || !p.nodes.length) return false;
+      if (p.nodes.some((n) => n.url === STALE_SHARED_DEMO)) return false;
       state.cam = p.cam || state.cam;
       state.nodes = p.nodes;
       state.edges = p.edges || [];
@@ -162,6 +351,17 @@
 
   function cardHTML(n) {
     const sel = state.selected === n.id ? " sel" : "";
+    if (n.kind === "text") {
+      return '<div class="card text' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+        '<div class="label">✎ ' + esc(n.title || "提示词") + '</div>' +
+        '<textarea class="editor" data-text data-id="' + esc(n.id) + '" placeholder="反推或手写提示词…">' + esc(n.text || "") + '</textarea>' +
+        '<div class="acts">' +
+        '<button type="button" data-textact="rev" data-id="' + esc(n.id) + '">反推</button>' +
+        '<button type="button" data-textact="gen" data-id="' + esc(n.id) + '">生图</button>' +
+        '</div>' +
+        '<button class="port in" data-side="in" type="button">+</button>' +
+        '<button class="port out" data-side="out" type="button">+</button></div>';
+    }
     if (n.kind === "shot") {
       const media = n.url
         ? (isVideoUrl(n.url)
@@ -184,6 +384,15 @@
   function renderCards() {
     world.querySelectorAll(".card").forEach((el) => el.remove());
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
+  }
+  function moveCardEl(n) {
+    const el = world.querySelector('.card[data-id="' + n.id + '"]');
+    if (el) { el.style.left = n.x + "px"; el.style.top = n.y + "px"; }
+  }
+  function markSelected(id) {
+    world.querySelectorAll(".card.sel").forEach((el) => el.classList.remove("sel"));
+    const el = world.querySelector('.card[data-id="' + id + '"]');
+    if (el) el.classList.add("sel");
   }
 
   function renderRail() {
@@ -224,15 +433,24 @@
 
   function renderDock() {
     const n = nodeById(state.selected);
-    if (!n || n.kind !== "shot") {
+    if (!n || (n.kind !== "shot" && n.kind !== "text")) {
       dock.classList.remove("show");
       renderRail();
       return;
     }
     dock.classList.add("show");
-    $("prompt").value = n.prompt || "";
-    $("modeVid").classList.toggle("on", state.mode === "video");
-    $("modeImg").classList.toggle("on", state.mode === "image");
+    $("prompt").value = promptOf(n);
+    if ($("modeTxt")) $("modeTxt").classList.toggle("on", n.kind === "text" || state.mode === "text");
+    $("modeVid").classList.toggle("on", n.kind === "shot" && state.mode === "video");
+    $("modeImg").classList.toggle("on", n.kind === "shot" && state.mode === "image");
+    if (n.kind === "text") {
+      if ($("send")) $("send").disabled = false;
+      $("refs").innerHTML =
+        '<button class="chip-btn wide" type="button" data-act="gen-text">生图</button>' +
+        '<button class="chip-btn wide" type="button" data-act="rev-text">反推</button>';
+      renderRail();
+      return;
+    }
     const list = assets();
     const linked = connectedAssets(n.id);
     const frame = frameAsset(n);
@@ -287,21 +505,32 @@
     return null;
   }
 
-  function mention(asset, shot) {
-    shot = shot || nodeById(state.selected);
-    if (!shot || shot.kind !== "shot") return;
-    const tag = "@" + sourceTitle(asset);
-    if (!(shot.prompt || "").includes(tag)) {
-      shot.prompt = (shot.prompt ? shot.prompt + " " : "") + tag;
-      if ($("prompt") && state.selected === shot.id) $("prompt").value = shot.prompt;
+  function syncPrompt(node, value, sourceEl) {
+    if (!node) return;
+    if (node.kind === "text") node.text = value; else node.prompt = value;
+    if (state.selected === node.id) {
+      const dockTa = $("prompt");
+      if (dockTa && dockTa !== sourceEl) dockTa.value = value;
+      const cardTa = world.querySelector('textarea[data-text][data-id="' + node.id + '"]');
+      if (cardTa && cardTa !== sourceEl) cardTa.value = value;
     }
+    persist();
   }
-  function unmention(asset, shot) {
-    if (!shot) return;
+
+  function mention(asset, target) {
+    target = target || nodeById(state.selected);
+    if (!target || (target.kind !== "shot" && target.kind !== "text")) return;
     const tag = "@" + sourceTitle(asset);
-    if ((shot.prompt || "").includes(tag)) {
-      shot.prompt = shot.prompt.split(tag).join("").replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
-      if ($("prompt") && state.selected === shot.id) $("prompt").value = shot.prompt;
+    const cur = promptOf(target);
+    if (!cur.includes(tag)) syncPrompt(target, (cur ? cur + " " : "") + tag);
+  }
+  function unmention(asset, target) {
+    if (!target) return;
+    const tag = "@" + sourceTitle(asset);
+    const cur = promptOf(target);
+    if (cur.includes(tag)) {
+      const next = cur.split(tag).join("").replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+      syncPrompt(target, next);
     }
   }
   function linkAssetToShot(asset, shot) {
@@ -310,8 +539,12 @@
     if (!state.edges.some((e) => e.from === asset.id && e.to === shot.id)) {
       state.edges.push({ from: asset.id, to: shot.id });
     }
-    mention(asset, shot);
-    if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    if (asset.kind === "text") {
+      syncPrompt(shot, asset.text || "");
+    } else {
+      mention(asset, shot);
+      if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    }
   }
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
@@ -394,14 +627,26 @@
     box.classList.add("show");
   }
 
+  function handlePromptInput(ta, node) {
+    if (node) syncPrompt(node, ta.value, ta);
+    const v = ta.value || "";
+    const caret = ta.selectionStart != null ? ta.selectionStart : v.length;
+    const before = v.slice(0, caret);
+    const at = before.lastIndexOf("@");
+    if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
+      state._atTarget = ta;
+      showAtbox(before.slice(at + 1));
+    } else hideAtbox();
+  }
+
   function insertMention(asset) {
-    const shot = nodeById(state.selected);
-    if (!shot || shot.kind !== "shot") return;
-    const ta = $("prompt");
+    const target = nodeById(state.selected);
+    if (!target || (target.kind !== "shot" && target.kind !== "text")) return;
+    const ta = state._atTarget || $("prompt");
     const tag = "@" + sourceTitle(asset);
     if (ta) {
       const v = ta.value || "";
-      const caret = ta.selectionStart || v.length;
+      const caret = ta.selectionStart != null ? ta.selectionStart : v.length;
       const before = v.slice(0, caret);
       const at = before.lastIndexOf("@");
       let next;
@@ -410,12 +655,17 @@
       } else if (v.indexOf(tag) < 0) {
         next = (v ? v + " " : "") + tag;
       } else next = v;
-      shot.prompt = next;
       ta.value = next;
+      syncPrompt(target, next, ta);
     }
-    linkAssetToShot(asset, shot);
+    if (target.kind === "shot") {
+      linkAssetToShot(asset, target);
+    } else if (isImageSource(asset) && !state.edges.some((e) => e.from === asset.id && e.to === target.id)) {
+      state.edges.push({ from: asset.id, to: target.id });
+    }
     hideAtbox();
-    renderCards(); drawWires(); renderDock(); persist();
+    state._atTarget = null;
+    drawWires(); renderDock(); persist();
   }
 
   function readFileAsDataUrl(f) {
@@ -467,6 +717,18 @@
       vp.setPointerCapture(e.pointerId);
       return;
     }
+    if (e.target.closest("textarea[data-text],.text .acts")) {
+      if (card) {
+        const id = card.dataset.id;
+        if (state.selected !== id) {
+          state.selected = id;
+          markSelected(id);
+          drawWires();
+          renderDock();
+        }
+      }
+      return;
+    }
     if (card) {
       const n = nodeById(card.dataset.id);
       selectNode(n.id);
@@ -488,7 +750,7 @@
       const w = clientToWorld(e.clientX, e.clientY);
       const n = nodeById(state.drag.id);
       n.x = w.x - state.drag.dx; n.y = w.y - state.drag.dy;
-      renderCards(); drawWires(); return;
+      moveCardEl(n); drawWires(); return;
     }
     if (state.pan) {
       state.cam.x = e.clientX - state.pan.x;
@@ -502,17 +764,24 @@
       const target = hitNode(w.x, w.y);
       if (target && target.id !== state.link.from) {
         const a = nodeById(state.link.from);
-        const dst = target.kind === "shot" ? target : (a.kind === "shot" ? a : null);
-        const src = dst === target ? a : target;
-        if (src && dst && dst.kind === "shot" && src.id !== dst.id && (src.kind !== "shot" || isImageSource(src))) {
-          linkAssetToShot(src, dst);
+        let dst = null, src = null;
+        if (target.kind === "shot" && a.kind !== "shot") { dst = target; src = a; }
+        else if (a.kind === "shot" && target.kind !== "shot") { dst = a; src = target; }
+        else if (target.kind === "text" && isImageSource(a)) { dst = target; src = a; }
+        else if (a.kind === "text" && isImageSource(target)) { dst = a; src = target; }
+        if (dst && src && src.id !== dst.id && (src.kind !== "shot" || isImageSource(src))) {
+          if (dst.kind === "shot") {
+            linkAssetToShot(src, dst);
+          } else if (!state.edges.some((e2) => e2.from === src.id && e2.to === dst.id)) {
+            state.edges.push({ from: src.id, to: dst.id });
+          }
           selectNode(dst.id);
         }
       }
       state.link = null;
       drawWires(); persist();
     }
-    if (state.drag) persist();
+    if (state.drag) { renderCards(); persist(); }
     state.drag = null; state.pan = null;
     vp.classList.remove("grabbing");
   });
@@ -526,6 +795,24 @@
     state.cam.y = e.clientY - r.top - w0.y * next;
     applyCam(); persist();
   }, { passive: false });
+
+  world.addEventListener("input", (e) => {
+    const ta = e.target.closest("textarea[data-text]");
+    if (!ta) return;
+    handlePromptInput(ta, nodeById(ta.dataset.id));
+  });
+  world.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-textact]");
+    if (!btn) return;
+    const n = nodeById(btn.dataset.id);
+    if (!n) return;
+    if (btn.dataset.textact === "gen") generateFromText(n);
+    else if (btn.dataset.textact === "rev") {
+      const src = connectedNodes(n.id).find(isImageSource);
+      if (src) { setMsg("正在反推…"); reverseFromImage(src).then(() => setMsg("反推完成，提示词已更新", "ok")); }
+      else setMsg("这张提示词卡还没连图片", "warn");
+    }
+  });
 
   $("refs").addEventListener("click", (e) => {
     const frameBtn = e.target.closest("[data-frame]");
@@ -555,6 +842,16 @@
         if (asset) { selectNode(asset.id); persist(); setMsg("已收进资产库，可拖到下一镜", "ok"); }
       }
     }
+    if (act.dataset.act === "gen-text") {
+      const n = nodeById(state.selected);
+      if (n) generateFromText(n);
+    }
+    if (act.dataset.act === "rev-text") {
+      const n = nodeById(state.selected);
+      const src = n && connectedNodes(n.id).find(isImageSource);
+      if (src) { setMsg("正在反推…"); reverseFromImage(src).then(() => setMsg("反推完成，提示词已更新", "ok")); }
+      else setMsg("这张提示词卡还没连图片", "warn");
+    }
   });
 
   function dropRailOnCanvas(payload, cx, cy) {
@@ -562,12 +859,17 @@
     const hit = hitNode(w.x, w.y);
     let node = payload.node || null;
     if (!node && payload.item) node = spawnHistoryAt(payload.item, w.x - 66, w.y - 40);
-    if (node && (!hit || hit.kind !== "shot")) {
+    if (node && (!hit || (hit.kind !== "shot" && hit.kind !== "text"))) {
       node.x = w.x - 66;
       node.y = w.y - 40;
     }
     if (node && hit && hit.kind === "shot") {
       linkAssetToShot(node, hit);
+      selectNode(hit.id);
+    } else if (node && hit && hit.kind === "text" && isImageSource(node)) {
+      if (!state.edges.some((e) => e.from === node.id && e.to === hit.id)) {
+        state.edges.push({ from: node.id, to: hit.id });
+      }
       selectNode(hit.id);
     } else if (node) {
       selectNode(node.id);
@@ -695,19 +997,11 @@
   }
 
   $("prompt").addEventListener("input", () => {
-    const n = nodeById(state.selected);
-    if (n) { n.prompt = $("prompt").value; persist(); }
-    const ta = $("prompt");
-    const v = ta.value || "";
-    const caret = ta.selectionStart || v.length;
-    const before = v.slice(0, caret);
-    const at = before.lastIndexOf("@");
-    if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
-      showAtbox(before.slice(at + 1));
-    } else hideAtbox();
+    handlePromptInput($("prompt"), nodeById(state.selected));
   });
   $("modeImg").onclick = () => { state.mode = "image"; renderDock(); persist(); };
   $("modeVid").onclick = () => { state.mode = "video"; renderDock(); persist(); };
+  if ($("modeTxt")) $("modeTxt").onclick = () => { state.mode = "text"; renderDock(); persist(); };
   ["backend", "service", "duration", "aspect", "res"].forEach((id) => {
     if ($(id)) $(id).addEventListener("change", persist);
   });
@@ -726,7 +1020,7 @@
     linked.forEach((a) => nodes.push({ id: a.id, op: "image", params: { url: a.url } }));
     let op = "t2i";
     if (state.mode === "video") op = "i2v";
-    else if (linked[0]) op = "i2i";
+    else if (state.mode !== "text" && linked[0]) op = "i2i";
     const aspect = $("aspect").value || "16:9";
     const res = $("res").value === "1080P" ? (aspect === "9:16" ? "1080x1920" : "1920x1080") : (aspect === "9:16" ? "720x1280" : "1280x720");
     nodes.push({
@@ -738,7 +1032,7 @@
       },
     });
     const ref = (op === "i2v") ? frame : linked[0];
-    if (ref) edges.push({ from: ref.id, fromPort: "image", to: shot.id, toPort: "image" });
+    if (ref && op !== "t2i") edges.push({ from: ref.id, fromPort: "image", to: shot.id, toPort: "image" });
     return { backend: $("backend").value, nodes: nodes, edges: edges };
   }
 
@@ -799,7 +1093,11 @@
     $("send").disabled = false;
     renderDock();
   }
-  $("send").onclick = generate;
+  $("send").onclick = () => {
+    const n = nodeById(state.selected);
+    if (n && n.kind === "text") generateFromText(n);
+    else generate();
+  };
 
   $("btnAdd").onclick = () => {
     const n = shots().length;
@@ -812,6 +1110,28 @@
     });
     selectNode(id); persist();
   };
+  if ($("btnText")) {
+    $("btnText").onclick = () => {
+      const base = nodeById(state.selected);
+      const id = uid("text");
+      state.nodes.push({
+        id: id, kind: "text", title: "提示词",
+        x: base ? base.x + 200 : 220, y: base ? base.y : 24, text: "",
+      });
+      selectNode(id); persist();
+    };
+  }
+  if ($("btnRev")) {
+    $("btnRev").onclick = () => {
+      const n = nodeById(state.selected);
+      const src = n && isImageSource(n) ? n : (n && n.kind === "shot" ? frameAsset(n) : null);
+      if (!src) { setMsg("先选中一张图片资产再反推", "warn"); return; }
+      setMsg("正在反推…");
+      reverseFromImage(src).then((node) => {
+        if (node) setMsg("反推完成，提示词已写入文本节点", "ok");
+      });
+    };
+  }
   $("btnAuto").onclick = () => {
     assets().forEach((n, i) => { n.x = 220; n.y = 24 + i * 236; });
     shots().forEach((n, i) => { n.x = 560 + (i % 2) * 720; n.y = 80 + Math.floor(i / 2) * 430; });
