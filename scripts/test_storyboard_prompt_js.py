@@ -121,6 +121,7 @@ def main():
     ok("function applySelectionDefaults" in src, "selection defaults")
     ok('kind: "none"' in src and 'kind: "video"' in src, "state kinds")
     ok("vp._sekoDeselect" in src, "empty-canvas deselect")
+    ok(".shot-bar button.skip{" in src, "pano/lip-sync skip is greyed")
     ok("function exportInpaintMaskPng" in src, "mask png export")
     ok("function sekoCommitMask" in src, "mask upload hook for Claude")
     ok('op: "inpaint"' in src, "inpaint op")

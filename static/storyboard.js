@@ -2131,6 +2131,8 @@
       "background:#141416;border:1px solid rgba(255,255,255,.1);border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35)}",
       ".shot-bar button{border:0;background:transparent;color:#ddd;font-size:12px;padding:4px 10px;border-radius:999px;white-space:nowrap}",
       ".shot-bar button:hover,.shot-bar button.on{background:rgba(255,255,255,.08);color:#fff}",
+      ".shot-bar button.skip{opacity:.38;color:#8b8b94;cursor:not-allowed}",
+      ".shot-bar button.skip:hover{background:transparent;color:#8b8b94}",
       ".split-menu{position:absolute;z-index:23;display:none;min-width:168px;padding:6px;background:#141416;",
       "border:1px solid rgba(255,255,255,.1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.45)}",
       ".split-menu button{display:flex;justify-content:space-between;gap:16px;width:100%;border:0;background:transparent;",
