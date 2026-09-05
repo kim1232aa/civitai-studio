@@ -1140,6 +1140,78 @@
   $("btnFit").onclick = () => {
     state.cam = { x: 90, y: 36, s: 0.3 }; applyCam(); persist();
   };
+  if ($("btnUpscale")) $("btnUpscale").onclick = () => upscaleShot();
+
+  async function upscaleShot() {
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot" || !shot.url || isVideoUrl(shot.url)) {
+      setMsg("先选中一张已出图的分镜再做超清", "warn"); return;
+    }
+    const backend = $("backend").value;
+    $("btnUpscale").disabled = true;
+    setMsg("正在挑选超清模型…");
+    let serviceId;
+    try {
+      const r = await fetch("/api/catalog?backend=" + encodeURIComponent(backend) + "&category=upscale");
+      const j = await r.json();
+      const it = (j.items || j.models || [])[0];
+      serviceId = it && (it.id || it.name);
+    } catch (_) {}
+    if (!serviceId) {
+      setMsg("当前后端 " + backend + " 目录里没有超清模型", "bad");
+      $("btnUpscale").disabled = false; return;
+    }
+    const graph = {
+      backend: backend,
+      nodes: [
+        { id: "src-" + shot.id, op: "image", params: { url: shot.url } },
+        { id: shot.id, op: "upscale", params: { serviceId: serviceId } },
+      ],
+      edges: [{ from: "src-" + shot.id, fromPort: "image", to: shot.id, toPort: "image" }],
+    };
+    setMsg("校验连线…");
+    let compiled;
+    try {
+      const r = await fetch("/api/graph/compile", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(graph),
+      });
+      compiled = await r.json();
+    } catch (e) {
+      setMsg(String(e), "bad"); $("btnUpscale").disabled = false; return;
+    }
+    if (!compiled.ok) {
+      setMsg(compiled.error || "校验未通过", "bad"); $("btnUpscale").disabled = false; return;
+    }
+    const payload = compiled.payload || (compiled.stages && compiled.stages[0] && compiled.stages[0].payload);
+    setMsg("正在请求云 API…");
+    try {
+      const r = await fetch("/api/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let j = await r.json();
+      if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
+      const jobId = j.id || j.jobId || j.workflowId;
+      if (jobId && !pickUrl(j)) {
+        for (let i = 0; i < 40; i++) {
+          await new Promise((res) => setTimeout(res, 2500));
+          const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
+          if (st.error || st.status === "failed") throw new Error(st.error || "任务失败");
+          if (pickUrl(st) || st.status === "done" || st.status === "succeeded" || st.status === "completed") { j = st; break; }
+          setMsg("云端进行中 " + (i + 1) + "/40");
+        }
+      }
+      const url = pickUrl(j);
+      if (url) {
+        shot.url = url;
+        promoteResult(shot, url);
+        renderCards(); drawWires(); persist();
+        setMsg("超清完成", "ok");
+      } else setMsg("云端已返回，没有可预览地址", "warn");
+    } catch (e) { setMsg(String(e), "bad"); }
+    $("btnUpscale").disabled = false;
+  }
   $("zIn").onclick = () => { state.cam.s = Math.min(1.5, state.cam.s * 1.12); applyCam(); persist(); };
   $("zOut").onclick = () => { state.cam.s = Math.max(0.16, state.cam.s * 0.9); applyCam(); persist(); };
 

@@ -163,6 +163,45 @@ def test_rail_history_not_in_compile():
     assert_true(r.get("ok") is True, r)
     assert_true("sourceImage" not in (r.get("payload") or {}), r)
 
+
+def upscale_graph(backend, image_url="/out/shot1.jpg"):
+    return {
+        "backend": backend,
+        "nodes": [
+            {"id": "a-src", "op": "image", "params": {"url": image_url}},
+            {"id": "shot-up", "op": "upscale", "params": {"serviceId": "fal-ai/clarity-upscaler"}},
+        ],
+        "edges": [
+            {"from": "a-src", "fromPort": "image", "to": "shot-up", "toPort": "image"},
+        ],
+    }
+
+
+def test_upscale_on_fal():
+    """图片超清：fal 的 catalog 驱动 imageFields 通用支持 upscale 类目模型。"""
+    r = compile(upscale_graph("fal"))
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("sourceImage") == "/out/shot1.jpg", r)
+    assert_true("prompt" not in r["payload"], r["payload"])
+
+
+def test_upscale_blocked_on_huggingface():
+    """huggingface 的 _call_bytes 目前完全不带图，禁止静默降级成纯文生图。"""
+    r = compile(upscale_graph("huggingface"))
+    assert_true(r.get("ok") is False, r)
+    assert_true(r.get("blocked") is True, r)
+    assert_true("超清" in (r.get("error") or ""), r)
+
+
+def test_upscale_missing_image_blocked():
+    g = upscale_graph("fal")
+    g["nodes"] = [n for n in g["nodes"] if n["id"] != "a-src"]
+    g["edges"] = []
+    r = compile(g)
+    assert_true(r.get("ok") is False, r)
+    assert_true(r.get("blocked") is True, r)
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -175,6 +214,9 @@ def main():
         test_shot_result_as_image_node,
         test_first_frame_from_promoted_asset,
         test_rail_history_not_in_compile,
+        test_upscale_on_fal,
+        test_upscale_blocked_on_huggingface,
+        test_upscale_missing_image_blocked,
     ]
     failed = 0
     for fn in tests:

@@ -47,6 +47,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "sourceImage",
         "videoDuration": True,
         "videoAspect": True,
+        "upscale": False,  # only reachable via ComfyUI workflow builder, not a plain serviceId call
     },
     "fal": {
         "lora": "path",
@@ -65,6 +66,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "fal_endpoint",
         "videoDuration": True,
         "videoAspect": True,
+        "upscale": True,  # build_fal_input maps sourceImage generically off catalog imageFields
     },
     "huggingface": {
         "lora": "path",
@@ -83,6 +85,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "none",
         "videoDuration": False,
         "videoAspect": False,
+        "upscale": False,  # _call_bytes never sends an image field at all today
     },
     "modelscope-ai": {
         "lora": "hub_repo",
@@ -101,6 +104,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
+        "upscale": False,  # is_edit(mid) gate only matches image-edit ids, won't attach sourceImage for upscale models yet
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -119,6 +123,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
+        "upscale": False,  # same is_edit(mid) gate as modelscope-ai
     },
     "nano-gpt": {
         "lora": "path",
@@ -137,6 +142,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": "string_seconds",
         "videoAspect": True,
+        "upscale": True,  # _source_images() attaches sourceImage unconditionally, no model-id gate
     },
 }
 
@@ -157,6 +163,7 @@ REQUIRED_KEYS = (
     "i2v",
     "videoDuration",
     "videoAspect",
+    "upscale",
 )
 
 
@@ -181,6 +188,7 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
             "i2v": "none",
             "videoDuration": False,
             "videoAspect": False,
+            "upscale": False,
         }
     return deepcopy(base)
 
@@ -282,6 +290,12 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
             out["videoAspect"] = False
         else:
             out["videoAspect"] = bool(o["videoAspect"])
+
+    if "upscale" in o:
+        if not out.get("upscale"):
+            out["upscale"] = False
+        else:
+            out["upscale"] = bool(o["upscale"])
 
     for k in (
         "resolutionTokens",

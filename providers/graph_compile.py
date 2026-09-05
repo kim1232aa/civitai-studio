@@ -36,6 +36,8 @@ OP_SPEC = {
     # image→video main path; prompt optional; may chain from upstream image out
     "i2v": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["video"], "required": ["image"]},
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
+    # image→image, no prompt required (超清/放大)
+    "upscale": {"ins": ["prompt", "image"], "outs": ["image"], "required": ["image"]},
 }
 
 
@@ -377,6 +379,41 @@ def compile_graph(graph: dict | None) -> dict:
             candidate_sinks.append((nid, payload))
             continue
 
+        if op == "upscale":
+            if not caps.get("upscale"):
+                return _err(f"后端 {backend} 不支持图片超清", blocked=True, nodeId=nid)
+            payload = {
+                "backend": backend,
+                "serviceId": params.get("serviceId") or g.get("serviceId"),
+            }
+            if not payload["serviceId"]:
+                return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
+            img, _ = _unwrap_image(inputs["image"])
+            needs: list[str] = []
+            if _is_pending_image(inputs["image"]):
+                up = inputs["image"].get("from")
+                if up:
+                    needs.append(up)
+                img = _image_payload_value(img)
+            if not img:
+                return _err(f"upscale {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
+            payload["sourceImage"] = img
+            if inputs.get("prompt"):
+                payload["prompt"] = inputs["prompt"]
+            for k in ("scale", "resolution", "width", "height"):
+                if k in params:
+                    payload[k] = deepcopy(params[k])
+
+            values[(nid, "image")] = _stage_image_ref(nid, [])
+            image_wired_on = any(e.get("fromPort") == "image" for e in outgoing.get(nid, []))
+            stage = {"id": nid, "op": op, "payload": deepcopy(payload), "produces": "image"}
+            if needs:
+                stage["needs"] = needs
+            stages.append(stage)
+            if image_wired_on:
+                continue
+            candidate_sinks.append((nid, payload))
+            continue
 
         if op == "i2v":
             if caps.get("i2v") in (None, "none"):
