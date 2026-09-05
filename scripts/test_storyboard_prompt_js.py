@@ -110,6 +110,26 @@ def main():
         and "音频分离" in src,
         "video toolbar five labels",
     )
+    ok(
+        'reason: "本版不做视频增强（无模型、不接商汤）"' in src
+        and 'reason: "本版不去做字幕（无模型、不接商汤）"' in src
+        and 'reason: "本版不做音频分离（无模型、不接商汤）"' in src,
+        "video enhance/unsub/split are skip, not empty clicks",
+    )
+    ok("function rejectVideoTool" in src, "explicit video refuse")
+    ok("SHOTBAR_GROUP_ITEMS" in src, "group toolbar variant")
+    ok(
+        '"下载"' in src
+        and "整组执行" in src
+        and "解组" in src
+        and "function downloadGroup" in src
+        and "function runGroup" in src
+        and "function layoutGroup" in src
+        and "function ungroup" in src
+        and "function ensureGroupWith" in src,
+        "group toolbar is real: download/run/layout/ungroup/create",
+    )
+    ok('kind: "group"' in src, "group kind in classifier")
     ok("局部摘取" in src, "nine-grid toolbar")
     ok("编辑文本" in src and "blankPill" in src, "blank-node pill")
     ok("描述你想要生成的图片，或输入 @ 引用角色" in src, "image placeholder")
@@ -122,6 +142,14 @@ def main():
     ok('kind: "none"' in src and 'kind: "video"' in src, "state kinds")
     ok("vp._sekoDeselect" in src, "empty-canvas deselect")
     ok(".shot-bar button.skip{" in src, "pano/lip-sync skip is greyed")
+    ok(
+        '"btnUpscale"' in src and "btnNineGrid" in src,
+        "left-rail extras including 超清 stay hidden",
+    )
+    ok(
+        'cls.kind === "group"' in src and 'cls.kind === "nine_grid"' in src,
+        "group and nine-grid hide generate dock",
+    )
     ok("function exportInpaintMaskPng" in src, "mask png export")
     ok("function sekoCommitMask" in src, "mask upload hook for Claude")
     ok('op: "inpaint"' in src, "inpaint op")

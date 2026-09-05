@@ -2112,13 +2112,34 @@
   ];
   const SHOTBAR_VIDEO_ITEMS = [
     { id: "btnExtractFrameBar", label: "截取帧" },
-    { id: "btnVideoEnhanceBar", label: "视频增强" },
-    { id: "btnUnsubBar", label: "去字幕" },
-    { id: "btnAudioSplitBar", label: "音频分离" },
+    {
+      id: "btnVideoEnhanceBar",
+      label: "视频增强",
+      skip: true,
+      reason: "本版不做视频增强（无模型、不接商汤）",
+    },
+    {
+      id: "btnUnsubBar",
+      label: "去字幕",
+      skip: true,
+      reason: "本版不去做字幕（无模型、不接商汤）",
+    },
+    {
+      id: "btnAudioSplitBar",
+      label: "音频分离",
+      skip: true,
+      reason: "本版不做音频分离（无模型、不接商汤）",
+    },
     { id: "btnVideoBar", label: "合成视频" },
   ];
   const SHOTBAR_NINE_ITEMS = [
     { id: "btnNineCropBar", label: "局部摘取" },
+  ];
+  const SHOTBAR_GROUP_ITEMS = [
+    { id: "btnGroupDownloadBar", label: "下载" },
+    { id: "btnGroupRunBar", label: "整组执行" },
+    { id: "btnGroupLayoutBar", label: "自动布局" },
+    { id: "btnGroupUngroupBar", label: "解组" },
   ];
   let sekoSelKey = "";
 
@@ -2237,6 +2258,9 @@
       ".shot-bar button.skip{opacity:.38}",
       ".blank-pill{min-width:72px;justify-content:center;padding:4px 14px;height:32px;cursor:pointer}",
       ".dock.node-attached{transform:none;bottom:auto}",
+      ".card.group{position:absolute;border:1px dashed rgba(255,255,255,.28);background:rgba(18,18,22,.32);border-radius:18px;z-index:0;box-shadow:none}",
+      ".card.group .label{position:absolute;top:-22px;left:0;font-size:11px;color:#9a9aa3}",
+      ".card.group.sel{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.35)}",
     ].join("");
     document.head.appendChild(st);
   }
@@ -2513,6 +2537,7 @@
       "btnStory",
       "btnGridSplit",
       "btnNineGrid",
+      "btnUpscale",
     ].forEach((id) => {
       const el = $(id);
       if (el) el.style.display = "none";
@@ -2550,6 +2575,7 @@
     const n = nodeById(state.selected);
     if (!n) return { kind: "none", node: null };
     if (n.kind === "text") return { kind: "text", node: n };
+    if (n.kind === "group") return { kind: "group", node: n };
     if (n.kind !== "shot") return { kind: "asset", node: n };
     if (n.gridN || n.title === "九宫格") return { kind: "nine_grid", node: n };
     if (n.url && isVideoUrl(n.url)) return { kind: "video", node: n };
@@ -2565,9 +2591,11 @@
         ? SHOTBAR_VIDEO_ITEMS
         : kind === "nine_grid"
           ? SHOTBAR_NINE_ITEMS
-          : kind === "image"
-            ? SHOTBAR_IMAGE_ITEMS
-            : [];
+          : kind === "group"
+            ? SHOTBAR_GROUP_ITEMS
+            : kind === "image"
+              ? SHOTBAR_IMAGE_ITEMS
+              : [];
     if (bar.dataset.variant === kind && bar.childElementCount === items.length)
       return;
     bar.dataset.variant = kind || "";
@@ -2625,7 +2653,10 @@
     const stage = document.querySelector(".stage");
     if (pill) pill.style.display = "none";
     const showBar =
-      cls.kind === "image" || cls.kind === "video" || cls.kind === "nine_grid";
+      cls.kind === "image" ||
+      cls.kind === "video" ||
+      cls.kind === "nine_grid" ||
+      cls.kind === "group";
     if (!stage || !showBar) {
       bar.style.display = "none";
       if (cls.kind === "blank") placeBlankPill(cls.node);
@@ -2728,6 +2759,8 @@
       if ($("res")) $("res").value = "720P";
     } else if (cls.kind === "text" || cls.kind === "blank") {
       state.mode = "text";
+    } else if (cls.kind === "group" || cls.kind === "nine_grid") {
+      closeAllToolPanels();
     }
     if (typeof loadCatalog === "function") loadCatalog();
   }
@@ -2767,6 +2800,7 @@
     if (
       cls.kind === "none" ||
       cls.kind === "nine_grid" ||
+      cls.kind === "group" ||
       cls.kind === "asset"
     ) {
       dock.classList.remove("show");
@@ -4150,6 +4184,165 @@
     );
   }
 
+  function groupMembers(g) {
+    if (!g || !g.memberIds) return [];
+    return g.memberIds.map(nodeById).filter(Boolean);
+  }
+  function memberBox(n) {
+    if (!n) return { w: 0, h: 0 };
+    if (n.kind === "shot") return { w: 640, h: 360 };
+    if (n.kind === "text") return { w: 320, h: 280 };
+    if (n.kind === "group") return { w: n.w || 400, h: n.h || 280 };
+    return { w: 132, h: 208 };
+  }
+  function fitGroupBox(g) {
+    if (!g) return;
+    const ms = groupMembers(g);
+    const pad = 28;
+    if (!ms.length) {
+      g.w = g.w || 400;
+      g.h = g.h || 280;
+      return;
+    }
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    ms.forEach((m) => {
+      const b = memberBox(m);
+      minX = Math.min(minX, m.x);
+      minY = Math.min(minY, m.y);
+      maxX = Math.max(maxX, m.x + b.w);
+      maxY = Math.max(maxY, m.y + b.h);
+    });
+    g.x = minX - pad;
+    g.y = minY - pad - 18;
+    g.w = Math.max(160, maxX - minX + pad * 2);
+    g.h = Math.max(120, maxY - minY + pad * 2 + 18);
+  }
+  function ensureGroupWith(ids) {
+    const unique = [];
+    (ids || []).forEach((id) => {
+      if (id && unique.indexOf(id) < 0) unique.push(id);
+    });
+    const nodes = unique.map(nodeById).filter(Boolean);
+    const groups = nodes.filter((n) => n.kind === "group");
+    const members = nodes.filter((n) => n.kind !== "group");
+    groups.forEach((g) => {
+      (g.memberIds || []).forEach((id) => {
+        const m = nodeById(id);
+        if (m && m.kind !== "group" && members.indexOf(m) < 0) members.push(m);
+      });
+    });
+    if (members.length < 2) {
+      setMsg("至少选两个节点再编组（Shift+点击另一个节点）", "warn");
+      return null;
+    }
+    let g = groups[0];
+    const memberIds = members.map((m) => m.id);
+    if (g) {
+      g.memberIds = memberIds;
+      g.title = g.title || "分组";
+    } else {
+      g = {
+        id: uid("group"),
+        kind: "group",
+        title: "分组",
+        x: 0,
+        y: 0,
+        w: 400,
+        h: 280,
+        memberIds: memberIds,
+      };
+      state.nodes.unshift(g);
+    }
+    fitGroupBox(g);
+    renderCards();
+    drawWires();
+    selectNode(g.id);
+    persist();
+    setMsg("已编组 " + memberIds.length + " 个节点。Shift+点击可继续加入。", "ok");
+    return g;
+  }
+  function downloadGroup() {
+    const cls = classifySelected();
+    if (cls.kind !== "group") return;
+    const files = groupMembers(cls.node).filter((n) => n.url);
+    if (!files.length) {
+      setMsg("分组里没有可下载的成片", "warn");
+      return;
+    }
+    files.forEach((n, i) => {
+      const a = document.createElement("a");
+      a.href = n.url;
+      a.download =
+        (n.title || "group-" + (i + 1)) + (isVideoUrl(n.url) ? ".mp4" : ".png");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    setMsg("已开始下载 " + files.length + " 项", "ok");
+  }
+  async function runGroup() {
+    const cls = classifySelected();
+    if (cls.kind !== "group") return;
+    const gid = cls.node.id;
+    const shotsToRun = groupMembers(cls.node).filter((n) => n.kind === "shot");
+    if (!shotsToRun.length) {
+      setMsg("分组里没有可执行的分镜", "warn");
+      return;
+    }
+    for (let i = 0; i < shotsToRun.length; i++) {
+      selectNode(shotsToRun[i].id);
+      setMsg("整组执行 " + (i + 1) + "/" + shotsToRun.length);
+      await generate();
+    }
+    selectNode(gid);
+    setMsg("整组执行完成（" + shotsToRun.length + " 个分镜）", "ok");
+  }
+  function layoutGroup() {
+    const cls = classifySelected();
+    if (cls.kind !== "group") return;
+    const g = cls.node;
+    const ms = groupMembers(g);
+    if (!ms.length) return;
+    const gap = 40;
+    const startX = g.x + 28;
+    let x = startX;
+    let y = g.y + 36;
+    let rowH = 0;
+    const wrapAt = Math.max(startX + 640, (g.x || 0) + (g.w || 900) - 28);
+    ms.forEach((m) => {
+      const b = memberBox(m);
+      if (x > startX && x + b.w > wrapAt) {
+        x = startX;
+        y += rowH + gap;
+        rowH = 0;
+      }
+      m.x = x;
+      m.y = y;
+      x += b.w + gap;
+      rowH = Math.max(rowH, b.h);
+    });
+    fitGroupBox(g);
+    renderCards();
+    drawWires();
+    persist();
+    placeShotBar();
+    setMsg("已自动布局组成员", "ok");
+  }
+  function ungroup() {
+    const cls = classifySelected();
+    if (cls.kind !== "group") return;
+    const first = (cls.node.memberIds || [])[0];
+    state.nodes = state.nodes.filter((n) => n.id !== cls.node.id);
+    renderCards();
+    drawWires();
+    selectNode(first || null);
+    persist();
+    setMsg("已解组", "ok");
+  }
+
   async function extractVideoFrame() {
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot" || !n.url || !isVideoUrl(n.url)) {
@@ -4266,6 +4459,10 @@
     else if (id === "btnUnsubBar") rejectVideoTool("去字幕");
     else if (id === "btnAudioSplitBar") rejectVideoTool("音频分离");
     else if (id === "btnNineCropBar") cropNineGridCell();
+    else if (id === "btnGroupDownloadBar") downloadGroup();
+    else if (id === "btnGroupRunBar") runGroup();
+    else if (id === "btnGroupLayoutBar") layoutGroup();
+    else if (id === "btnGroupUngroupBar") ungroup();
   }
 
   function bindClaudeToolbar() {
@@ -4336,11 +4533,75 @@
             )
           )
             return;
+          const card = e.target.closest(".card");
+          if (
+            e.shiftKey &&
+            card &&
+            !e.target.closest("textarea,input,.port")
+          ) {
+            e.stopPropagation();
+            const id = card.dataset.id;
+            const cur = state.selected;
+            if (!cur || cur === id) selectNode(id);
+            else ensureGroupWith([cur, id]);
+            return;
+          }
           if (e.target.closest(".card,.port")) return;
           if (state.selected) selectNode(null);
         },
         true,
       );
+    }
+    if (vp && !vp._sekoGroupDrag) {
+      vp._sekoGroupDrag = true;
+      vp.addEventListener("pointerdown", (e) => {
+        const card = e.target.closest(".card");
+        if (!card) return;
+        const n = nodeById(card.dataset.id);
+        if (!n || n.kind !== "group") return;
+        groupMembers(n).forEach((m) => {
+          m._offX = m.x - n.x;
+          m._offY = m.y - n.y;
+        });
+      });
+      vp.addEventListener("pointerup", () => {
+        const n = nodeById(state.selected);
+        if (!n) return;
+        const host =
+          n.kind === "group"
+            ? n
+            : state.nodes.find(
+                (x) =>
+                  x.kind === "group" &&
+                  (x.memberIds || []).indexOf(n.id) >= 0,
+              );
+        if (!host) return;
+        fitGroupBox(host);
+        const el = world.querySelector('.card[data-id="' + host.id + '"]');
+        if (el) {
+          el.style.left = host.x + "px";
+          el.style.top = host.y + "px";
+          el.style.width = host.w + "px";
+          el.style.height = host.h + "px";
+        }
+        persist();
+      });
+    }
+    if (!document._sekoGroupHotkey) {
+      document._sekoGroupHotkey = true;
+      document.addEventListener("keydown", (e) => {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "g") return;
+        if (e.target && e.target.closest && e.target.closest("textarea,input"))
+          return;
+        e.preventDefault();
+        const n = nodeById(state.selected);
+        if (!n) return;
+        const g = state.nodes.find(
+          (x) => x.kind === "group" && (x.memberIds || []).indexOf(n.id) >= 0,
+        );
+        if (g) ensureGroupWith([g.id, n.id]);
+        else setMsg("先 Shift+点击另一个节点再 Ctrl/Cmd+G 编组", "warn");
+      });
     }
     const menu = $("gridSplitMenu");
     if (menu && !menu._bound) {
@@ -4642,12 +4903,37 @@
   const _moveCardEl = moveCardEl;
   moveCardEl = (n) => {
     _moveCardEl(n);
+    if (n && n.kind === "group") {
+      groupMembers(n).forEach((m) => {
+        if (m._offX == null || m._offY == null) return;
+        m.x = n.x + m._offX;
+        m.y = n.y + m._offY;
+        const el = world.querySelector('.card[data-id="' + m.id + '"]');
+        if (el) {
+          el.style.left = m.x + "px";
+          el.style.top = m.y + "px";
+        }
+      });
+    }
     placeShotBar();
     placeEraseBar();
     placeDock();
   };
   const _renderDock = renderDock;
   renderDock = () => {
+    const cls = classifySelected();
+    if (
+      cls.kind === "none" ||
+      cls.kind === "nine_grid" ||
+      cls.kind === "group" ||
+      cls.kind === "asset"
+    ) {
+      dock.classList.remove("show");
+      renderRail();
+      applyDockChrome();
+      placeShotBar();
+      return;
+    }
     _renderDock();
     syncDockVisibility();
     applyDockChrome();
@@ -4703,8 +4989,38 @@
     return true;
   }
 
+  const _box = box;
+  box = function box(n) {
+    if (n && n.kind === "group") return { w: n.w || 400, h: n.h || 280 };
+    return _box(n);
+  };
+  const _assets = assets;
+  assets = function assets() {
+    return _assets().filter((n) => n.kind !== "group");
+  };
   const _cardHTML = cardHTML;
   cardHTML = function cardHTML(n) {
+    if (n && n.kind === "group") {
+      const sel = state.selected === n.id ? " sel" : "";
+      return (
+        '<div class="card group' +
+        sel +
+        '" data-id="' +
+        esc(n.id) +
+        '" style="left:' +
+        n.x +
+        "px;top:" +
+        n.y +
+        "px;width:" +
+        (n.w || 400) +
+        "px;height:" +
+        (n.h || 280) +
+        'px">' +
+        '<div class="label">' +
+        esc(n.title || "分组") +
+        "</div></div>"
+      );
+    }
     return _cardHTML(n);
   };
 
