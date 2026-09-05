@@ -939,7 +939,21 @@ class Handler(BaseHTTPRequestHandler):
                 endpoint=payload.get("endpoint") or payload.get("serviceId"),
             )
             return self._json(code, data)
+        if path == "/api/graph/compile":
+            from providers.graph_compile import compile_graph
+            graph = payload.get("graph") if isinstance(payload.get("graph"), dict) else payload
+            if isinstance(graph, dict) and graph.get("backend"):
+                graph = dict(graph)
+                graph["backend"] = _alias_backend(graph["backend"])
+            result = compile_graph(graph)
+            code = 200 if result.get("ok") else 400
+            return self._json(code, result)
         if path in ("/api/generate", "/api/whatif"):
+            if path == "/api/generate":
+                from providers.graph_compile import reject_staged_generate
+                blocked = reject_staged_generate(payload)
+                if blocked:
+                    return self._json(400, blocked)
             prov = providers.resolve_from_payload(payload)
             if path == "/api/whatif":
                 code, data = prov.whatif(payload)

@@ -999,9 +999,9 @@
   $("prompt").addEventListener("input", () => {
     handlePromptInput($("prompt"), nodeById(state.selected));
   });
-  $("modeImg").onclick = () => { state.mode = "image"; renderDock(); persist(); };
-  $("modeVid").onclick = () => { state.mode = "video"; renderDock(); persist(); };
-  if ($("modeTxt")) $("modeTxt").onclick = () => { state.mode = "text"; renderDock(); persist(); };
+  $("modeImg").onclick = () => { state.mode = "image"; renderDock(); loadCatalog(); persist(); };
+  $("modeVid").onclick = () => { state.mode = "video"; renderDock(); loadCatalog(); persist(); };
+  if ($("modeTxt")) $("modeTxt").onclick = () => { state.mode = "text"; renderDock(); loadCatalog(); persist(); };
   ["backend", "service", "duration", "aspect", "res"].forEach((id) => {
     if ($(id)) $(id).addEventListener("change", persist);
   });
@@ -1026,7 +1026,7 @@
     nodes.push({
       id: shot.id, op: op,
       params: {
-        serviceId: $("service").value || (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell"),
+        serviceId: $("service").value,
         resolution: res,
         duration: parseInt($("duration").value, 10) || 5,
       },
@@ -1143,10 +1143,16 @@
   $("zIn").onclick = () => { state.cam.s = Math.min(1.5, state.cam.s * 1.12); applyCam(); persist(); };
   $("zOut").onclick = () => { state.cam.s = Math.max(0.16, state.cam.s * 0.9); applyCam(); persist(); };
 
+  function catalogCategory() {
+    return state.mode === "video" ? "video" : "image";
+  }
   async function loadCatalog() {
     $("service").innerHTML = '<option value="">默认模型</option>';
     try {
-      const r = await fetch("/api/catalog?backend=" + encodeURIComponent($("backend").value));
+      const r = await fetch(
+        "/api/catalog?backend=" + encodeURIComponent($("backend").value) +
+        "&category=" + encodeURIComponent(catalogCategory())
+      );
       const j = await r.json();
       (j.items || j.models || []).slice(0, 60).forEach((it) => {
         const id = it.id || it.name || "";
@@ -1157,6 +1163,11 @@
       if (state._pendingService) {
         $("service").value = state._pendingService;
         state._pendingService = "";
+      }
+      // Each provider ships a different model roster per category — never leave
+      // serviceId blank, or generate() would fall back across providers.
+      if (!$("service").value && $("service").options.length > 1) {
+        $("service").selectedIndex = 1;
       }
     } catch (_) {}
   }
