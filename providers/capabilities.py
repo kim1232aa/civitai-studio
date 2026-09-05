@@ -104,7 +104,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
-        "upscale": False,  # is_edit(mid) gate only matches image-edit ids, won't attach sourceImage for upscale models yet
+        "upscale": True,  # generate() now uses wants_source_image(mid) = is_edit(mid) or hub_upscale_blob(mid); 8 real upscale models confirmed via /api/catalog
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -123,7 +123,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
-        "upscale": False,  # same is_edit(mid) gate as modelscope-ai
+        "upscale": True,  # same fix, same 8 models (AI/CN share one Hub catalog)
     },
     "nano-gpt": {
         "lora": "path",

@@ -306,6 +306,19 @@ def is_edit(mid: str) -> bool:
     return "image-edit" in low or "image-to-image" in low or "/edit" in low
 
 
+def wants_source_image(mid: str) -> bool:
+    """True when the model needs an input image: edit models, or upscale models.
+
+    Upscale models (NMKDSuperscale, Ultrasharp, APISR, Controlnet-Upscaler, ...)
+    rarely have "image-edit"/"image-to-image" in their id, so is_edit() alone
+    missed them — the request would silently go out as plain text-to-image with
+    no source image attached. hub_upscale_blob() is the same id/name/tag
+    classifier the catalog already uses to put these models in the "upscale"
+    category, so this stays consistent with what the UI shows the user.
+    """
+    return is_edit(mid) or hub_upscale_blob({"id": mid})
+
+
 class ModelScopeProvider(Provider):
     def __init__(self, flavor: str):
         flavor = "cn" if flavor == "cn" else "ai"
@@ -478,7 +491,7 @@ class ModelScopeProvider(Provider):
         extra = [x for x in (payload.get("images") or []) if x]
         if img and img not in extra:
             extra = [img] + extra
-        if is_edit(mid) and extra:
+        if wants_source_image(mid) and extra:
             body["image_url"] = extra[:9]
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
         url = f"{self._base}/images/generations"

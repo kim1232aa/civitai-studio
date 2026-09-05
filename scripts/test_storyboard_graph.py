@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from providers.graph_compile import compile_graph
+from providers.modelscope import wants_source_image
 
 
 def compile(graph):
@@ -202,6 +203,43 @@ def test_upscale_missing_image_blocked():
     assert_true(r.get("blocked") is True, r)
 
 
+def test_upscale_on_modelscope_ai():
+    """图片超清：修复 is_edit(mid) 漏判后，muse/NMKDSuperscale15000G8x 等真实超清模型可用。"""
+    r = compile({**upscale_graph("modelscope-ai"), "nodes": [
+        {"id": "a-src", "op": "image", "params": {"url": "/out/shot1.jpg"}},
+        {"id": "shot-up", "op": "upscale", "params": {"serviceId": "muse/NMKDSuperscale15000G8x"}},
+    ]})
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("sourceImage") == "/out/shot1.jpg", r)
+
+
+def test_upscale_on_modelscope_cn():
+    r = compile({**upscale_graph("modelscope-cn"), "nodes": [
+        {"id": "a-src", "op": "image", "params": {"url": "/out/shot1.jpg"}},
+        {"id": "shot-up", "op": "upscale", "params": {"serviceId": "muse/NMKDSuperscale15000G8x"}},
+    ]})
+    assert_true(r.get("ok") is True, r)
+    assert_true(r["payload"].get("sourceImage") == "/out/shot1.jpg", r)
+
+
+def test_modelscope_wants_source_image_covers_real_upscale_ids():
+    """/api/catalog?backend=modelscope-ai&category=upscale 里真实的 8 个模型 id 都要命中，
+    否则会静默退化成纯文生图（这就是原来的 bug）。"""
+    real_ids = [
+        "muse/NMKDSuperscale15000G8x",
+        "muse/4xNomos8kSCHAT-L",
+        "muse/Ultrasharp4x",
+        "muse/NMKD_Siax_200k_x4",
+        "jasperai/Flux.1-dev-Controlnet-Upscaler",
+        "AI-ModelScope/Flux.1-dev-Controlnet-Upscaler",
+        "Xenova/4x_APISR_GRL_GAN_generator-onnx",
+        "Xenova/2x_APISR_RRDB_GAN_generator-onnx",
+    ]
+    for mid in real_ids:
+        assert_true(wants_source_image(mid), f"{mid} should attach sourceImage")
+    assert_true(not wants_source_image("Tongyi-MAI/Z-Image-Turbo"), "plain t2i model must stay text-only")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -217,6 +255,9 @@ def main():
         test_upscale_on_fal,
         test_upscale_blocked_on_huggingface,
         test_upscale_missing_image_blocked,
+        test_upscale_on_modelscope_ai,
+        test_upscale_on_modelscope_cn,
+        test_modelscope_wants_source_image_covers_real_upscale_ids,
     ]
     failed = 0
     for fn in tests:
