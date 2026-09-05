@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .base import Provider
+from .capabilities import get_provider_capabilities
 from .http import collect_urls, json_call, parse_job_id, save_media_urls
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -358,6 +359,27 @@ def fill_required(inp: dict, payload: dict, cap: dict | None):
             inp["resolution"] = payload.get("resolution") or "720p"
 
 
+_WH_TOKEN = re.compile(r"^\s*(\d{2,5})\s*[x\u00d7*]\s*(\d{2,5})\s*$", re.I)
+
+
+def _split_free_wh(inp: dict, payload: dict, cap: dict | None) -> None:
+    """把 `720x1280` 拆成 width/height；显式 width/height 优先。"""
+    m = _WH_TOKEN.match(str(payload.get("resolution") or ""))
+    if not m:
+        return
+    fields = set((cap or {}).get("required") or []) | set((cap or {}).get("optional") or [])
+    if "resolution" in fields:
+        return  # 服务本身收 resolution 令牌，别动
+    if payload.get("width") in (None, "") and payload.get("height") in (None, ""):
+        inp["width"] = max(16, min(2048, int(m.group(1))))
+        inp["height"] = max(16, min(2048, int(m.group(2))))
+    inp.pop("resolution", None)
+
+
+def _provider_id(payload: dict) -> str:
+    return "civitai"
+
+
 def build_workflow(payload: dict) -> dict:
     svc = None
     sid = (payload.get("serviceId") or "").strip()
@@ -422,6 +444,11 @@ def build_workflow(payload: dict) -> dict:
         inp["loras"] = loras
     cap = apply_frames(inp, payload, svc)
     fill_required(inp, payload, cap)
+    # free_wh 服务只认 width/height。`720x1280` 原样透传会被下面的 allowed 过滤掉，
+    # Civitai 回落到 catalog defaults 1024x1024（真扣费复现过）。
+    # 只拆 WxH；视频的 `720p`/`1080p` 是 catalog 令牌，cap 里声明了 resolution 的一律不动。
+    if get_provider_capabilities(_provider_id(payload)).get("resolution") == "free_wh":
+        _split_free_wh(inp, payload, cap)
     if cap:
         allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
                    "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
