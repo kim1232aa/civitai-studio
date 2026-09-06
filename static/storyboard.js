@@ -2769,7 +2769,7 @@
           const same =
             durSel.options.length === opts.length &&
             [...durSel.options].every((o, i) => o.value === opts[i]);
-          if (!same) {
+          if (!same || !inRange(now)) {
             const keep = inRange(now) ? durSel.value : "";
             durSel.replaceChildren();
             opts.forEach((t) => durSel.add(new Option(t, t)));
