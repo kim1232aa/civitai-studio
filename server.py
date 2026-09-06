@@ -432,6 +432,12 @@ class Handler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path == "/storyboard.html":
+            return self._bytes(
+                200,
+                (STATIC / "storyboard.html").read_bytes(),
+                "text/html; charset=utf-8",
+            )
         if path.startswith("/static/"):
             name = Path(path.split("/static/", 1)[1]).name
             fp = STATIC / name
