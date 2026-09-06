@@ -13,7 +13,11 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import providers
-from providers.capabilities import get_provider_capabilities
+from canvas_store import (
+    CanvasNotFoundError,
+    CanvasStore,
+    CanvasStoreError,
+)
 from providers import civitai as civitai_prov
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +30,11 @@ SITE = "https://civitai.com/api/v1"
 PORT = int(os.environ.get("PORT", "8765"))
 OUT.mkdir(parents=True, exist_ok=True)
 DOCS.mkdir(parents=True, exist_ok=True)
+
+CANVAS_STORE_PATH = Path(
+    os.environ.get("CANVAS_STORE_PATH", str(ROOT / "data" / "canvas_projects.json"))
+)
+canvas_store = CanvasStore(CANVAS_STORE_PATH)
 
 SAMPLERS = [
     "er_sde", "euler", "euler_ancestral", "euler_cfg_pp", "euler_ancestral_cfg_pp",
@@ -406,6 +415,152 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(n).decode())
 
+    @staticmethod
+    def _canvas_parts(path):
+        prefix = "/api/canvas-projects"
+        if path == prefix:
+            return []
+        if not path.startswith(prefix + "/"):
+            return None
+        return [
+            urllib.parse.unquote(part)
+            for part in path[len(prefix) + 1 :].strip("/").split("/")
+            if part
+        ]
+
+    def _canvas_error(self, exc):
+        code = 404 if isinstance(exc, CanvasNotFoundError) else 400
+        return self._json(code, {"error": str(exc)})
+
+    def _handle_canvas_get(self, path):
+        parts = self._canvas_parts(path)
+        if parts is None:
+            return False
+        try:
+            if not parts:
+                return self._json(200, {"items": canvas_store.list()})
+            project_id = parts[0]
+            if len(parts) == 1:
+                return self._json(200, {"project": canvas_store.get(project_id)})
+            if len(parts) == 2 and parts[1] == "assets":
+                project = canvas_store.get(project_id)
+                return self._json(
+                    200, {"projectId": project_id, "items": project.get("assets") or []}
+                )
+            if len(parts) == 3 and parts[1] == "canvases":
+                project = canvas_store.get(project_id)
+                canvas = next(
+                    (
+                        item
+                        for item in project.get("canvases") or []
+                        if item.get("id") == parts[2]
+                    ),
+                    None,
+                )
+                if canvas is None:
+                    raise CanvasNotFoundError("画布不存在")
+                return self._json(200, {"canvas": canvas})
+            return self._json(404, {"error": "not found"})
+        except CanvasStoreError as exc:
+            return self._canvas_error(exc)
+
+    def _handle_canvas_post(self, path, payload):
+        parts = self._canvas_parts(path)
+        if parts is None:
+            return False
+        if not isinstance(payload, dict):
+            return self._json(400, {"error": "请求内容必须是对象"})
+        try:
+            if not parts:
+                project = canvas_store.create(payload.get("name"))
+                return self._json(201, {"project": project})
+            project_id = parts[0]
+            if len(parts) == 2 and parts[1] == "duplicate":
+                project = canvas_store.duplicate(project_id, payload.get("name"))
+                return self._json(201, {"project": project})
+            if len(parts) == 2 and parts[1] == "canvases":
+                canvas = canvas_store.create_canvas(project_id, payload.get("name"))
+                return self._json(201, {"canvas": canvas})
+            if len(parts) == 2 and parts[1] == "assets":
+                asset = canvas_store.add_asset(project_id, payload.get("asset", payload))
+                return self._json(201, {"asset": asset})
+            return self._json(404, {"error": "not found"})
+        except CanvasStoreError as exc:
+            return self._canvas_error(exc)
+
+    def _handle_canvas_patch(self, path, payload, *, replace=False):
+        parts = self._canvas_parts(path)
+        if parts is None:
+            return False
+        if not isinstance(payload, dict):
+            return self._json(400, {"error": "请求内容必须是对象"})
+        try:
+            if not parts:
+                return self._json(400, {"error": "缺少项目 id"})
+            project_id = parts[0]
+            if replace:
+                # PUT = 整状态替换：body 必须正好是 assets/canvases/activeCanvasId 三件套，
+                # 缺字段/多字段/非 /state 一律 400，不许像 PATCH 那样静默合并。
+                if not (len(parts) == 2 and parts[1] == "state"):
+                    return self._json(400, {"error": "PUT 只支持整状态替换，必须指向 /state"})
+                required = {"assets", "canvases", "activeCanvasId"}
+                missing = sorted(required - set(payload))
+                extra = sorted(set(payload) - required)
+                if missing:
+                    return self._json(400, {"error": f"PUT 整状态替换缺少字段: {', '.join(missing)}"})
+                if extra:
+                    return self._json(400, {"error": f"PUT 整状态替换不接受额外字段: {', '.join(extra)}"})
+                project = canvas_store.update_state(project_id, payload)
+                return self._json(200, {"project": project})
+            if len(parts) == 1:
+                state = payload.get("state")
+                state_fields = {"assets", "canvases", "activeCanvasId"}
+                if isinstance(state, dict):
+                    update = state
+                elif any(key in payload for key in state_fields):
+                    update = {key: payload[key] for key in state_fields if key in payload}
+                else:
+                    update = None
+                if update is not None:
+                    project = canvas_store.update_state(project_id, update)
+                elif "name" in payload:
+                    project = canvas_store.rename(project_id, payload["name"])
+                else:
+                    return self._json(400, {"error": "没有可更新字段"})
+                return self._json(200, {"project": project})
+            if len(parts) == 2 and parts[1] == "state":
+                project = canvas_store.update_state(project_id, payload)
+                return self._json(200, {"project": project})
+            if len(parts) == 3 and parts[1] == "canvases":
+                canvas = canvas_store.update_canvas(project_id, parts[2], payload)
+                return self._json(200, {"canvas": canvas})
+            if len(parts) == 3 and parts[1] == "assets":
+                asset = canvas_store.update_asset(project_id, parts[2], payload)
+                return self._json(200, {"asset": asset})
+            return self._json(404, {"error": "not found"})
+        except CanvasStoreError as exc:
+            return self._canvas_error(exc)
+
+    def _handle_canvas_delete(self, path):
+        parts = self._canvas_parts(path)
+        if parts is None:
+            return False
+        try:
+            if len(parts) == 1:
+                project_id = parts[0]
+                canvas_store.delete(project_id)
+                return self._json(200, {"deleted": project_id})
+            if len(parts) == 3 and parts[1] == "canvases":
+                canvas_store.delete_canvas(parts[0], parts[2])
+                return self._json(200, {"deleted": parts[2]})
+            if len(parts) == 3 and parts[1] == "assets":
+                canvas_store.delete_asset(parts[0], parts[2])
+                return self._json(200, {"deleted": parts[2]})
+            return self._json(404, {"error": "not found"})
+        except CanvasStoreError as exc:
+            return self._canvas_error(exc)
+
+
     def _cancel_job(self, path):
         rest = urllib.parse.unquote(path.split("/api/jobs/", 1)[1])
         job_id = rest[:-7] if rest.endswith("/cancel") else rest
@@ -430,6 +585,8 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
+        if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
+            return self._handle_canvas_get(path)
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         if path == "/storyboard.html":
@@ -638,6 +795,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "invalid json"})
+        if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
+            return self._handle_canvas_post(path, payload)
         if path in ("/api/caption", "/api/upload-out"):
             from providers.media_io import handle_media_post
             code, data = handle_media_post(path, payload)
@@ -712,9 +871,46 @@ class Handler(BaseHTTPRequestHandler):
             return self._cancel_job(path)
         self._json(404, {"error": "not found"})
 
+    def do_PATCH(self):
+        try:
+            path = urllib.parse.urlparse(self.path).path
+            try:
+                payload = self._read_json()
+            except Exception:
+                return self._json(400, {"error": "invalid json"})
+            if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
+                return self._handle_canvas_patch(path, payload)
+            return self._json(404, {"error": "not found"})
+        except Exception as e:
+            print("[web] PATCH", e, flush=True)
+            try:
+                return self._json(500, {"error": "服务器出错"})
+            except Exception:
+                return
+
+    def do_PUT(self):
+        try:
+            path = urllib.parse.urlparse(self.path).path
+            try:
+                payload = self._read_json()
+            except Exception:
+                return self._json(400, {"error": "invalid json"})
+            if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
+                return self._handle_canvas_patch(path, payload, replace=True)
+            return self._json(404, {"error": "not found"})
+        except Exception as e:
+            print("[web] PUT", e, flush=True)
+            try:
+                return self._json(500, {"error": "服务器出错"})
+            except Exception:
+                return
+
+
     def do_DELETE(self):
         try:
             path = urllib.parse.urlparse(self.path).path
+            if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
+                return self._handle_canvas_delete(path)
             if path.startswith("/api/jobs/") and path.rstrip("/").endswith("/cancel"):
                 return self._cancel_job(path)
             return self._json(404, {"error": "not found"})

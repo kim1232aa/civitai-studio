@@ -22,12 +22,16 @@
   .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#5ee0c5,#3aa0ff)}
   .title{font-weight:600;font-size:13px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36vw}
   .tabs{display:flex;gap:6px;background:#16161a;border:1px solid var(--line);border-radius:999px;padding:3px;margin:0 auto}
-  .tabs a,.tabs span{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:999px;font-size:12px}
+  .tabs a,.tabs span,.tabs button{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:999px;font-size:12px}
+  .tabs button{border:0;background:transparent;cursor:pointer}
   .tabs .on{background:#222228;color:#fff}
-  .tabs .off{opacity:.45;cursor:not-allowed}
+  .tabs .off{opacity:.45;cursor:pointer}
+  .tabs .off:hover{opacity:.8}
   .mode-mini{display:flex;gap:8px;align-items:center;margin-left:auto}
   .mode-mini a{color:var(--muted);text-decoration:none;font-size:12px}
   .mode-mini a:hover{color:#fff}
+  .tool-mini{border:1px solid var(--line);background:#16161a;color:#ddd;border-radius:8px;padding:5px 9px;font-size:11px}
+  .tool-mini:hover{border-color:#4a4a52;color:#fff}
   .stamp{font:600 11px ui-monospace,Menlo,monospace;color:var(--buzz)}
   .stage{flex:1;position:relative;min-height:0;background:
     radial-gradient(1200px 600px at 10% -10%, rgba(94,224,197,.04), transparent 50%),
@@ -142,24 +146,58 @@
   .atbox button{display:flex;gap:8px;align-items:center;width:100%;background:transparent;border:0;color:#ddd;padding:6px;border-radius:8px}
   .atbox button:hover{background:#222}
   .atbox img{width:28px;height:28px;object-fit:cover;border-radius:6px}
+  .canvas-manager{position:fixed;top:62px;right:16px;z-index:60;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 78px);
+    overflow:auto;display:none;background:#151519ee;border:1px solid #35353e;border-radius:16px;padding:14px;
+    box-shadow:0 24px 80px rgba(0,0,0,.58);backdrop-filter:blur(18px)}
+  .canvas-manager.show{display:block}
+  .cm-head,.cm-controls,.cm-columns,.cm-row,.cm-asset{display:flex;align-items:center}
+  .cm-head{justify-content:space-between;gap:12px;margin-bottom:12px}
+  .cm-tabs{display:flex;gap:4px;background:#101014;border:1px solid #2a2a30;border-radius:999px;padding:3px}
+  .cm-tabs button,.cm-controls button,.cm-add,.cm-asset button{border:1px solid #303039;background:#1a1a1f;color:#cfcfd6;border-radius:8px;padding:6px 10px}
+  .cm-tabs button{border:0;border-radius:999px;padding:6px 12px;color:#9a9aa3}
+  .cm-tabs button[aria-selected="true"]{background:#27272e;color:#fff}
+  .cm-close{border:0;background:transparent;color:#aaa;font-size:22px;line-height:1}
+  .cm-controls{flex-wrap:wrap;gap:7px;padding-bottom:10px;border-bottom:1px solid #292930}
+  .cm-controls label{display:flex;align-items:center;gap:6px;color:#9a9aa3;margin-right:auto}
+  .cm-controls select{min-width:160px;max-width:280px;background:#1a1a1f;border:1px solid #303039;border-radius:8px;padding:6px 8px}
+  .cm-controls button:disabled,.cm-add:disabled{opacity:.4;cursor:not-allowed}
+  .cm-status{min-height:1.4em;padding:8px 2px;color:var(--coral);font-size:12px}
+  .cm-columns{align-items:stretch;gap:12px}
+  .cm-columns section{min-width:0;flex:1;border:1px solid #2a2a30;border-radius:12px;background:#111114;padding:10px}
+  .cm-columns h3{margin:0 0 8px;color:#eee;font-size:13px}
+  .cm-columns h3 small{font-weight:400;color:#777780;margin-left:4px}
+  .cm-columns ul{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:5px}
+  .cm-row{gap:4px;border:1px solid #27272e;border-radius:8px;padding:3px;background:#17171b}
+  .cm-row.on{border-color:var(--teal)}
+  .cm-row button:first-child{flex:1;border:0;background:transparent;color:#ddd;text-align:left;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cm-icon{border:0;background:transparent;color:#888;padding:4px 6px}
+  .cm-asset{gap:7px;border:1px solid #27272e;border-radius:8px;padding:4px;background:#17171b}
+  .cm-asset.bound{border-color:#4b9f8c}
+  .cm-asset img,.cm-thumb-empty{width:34px;height:34px;object-fit:cover;border-radius:5px;background:#202026;display:grid;place-items:center;color:#777}
+  .cm-asset span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;font-size:12px}
+  .cm-asset button{padding:4px 7px;font-size:11px}
+  .cm-empty,.cm-note{color:#777780;font-size:12px}
+  .cm-note{line-height:1.5;margin:10px 0 0}
 </style>
 </head>
 <body>
 <div class="app">
   <header>
     <div class="logo" aria-hidden="true"></div>
-    <div class="title" id="projTitle">错位人生：我的扫地机器人同事（副本）</div>
+    <div class="title" id="projTitle">未命名项目</div>
     <nav class="tabs" aria-label="工作流">
-      <span class="off" title="本版只做画布，剧本策划入口保留">剧本策划</span>
-      <a class="on" href="/storyboard.html" aria-current="page">画布</a>
-      <span class="off" title="本版不做剪辑时间线">编辑器</span>
+      <button class="off" type="button" data-workspace="story" aria-selected="false">剧本策划</button>
+      <button class="on" type="button" data-workspace="canvas" aria-selected="true">画布</button>
+      <button class="off" type="button" data-workspace="editor" aria-selected="false">编辑器</button>
     </nav>
     <div class="mode-mini">
+      <button class="tool-mini" id="canvasManagerToggle" type="button">项目</button>
       <a href="/">配方台</a>
       <a href="/cloud-nodes.html">LiteGraph</a>
       <span class="stamp">v0794-seko</span>
     </div>
   </header>
+  <div id="canvasManager" class="canvas-manager" aria-label="项目与画布管理"></div>
   <div class="stage">
     <div class="tools">
       <button class="tool" id="btnAdd" title="添加分镜">+</button>
@@ -225,5 +263,6 @@
 <input class="hidden-file" id="file" type="file" accept="image/*" />
 <div class="ghost" id="ghost" aria-hidden="true"></div>
 <script src="/static/storyboard.js"></script>
+<script src="/static/canvas_manager.js"></script>
 </body>
 </html>
