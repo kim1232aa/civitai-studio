@@ -19,6 +19,10 @@ sys.path.insert(0, str(ROOT))
 from providers import fal as fal_mod
 from providers import huggingface as hf_mod
 from providers import modelscope as ms_mod
+from providers import nanogpt as nano_mod
+
+_ORIG_NANO_TEXT = nano_mod.fetch_text_catalog
+_ORIG_NANO_JSON = nano_mod.json_call
 
 fails = []
 
@@ -217,10 +221,76 @@ ms._reach_error = lambda: "魔搭 AI 地址连不上"
 code, d = ms.whatif({"serviceId": "Qwen/Qwen-Image", "prompt": "a cat"})
 expect("连不上要 502 不是假 200", code, d, 502, "unreachable")
 
-# --- 反空壳: 三家 whatif 不许再是常量返回 -------------------------------
+ms._reach_error = lambda: None
+ms_mod.hub_model_probe = lambda mid: (401, {})
+code, d = ms.whatif({"serviceId": "ghost/unknown-model", "prompt": "x"})
+check(
+    "未知模型 401 不得 200 放行",
+    code in (400, 401) and d.get("code") in ("unknown_service", "forbidden"),
+    f"{code} {d.get('code')} {d.get('error')}",
+)
+
+print("nanogpt")
+FAKE_NANO = [
+    {
+        "id": "krea-2-turbo",
+        "category": "image",
+        "task": "text-to-image",
+        "capabilities": {"image_generation": True},
+        "supported_parameters": {"resolutions": ["1K", "2K"]},
+        "pricing": {"per_image": {"1K": 0.01}},
+    },
+    {
+        "id": "edit-model",
+        "category": "image",
+        "task": "image-to-image",
+        "needsSource": True,
+        "capabilities": {"image_to_image": True, "image_generation": False},
+        "supported_parameters": {"resolutions": ["1K"]},
+        "pricing": {},
+    },
+]
+nano_mod.nano_key = lambda: "test-key"
+nano_mod.json_call = _boom
+nano_mod.fetch_catalog = lambda force=False: list(FAKE_NANO)
+nano_mod.fetch_text_catalog = lambda force=False: []
+np = nano_mod.NanoGptProvider()
+code, d = np.whatif({})
+expect("空 serviceId 打回", code, d, 400, "missing_service")
+code, d = np.whatif({"serviceId": "image/convertImage", "prompt": "x"})
+expect("civitai 服务打回", code, d, 400, "wrong_backend")
+code, d = np.whatif({"serviceId": "ghost/not-in-catalog", "prompt": "x"})
+expect("目录外 id 打回", code, d, 400, "unknown_service")
+code, d = np.whatif({"serviceId": "krea-2-turbo"})
+expect("t2i 缺 prompt 打回", code, d, 400, "missing_prompt")
+code, d = np.whatif({"serviceId": "edit-model", "prompt": "night"})
+expect("i2i 没接图打回", code, d, 400, "missing_input_media")
+code, d = np.whatif({"serviceId": "krea-2-turbo", "prompt": "a cat"})
+expect("t2i 齐全放行", code, d, 200)
+check("whatif 不提交", True)
+
+print("nano H5 失败不覆盖缓存")
+nano_mod.fetch_text_catalog = _ORIG_NANO_TEXT
+nano_mod._CACHE["text"] = {"at": 0.0, "items": [{"id": "keep-me", "category": "text"}]}
+def _fail_json(*a, **k):
+    return 500, {"error": "down"}
+nano_mod.json_call = _fail_json
+kept = nano_mod.fetch_text_catalog(force=True)
+check("失败保留旧文本目录", kept and kept[0].get("id") == "keep-me", str(kept))
+nano_mod._CACHE["text"] = {"at": 0.0, "items": None}
+raised = False
+try:
+    nano_mod.fetch_text_catalog(force=True)
+except nano_mod.CatalogFetchError:
+    raised = True
+check("空失败抛错而不是 []", raised)
+nano_mod.json_call = _ORIG_NANO_JSON
+
+# --- 反空壳: whatif 不许再是常量返回 -------------------------------
 print("anti-stub")
 import inspect
-for mod, name in ((fal_mod, "fal"), (hf_mod, "huggingface"), (ms_mod, "modelscope")):
+
+for mod, name in ((fal_mod, "fal"), (hf_mod, "huggingface"), (ms_mod, "modelscope"), (nano_mod, "nanogpt")):
     prov_cls = [
         obj for n, obj in vars(mod).items()
         if isinstance(obj, type) and n.endswith("Provider") and obj is not mod.Provider
