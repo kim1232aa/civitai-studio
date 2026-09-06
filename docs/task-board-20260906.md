@@ -83,3 +83,4 @@
 - 所有门**空转**（无新交付物进门）；最近 G commit `8698ca6` 已过 D（fal/hf），modelscope 有洞（见 §2）。
 - 下一触发：**A 包 commit** 与 **B 收尾 commit** → D 预审结论 → 正式 D 门 → E 门（glm-5.3-flash 基线遍历先行）→ F 门 → 终审 Ekko。
 - 变更记录：本板 v1 = default 派单（gpt-5.6-sol A / grok G-2+H / deepseek D 预审 / glm-5.3-flash E / pi F / 代码任务卡）固化。
+- 变更记录：v2（17:13 大佬令重派）——实测工作树活跃写入区 = `providers/*`（civitai/fal/hf/modelscope/nanogpt/__init__/catalog_ops/media_io，17:07–17:11 连续改动）+ `server.py`（17:12 后仍在变）= **grok 密集推进区，不派新写手、不 commit、不围观**；`static/storyboard.js` 自 15:46 静止 → A 包（gpt-5.6-sol）开工令重申（先 commit 现有改动→A-1→E5 前端；A-2 等 grok catalog）；`nanogpt.py` 归属待代码声明（grok ④亦列此洞，禁双写）；pi F 门预备只读可推进 + 账本文档单独 commit；glm-5.3-flash 修基线截图 md5 雷同；**审查门（D/E/F/C）无新 commit 不叫**。
