@@ -563,6 +563,7 @@
       "on",
       n.kind === "shot" && state.mode === "image",
     );
+    syncSamplerChrome(n);
     if (n.kind === "text") {
       if ($("send")) $("send").disabled = false;
       setTextDockRefs(n);
@@ -1423,6 +1424,64 @@
     if (el.textContent || el.dataset.source) setMsg("");
   }
 
+  // ===== A2: sampler/scheduler 画布接线（值源 /api/defaults，禁手抄；仅 civitai 图片生图可见/随请求）=====
+  // B 线 storyboard.html 提供 <span id="samplerChrome" hidden> 内两下拉（id=sampler/scheduler）。
+  // 控件不在时全部 no-op（防批未合批的中间态）；enrich/buildGraph 的 key 只在真值下透传，
+  // graph_compile 白名单对缺席 key 不发明默认（grok bdb0a87 已验）。
+  function samplerEnabled(n) {
+    if (!n || n.kind !== "shot") return false;
+    const backend = $("backend");
+    if (!backend || backend.value !== "civitai") return false;
+    return state.mode === "image";
+  }
+  function syncSamplerChrome(n) {
+    const wrap = $("samplerChrome");
+    if (!wrap) return;
+    wrap.hidden = !samplerEnabled(n || nodeById(state.selected));
+  }
+  function fillSamplerOptions(select, values, wanted) {
+    if (!select || !Array.isArray(values) || !values.length) return;
+    select.replaceChildren();
+    values.forEach((value) => {
+      const option = document.createElement("option");
+      option.value = String(value);
+      option.textContent = String(value);
+      select.appendChild(option);
+    });
+    if (wanted != null && values.indexOf(wanted) >= 0)
+      select.value = String(wanted);
+  }
+  async function loadSamplerDefaults() {
+    const sampler = $("sampler");
+    const scheduler = $("scheduler");
+    if (!sampler || !scheduler) return;
+    try {
+      const response = await fetch("/api/defaults");
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const j = await response.json();
+      const defs = (j && j.defaults) || {};
+      fillSamplerOptions(sampler, j.samplers || [], defs.sampler);
+      fillSamplerOptions(scheduler, j.schedulers || [], defs.scheduler);
+    } catch (_) {
+      // 拉不到默认参数就禁用并说明，禁死 UI 假装可选。
+      [sampler, scheduler].forEach((el) => {
+        el.disabled = true;
+        el.title = "默认参数加载失败";
+      });
+    }
+  }
+  // 仅 civitai 的 t2i/i2i 随请求带所选 sampler/scheduler；其它后端/视频/文本不加 key。
+  function samplerGraphParams(op, backend) {
+    if (op !== "t2i" && op !== "i2i") return {};
+    if (backend !== "civitai") return {};
+    const out = {};
+    const sampler = $("sampler");
+    const scheduler = $("scheduler");
+    if (sampler && sampler.value) out.sampler = sampler.value;
+    if (scheduler && scheduler.value) out.scheduler = scheduler.value;
+    return out;
+  }
+
   function buildGraph(shot) {
     const frame = frameAsset(shot);
     const linked = connectedAssets(shot.id);
@@ -1462,14 +1521,18 @@
           : aspect === "9:16"
             ? "720x1280"
             : "1280x720";
+    const backend = ($("backend") && $("backend").value) || "";
     nodes.push({
       id: shot.id,
       op: op,
-      params: {
-        serviceId: $("service").value,
-        resolution: res,
-        duration: parseInt($("duration").value, 10) || 5,
-      },
+      params: Object.assign(
+        {
+          serviceId: $("service").value,
+          resolution: res,
+          duration: parseInt($("duration").value, 10) || 5,
+        },
+        samplerGraphParams(op, backend),
+      ),
     });
     const ref = op === "i2v" ? frame : linked[0];
     if (ref && op !== "t2i")
@@ -1479,7 +1542,7 @@
         to: shot.id,
         toPort: "image",
       });
-    return { backend: $("backend").value, nodes: nodes, edges: edges };
+    return { backend: backend, nodes: nodes, edges: edges };
   }
 
   function pickUrl(data) {
@@ -1872,17 +1935,28 @@
     );
     const frameFields = uniqueValues((cap && cap.frameFields) || []);
     const constraints = (cap && cap.constraints) || {};
-    const referenceLimit = frameFields.reduce((limit, field) => {
+    // P1：capabilities.json 只属 civitai 键域（raw.id=image/comfy/...）；其它后端按
+    // api-capability-落地 §3.1 走条目自带字段（operation/supportedOperations/referenceLimit/
+    // supported_parameters overlay），禁止拿 civitai id 模糊蹭。服务端已吐的字段不得被前端清零。
+    let referenceLimit = frameFields.reduce((limit, field) => {
       const rule = constraints[field];
       if (!rule || rule.type !== "array") return limit;
       const value = rule.maxItems == null ? rule.maxLength : rule.maxItems;
       return value == null ? limit : Math.max(limit || 0, Number(value));
     }, null);
+    if (referenceLimit == null && item && item.referenceLimit != null)
+      referenceLimit = item.referenceLimit;
+    if (referenceLimit == null && params.max_images != null)
+      referenceLimit = Number(params.max_images);
+    else if (referenceLimit == null && params.max_output_images != null)
+      referenceLimit = Number(params.max_output_images);
     const supportedOperations = uniqueValues(
-      (cap && cap.operation ? [cap.operation] : []).concat(
-        constraintEnum(cap, ["operation"]),
-        item && item.operation ? [item.operation] : [],
-      ),
+      (cap && cap.operation ? [cap.operation] : [])
+        .concat(constraintEnum(cap, ["operation"]))
+        .concat(item && item.operation ? [item.operation] : [])
+        .concat(
+          item && item.supportedOperations ? item.supportedOperations : [],
+        ),
     );
     const maxResolution =
       resolutions
@@ -1934,7 +2008,13 @@
       /^([24])k$/i.test(String(value).trim()),
     );
     if (highRes.length) labels.push(highRes.join(" / ").toUpperCase());
-    else if (item.maxResolution) labels.push(String(item.maxResolution));
+    // P1：catalog_token（nano 原样 token，如 square_hd/1024x1024）不是分辨率徽标，
+    // 禁止画 SQUARE_HD/1024X1024 冒充；2K/4K 命中不受影响。
+    else if (
+      item.resolutionMode !== "catalog_token" &&
+      item.maxResolution
+    )
+      labels.push(String(item.maxResolution));
     if (item.referenceLimit != null)
       labels.push("支持 " + item.referenceLimit + " 个参考");
     return labels;
@@ -5865,6 +5945,7 @@
     if (toolUi.story) return;
     await _loadCatalog();
     preferDockModel();
+    syncSamplerChrome();
   };
   const _catalogCategory = catalogCategory;
   catalogCategory = function catalogCategory() {
@@ -5970,4 +6051,5 @@
     loadCatalog();
   }
   loadOuts();
+  loadSamplerDefaults();
 })();
