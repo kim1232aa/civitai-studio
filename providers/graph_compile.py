@@ -377,7 +377,16 @@ def compile_graph(graph: dict | None) -> dict:
                     return _err(f"i2i {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
                 payload["sourceImage"] = img
 
-            for k in ("resolution", "width", "height", "steps", "cfgScale", "quantity"):
+            for k in (
+                "resolution",
+                "width",
+                "height",
+                "steps",
+                "cfgScale",
+                "quantity",
+                "sampler",
+                "scheduler",
+            ):
                 if k in params:
                     payload[k] = deepcopy(params[k])
 
@@ -579,7 +588,15 @@ def compile_graph(graph: dict | None) -> dict:
                     blocked=True,
                     nodeId=nid,
                 )
-            for k in ("resolution", "duration", "aspectRatio", "width", "height"):
+            for k in (
+                "resolution",
+                "duration",
+                "aspectRatio",
+                "width",
+                "height",
+                "sampler",
+                "scheduler",
+            ):
                 if k in params:
                     payload[k] = deepcopy(params[k])
             wired_loras = inputs.get("loras")
