@@ -1963,6 +1963,12 @@ function bindRows(root) {
 function alnum(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
 }
+// W1/A包① 全量模型可选：去掉 60/20 截断后大目录(fal 数百~上千)不许一次性硬灌卡死，
+// 首帧同步 SVC_LIST_SYNC 行，其余按帧增量 append，配 #svcFilter 真能选到最后一个。
+let _svcListToken = 0;
+let _svcListHandle = 0;
+const SVC_LIST_SYNC = 300;
+const SVC_LIST_CHUNK = 400;
 function renderServiceList(opts) {
   const locked = selectionLocked();
   // While generating / shortly after: never auto-pick another row. userPickedId wins.
@@ -1983,24 +1989,63 @@ function renderServiceList(opts) {
   const live = list.filter(x => x.status === 'available' || x.status === 'degraded');
   const other = list.filter(x => x.status !== 'available' && x.status !== 'degraded');
   const tags = svcDisambigTags(list);
-  const CAP = 60;
   const wantId = userPickedId || (selected && selected.id) || '';
   // Only accept picks still in the filtered recipe list (no APISR via findCatalogItem bypass).
   const wantItem = wantId ? (list.find(x => x.id === wantId) || null) : null;
-  let liveShow = live.slice(0, CAP);
-  if (wantItem && !liveShow.some(x => x.id === wantItem.id)) {
-    liveShow = [wantItem].concat(liveShow.filter(x => x.id !== wantItem.id)).slice(0, CAP);
+  // W1/A包①：去掉 CAP=60 截断与「只显示前 N」提示、去掉 other 截 20——全量可达末位。
+  // 大目录(fal 数百~上千)分帧增量灌入（首帧 SVC_LIST_SYNC，之后每帧 SVC_LIST_CHUNK），
+  // 不一次性硬灌卡主线程；配 #svcFilter 真能选到最后一个。
+  // 已选模型若属「其它/未上线」仍置顶可见（等价旧 pin 逻辑，只是不再因 cap 而需要）。
+  const liveRows = live.slice();
+  let otherRows = other;
+  if (wantItem) {
+    const oi = otherRows.findIndex(x => x.id === wantItem.id);
+    if (oi >= 0) {
+      liveRows.unshift(wantItem);
+      otherRows = otherRows.filter(x => x.id !== wantItem.id);
+    }
   }
-  let html = liveShow.map(it => svcRow(it, tags)).join('');
-  if (live.length > CAP) {
-    html += `<div class="svc-empty">只显示前 ${CAP} 个，共 ${live.length}。用上面搜索看其余</div>`;
+  const pieces = [];
+  if (!list.length) {
+    pieces.push('<div class="svc-empty">这个配方下还没有服务</div>');
+  } else {
+    liveRows.forEach(it => pieces.push(svcRow(it, tags)));
+    if (otherRows.length) {
+      pieces.push('<details class="svc-other"><summary>其它 / 未上线 ' + otherRows.length + '</summary>' +
+        otherRows.map(it => svcRow(it, tags)).join('') + '</details>');
+    }
   }
-  if (other.length) {
-    html += `<details class="svc-other"><summary>其它 / 未上线 ${other.length}</summary>${other.slice(0, 20).map(it => svcRow(it, tags)).join('')}</details>`;
+  const listEl = $('serviceList');
+  if (!listEl) return;
+  bindRows(listEl);
+  const token = ++_svcListToken;
+  if (_svcListHandle) { cancelAnimationFrame(_svcListHandle); _svcListHandle = 0; }
+  const finish = () => {
+    if (token !== _svcListToken) return;
+    [...listEl.querySelectorAll('.svc-row')].forEach(el => {
+      el.classList.toggle('on', !!(selected && el.getAttribute('data-id') === selected.id));
+    });
+    showPickedChip();
+    syncPickedDockIfStale();
+    updateFields();
+    if (selected) scrollSvcOnIntoView();
+  };
+  const syncN = Math.min(pieces.length, SVC_LIST_SYNC);
+  listEl.innerHTML = pieces.slice(0, syncN).join('');
+  let pIdx = syncN;
+  if (pIdx < pieces.length) {
+    const step = () => {
+      if (token !== _svcListToken) return;
+      const el = $('serviceList');
+      if (!el) { _svcListHandle = 0; return; }
+      const end = Math.min(pIdx + SVC_LIST_CHUNK, pieces.length);
+      el.insertAdjacentHTML('beforeend', pieces.slice(pIdx, end).join(''));
+      pIdx = end;
+      if (pIdx < pieces.length) _svcListHandle = requestAnimationFrame(step);
+      else { _svcListHandle = 0; finish(); }
+    };
+    _svcListHandle = requestAnimationFrame(step);
   }
-  if (!list.length) html = '<div class="svc-empty">这个配方下还没有服务</div>';
-  $('serviceList').innerHTML = html;
-  bindRows($('serviceList'));
   let pick = wantItem || null;
   if (!pick && pickDefault && !userPickedId && !locked) {
     const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'nano-gpt':['wavespeed-ai/krea-v2/turbo-lora','wavespeed-ai/krea-v2/turbo','z-image-turbo-lora','z-image-turbo']}[backend] || [];

@@ -31,7 +31,18 @@
     catalogById: {},
     _capabilitiesPromise: null,
     _catalogSeq: 0,
+    _serviceItems: [],
   };
+
+  // ===== W1/A包① 全量模型可选：目录不再 slice(0,60) =====
+  // 大目录（fal image 678 / civitai image 144…）必须能翻到并选中最后一个。
+  // #service 由 renderServiceOptions 统一渲染：同步首灌 300 个避免空窗，其余按帧
+  // 增量 append（不一次性硬灌卡主线程）；顶部 #serviceFilter 输入即按 名称/id/徽标
+  // 过滤，命中集全量可达；已选模型被过滤掉时置顶钉住，不丢选择。
+  let _svcChunkHandle = 0;
+  let _svcChunkToken = 0;
+  const SERVICE_SYNC_BUDGET = 300;
+  const SERVICE_CHUNK_SIZE = 400;
 
   function uid(prefix) {
     return prefix + "-" + Math.random().toString(36).slice(2, 8);
@@ -2719,10 +2730,125 @@
     const service = $("service");
     return state.catalogById[(service && service.value) || ""] || null;
   }
+  function svcOptionText(it) {
+    const id = (it && (it.id || it.name)) || "";
+    const badges = serviceBadges(it || {});
+    return [String((it && (it.name || id)) || id), badges.join(" · ")]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  function appendServiceOption(sel, it) {
+    const id = it && (it.id || it.name);
+    if (!id) return;
+    const o = document.createElement("option");
+    o.value = String(id);
+    o.textContent = svcOptionText(it);
+    sel.appendChild(o);
+  }
+  function svcPlaceholderOption(text) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = text || "选择模型";
+    return o;
+  }
+  function renderServiceOptions(items, placeholder) {
+    const sel = $("service");
+    if (!sel) return;
+    const list = Array.isArray(items) ? items : [];
+    state._serviceItems = list;
+    const token = ++_svcChunkToken;
+    if (_svcChunkHandle) {
+      cancelAnimationFrame(_svcChunkHandle);
+      _svcChunkHandle = 0;
+    }
+    const input = $("serviceFilter");
+    const q = (input ? input.value : "").trim().toLowerCase();
+    const keep = sel.value || "";
+    let pool = list;
+    if (q) {
+      const alnum = (s) =>
+        String(s)
+          .toLowerCase()
+          .replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
+      const blobOf = (it) => {
+        const id = (it && (it.id || it.name)) || "";
+        return (
+          String((it && (it.name || id)) || "") +
+          " " +
+          id +
+          " " +
+          ((it && (it.tags || [])) || []).join(" ") +
+          " " +
+          ((it && (it.engine)) || "") +
+          " " +
+          ((it && (it.operation)) || "")
+        ).toLowerCase();
+      };
+      const tokens = q
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => ({ raw: t, al: alnum(t) }));
+      pool = list.filter((it) => {
+        const lower = blobOf(it);
+        const lowerAl = alnum(lower);
+        return tokens.every(
+          (t) =>
+            lower.indexOf(t.raw) >= 0 ||
+            (t.al.length >= 2 && lowerAl.indexOf(t.al) >= 0),
+        );
+      });
+    }
+    const keepById = keep ? state.catalogById[keep] || null : null;
+    const keepItem =
+      keepById ||
+      list.find((it) => it && (it.id || it.name) === keep) ||
+      null;
+    sel.innerHTML = "";
+    sel.appendChild(svcPlaceholderOption(placeholder));
+    if (keepItem && pool.indexOf(keepItem) < 0) appendServiceOption(sel, keepItem);
+    const head = pool.slice(0, SERVICE_SYNC_BUDGET);
+    for (const it of head) appendServiceOption(sel, it);
+    if (!pool.length && !keepItem) {
+      const none = svcPlaceholderOption(
+        q ? "无匹配模型：清空搜索后可见全量" : placeholder,
+      );
+      none.disabled = true;
+      sel.appendChild(none);
+    } else if (pool.length > SERVICE_SYNC_BUDGET) {
+      let idx = SERVICE_SYNC_BUDGET;
+      const tryRestoreKeep = () => {
+        // keep 可能排在首灌 300 之后的增量块里：每块灌完都试一次恢复，末块必达；
+        // 只恢复仍存在于池中的选中，避免把"清空搜索"误判为丢失选择。
+        if (!keep) return;
+        try {
+          const target = $("service");
+          if (target) target.value = keep;
+        } catch (_) {}
+      };
+      const step = () => {
+        if (token !== _svcChunkToken) return;
+        const target = $("service");
+        if (!target) return;
+        const end = Math.min(idx + SERVICE_CHUNK_SIZE, pool.length);
+        for (; idx < end; idx++) appendServiceOption(target, pool[idx]);
+        tryRestoreKeep();
+        if (idx < pool.length) _svcChunkHandle = requestAnimationFrame(step);
+        else _svcChunkHandle = 0;
+      };
+      _svcChunkHandle = requestAnimationFrame(step);
+    }
+    if (keep) {
+      try {
+        sel.value = keep;
+      } catch (_) {}
+    }
+  }
   async function loadCatalog() {
     const seq = ++state._catalogSeq;
     const category = catalogCategory();
     const backend = selectDefaultBackendForCategory(category);
+    const svcFilterEl = $("serviceFilter");
+    if (svcFilterEl && svcFilterEl.value) svcFilterEl.value = "";
     $("service").innerHTML = '<option value="">选择模型</option>';
     try {
       const [response, capabilities] = await Promise.all([
@@ -2747,17 +2873,9 @@
         const id = item.id || item.name || "";
         if (id) state.catalogById[id] = item;
       });
-      items.slice(0, 60).forEach((it) => {
-        const id = it.id || it.name || "";
-        if (!id) return;
-        const o = document.createElement("option");
-        o.value = id;
-        const badges = serviceBadges(it);
-        o.textContent = [it.name || id, badges.join(" · ")]
-          .filter(Boolean)
-          .join(" · ");
-        $("service").appendChild(o);
-      });
+      // W1/A包①：全量灌入（fal image 678 / civitai image 144 一个不砍），
+      // 大目录由 renderServiceOptions 分帧增量渲染，配 #serviceFilter 搜索可达末位。
+      renderServiceOptions(items, "选择模型");
       if (state._pendingService) {
         $("service").value = state._pendingService;
         state._pendingService = "";
@@ -2795,6 +2913,20 @@
       resetScopedMsg();
       applyServiceConstraints();
       persist();
+    });
+  }
+  const svcFilterInput = $("serviceFilter");
+  if (svcFilterInput && !svcFilterInput.dataset.svcFilterBound) {
+    svcFilterInput.dataset.svcFilterBound = "1";
+    let svcFilterTimer = null;
+    svcFilterInput.addEventListener("input", () => {
+      clearTimeout(svcFilterTimer);
+      svcFilterTimer = setTimeout(() => {
+        const list = state._serviceItems || [];
+        if (!list.length) return;
+        renderServiceOptions(list, toolUi.story ? "选择故事模型" : "选择模型");
+        applyServiceConstraints();
+      }, 120);
     });
   }
   async function loadOuts() {
@@ -5388,15 +5520,10 @@
       );
       const j = await r.json();
       if (seq !== state._catalogSeq) return;
-      dedupeCatalogItems(j.items || j.models || [])
-        .slice(0, 60)
-        .forEach((it) => {
-          const id = it.id || it.name || "";
-          const o = document.createElement("option");
-          o.value = id;
-          o.textContent = it.name || id;
-          $("service").appendChild(o);
-        });
+      const storyItems = dedupeCatalogItems(j.items || j.models || []);
+      const sf = $("serviceFilter");
+      if (sf && sf.value) sf.value = "";
+      renderServiceOptions(storyItems, "选择故事模型");
       if (!$("service").value && $("service").options.length > 1)
         $("service").selectedIndex = 1;
     } catch (_) {}
