@@ -352,49 +352,27 @@
         url: DEMO_BATH,
       },
     ];
-    const shotSeeds = [
-      { assets: ["a-bot", "a-home", "s-bed"] },
-      { assets: ["a-bot", "s-bed"] },
-      { assets: ["a-work"] },
-      { assets: ["a-vac"] },
-      { assets: ["s-bed"] },
-      { assets: ["s-bath"] },
+    const textSeeds = [
+      { title: "分镜1提示词", asset: "a-bot", x: 560, y: 80 },
+      { title: "分镜2提示词", asset: "a-work", x: 560, y: 410 },
+      { title: "分镜3提示词", asset: "s-bed", x: 560, y: 740 },
     ];
     const textNodes = [];
-    const shotNodes = [];
     const edges = [];
-    shotSeeds.forEach((seed, i) => {
-      const shotId = "shot-" + (i + 1);
+    textSeeds.forEach((seed, i) => {
       const textId = "text-" + (i + 1);
-      const col = i % 2,
-        row = Math.floor(i / 2);
-      const textX = 560 + col * 900;
-      const textY = 80 + row * 430;
-      const primary = assetsSeed.find((a) => a.id === seed.assets[0]);
-      const text = describePrompt(primary, "");
+      const primary = assetsSeed.find((a) => a.id === seed.asset);
       textNodes.push({
         id: textId,
         kind: "text",
-        title: "分镜" + (i + 1) + "提示词",
-        x: textX,
-        y: textY,
-        text: text,
+        title: seed.title,
+        x: seed.x,
+        y: seed.y,
+        text: describePrompt(primary, ""),
       });
-      shotNodes.push({
-        id: shotId,
-        kind: "shot",
-        title: "分镜" + (i + 1),
-        x: textX + 380,
-        y: textY,
-        url: "",
-        firstFrameId: seed.assets[0],
-        prompt: text,
-      });
-      seed.assets.forEach((aid) => edges.push({ from: aid, to: shotId }));
-      edges.push({ from: seed.assets[0], to: textId });
-      edges.push({ from: textId, to: shotId });
+      edges.push({ from: seed.asset, to: textId });
     });
-    state.nodes = assetsSeed.concat(textNodes, shotNodes);
+    state.nodes = assetsSeed.concat(textNodes);
     state.edges = edges;
   }
 
@@ -1575,10 +1553,22 @@
     if ($(id)) $(id).addEventListener("change", persist);
   });
 
-  function setMsg(t, cls) {
+  function setMsg(t, cls, source) {
     if (!$("msg")) return;
-    $("msg").textContent = t;
-    $("msg").className = "msg" + (cls ? " " + cls : "");
+    const el = $("msg");
+    el.textContent = t || "";
+    el.className = "msg" + (cls ? " " + cls : "");
+    el.dataset.source = source || (t ? "general" : "");
+  }
+  function clearMsgFrom(source) {
+    const el = $("msg");
+    if (el && el.dataset.source === source) setMsg("");
+  }
+  function resetScopedMsg() {
+    const el = $("msg");
+    if (!el) return;
+    const src = el.dataset.source || "";
+    if (src && src !== "general") setMsg("");
   }
 
   function buildGraph(shot) {
@@ -2135,18 +2125,18 @@
     },
   ];
   const LIGHT_PRESET_THUMBS = [
-    DEMO_BOT,
-    DEMO_WORK,
-    DEMO_BED,
-    DEMO_BATH,
-    DEMO_BOT,
-    DEMO_WORK,
-    DEMO_BED,
-    DEMO_BATH,
-    DEMO_BOT,
-    DEMO_WORK,
-    DEMO_BED,
-    DEMO_BATH,
+    "/static/light-preset-01.jpg",
+    "/static/light-preset-02.jpg",
+    "/static/light-preset-03.jpg",
+    "/static/light-preset-04.jpg",
+    "/static/light-preset-05.jpg",
+    "/static/light-preset-06.jpg",
+    "/static/light-preset-07.jpg",
+    "/static/light-preset-08.jpg",
+    "/static/light-preset-09.jpg",
+    "/static/light-preset-10.jpg",
+    "/static/light-preset-11.jpg",
+    "/static/light-preset-12.jpg",
   ];
   function fallbackRealThumb(i) {
     return LIGHT_PRESET_THUMBS[i % LIGHT_PRESET_THUMBS.length] || DEMO_BOT;
@@ -2171,7 +2161,7 @@
       swatch: "linear-gradient(135deg,#1a2a44,#6ea0d4)",
       prompt: "blue hour, cool twilight",
       kelvin: 7500,
-      dir: "front",
+      dir: "left",
     },
     {
       label: "暖调光斑",
@@ -2250,7 +2240,7 @@
     colorMode: "hex",
     hex: "#FFFFFF",
     kelvin: 5000,
-    dir: "front",
+    dir: "left",
     rim: false,
     desc: "",
     preset: -1,
@@ -2344,8 +2334,9 @@
     const st = document.createElement("style");
     st.id = "sekoCamCss";
     st.textContent = [
-      ".shot-bar{position:absolute;z-index:21;display:none;align-items:center;gap:2px;height:36px;padding:3px 6px;",
+      ".shot-bar{position:absolute;z-index:21;display:none;align-items:center;gap:2px;height:36px;max-width:min(520px,calc(100vw - 32px));padding:3px 6px;overflow-x:auto;scrollbar-width:none;",
       "background:#141416;border:1px solid rgba(255,255,255,.1);border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35)}",
+      ".shot-bar::-webkit-scrollbar{display:none}",
       ".shot-bar button{border:0;background:transparent;color:#ddd;font-size:12px;padding:4px 10px;border-radius:999px;white-space:nowrap}",
       ".shot-bar button:hover,.shot-bar button.on{background:rgba(255,255,255,.08);color:#fff}",
       ".shot-bar button.skip{opacity:.38;color:#8b8b94;cursor:not-allowed}",
@@ -3152,7 +3143,9 @@
     const r = el.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
     bar.style.display = "flex";
-    bar.style.left = Math.max(8, r.left - s.left) + "px";
+    const bw = Math.min(bar.offsetWidth || 0, Math.max(0, s.width - 16));
+    const cx = r.left - s.left + r.width / 2;
+    bar.style.left = Math.max(8, Math.min(cx - bw / 2, s.width - bw - 8)) + "px";
     bar.style.top = Math.max(8, r.top - s.top - 42) + "px";
   }
 
@@ -3221,6 +3214,7 @@
     const key = String(state.selected || "") + ":" + cls.kind;
     if (key === sekoSelKey) return;
     sekoSelKey = key;
+    resetScopedMsg();
     const keepStory =
       toolUi.story && (cls.kind === "text" || cls.kind === "blank");
     closeAllToolPanels();
@@ -3326,7 +3320,7 @@
     menu.style.display = "block";
     menu.style.left = r.left - s.left + "px";
     menu.style.top = r.bottom - s.top + 6 + "px";
-    setMsg("画面切分：请选择 2×2 / 3×3 / 4×4 / 5×5", "ok");
+    setMsg("画面切分：请选择 2×2 / 3×3 / 4×4 / 5×5", "ok", "gridSplit");
   }
 
   function zoomLabel(slot) {
@@ -3439,7 +3433,8 @@
     placeCamPanel();
     syncCamControls();
     setCamMsg("");
-    setMsg("多角度：调整镜头后点击面板生成", "ok");
+    clearMsgFrom("inpaint");
+    setMsg("多角度：调整镜头后点击面板生成", "ok", "cameraAngle");
     placeShotBar();
   }
 
@@ -3759,6 +3754,7 @@
     return parts.join(", ");
   }
   function syncLightControls() {
+    const shot = selectedShotImage();
     document
       .querySelectorAll("#lightView [data-lview]")
       .forEach((b) =>
@@ -3794,7 +3790,7 @@
       $("lightKelvinVal").textContent = lightUi.kelvin + " K";
     if ($("lightRim")) $("lightRim").checked = !!lightUi.rim;
     document.querySelectorAll("#lightPresets img").forEach((img, i) => {
-      img.src = shot && shotImageUrl(shot) ? shotImageUrl(shot) : fallbackRealThumb(i);
+      img.src = fallbackRealThumb(i);
     });
     if ($("lightDesc") && $("lightDesc") !== document.activeElement)
       $("lightDesc").value = lightUi.desc;
@@ -3811,8 +3807,7 @@
       dot.style.top = d.y * 100 + "%";
     }
     const thumb = document.querySelector("#lightThumb img");
-    const shot = selectedShotImage();
-    if (thumb) thumb.src = shot ? shotImageUrl(shot) : "";
+    if (thumb) thumb.src = shot ? shotImageUrl(shot) : fallbackRealThumb(lightUi.preset >= 0 ? lightUi.preset : 0);
     const wrap = $("lightThumb");
     if (wrap) {
       wrap.style.transform =
@@ -3826,7 +3821,7 @@
     lightUi.colorMode = "hex";
     lightUi.hex = "#FFFFFF";
     lightUi.kelvin = 5000;
-    lightUi.dir = "front";
+    lightUi.dir = "left";
     lightUi.rim = false;
     lightUi.desc = "";
     lightUi.preset = -1;
@@ -3877,7 +3872,8 @@
     placeLightPanel();
     setLightMsg("");
     syncLightControls();
-    setMsg("打光：选择光源方向、预设后点击面板生成", "ok");
+    clearMsgFrom("inpaint");
+    setMsg("打光：选择光源方向、预设后点击面板生成", "ok", "relight");
     placeShotBar();
   }
   function closeLightPanel() {
@@ -4166,7 +4162,7 @@
     attachInpaintOverlay();
     placeEraseBar();
     placeShotBar();
-    setMsg("在图上圈选要消除的区域，再点「消除 ◆1」。未点发送。", "ok");
+    setMsg("在图上圈选要消除的区域，再点「消除 ◆1」。未点发送。", "ok", "inpaint");
   }
   function closeInpaintBar() {
     inpaintUi.on = false;
@@ -5816,102 +5812,8 @@
     return _cardHTML(n);
   };
 
-  loadDemo = function loadDemo() {
-    const assetsSeed = [
-      {
-        id: "a-bot",
-        kind: "character",
-        title: "家用机器人",
-        x: 48,
-        y: 24,
-        url: DEMO_BOT,
-      },
-      {
-        id: "a-home",
-        kind: "character",
-        title: "大白-居家装",
-        x: 48,
-        y: 260,
-        url: DEMO_BOT,
-      },
-      {
-        id: "a-work",
-        kind: "character",
-        title: "大白-职场装",
-        x: 48,
-        y: 496,
-        url: DEMO_WORK,
-      },
-      {
-        id: "a-vac",
-        kind: "character",
-        title: "扫地机器人",
-        x: 48,
-        y: 732,
-        url: DEMO_BOT,
-      },
-      {
-        id: "s-bed",
-        kind: "scene",
-        title: "温馨现代卧室",
-        x: 48,
-        y: 992,
-        url: DEMO_BED,
-      },
-      {
-        id: "s-bath",
-        kind: "scene",
-        title: "现代感洗手间",
-        x: 48,
-        y: 1228,
-        url: DEMO_BATH,
-      },
-    ];
-    const shotSeeds = [
-      { assets: ["a-bot", "a-home", "s-bed"] },
-      { assets: ["a-bot", "s-bed"] },
-      { assets: ["a-work"] },
-      { assets: ["a-vac"] },
-      { assets: ["s-bed"] },
-      { assets: ["s-bath"] },
-    ];
-    const textNodes = [];
-    const shotNodes = [];
-    const edges = [];
-    shotSeeds.forEach((seed, i) => {
-      const shotId = "shot-" + (i + 1);
-      const textId = "text-" + (i + 1);
-      const col = i % 2,
-        row = Math.floor(i / 2);
-      const textX = 560 + col * 1120;
-      const textY = 80 + row * 430;
-      const primary = assetsSeed.find((a) => a.id === seed.assets[0]);
-      const text = describePrompt(primary, "");
-      textNodes.push({
-        id: textId,
-        kind: "text",
-        title: "分镜" + (i + 1) + "提示词",
-        x: textX,
-        y: textY,
-        text: text,
-      });
-      shotNodes.push({
-        id: shotId,
-        kind: "shot",
-        title: "分镜" + (i + 1),
-        x: textX + 400,
-        y: textY,
-        url: "",
-        firstFrameId: seed.assets[0],
-        prompt: text,
-      });
-      seed.assets.forEach((aid) => edges.push({ from: aid, to: shotId }));
-      edges.push({ from: seed.assets[0], to: textId });
-      edges.push({ from: textId, to: shotId });
-    });
-    state.nodes = assetsSeed.concat(textNodes, shotNodes);
-    state.edges = edges;
-  };
+  window.__sekoLoadDemo = loadDemo;
+
 
   bindCamOnce();
   window.__sekoSelect = selectNode;

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Static checks that storyboard.js actually implements the prompt contract."""
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 JS = Path(__file__).resolve().parents[1] / "static" / "storyboard.js"
 src = JS.read_text(encoding="utf-8")
@@ -38,11 +38,8 @@ def main():
     ):
         ok(title in src, title)
     ok(src.count("demo-bot.jpg") >= 1, "distinct demo urls")
-    ok("col * 1120" in src, "demo column stride 1120 (text+shot must not overlap)")
-    ok(
-        "function sekoRelayoutSeedCards" in src,
-        "relayout persisted overlapping seed cards",
-    )
+    ok('const textSeeds = [' in src, "demo seeds prompt cards without blank shot placeholders")
+    ok("function sekoRelayoutSeedCards" in src, "legacy relayout hook still safe for restored sessions")
     ok("demo-bath.jpg" in src and "demo-work.jpg" in src, "all demo thumbs")
     ok('kind === "text"' in src or 'kind === "text"' in src, "text kind")
     ok("function mapSekoYawToFal" in src, "yaw fal remap")
@@ -88,7 +85,37 @@ def main():
         "伦勃朗光" in src and "光学焦散" in src and "布达佩斯大饭店" in src,
         "12 lighting preset names",
     )
-    ok("function fallbackRealThumb" in src and "LIGHT_PRESET_THUMBS = []" not in src, "lighting thumbnails are real image refs")
+    ok(
+        "function fallbackRealThumb" in src and "LIGHT_PRESET_THUMBS = []" not in src,
+        "lighting thumbnails are real image refs",
+    )
+
+    preset_files = re.findall(r'"(/static/light-preset-(?:0[1-9]|1[0-2])\.jpg)"', src)
+    ok(len(set(preset_files)) == 12, "12 lighting preset image files are checked in")
+    ok(
+        "DEMO_BOT,"
+        not in src[
+            src.index("const LIGHT_PRESET_THUMBS") : src.index(
+                "function fallbackRealThumb"
+            )
+        ],
+        "lighting presets do not reuse generic demo thumbnails",
+    )
+    sync_body = src[
+        src.index("function syncLightControls") : src.index("function resetLightParams")
+    ]
+    ok(
+        sync_body.index("const shot = selectedShotImage()")
+        < sync_body.index("#lightPresets img"),
+        "lighting thumbnails sync after selected shot is defined",
+    )
+    load_demo = src[src.index("function loadDemo") : src.index("function persist")]
+    ok("shotNodes.push" not in load_demo, "demo seed has no blank shot cards")
+    ok("loadDemo = function loadDemo" not in src, "no legacy loadDemo override re-seeding blank shots")
+    ok(
+        not re.search(r'kind:\s*"shot"[\s\S]*?url:\s*""', load_demo),
+        "demo seed has no empty-url shot cards",
+    )
     ok("光源描述 (选填)" in src, "lighting desc")
     ok("简单描述你想实现的灯光效果，或情绪风格" in src, "lighting placeholder")
     ok('op: "relight"' in src, "relight op")
@@ -98,6 +125,8 @@ def main():
     )
     ok("消除 ◆1" in src, "eraser submit label")
     ok("该方向 fal 不支持" in src, "front/back lighting unsupported")
+    light_ui = src[src.index("const lightUi = {") : src.index("const inpaintUi = {")]
+    ok('dir: "left"' in light_ui and 'dir: "front"' not in light_ui, "relight opens on supported left direction")
     ok("btnVideoBar" in src and "合成视频" in src, "compose-video shot-bar entry")
     ok("function classifySelected" in src, "selection classifier")
     ok("SHOTBAR_VIDEO_ITEMS" in src, "video toolbar variant")
@@ -147,6 +176,10 @@ def main():
     ok('kind: "none"' in src and 'kind: "video"' in src, "state kinds")
     ok("vp._sekoDeselect" in src, "empty-canvas deselect")
     ok(".shot-bar button.skip{" in src, "pano/lip-sync skip is greyed")
+    ok("max-width:min(520px" in src and "cx - bw / 2" in src, "shot-bar is compact centered capsule")
+    ok("function resetScopedMsg" in src and "dataset.source" in src, "status messages are source-scoped")
+    ok("img.src = fallbackRealThumb(i);" in src, "lighting preset thumbnails stay distinct after selecting a shot")
+    ok('"gridSplit"' in src and '"inpaint"' in src and "clearMsgFrom" in src, "tool status does not leak across panels")
     ok(
         '"btnUpscale"' in src and "btnNineGrid" in src,
         "left-rail extras including 超清 stay hidden",
@@ -161,8 +194,16 @@ def main():
     ok('op: "mask"' not in src, "inpaint is single node, no mask op")
     ok("maskUrl: maskUrl" in src, "inpaint params.maskUrl")
     ok("window.__sekoUploadMask" in src, "mask upload hook name")
-    ok("输入你的故事、场景或角色设定" in src and "向后推演" in src and "向前推演" in src, "story placeholder and sliders")
-    ok("STORY_PLAN_ENDPOINT" in src and "buildStoryFrameGraph" in src, "story endpoint plans then generates frames")
+    ok(
+        "输入你的故事、场景或角色设定" in src
+        and "向后推演" in src
+        and "向前推演" in src,
+        "story placeholder and sliders",
+    )
+    ok(
+        "STORY_PLAN_ENDPOINT" in src and "buildStoryFrameGraph" in src,
+        "story endpoint plans then generates frames",
+    )
     ok("skill · 故事导演" in src and "生成 ◆10" in src, "story director controls")
     ok("GMLM" not in src, "do not show GMLM")
     ok("请输入九宫格生成提示词..." in src, "ninegrid placeholder")
