@@ -224,7 +224,15 @@ def load_caps():
     return _CAPS
 
 
-def find_cap(engine=None, operation=None, version=None, provider=None):
+def _cap_meta(c: dict, key: str):
+    """capabilities.json 的 version / provider 只存在 defaults 里，顶层恒为 None。"""
+    v = c.get(key)
+    if v in (None, ""):
+        v = (c.get("defaults") or {}).get(key)
+    return v
+
+
+def find_cap(engine=None, operation=None, version=None, provider=None, model=None):
     best, score = None, -1
     for c in load_caps():
         s = 0
@@ -237,9 +245,11 @@ def find_cap(engine=None, operation=None, version=None, provider=None):
                 s += 3
             elif c.get("operation") in (None, "videoGen", "imageGen"):
                 s += 1
-        if version and c.get("version") == version:
-            s += 2
-        if provider and c.get("provider") == provider:
+        if version and _cap_meta(c, "version") == version:
+            s += 4
+        if model and _cap_meta(c, "model") == model:
+            s += 4
+        if provider and _cap_meta(c, "provider") == provider:
             s += 1
         if s > score:
             best, score = c, s
@@ -249,7 +259,10 @@ def find_cap(engine=None, operation=None, version=None, provider=None):
 def apply_frames(inp: dict, payload: dict, svc: dict | None):
     engine = (inp.get("engine") or (svc or {}).get("engine") or "")
     op = (inp.get("operation") or (svc or {}).get("operation") or "")
-    cap = find_cap(engine, op, inp.get("version") or (svc or {}).get("version"), inp.get("provider") or (svc or {}).get("provider"))
+    cap = find_cap(engine, op,
+                   inp.get("version") or (svc or {}).get("version"),
+                   inp.get("provider") or (svc or {}).get("provider"),
+                   inp.get("model") or (svc or {}).get("model"))
     frames = list((cap or {}).get("frameFields") or [])
     first = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("startImage") or payload.get("image") or "").strip()
     last = (payload.get("lastFrame") or payload.get("endImage") or payload.get("endSourceImage") or "").strip()
@@ -376,6 +389,71 @@ def _split_free_wh(inp: dict, payload: dict, cap: dict | None) -> None:
     inp.pop("resolution", None)
 
 
+_RES_TOKEN = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([pkPK])?\s*$")
+
+
+def _token_pixels(tok) -> int | None:
+    """把 `720p` / `1080p` / `2K` / 整数 720 折成可比的短边像素数。"""
+    if isinstance(tok, bool):
+        return None
+    if isinstance(tok, (int, float)):
+        return int(tok)
+    m = _RES_TOKEN.match(str(tok))
+    if not m:
+        return None
+    n = float(m.group(1))
+    return int(n * 1024) if (m.group(2) or "p").lower() == "k" else int(n)
+
+
+def _aspect_of(w: int, h: int) -> str:
+    from math import gcd
+
+    g = gcd(w, h) or 1
+    return f"{w // g}:{h // g}"
+
+
+def _cap_fields(cap: dict | None) -> set:
+    cap = cap or {}
+    return (set(cap.get("required") or []) | set(cap.get("optional") or [])
+            | set((cap.get("constraints") or {}).keys()))
+
+
+def _snap_enum_resolution(inp: dict, payload: dict, cap: dict | None) -> bool:
+    """枚举令牌家族（视频 wan/seedance/sora…、图片 nano-banana/grok）只认 `720p`/`1K`。
+
+    UI 一律发 `720x1280`（WxH），落到这类服务上是非法枚举值，云端打回或按默认档渲染，
+    而且竖屏意图整个丢掉 —— 这些服务的朝向靠 aspectRatio，不靠 WxH。
+    返回 True 表示该服务归令牌家族（调用方就别再走 free_wh 拆分了）。
+    """
+    cons = ((cap or {}).get("constraints") or {}).get("resolution") or {}
+    enum = cons.get("enum")
+    if not enum:
+        return False
+    m = _WH_TOKEN.match(str(payload.get("resolution") or ""))
+    if not m:
+        return True  # 已经是令牌（或没给），不动
+    w, h = int(m.group(1)), int(m.group(2))
+    usable = [(v, _token_pixels(v)) for v in enum]
+    usable = [(v, px) for v, px in usable if px]
+    if usable:
+        tier = min(w, h)
+        fit = [t for t in usable if t[1] <= tier]
+        inp["resolution"] = (max(fit, key=lambda t: t[1]) if fit else min(usable, key=lambda t: t[1]))[0]
+    else:
+        dv = ((cap or {}).get("defaults") or {}).get("resolution")
+        inp["resolution"] = dv if dv in enum else enum[0]
+    fields = _cap_fields(cap)
+    if "aspectRatio" in fields and not payload.get("aspectRatio"):
+        ar = _aspect_of(w, h)
+        ar_enum = ((cap or {}).get("constraints") or {}).get("aspectRatio", {}).get("enum")
+        if not ar_enum or ar in ar_enum:
+            inp["aspectRatio"] = ar
+    if "width" not in fields and "height" not in fields:
+        inp.pop("width", None)
+        inp.pop("height", None)
+    return True
+
+
 def _provider_id(payload: dict) -> str:
     return "civitai"
 
@@ -447,8 +525,9 @@ def build_workflow(payload: dict) -> dict:
     # free_wh 服务只认 width/height。`720x1280` 原样透传会被下面的 allowed 过滤掉，
     # Civitai 回落到 catalog defaults 1024x1024（真扣费复现过）。
     # 只拆 WxH；视频的 `720p`/`1080p` 是 catalog 令牌，cap 里声明了 resolution 的一律不动。
-    if get_provider_capabilities(_provider_id(payload)).get("resolution") == "free_wh":
-        _split_free_wh(inp, payload, cap)
+    if not _snap_enum_resolution(inp, payload, cap):
+        if get_provider_capabilities(_provider_id(payload)).get("resolution") == "free_wh":
+            _split_free_wh(inp, payload, cap)
     if cap:
         allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
                    "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
