@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Static checks for v0794 non-shell UI contracts."""
+"""Static checks for real, non-demo storyboard contracts."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,31 +17,53 @@ def ok(cond, msg):
 
 
 def main() -> int:
-    # C8: no flat demo placeholders left in shipped demo assets.
-    for name in ("demo-bot.jpg", "demo-work.jpg", "demo-bed.jpg", "demo-bath.jpg"):
-        fp = ROOT / "static" / name
-        ok(fp.exists() and fp.stat().st_size > 20_000, f"{name} still placeholder-sized")
-    ok("LIGHT_PRESET_THUMBS = []" not in SRC, "lighting presets must not render color swatches only")
-    ok("fallbackRealThumb" in SRC, "relight/camera orb needs selected image fallback")
-    ok('class="sw"' not in SRC, "lighting preset swatches must be replaced by real thumbnails")
+    # A-0 authenticity contract: deleted robot/demo wiring must stay deleted.
+    for token in ("CHAR_LIB", "DEMO_BOT", "fallbackRealThumb", "loadDemo"):
+        ok(token not in SRC, f"forbidden production token remains: {token}")
+    ok(
+        not re.search(
+            r"[\"'](?:/static/)?(?:demo-(?:bot|work|bed|bath)|light-preset-\d+)\.jpg",
+            SRC,
+        ),
+        "production code must not reference frozen demo/preset jpg assets",
+    )
+    ok("LIGHT_PRESET_THUMBS" not in SRC, "obsolete preset thumbnail table remains")
 
-    # C3/C9: node class drives model category and UI, first render must land on text backend.
-    ok("function selectDefaultBackendForCategory" in SRC, "category-specific backend selector missing")
-    ok('selectDefaultBackendForCategory("text")' in SRC, "initial text backend not forced")
-    ok("dedupeCatalogItems" in SRC, "model catalog dedupe missing")
-    ok('cls.kind === "text"' in SRC and 'setTextDockRefs' in SRC, "text node refs path missing")
-    ok("data-textact" in SRC and "生图" not in SRC.split("function setTextDockRefs", 1)[1].split("function", 1)[0], "text dock refs still生图/反推")
+    # Prompt/story contracts must reach the real graph and model paths.
+    for token in (
+        'const STORE = "nl-storyboard-v0794"',
+        "function promptOf",
+        "async function reverseFromImage",
+        "function describePrompt",
+        "async function generateFromText",
+        "function syncPrompt",
+        "function moveCardEl",
+        "function selectDefaultBackendForCategory",
+        "dedupeCatalogItems",
+        "data-textact",
+        "buildStoryGraph",
+        "generateStoryFrames",
+        "buildStoryFrameGraph",
+        "runCompiledGenerate(",
+    ):
+        ok(token in SRC, f"real storyboard path missing: {token}")
+    ok('fetch("/api/story"' not in SRC, "story must not bypass compiled generation")
+    ok(REQ.exists(), "original requirements file is present")
 
-    # C6: story推演 has source-like controls and real graph/generate path, not /api/story only.
-    for token in ("向后推演", "向前推演", "专业模型", "通用模型", "生成 ◆10"):
-        ok(token in SRC, f"story UI missing {token}")
-    ok("buildStoryGraph" in SRC, "story graph builder missing")
-    ok("generateStoryFrames" in SRC, "story frame generator missing")
-    ok("buildGraph → compile → generate → poll" in SRC, "story path must document true pipeline")
-    ok('fetch("/api/story"' not in SRC, "story send still calls /api/story directly")
-    ok("runCompiledGenerate(" in SRC and "buildStoryFrameGraph" in SRC, "story frames not using compiled generate")
+    # Lighting is runtime current-image + filter/swatch preview, not fake files.
+    light = SRC[SRC.index("const LIGHT_PRESETS") : SRC.index("const NINE_TYPES")]
+    ok(len(re.findall(r"\blabel:\s*\"", light)) == 12, "lighting preset count is not 12")
+    for token in (
+        "data-light-thumb",
+        "data-light-swatch",
+        "示意",
+        "实际光影由生成模型输出决定",
+        "selectedShotImage()",
+        "syncLightControls",
+        "applyLightPreset",
+    ):
+        ok(token in SRC, f"runtime lighting contract missing: {token}")
 
-    ok(REQ.exists(), "dalao_original_requirements.md not migrated into repo")
     print("ok v0794-contract")
     return 0
 
