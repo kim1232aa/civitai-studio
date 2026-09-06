@@ -476,8 +476,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(502, {"error": str(e)})
             return self._json(code, data)
         if path == "/api/catalog":
-            backend = (qs.get("backend") or ["civitai"])[0]
-            prov = providers.get(backend) or providers.get("civitai")
+            backend = _alias_backend((qs.get("backend") or ["civitai"])[0])
+            prov = providers.get(backend)
+            if not prov:
+                return self._json(400, {"error": f"未知后端 {backend}", "code": "unknown_backend"})
             if backend != "civitai" and (qs.get("refresh") or ["0"])[0] in ("1", "true"):
                 pass
             elif backend == "civitai" and (qs.get("refresh") or ["0"])[0] in ("1", "true"):
@@ -486,6 +488,8 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     print("catalog refresh", e, flush=True)
             body = prov.catalog((qs.get("q") or [""])[0], (qs.get("category") or [""])[0], (qs.get("status") or [""])[0])
+            if isinstance(body, dict) and body.get("error") and not (body.get("items") or []):
+                return self._json(502, body)
             return self._json(200, body)
         if path == "/api/defaults":
             civ = providers.get("civitai")
@@ -634,6 +638,10 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "invalid json"})
+        if path in ("/api/caption", "/api/upload-out"):
+            from providers.media_io import handle_media_post
+            code, data = handle_media_post(path, payload)
+            return self._json(code, data)
         if path == "/api/import":
             raw = None
             b64 = payload.get("fileB64") or payload.get("file")
@@ -669,6 +677,8 @@ class Handler(BaseHTTPRequestHandler):
                 if blocked:
                     return self._json(400, blocked)
             prov = providers.resolve_from_payload(payload)
+            if prov is None:
+                return self._json(400, {"error": "未知后端或服务，拒绝默认改打 Civitai", "code": "unknown_backend"})
             if path == "/api/whatif":
                 code, data = prov.whatif(payload)
             else:

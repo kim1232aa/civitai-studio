@@ -3,16 +3,17 @@ from __future__ import annotations
 import json
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .base import Provider
 from .capabilities import get_provider_capabilities
-from .http import collect_urls, json_call, parse_job_id, save_media_urls
+from .catalog_ops import CANVAS_OP_SET, category_matches, enrich_catalog_item, native_operation
+from .http import collect_urls, extract_error, json_call, parse_job_id, save_media_urls
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -21,14 +22,47 @@ ORCH = "https://orchestration.civitai.com"
 SITE = "https://civitai.com/api/v1"
 
 SAMPLERS = [
-    "er_sde", "euler", "euler_ancestral", "euler_cfg_pp", "euler_ancestral_cfg_pp",
-    "heun", "heunpp2", "dpm_2", "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
-    "dpmpp_2s_ancestral", "dpmpp_2s_ancestral_cfg_pp", "dpmpp_sde", "dpmpp_sde_gpu",
-    "dpmpp_2m", "dpmpp_2m_cfg_pp", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
-    "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm", "ipndm", "ipndm_v",
-    "deis", "ddim", "uni_pc", "uni_pc_bh2", "res_multistep",
+    "er_sde",
+    "euler",
+    "euler_ancestral",
+    "euler_cfg_pp",
+    "euler_ancestral_cfg_pp",
+    "heun",
+    "heunpp2",
+    "dpm_2",
+    "dpm_2_ancestral",
+    "lms",
+    "dpm_fast",
+    "dpm_adaptive",
+    "dpmpp_2s_ancestral",
+    "dpmpp_2s_ancestral_cfg_pp",
+    "dpmpp_sde",
+    "dpmpp_sde_gpu",
+    "dpmpp_2m",
+    "dpmpp_2m_cfg_pp",
+    "dpmpp_2m_sde",
+    "dpmpp_2m_sde_gpu",
+    "dpmpp_3m_sde",
+    "dpmpp_3m_sde_gpu",
+    "ddpm",
+    "lcm",
+    "ipndm",
+    "ipndm_v",
+    "deis",
+    "ddim",
+    "uni_pc",
+    "uni_pc_bh2",
+    "res_multistep",
 ]
-SCHEDULERS = ["sgm_uniform", "simple", "normal", "karras", "exponential", "ddim_uniform", "beta"]
+SCHEDULERS = [
+    "sgm_uniform",
+    "simple",
+    "normal",
+    "karras",
+    "exponential",
+    "ddim_uniform",
+    "beta",
+]
 
 DEFAULTS = {
     "serviceId": "image/comfy/krea2/turbo/createImage",
@@ -128,8 +162,14 @@ def refresh_catalog() -> dict:
         if not batch or (total is not None and len(items) >= total):
             break
         offset += 200
-    payload = {"total": len(items), "items": items, "fetchedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-    (DOCS / "catalog.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    payload = {
+        "total": len(items),
+        "items": items,
+        "fetchedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    (DOCS / "catalog.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2)
+    )
     with _catalog_lock:
         _catalog.update(payload)
     return payload
@@ -139,7 +179,11 @@ def catalog_items():
     with _catalog_lock:
         if not _catalog["items"]:
             load_catalog_disk()
-        return list(_catalog["items"]), _catalog.get("fetchedAt"), _catalog.get("total") or 0
+        return (
+            list(_catalog["items"]),
+            _catalog.get("fetchedAt"),
+            _catalog.get("total") or 0,
+        )
 
 
 def find_service(service_id: str):
@@ -150,16 +194,19 @@ def find_service(service_id: str):
     return None
 
 
-def match_service(engine=None, operation=None, ecosystem=None, model=None, category=None):
+def match_service(
+    engine=None, operation=None, ecosystem=None, model=None, category=None
+):
     items, _, _ = catalog_items()
     scored = []
     for it in items:
         if category and it.get("category") != category:
             continue
+        item_op = native_operation(it) or it.get("operation")
         s = 0
         if engine and it.get("engine") == engine:
             s += 4
-        if operation and it.get("operation") == operation:
+        if operation and (item_op == operation or it.get("operation") == operation):
             s += 3
         if ecosystem and it.get("ecosystem") == ecosystem:
             s += 2
@@ -190,6 +237,7 @@ def _set_int(inp, payload, key, lo=None, hi=None):
     if payload.get(key) in (None, ""):
         return
     from .io_meta import coerce_int
+
     v = coerce_int(payload.get(key), None)
     if v is None:
         return
@@ -218,10 +266,30 @@ def load_caps():
         _CAPS = []
         return _CAPS
     try:
-        _CAPS = (json.loads(fp.read_text()).get("capabilities") or [])
+        _CAPS = json.loads(fp.read_text()).get("capabilities") or []
     except Exception:
         _CAPS = []
     return _CAPS
+
+
+def _cap_for_id(item_id: str):
+    item_id = str(item_id or "")
+    if not item_id:
+        return None
+    return next(
+        (
+            candidate
+            for candidate in load_caps()
+            if str((candidate.get("raw") or {}).get("id") or "") == item_id
+        ),
+        None,
+    )
+
+
+def _catalog_capability(item: dict) -> dict:
+    """Join capabilities.json by raw.id and emit canvas catalog fields."""
+    cap = _cap_for_id((item or {}).get("id"))
+    return enrich_catalog_item(item, "civitai", cap=cap)
 
 
 def _cap_meta(c: dict, key: str):
@@ -257,16 +325,32 @@ def find_cap(engine=None, operation=None, version=None, provider=None, model=Non
 
 
 def apply_frames(inp: dict, payload: dict, svc: dict | None):
-    engine = (inp.get("engine") or (svc or {}).get("engine") or "")
-    op = (inp.get("operation") or (svc or {}).get("operation") or "")
-    cap = find_cap(engine, op,
-                   inp.get("version") or (svc or {}).get("version"),
-                   inp.get("provider") or (svc or {}).get("provider"),
-                   inp.get("model") or (svc or {}).get("model"))
+    engine = inp.get("engine") or (svc or {}).get("engine") or ""
+    op = inp.get("operation") or (svc or {}).get("operation") or ""
+    cap = find_cap(
+        engine,
+        op,
+        inp.get("version") or (svc or {}).get("version"),
+        inp.get("provider") or (svc or {}).get("provider"),
+        inp.get("model") or (svc or {}).get("model"),
+    )
     frames = list((cap or {}).get("frameFields") or [])
-    first = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("startImage") or payload.get("image") or "").strip()
-    last = (payload.get("lastFrame") or payload.get("endImage") or payload.get("endSourceImage") or "").strip()
-    extra = [x for x in (payload.get("images") or payload.get("referenceImages") or []) if x]
+    first = (
+        payload.get("firstFrame")
+        or payload.get("sourceImage")
+        or payload.get("startImage")
+        or payload.get("image")
+        or ""
+    ).strip()
+    last = (
+        payload.get("lastFrame")
+        or payload.get("endImage")
+        or payload.get("endSourceImage")
+        or ""
+    ).strip()
+    extra = [
+        x for x in (payload.get("images") or payload.get("referenceImages") or []) if x
+    ]
     if first and first not in extra:
         extra = [first] + extra
     FIRST_NAMES = {"firstFrame", "sourceImage", "image", "sourceImageUrl"}
@@ -299,9 +383,7 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
             inp[name] = last
         elif name == "startImage" and first:
             inp[name] = first
-        elif name == "images" and extra:
-            inp[name] = extra[:9]
-        elif name == "referenceImages" and extra:
+        elif name == "images" and extra or name == "referenceImages" and extra:
             inp[name] = extra[:9]
         elif name == "sourceVideo" and payload.get("sourceVideo"):
             inp[name] = payload["sourceVideo"]
@@ -380,7 +462,9 @@ def _split_free_wh(inp: dict, payload: dict, cap: dict | None) -> None:
     m = _WH_TOKEN.match(str(payload.get("resolution") or ""))
     if not m:
         return
-    fields = set((cap or {}).get("required") or []) | set((cap or {}).get("optional") or [])
+    fields = set((cap or {}).get("required") or []) | set(
+        (cap or {}).get("optional") or []
+    )
     if "resolution" in fields:
         return  # 服务本身收 resolution 令牌，别动
     if payload.get("width") in (None, "") and payload.get("height") in (None, ""):
@@ -414,8 +498,11 @@ def _aspect_of(w: int, h: int) -> str:
 
 def _cap_fields(cap: dict | None) -> set:
     cap = cap or {}
-    return (set(cap.get("required") or []) | set(cap.get("optional") or [])
-            | set((cap.get("constraints") or {}).keys()))
+    return (
+        set(cap.get("required") or [])
+        | set(cap.get("optional") or [])
+        | set((cap.get("constraints") or {}).keys())
+    )
 
 
 def _snap_enum_resolution(inp: dict, payload: dict, cap: dict | None) -> bool:
@@ -438,14 +525,18 @@ def _snap_enum_resolution(inp: dict, payload: dict, cap: dict | None) -> bool:
     if usable:
         tier = min(w, h)
         fit = [t for t in usable if t[1] <= tier]
-        inp["resolution"] = (max(fit, key=lambda t: t[1]) if fit else min(usable, key=lambda t: t[1]))[0]
+        inp["resolution"] = (
+            max(fit, key=lambda t: t[1]) if fit else min(usable, key=lambda t: t[1])
+        )[0]
     else:
         dv = ((cap or {}).get("defaults") or {}).get("resolution")
         inp["resolution"] = dv if dv in enum else enum[0]
     fields = _cap_fields(cap)
     if "aspectRatio" in fields and not payload.get("aspectRatio"):
         ar = _aspect_of(w, h)
-        ar_enum = ((cap or {}).get("constraints") or {}).get("aspectRatio", {}).get("enum")
+        ar_enum = (
+            ((cap or {}).get("constraints") or {}).get("aspectRatio", {}).get("enum")
+        )
         if not ar_enum or ar in ar_enum:
             inp["aspectRatio"] = ar
     if "width" not in fields and "height" not in fields:
@@ -458,31 +549,51 @@ def _provider_id(payload: dict) -> str:
     return "civitai"
 
 
+class UnknownServiceError(ValueError):
+    def __init__(self, message, service_id="", code="unknown_service"):
+        super().__init__(message)
+        self.service_id = service_id
+        self.code = code
+
+
 def build_workflow(payload: dict) -> dict:
     svc = None
     sid = (payload.get("serviceId") or "").strip()
     if sid:
         svc = find_service(sid)
+        if not svc:
+            raise UnknownServiceError(f"目录没有该服务：{sid}", service_id=sid)
     kind = payload.get("kind") or (svc or {}).get("category") or "image"
     if not svc:
+        want_op = payload.get("operation")
+        if want_op in CANVAS_OP_SET:
+            want_op = None
         if kind == "video":
             svc = match_service(
                 engine=payload.get("engine"),
-                operation=payload.get("operation"),
+                operation=want_op,
                 category="video",
-            ) or find_service(DEFAULTS["videoServiceId"])
+            )
         else:
             svc = match_service(
                 engine=payload.get("engine") or "comfy",
-                operation=payload.get("operation") or "createImage",
+                operation=want_op or "createImage",
                 ecosystem=payload.get("ecosystem") or "krea2",
                 model=payload.get("model"),
                 category="image",
-            ) or find_service(DEFAULTS["serviceId"])
+            )
+        if not svc:
+            raise UnknownServiceError(
+                "目录没有匹配的服务，拒绝改打默认 krea2 / MiniMax",
+                service_id=sid,
+            )
     inp = dict((svc or {}).get("parameters") or {})
-    for k in ("engine", "operation", "ecosystem", "model", "version", "provider"):
+    for k in ("engine", "ecosystem", "model", "version", "provider"):
         if payload.get(k):
             inp[k] = payload[k]
+    payload_op = payload.get("operation")
+    if payload_op and payload_op not in CANVAS_OP_SET:
+        inp["operation"] = payload_op
     if payload.get("prompt"):
         inp["prompt"] = payload["prompt"]
     if payload.get("negativePrompt"):
@@ -526,14 +637,41 @@ def build_workflow(payload: dict) -> dict:
     # Civitai 回落到 catalog defaults 1024x1024（真扣费复现过）。
     # 只拆 WxH；视频的 `720p`/`1080p` 是 catalog 令牌，cap 里声明了 resolution 的一律不动。
     if not _snap_enum_resolution(inp, payload, cap):
-        if get_provider_capabilities(_provider_id(payload)).get("resolution") == "free_wh":
+        if (
+            get_provider_capabilities(_provider_id(payload)).get("resolution")
+            == "free_wh"
+        ):
             _split_free_wh(inp, payload, cap)
     if cap:
-        allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
-                   "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
-                   "steps", "width", "height", "cfgScale", "quantity", "duration",
-                   "sampler", "scheduler", "denoise"}
-        for lst in (cap.get("required"), cap.get("optional"), cap.get("frameFields"), list((cap.get("constraints") or {}).keys()), list((cap.get("extraFlags") or {}).keys())):
+        allowed = {
+            "engine",
+            "operation",
+            "ecosystem",
+            "model",
+            "version",
+            "provider",
+            "prompt",
+            "negativePrompt",
+            "loras",
+            "diffusionModel",
+            "seed",
+            "steps",
+            "width",
+            "height",
+            "cfgScale",
+            "quantity",
+            "duration",
+            "sampler",
+            "scheduler",
+            "denoise",
+        }
+        for lst in (
+            cap.get("required"),
+            cap.get("optional"),
+            cap.get("frameFields"),
+            list((cap.get("constraints") or {}).keys()),
+            list((cap.get("extraFlags") or {}).keys()),
+        ):
             if lst:
                 allowed.update(lst)
         inp = {k: v for k, v in inp.items() if k in allowed}
@@ -543,14 +681,24 @@ def build_workflow(payload: dict) -> dict:
     return {
         "allowMatureContent": bool(payload.get("allowMatureContent", True)),
         "steps": [{"$type": step, "input": inp}],
-        "_meta": {"serviceId": (svc or {}).get("id"), "serviceName": (svc or {}).get("name")},
+        "_meta": {
+            "serviceId": (svc or {}).get("id"),
+            "serviceName": (svc or {}).get("name"),
+        },
     }
 
 
 def parse_image_id(raw: str) -> int:
     import re
+
     s = (raw or "").strip()
-    for pat in (r"/images/(\d+)", r"/image/(\d+)", r"[?&]imageId=(\d+)", r"[?&]id=(\d+)", r"^(\d+)$"):
+    for pat in (
+        r"/images/(\d+)",
+        r"/image/(\d+)",
+        r"[?&]imageId=(\d+)",
+        r"[?&]id=(\d+)",
+        r"^(\d+)$",
+    ):
         m = re.search(pat, s, re.I)
         if m:
             return int(m.group(1))
@@ -587,9 +735,16 @@ def _air_from_ids(model_id, version_id, typ="", base="", name=""):
 
 def _normalize_pair(sampler, scheduler):
     from . import io_meta
-    samp, sched = io_meta.split_sampler_scheduler(str(sampler or ""), str(scheduler or ""))
-    samp_n = io_meta.normalize_sampler(samp, SAMPLERS) or io_meta.normalize_sampler(samp)
-    sched_n = io_meta.normalize_scheduler(sched, SCHEDULERS) or io_meta.normalize_scheduler(sched)
+
+    samp, sched = io_meta.split_sampler_scheduler(
+        str(sampler or ""), str(scheduler or "")
+    )
+    samp_n = io_meta.normalize_sampler(samp, SAMPLERS) or io_meta.normalize_sampler(
+        samp
+    )
+    sched_n = io_meta.normalize_scheduler(
+        sched, SCHEDULERS
+    ) or io_meta.normalize_scheduler(sched)
     if samp_n not in SAMPLERS:
         samp_n = DEFAULTS["sampler"]
     if sched_n not in SCHEDULERS:
@@ -598,7 +753,9 @@ def _normalize_pair(sampler, scheduler):
 
 
 def _fetch_html(url, timeout=25) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html"})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html"}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", "replace")
 
@@ -617,7 +774,13 @@ def generation_from_page(image_id: int) -> dict:
             data = json.loads(m.group(1))
         except Exception:
             continue
-        queries = ((((data.get("props") or {}).get("pageProps") or {}).get("trpcState") or {}).get("json") or {}).get("queries") or []
+        queries = (
+            (
+                ((data.get("props") or {}).get("pageProps") or {}).get("trpcState")
+                or {}
+            ).get("json")
+            or {}
+        ).get("queries") or []
         gen, info = {}, {}
         for q in queries:
             key = q.get("queryKey") or []
@@ -665,7 +828,9 @@ def enrich_local_parse(parsed: dict) -> dict:
     query = re.sub(r"\s+", " ", query)
     if not query or len(query) < 4:
         return parsed
-    code, data = json_call(f"{SITE}/models?limit=5&query={urllib.parse.quote(query)}", timeout=20)
+    code, data = json_call(
+        f"{SITE}/models?limit=5&query={urllib.parse.quote(query)}", timeout=20
+    )
     items = (data or {}).get("items") if isinstance(data, dict) else []
     if not items:
         return parsed
@@ -688,10 +853,18 @@ def enrich_local_parse(parsed: dict) -> dict:
             break
     ver = ver or (vers[0] if vers else None)
     if not ver:
-        parsed["checkpointName"] = parsed.get("checkpointName") or pick.get("name") or name
+        parsed["checkpointName"] = (
+            parsed.get("checkpointName") or pick.get("name") or name
+        )
         return parsed
     mid, vid = pick.get("id"), ver.get("id")
-    air = ver.get("air") or _air_from_ids(mid, vid, pick.get("type"), ver.get("baseModel") or pick.get("baseModel"), pick.get("name"))
+    air = ver.get("air") or _air_from_ids(
+        mid,
+        vid,
+        pick.get("type"),
+        ver.get("baseModel") or pick.get("baseModel"),
+        pick.get("name"),
+    )
     if air and not parsed.get("diffusionModel"):
         parsed["diffusionModel"] = air
     parsed["checkpointName"] = pick.get("name") or parsed.get("checkpointName") or name
@@ -701,7 +874,14 @@ def enrich_local_parse(parsed: dict) -> dict:
 
 
 _LORA_TYPES = {
-    "LORA", "LORAS", "LOCON", "LOHA", "LOKR", "DORA", "LYCORIS", "TEXTUALINVERSION",
+    "LORA",
+    "LORAS",
+    "LOCON",
+    "LOHA",
+    "LOKR",
+    "DORA",
+    "LYCORIS",
+    "TEXTUALINVERSION",
 }
 _LORA_TAG_RE = re.compile(r"<lora:([^:>]+)(?::([0-9.]+))?>", re.I)
 
@@ -758,10 +938,22 @@ def fetch_version_air(vid, timeout=20):
         if not ver.get("air"):
             mid = ver.get("modelId")
             base = ver.get("baseModel") or ""
-            typ = ((ver.get("model") or {}).get("type") if isinstance(ver.get("model"), dict) else "") or ""
+            typ = (
+                (ver.get("model") or {}).get("type")
+                if isinstance(ver.get("model"), dict)
+                else ""
+            ) or ""
             if mid and vid:
                 ver = dict(ver)
-                ver["air"] = _air_from_ids(mid, vid, typ, base, (ver.get("model") or {}).get("name") if isinstance(ver.get("model"), dict) else "")
+                ver["air"] = _air_from_ids(
+                    mid,
+                    vid,
+                    typ,
+                    base,
+                    (ver.get("model") or {}).get("name")
+                    if isinstance(ver.get("model"), dict)
+                    else "",
+                )
         return _store_version(vid, ver)
     return ver if isinstance(ver, dict) else {}
 
@@ -800,7 +992,7 @@ def import_image(image_id: str) -> dict:
     file_parsed = {}
     if not meta.get("prompt") or not meta.get("sampler"):
         public_row = public_image_row(iid)
-        url = (info_js.get("url") or public_row.get("url") or "")
+        url = info_js.get("url") or public_row.get("url") or ""
         if isinstance(url, str) and url.startswith("http"):
             try:
                 raw = _download_bytes(url)
@@ -819,25 +1011,39 @@ def import_image(image_id: str) -> dict:
         meta.get("resources"),
         meta.get("civitaiResources"),
         js.get("civitaiResources"),
-        (js.get("additionalMeta") or {}).get("resources") if isinstance(js.get("additionalMeta"), dict) else None,
+        (js.get("additionalMeta") or {}).get("resources")
+        if isinstance(js.get("additionalMeta"), dict)
+        else None,
     ):
         if isinstance(src, list):
             resources.extend(x for x in src if isinstance(x, dict))
     if not js and not meta and not file_parsed:
         err = gen.get("error") or info.get("error") or ""
         if gen_code == 401 or info_code == 401 or "没有 API Key" in str(err):
-            raise ValueError("没有 Civitai API Key，公开页也没读到这张图的提示词 / 底模 / LoRA。把 token 放到 ~/.config/civitai/token，或改上传带 Comfy/A1111 参数的 PNG。")
-        raise ValueError(err or f"Civitai 没返回这张图的生成参数（HTTP {gen_code or 404}）")
-    media_type = info_js.get("type") or js.get("type") or public_row.get("type") or "image"
+            raise ValueError(
+                "没有 Civitai API Key，公开页也没读到这张图的提示词 / 底模 / LoRA。把 token 放到 ~/.config/civitai/token，或改上传带 Comfy/A1111 参数的 PNG。"
+            )
+        raise ValueError(
+            err or f"Civitai 没返回这张图的生成参数（HTTP {gen_code or 404}）"
+        )
+    media_type = (
+        info_js.get("type") or js.get("type") or public_row.get("type") or "image"
+    )
     uuid = info_js.get("url") or public_row.get("url") or ""
     name = info_js.get("name") or ""
     media_url = ""
     if isinstance(uuid, str) and uuid.startswith("http"):
         media_url = uuid
     elif uuid:
-        ext = "mp4" if str(media_type) == "video" or str(name).endswith(".mp4") else "jpeg"
+        ext = (
+            "mp4"
+            if str(media_type) == "video" or str(name).endswith(".mp4")
+            else "jpeg"
+        )
         media_url = f"https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{uuid}/original=true/{uuid}.{ext}"
-    raw_sampler = meta.get("sampler") or file_parsed.get("sampler") or DEFAULTS["sampler"]
+    raw_sampler = (
+        meta.get("sampler") or file_parsed.get("sampler") or DEFAULTS["sampler"]
+    )
     raw_sched = meta.get("scheduler") or file_parsed.get("scheduler") or ""
     sampler, scheduler = _normalize_pair(raw_sampler, raw_sched)
     need = []
@@ -868,12 +1074,27 @@ def import_image(image_id: str) -> dict:
             vid = r.get("modelVersionId") or r.get("versionId")
         ver = fetched.get(vid) or _version_from_cache(vid) or {}
         air = (r.get("air") or ver.get("air") or "").strip()
-        typ = r.get("modelType") or r.get("type") or (ver.get("model") or {}).get("type") or ""
-        name = r.get("modelName") or r.get("name") or (ver.get("model") or {}).get("name") or ver.get("name") or ""
+        typ = (
+            r.get("modelType")
+            or r.get("type")
+            or (ver.get("model") or {}).get("type")
+            or ""
+        )
+        name = (
+            r.get("modelName")
+            or r.get("name")
+            or (ver.get("model") or {}).get("name")
+            or ver.get("name")
+            or ""
+        )
         if not air:
             mid = r.get("modelId") or ver.get("modelId")
-            air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
-        strength_raw = r.get("strength") if r.get("strength") is not None else r.get("weight")
+            air = _air_from_ids(
+                mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name
+            )
+        strength_raw = (
+            r.get("strength") if r.get("strength") is not None else r.get("weight")
+        )
         try:
             strength = float(strength_raw) if strength_raw is not None else 0.8
         except (TypeError, ValueError):
@@ -891,8 +1112,10 @@ def import_image(image_id: str) -> dict:
             if vid:
                 item["versionId"] = vid
             path = ""
-            for f in (ver.get("files") or []):
-                if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
+            for f in ver.get("files") or []:
+                if isinstance(f, dict) and (
+                    f.get("downloadUrl") or f.get("download_url")
+                ):
                     path = f.get("downloadUrl") or f.get("download_url")
                     break
             if not path and vid:
@@ -909,22 +1132,34 @@ def import_image(image_id: str) -> dict:
                 checkpoint_name = name or ""
     for tag in _prompt_lora_tags(meta.get("prompt") or ""):
         key = tag["name"].lower()
-        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
+        if any(
+            key == str(x.get("name") or "").lower()
+            or key in str(x.get("air") or "").lower()
+            for x in loras
+        ):
             continue
-        loras.append({
-            "air": "",
-            "strength": tag["strength"],
-            "name": tag["name"],
-        })
+        loras.append(
+            {
+                "air": "",
+                "strength": tag["strength"],
+                "name": tag["name"],
+            }
+        )
     if not checkpoint_air:
-        guessed = enrich_local_parse({
-            "checkpointName": checkpoint_name or meta.get("Model") or meta.get("checkpointName") or "",
-            "models": meta.get("models") or file_parsed.get("models") or [],
-            "Model": meta.get("Model") or "",
-        })
+        guessed = enrich_local_parse(
+            {
+                "checkpointName": checkpoint_name
+                or meta.get("Model")
+                or meta.get("checkpointName")
+                or "",
+                "models": meta.get("models") or file_parsed.get("models") or [],
+                "Model": meta.get("Model") or "",
+            }
+        )
         checkpoint_air = guessed.get("diffusionModel") or ""
         checkpoint_name = guessed.get("checkpointName") or checkpoint_name
     from .io_meta import coerce_int, dims_from_selector, first_int
+
     selector = None
     for cand in (file_parsed, meta, info_js, public_row):
         if isinstance(cand, dict):
@@ -952,15 +1187,26 @@ def import_image(image_id: str) -> dict:
     h = coerce_int(h, 1440) or 1440
     w = max(64, min(2048, (w // 16) * 16 or 16))
     h = max(64, min(2048, (h // 16) * 16 or 16))
-    kind = "video" if str(media_type) == "video" or "minimax" in (checkpoint_air or "").lower() else "image"
+    kind = (
+        "video"
+        if str(media_type) == "video" or "minimax" in (checkpoint_air or "").lower()
+        else "image"
+    )
     engine = None
     operation = None
     ecosystem = None
     model = "turbo"
-    base_blob = " ".join(str(x or "") for x in (
-        checkpoint_air, checkpoint_name, meta.get("engine"), meta.get("Model"),
-        public_row.get("baseModel"), info_js.get("baseModel"),
-    ))
+    base_blob = " ".join(
+        str(x or "")
+        for x in (
+            checkpoint_air,
+            checkpoint_name,
+            meta.get("engine"),
+            meta.get("Model"),
+            public_row.get("baseModel"),
+            info_js.get("baseModel"),
+        )
+    )
     if kind == "video":
         engine, operation = "minimax-h3-comfy", "imageToVideo"
     else:
@@ -972,14 +1218,24 @@ def import_image(image_id: str) -> dict:
             engine, ecosystem = "sdcpp", "zImage"
         elif eco == "qwen":
             engine, ecosystem = "sdcpp", "qwen"
-    svc = match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category=kind)
-    denoise = meta.get("denoise") if meta.get("denoise") is not None else file_parsed.get("denoise")
+    svc = match_service(
+        engine=engine,
+        operation=operation,
+        ecosystem=ecosystem,
+        model=model,
+        category=kind,
+    )
+    denoise = (
+        meta.get("denoise")
+        if meta.get("denoise") is not None
+        else file_parsed.get("denoise")
+    )
     try:
         denoise = float(denoise) if denoise is not None else None
     except (TypeError, ValueError):
         denoise = None
     unmatched = []
-    for n in (meta.get("unmatchedNodes") or file_parsed.get("unmatchedNodes") or []):
+    for n in meta.get("unmatchedNodes") or file_parsed.get("unmatchedNodes") or []:
         unmatched.append(str(n))
     comfy_blob = meta.get("comfy") if isinstance(meta.get("comfy"), dict) else None
     graph = {}
@@ -991,10 +1247,15 @@ def import_image(image_id: str) -> dict:
             if not isinstance(node, dict):
                 continue
             ctype = str(node.get("class_type") or node.get("type") or "")
-            if any(tok.lower() in ctype.lower() for tok in extra_toks) and ctype not in unmatched:
+            if (
+                any(tok.lower() in ctype.lower() for tok in extra_toks)
+                and ctype not in unmatched
+            ):
                 unmatched.append(ctype)
     if meta.get("vaes") or file_parsed.get("vaes"):
-        unmatched.append("VAE " + ", ".join((meta.get("vaes") or file_parsed.get("vaes") or [])[:2]))
+        unmatched.append(
+            "VAE " + ", ".join((meta.get("vaes") or file_parsed.get("vaes") or [])[:2])
+        )
     node_count = meta.get("comfyNodeCount") or file_parsed.get("comfyNodeCount")
     comfy_blob = meta.get("comfy") if isinstance(meta.get("comfy"), dict) else None
     if comfy_blob and not node_count:
@@ -1016,21 +1277,38 @@ def import_image(image_id: str) -> dict:
         "serviceId": (svc or {}).get("id"),
         "serviceName": (svc or {}).get("name"),
         "prompt": meta.get("prompt") or file_parsed.get("prompt") or "",
-        "negativePrompt": meta.get("negativePrompt") or file_parsed.get("negativePrompt") or "",
+        "negativePrompt": meta.get("negativePrompt")
+        or file_parsed.get("negativePrompt")
+        or "",
         "width": w,
         "height": h,
-        "steps": int(meta.get("steps") or file_parsed.get("steps") or (20 if kind == "video" else 8)),
-        "cfgScale": float(meta.get("cfgScale") if meta.get("cfgScale") is not None else (file_parsed.get("cfgScale") if file_parsed.get("cfgScale") is not None else 1)),
+        "steps": int(
+            meta.get("steps")
+            or file_parsed.get("steps")
+            or (20 if kind == "video" else 8)
+        ),
+        "cfgScale": float(
+            meta.get("cfgScale")
+            if meta.get("cfgScale") is not None
+            else (
+                file_parsed.get("cfgScale")
+                if file_parsed.get("cfgScale") is not None
+                else 1
+            )
+        ),
         "sampler": sampler,
         "scheduler": scheduler,
-        "seed": meta.get("seed") if meta.get("seed") is not None else file_parsed.get("seed"),
+        "seed": meta.get("seed")
+        if meta.get("seed") is not None
+        else file_parsed.get("seed"),
         "denoise": denoise,
         "model": model,
         "engine": engine,
         "operation": operation,
         "ecosystem": ecosystem,
         "diffusionModel": checkpoint_air,
-        "checkpointName": checkpoint_name or str(meta.get("Model") or file_parsed.get("checkpointName") or ""),
+        "checkpointName": checkpoint_name
+        or str(meta.get("Model") or file_parsed.get("checkpointName") or ""),
         "loras": loras,
         "mediaUrl": media_url,
         "mediaType": media_type,
@@ -1045,12 +1323,18 @@ def import_image(image_id: str) -> dict:
 
 
 def submit(body, whatif=False):
-    allow = True if not isinstance(body, dict) else bool(body.get("allowMatureContent", True))
-    q = urllib.parse.urlencode({
-        "whatif": "true" if whatif else "false",
-        "wait": "0",
-        "hideMatureContent": "false" if allow else "true",
-    })
+    allow = (
+        True
+        if not isinstance(body, dict)
+        else bool(body.get("allowMatureContent", True))
+    )
+    q = urllib.parse.urlencode(
+        {
+            "whatif": "true" if whatif else "false",
+            "wait": "0",
+            "hideMatureContent": "false" if allow else "true",
+        }
+    )
     return civitai(f"{ORCH}/v2/consumer/workflows?{q}", method="POST", body=body)
 
 
@@ -1062,10 +1346,102 @@ def workflow_urls(wf: dict) -> list[str]:
     return urls
 
 
+def _extract_caption(data) -> str:
+    if isinstance(data, str) and data.strip():
+        return data.strip()
+    if not isinstance(data, dict):
+        return ""
+    for key in ("caption", "text", "prompt", "description"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for step in data.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        found = _extract_caption(step.get("output") or step.get("result") or {})
+        if found:
+            return found
+    blobs = data.get("blobs") or data.get("output") or {}
+    if isinstance(blobs, dict):
+        found = _extract_caption(blobs)
+        if found:
+            return found
+    return ""
+
+
+def caption_media(media_url: str, model: str = "joy-caption") -> tuple[int, dict]:
+    """POST orchestration mediaCaptioning recipe. Real vision caption, never a fixed string."""
+    url = (media_url or "").strip()
+    if not url:
+        return 400, {"error": "缺少 mediaUrl", "code": "missing_url", "backend": "civitai"}
+    if not has_key():
+        return 401, {"error": "没有 Civitai API Key", "code": "no_key", "backend": "civitai"}
+    chosen = (model or "joy-caption").strip() or "joy-caption"
+    if chosen not in ("joy-caption", "ideogram4"):
+        chosen = "joy-caption"
+    body = {"mediaUrl": url, "model": chosen}
+    code, data = civitai(
+        f"{ORCH}/v2/consumer/recipes/mediaCaptioning?whatif=false",
+        method="POST",
+        body=body,
+        timeout=120,
+    )
+    if not isinstance(data, dict):
+        return 502, {"error": f"Civitai caption 返回无法解析（HTTP {code}）", "backend": "civitai"}
+    if code >= 400:
+        return code, {
+            "error": extract_error(data, data.get("title") or f"Civitai caption HTTP {code}"),
+            "code": "caption_failed",
+            "backend": "civitai",
+        }
+    caption = _extract_caption(data)
+    if caption:
+        return 200, {"caption": caption, "backend": "civitai", "model": chosen}
+    wf_id = data.get("id") or data.get("workflowId") or data.get("token")
+    if not wf_id:
+        return 502, {
+            "error": "Civitai caption 未返回描述",
+            "backend": "civitai",
+            "raw": {k: data.get(k) for k in list(data)[:12]},
+        }
+    deadline = time.time() + 90
+    last = data
+    while time.time() < deadline:
+        time.sleep(1.5)
+        poll, last = civitai(f"{ORCH}/v2/consumer/workflows/{wf_id}")
+        if not isinstance(last, dict):
+            continue
+        caption = _extract_caption(last)
+        if caption:
+            return 200, {
+                "caption": caption,
+                "backend": "civitai",
+                "model": chosen,
+                "workflowId": wf_id,
+            }
+        st = str(last.get("status") or "").lower()
+        if st in ("failed", "canceled", "cancelled", "error"):
+            return 502, {
+                "error": extract_error(last, f"Civitai caption {st}"),
+                "backend": "civitai",
+                "workflowId": wf_id,
+            }
+        if poll >= 400 and st not in ("pending", "processing", "queued"):
+            break
+    return 504, {
+        "error": "Civitai caption 超时，没有拿到描述",
+        "backend": "civitai",
+        "workflowId": wf_id,
+    }
+
 
 def fetch_models(q: str, limit=8, types=None, nsfw=True):
     """GET /api/v1/models. Nested versions have files[].name but no air."""
-    qs = {"limit": str(int(limit) or 8), "query": q, "nsfw": "true" if nsfw else "false"}
+    qs = {
+        "limit": str(int(limit) or 8),
+        "query": q,
+        "nsfw": "true" if nsfw else "false",
+    }
     if types:
         qs["types"] = types
     return civitai(f"{SITE}/models?" + urllib.parse.urlencode(qs))
@@ -1080,8 +1456,9 @@ def fetch_model_version_mini(vid):
 
 
 def fetch_model_version_by_hash(h: str):
-    return civitai(f"{SITE}/model-versions/by-hash/{urllib.parse.quote(str(h), safe='')}")
-
+    return civitai(
+        f"{SITE}/model-versions/by-hash/{urllib.parse.quote(str(h), safe='')}"
+    )
 
 
 def _wait_snapshot(data: dict) -> dict:
@@ -1176,15 +1553,25 @@ class CivitaiProvider(Provider):
         cat = category or ""
         st = status or ""
         qn = (q or "").lower()
+
         def _alnum(s):
             return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+
         if cat:
-            out = [x for x in out if x.get("category") == cat]
+            out = [x for x in out if category_matches(x.get("category"), cat)]
         if st:
             out = [x for x in out if x.get("status") == st]
         if qn:
             needle = _alnum(qn)
-            out = [x for x in out if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id")) or needle in _alnum(x.get("engine")) or needle in _alnum(x.get("ecosystem"))]
+            out = [
+                x
+                for x in out
+                if needle in _alnum(x.get("name"))
+                or needle in _alnum(x.get("id"))
+                or needle in _alnum(x.get("engine"))
+                or needle in _alnum(x.get("ecosystem"))
+            ]
+        out = [_catalog_capability(x) for x in out]
         body = {
             "total": total,
             "count": len(out),
@@ -1211,7 +1598,15 @@ class CivitaiProvider(Provider):
     def generate(self, payload: dict):
         if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=False)
-        body = build_workflow(payload or {})
+        try:
+            body = build_workflow(payload or {})
+        except UnknownServiceError as e:
+            return 400, {
+                "error": str(e),
+                "code": e.code,
+                "backend": "civitai",
+                "service": {"serviceId": e.service_id},
+            }
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=False)
         if isinstance(data, dict):
@@ -1225,12 +1620,24 @@ class CivitaiProvider(Provider):
     def whatif(self, payload: dict):
         if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=True)
-        body = build_workflow(payload or {})
+        try:
+            body = build_workflow(payload or {})
+        except UnknownServiceError as e:
+            return 400, {
+                "error": str(e),
+                "code": e.code,
+                "backend": "civitai",
+                "service": {"serviceId": e.service_id},
+            }
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=True)
         if isinstance(data, dict):
             data["service"] = meta
-            data["submittedInput"] = body["steps"][0]["input"] if body.get("steps") else {"serviceId": meta.get("serviceId")}
+            data["submittedInput"] = (
+                body["steps"][0]["input"]
+                if body.get("steps")
+                else {"serviceId": meta.get("serviceId")}
+            )
             data["backend"] = "civitai"
         return code, data
 
@@ -1264,7 +1671,10 @@ class CivitaiProvider(Provider):
                 "status": "canceled",
             }
         if isinstance(data, dict):
-            data.setdefault("error", data.get("message") or data.get("title") or f"Civitai 取消 HTTP {code}")
+            data.setdefault(
+                "error",
+                data.get("message") or data.get("title") or f"Civitai 取消 HTTP {code}",
+            )
             return code if code >= 400 else 400, data
         return code if code >= 400 else 400, {"error": f"Civitai 取消 HTTP {code}"}
 
@@ -1278,7 +1688,9 @@ class CivitaiProvider(Provider):
         return civitai(f"{ORCH}/health")
 
     def services(self, limit="50", offset="0"):
-        return civitai(f"{ORCH}/v2/services?limit={urllib.parse.quote(str(limit))}&offset={urllib.parse.quote(str(offset))}")
+        return civitai(
+            f"{ORCH}/v2/services?limit={urllib.parse.quote(str(limit))}&offset={urllib.parse.quote(str(offset))}"
+        )
 
     def list_jobs(self):
         return civitai(f"{ORCH}/v2/consumer/workflows")
@@ -1293,9 +1705,27 @@ class CivitaiProvider(Provider):
             for it in (data.get("items") or [])[:8]:
                 vers = []
                 for v in (it.get("modelVersions") or [])[:6]:
-                    files = [{"name": f.get("name"), "id": f.get("id")} for f in (v.get("files") or [])]
-                    vers.append({"id": v.get("id"), "name": v.get("name"), "baseModel": v.get("baseModel"), "files": files})
-                items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "source": "civitai", "versions": vers})
+                    files = [
+                        {"name": f.get("name"), "id": f.get("id")}
+                        for f in (v.get("files") or [])
+                    ]
+                    vers.append(
+                        {
+                            "id": v.get("id"),
+                            "name": v.get("name"),
+                            "baseModel": v.get("baseModel"),
+                            "files": files,
+                        }
+                    )
+                items.append(
+                    {
+                        "id": it.get("id"),
+                        "name": it.get("name"),
+                        "type": it.get("type"),
+                        "source": "civitai",
+                        "versions": vers,
+                    }
+                )
         return code, {"items": items}
 
     def search_loras(self, q: str, nsfw: bool = True):
@@ -1316,12 +1746,18 @@ class CivitaiProvider(Provider):
         return code, data
 
     def recipe(self, recipe: str, payload: dict):
-        q = urllib.parse.urlencode({
-            "whatif": "true" if (payload or {}).get("whatif") else "false",
-            "allowMatureContent": "true" if (payload or {}).get("allowMatureContent", True) else "false",
-        })
+        q = urllib.parse.urlencode(
+            {
+                "whatif": "true" if (payload or {}).get("whatif") else "false",
+                "allowMatureContent": "true"
+                if (payload or {}).get("allowMatureContent", True)
+                else "false",
+            }
+        )
         body = (payload or {}).get("input") or payload
-        return civitai(f"{ORCH}/v2/consumer/recipes/{recipe}?{q}", method="POST", body=body)
+        return civitai(
+            f"{ORCH}/v2/consumer/recipes/{recipe}?{q}", method="POST", body=body
+        )
 
     def capabilities(self):
         fp = DOCS / "capabilities.json"
@@ -1337,17 +1773,25 @@ class CivitaiProvider(Provider):
             "schedulers": SCHEDULERS,
             "catalogTotal": total,
             "catalogFetchedAt": fetched,
-            "categories": sorted({x.get("category") for x in items if x.get("category")}),
+            "categories": sorted(
+                {x.get("category") for x in items if x.get("category")}
+            ),
         }
 
     def lookup_air_file(self, filename: str):
         from . import civitai_workflows as cw
+
         rec = cw.lookup_filename(filename or "")
         return 200, rec
 
     def list_workflows(self, q="", username="", limit=30, nsfw=True):
         from .civitai_workflows import MOODY_USER
-        qs = {"types": "Workflows", "limit": str(int(limit) or 30), "nsfw": "true" if nsfw else "false"}
+
+        qs = {
+            "types": "Workflows",
+            "limit": str(int(limit) or 30),
+            "nsfw": "true" if nsfw else "false",
+        }
         if q:
             qs["query"] = q
         user = username or (MOODY_USER if not q else "")
@@ -1360,20 +1804,23 @@ class CivitaiProvider(Provider):
             for it in data.get("items") or []:
                 vers = it.get("modelVersions") or []
                 v = vers[0] if vers else {}
-                items.append({
-                    "id": it.get("id"),
-                    "name": it.get("name"),
-                    "type": it.get("type"),
-                    "nsfw": it.get("nsfw"),
-                    "versionId": v.get("id"),
-                    "versionName": v.get("name"),
-                    "air": v.get("air"),
-                    "url": f"https://civitai.com/models/{it.get('id')}?modelVersionId={v.get('id')}",
-                })
+                items.append(
+                    {
+                        "id": it.get("id"),
+                        "name": it.get("name"),
+                        "type": it.get("type"),
+                        "nsfw": it.get("nsfw"),
+                        "versionId": v.get("id"),
+                        "versionName": v.get("name"),
+                        "air": v.get("air"),
+                        "url": f"https://civitai.com/models/{it.get('id')}?modelVersionId={v.get('id')}",
+                    }
+                )
         return 200 if code == 200 else code, {"items": items, "username": user, "q": q}
 
     def import_workflow(self, raw: str, version_id=None):
         from . import civitai_workflows as cw
+
         ref = cw.parse_workflow_ref(raw)
         vid = version_id or ref.get("versionId")
         mid = ref.get("modelId")
@@ -1400,7 +1847,11 @@ class CivitaiProvider(Provider):
         class _StripAuthRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, req, fp, code, msg, headers, newurl):
                 if "civitai.com" not in (urllib.parse.urlparse(newurl).hostname or ""):
-                    headers = {k: v for k, v in req.headers.items() if k.lower() != "authorization"}
+                    headers = {
+                        k: v
+                        for k, v in req.headers.items()
+                        if k.lower() != "authorization"
+                    }
                     return urllib.request.Request(newurl, headers=headers, method="GET")
                 return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -1410,8 +1861,13 @@ class CivitaiProvider(Provider):
         last_err = None
         for cand in cands:
             fid = cand.get("id")
-            dl = f"https://civitai.com/api/download/models/{vid}" + (f"?fileId={fid}" if fid else "")
-            req = urllib.request.Request(dl, headers={"Authorization": f"Bearer {tok}", "User-Agent": "Mozilla/5.0"})
+            dl = f"https://civitai.com/api/download/models/{vid}" + (
+                f"?fileId={fid}" if fid else ""
+            )
+            req = urllib.request.Request(
+                dl,
+                headers={"Authorization": f"Bearer {tok}", "User-Agent": "Mozilla/5.0"},
+            )
             try:
                 with opener.open(req, timeout=90) as r:
                     raw_bytes = r.read()
@@ -1429,22 +1885,32 @@ class CivitaiProvider(Provider):
         cache = cw.CACHE / f"{vid}.json"
         cache.write_text(json.dumps(wf, ensure_ascii=False), encoding="utf-8")
         api_wf = cw.ui_to_api(wf)
-        summary = cw.summarize(wf, meta={
-            "modelId": ver.get("modelId") or mid,
-            "versionId": vid,
-            "name": (ver.get("model") or {}).get("name") or (meta_model or {}).get("name"),
-            "versionName": ver.get("name"),
-            "file": json_file.get("name"),
-            "air": ver.get("air"),
-        })
+        summary = cw.summarize(
+            wf,
+            meta={
+                "modelId": ver.get("modelId") or mid,
+                "versionId": vid,
+                "name": (ver.get("model") or {}).get("name")
+                or (meta_model or {}).get("name"),
+                "versionName": ver.get("name"),
+                "file": json_file.get("name"),
+                "air": ver.get("air"),
+            },
+        )
         summary["apiNodes"] = len(api_wf)
         summary["workflowApi"] = api_wf
         mapped = cw.resolve_resources(wf)
         summary["resources"] = mapped.get("resources") or []
         summary["airMap"] = mapped
-        n_file_ok = sum(1 for x in (mapped.get("files") or []) if x.get("status") == "matched")
+        n_file_ok = sum(
+            1 for x in (mapped.get("files") or []) if x.get("status") == "matched"
+        )
         n_file_miss = len(mapped.get("unmatchedFiles") or [])
-        n_node_ok = sum(len(x.get("nodes") or []) for x in (mapped.get("nodepacks") or []) if x.get("status") == "matched")
+        n_node_ok = sum(
+            len(x.get("nodes") or [])
+            for x in (mapped.get("nodepacks") or [])
+            if x.get("status") == "matched"
+        )
         n_node_miss = len(mapped.get("unmatchedNodes") or [])
         n_ok = n_file_ok + n_node_ok
         n_miss = n_file_miss + n_node_miss
@@ -1453,6 +1919,7 @@ class CivitaiProvider(Provider):
 
     def run_custom_comfy(self, payload, whatif=False):
         from . import civitai_workflows as cw
+
         api_wf = payload.get("comfyWorkflow") or payload.get("workflow")
         if isinstance(api_wf, dict) and api_wf.get("nodes"):
             api_wf = cw.ui_to_api(api_wf)
@@ -1461,7 +1928,11 @@ class CivitaiProvider(Provider):
         edits = payload.get("promptEdits") or []
         if edits:
             api_wf = cw.apply_prompt_edits(api_wf, edits)
-        resources = [x for x in (payload.get("resources") or []) if isinstance(x, str) and x.strip()]
+        resources = [
+            x
+            for x in (payload.get("resources") or [])
+            if isinstance(x, str) and x.strip()
+        ]
         mapped = None
         if not resources:
             mapped = cw.resolve_resources(api_wf)
@@ -1472,8 +1943,11 @@ class CivitaiProvider(Provider):
                 "airMap": mapped,
             }
         bare_packs = [
-            a for a in resources
-            if isinstance(a, str) and ":nodepack:" in a.lower() and ":nodepacklayer:" not in a.lower()
+            a
+            for a in resources
+            if isinstance(a, str)
+            and ":nodepack:" in a.lower()
+            and ":nodepacklayer:" not in a.lower()
         ]
         if bare_packs:
             shown = "、".join(bare_packs[:3])
@@ -1492,10 +1966,21 @@ class CivitaiProvider(Provider):
             "trace": payload.get("trace") or "none",
         }
         ci = payload.get("comfyImage") or ""
-        if isinstance(ci, str) and ci.startswith("urn:air:") and "comfyimage" in ci.lower():
+        if (
+            isinstance(ci, str)
+            and ci.startswith("urn:air:")
+            and "comfyimage" in ci.lower()
+        ):
             body["comfyImage"] = ci
         # Do not send sessionOwnerApiToken.
-        return self.recipe("customComfy", {"input": body, "whatif": whatif, "allowMatureContent": payload.get("allowMatureContent", True)})
+        return self.recipe(
+            "customComfy",
+            {
+                "input": body,
+                "whatif": whatif,
+                "allowMatureContent": payload.get("allowMatureContent", True),
+            },
+        )
 
 
 from . import register  # noqa: E402

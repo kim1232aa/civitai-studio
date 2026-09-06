@@ -27,7 +27,7 @@ WAN26_I2V = "video/wan/v2.6/fal/image-to-video"  # enum 720p/1080p，cap 无 asp
 WAN22_COMFY = "video/wan/v2.2/comfy"  # WxH 家族，无 resolution 字段
 SEEDANCE = "video/seedance"  # 非 wan，resolution 为 required
 NANO2 = "image/google/nano-banana-2"  # 图片枚举 1K/2K/4K
-KREA2 = "urn:air:flux1:checkpoint:civitai:1889679@2138541/krea2/turbo/createImage"
+KREA2 = "image/comfy/krea2/turbo/createImage"
 
 
 def ok(cond, msg):

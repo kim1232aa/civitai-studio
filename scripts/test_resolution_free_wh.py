@@ -90,7 +90,7 @@ def test_build_workflow_explicit_wh_wins():
 def test_video_resolution_token_untouched():
     """wan videoGen 的 resolution 是 catalog 令牌（720p），禁止被拆。"""
     body = build_workflow({"backend": "civitai", "kind": "video",
-                           "serviceId": "video/wan/v2.2/i2v",
+                           "serviceId": "video/wan/v2.2/fal/image-to-video",
                            "prompt": "a cat", "resolution": "720p",
                            "sourceImage": "https://example.com/a.jpg"})
     inp = body["steps"][0]["input"]

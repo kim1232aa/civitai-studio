@@ -204,6 +204,12 @@ def overlay_image_fields(item: dict) -> dict:
     )
     has_first = any(f in FIRST_IMAGE_FIELDS for f in fields)
     has_many = "image_urls" in fields
+    is_edit = (
+        "/edit" in eid
+        or fcat in ("image-to-image", "image-to-3d")
+        or "image-to-image" in eid
+        or "image-to-image" in blob
+    )
     if recipe in ("relight", "camera-angle", "inpaint"):
         out["needsSource"] = True
         out["needsFirstFrame"] = False
@@ -213,6 +219,10 @@ def overlay_image_fields(item: dict) -> dict:
         out["needsFirstFrame"] = bool(
             has_first or "image-to-video" in blob or "first-last" in blob or "reference-to-video" in blob
         )
+    elif is_edit:
+        # /edit and image-to-image still need a source even when the field is image_urls.
+        out["needsSource"] = True
+        out["needsFirstFrame"] = False
     elif has_many and not has_first:
         out["needsSource"] = False
     elif has_first:
@@ -1347,6 +1357,8 @@ class FalProvider(Provider):
         return sorted({x.get("category") for x in load_catalog() if x.get("category")})
 
     def catalog(self, q, category, status) -> dict:
+        from .catalog_ops import category_matches, enrich_catalog_item
+
         qn = (q or "").strip()
         items = [overlay_image_fields(x) for x in load_catalog()]
         unfiltered = len(items)
@@ -1361,9 +1373,10 @@ class FalProvider(Provider):
                     items.append(x)
                     by[eid] = x
         if category:
-            items = [x for x in items if x.get("category") == category]
+            items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
+        items = [enrich_catalog_item(x, "fal") for x in items]
         return {
             "total": unfiltered,
             "count": len(items),

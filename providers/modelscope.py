@@ -452,17 +452,21 @@ class ModelScopeProvider(Provider):
         qnl = qn.lower()
         items = [_apply_upscale_category(dict(x)) for x in items]
         if category:
-            items = [x for x in items if x.get("category") == category]
+            from .catalog_ops import category_matches
+
+            items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
         if qnl:
             needle = _alnum(qnl)
             items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
+        from .catalog_ops import enrich_catalog_item
+
         tagged = []
         for x in items:
             row = dict(x)
             row["backend"] = self.id
-            tagged.append(row)
+            tagged.append(enrich_catalog_item(row, self.id))
         return {
             "total": len(tagged),
             "count": len(tagged),
@@ -545,14 +549,21 @@ class ModelScopeProvider(Provider):
                     "error": f"{self.label} Hub 上没有 {mid}",
                     "code": "unknown_service",
                 }
+            if hub_code in (401, 403):
+                return 401, {
+                    **base,
+                    "error": f"{self.label} Hub 拒绝访问 {mid}（HTTP {hub_code}），无法确认模型存在，拒绝放行",
+                    "code": "forbidden",
+                }
             if hub_code == 200 and block:
                 source = "hub"
             else:
-                source = None
-                warnings.append({
-                    "code": "hub_unreachable",
-                    "message": f"没连上{self.label} Hub（HTTP {hub_code}），模型存在性这次没校验",
-                })
+                return 400, {
+                    **base,
+                    "error": f"没连上{self.label} Hub（HTTP {hub_code}），且目录里没有 {mid}，拒绝放行未知模型",
+                    "code": "unknown_service",
+                    "checked": {"hubStatus": hub_code, "modelSource": None},
+                }
 
         body, lora_skip = build_ms_body(p, mid)
         if lora_skip:

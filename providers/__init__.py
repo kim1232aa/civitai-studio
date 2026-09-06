@@ -29,7 +29,7 @@ def resolve_from_payload(payload: dict):
     for p in all_providers():
         if p.owns_service(sid):
             return p
-    return PROVIDERS.get("civitai")
+    return None
 
 
 def resolve_from_job(job_id: str):
@@ -46,8 +46,16 @@ def resolve_from_job(job_id: str):
 
 
 def list_public():
+    from .capabilities import get_provider_capabilities
+
     return [
-        {"id": p.id, "label": p.label, "hasKey": p.has_key(), "categories": p.categories()}
+        {
+            "id": p.id,
+            "label": p.label,
+            "hasKey": p.has_key(),
+            "categories": p.categories(),
+            "capabilities": get_provider_capabilities(p.id),
+        }
         for p in all_providers()
     ]
 

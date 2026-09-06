@@ -478,9 +478,14 @@ class HuggingFaceProvider(Provider):
             items = pins
         items = [_apply_upscale_category(dict(x)) for x in items]
         if category:
-            items = [x for x in items if x.get("category") == category]
+            from .catalog_ops import category_matches
+
+            items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
+        from .catalog_ops import enrich_catalog_item
+
+        items = [enrich_catalog_item(x, "huggingface") for x in items]
         return {
             "total": len(items),
             "count": len(items),

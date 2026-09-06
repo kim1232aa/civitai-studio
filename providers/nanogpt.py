@@ -752,8 +752,17 @@ def _row_text(it: dict) -> dict:
     }
 
 
+class CatalogFetchError(RuntimeError):
+    def __init__(self, message, code="catalog_fetch_failed"):
+        super().__init__(message)
+        self.code = code
+
+
 def fetch_text_catalog(force=False) -> list:
-    """Fetch official NanoGPT text model IDs; never infer chat models from image/video rows."""
+    """Fetch official NanoGPT text model IDs; never infer chat models from image/video rows.
+
+    A failed fetch must not overwrite a good cache with []. Empty failure raises.
+    """
     now = time.time()
     cache = _CACHE.setdefault("text", {"at": 0.0, "items": None})
     if not force and cache.get("items") is not None and now - (cache.get("at") or 0) < _TTL:
@@ -769,8 +778,13 @@ def fetch_text_catalog(force=False) -> list:
             if row["id"] not in seen:
                 seen.add(row["id"])
                 items.append(row)
-    cache["items"], cache["at"] = items, now
-    return list(items)
+        cache["items"], cache["at"] = items, now
+        cache["error"] = None
+        return list(items)
+    if cache.get("items"):
+        cache["stale"] = True
+        return list(cache["items"])
+    raise CatalogFetchError(f"NanoGPT 文本目录 HTTP {code}，没有可用缓存")
 
 
 def fetch_catalog(force=False) -> list:
@@ -780,9 +794,9 @@ def fetch_catalog(force=False) -> list:
     items, seen = [], set()
     headers = {"Accept": "application/json"}
     headers.update(_auth())
-    code, data = json_call(IMG_MODELS, headers=headers, timeout=30)
+    img_code, data = json_call(IMG_MODELS, headers=headers, timeout=30)
     block = (data or {}).get("data") if isinstance(data, dict) else None
-    if code == 200 and isinstance(block, list):
+    if img_code == 200 and isinstance(block, list):
         for it in block:
             if not isinstance(it, dict) or not it.get("id"):
                 continue
@@ -791,9 +805,9 @@ def fetch_catalog(force=False) -> list:
                 continue
             seen.add(row["id"])
             items.append(row)
-    code, data = json_call(VID_MODELS, headers=headers, timeout=30)
+    vid_code, data = json_call(VID_MODELS, headers=headers, timeout=30)
     block = (data or {}).get("data") if isinstance(data, dict) else None
-    if code == 200 and isinstance(block, list):
+    if vid_code == 200 and isinstance(block, list):
         for it in block:
             if not isinstance(it, dict) or not it.get("id"):
                 continue
@@ -802,17 +816,38 @@ def fetch_catalog(force=False) -> list:
                 continue
             seen.add(row["id"])
             items.append(row)
-    _CACHE["items"] = items
-    _CACHE["at"] = now
-    return list(items)
+    if items:
+        _CACHE["items"] = items
+        _CACHE["at"] = now
+        return list(items)
+    prev = _CACHE.get("items")
+    if prev:
+        return list(prev)
+    raise CatalogFetchError(f"NanoGPT 图/视频目录为空（image HTTP {img_code}, video HTTP {vid_code}）")
 
 
 def find_spec(mid: str) -> dict:
     mid = (mid or "").strip()
-    for it in fetch_catalog():
+    try:
+        pool = list(fetch_catalog())
+    except CatalogFetchError:
+        pool = []
+    try:
+        pool.extend(fetch_text_catalog())
+    except CatalogFetchError:
+        pass
+    for it in pool:
         if it.get("id") == mid:
             return it
     return {"id": mid, "supported_parameters": {}, "capabilities": {}}
+
+
+def known_nano_model(mid: str) -> bool:
+    mid = (mid or "").strip()
+    if not mid:
+        return False
+    spec = find_spec(mid)
+    return bool(spec.get("category") or spec.get("supported_parameters") or spec.get("capabilities"))
 
 
 def model_id(service_id: str) -> str:
@@ -972,29 +1007,47 @@ class NanoGptProvider(Provider):
         return bool(nano_key())
 
     def categories(self) -> list:
-        return sorted(
-            {x.get("category") for x in fetch_catalog() if x.get("category")}
-            | {x.get("category") for x in fetch_text_catalog() if x.get("category")}
-        )
+        cats = set()
+        try:
+            cats |= {x.get("category") for x in fetch_catalog() if x.get("category")}
+        except CatalogFetchError:
+            cats.update({"image", "video"})
+        try:
+            cats |= {x.get("category") for x in fetch_text_catalog() if x.get("category")}
+        except CatalogFetchError:
+            cats.add("text")
+        return sorted(cats) or ["image", "video", "text"]
 
     def catalog(self, q, category, status) -> dict:
-        # NanoGPT publishes text models from /models, separate from media catalogs.
-        items = fetch_text_catalog() if category in ("chat", "text") else fetch_catalog()
+        from .catalog_ops import category_matches, enrich_catalog_item
+
+        error = None
+        err_code = None
+        try:
+            items = fetch_text_catalog() if category in ("chat", "text") else fetch_catalog()
+        except CatalogFetchError as e:
+            items = []
+            error = str(e)
+            err_code = e.code
         qn = _alnum(q)
         if qn:
             items = [x for x in items if qn in _alnum((x.get("name") or "") + " " + (x.get("id") or "") + " " + " ".join(x.get("tags") or []))]
         if category:
-            wanted_category = "text" if category == "chat" else category
-            items = [x for x in items if x.get("category") == wanted_category]
+            items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
-        return {
+        items = [enrich_catalog_item(x, "nano-gpt") for x in items]
+        body = {
             "total": len(items),
             "count": len(items),
             "backend": self.id,
             "items": items,
             "hasKey": self.has_key(),
         }
+        if error:
+            body["error"] = error
+            body["code"] = err_code
+        return body
 
     def owns_service(self, service_id: str) -> bool:
         sid = (service_id or "").strip()
@@ -1010,10 +1063,63 @@ class NanoGptProvider(Provider):
         return pid in ("nano-gpt", "nanogpt", "nano") or (job_id or "").startswith("nano-gpt|")
 
     def whatif(self, payload: dict):
-        mid = model_id((payload or {}).get("serviceId") or "")
+        """Dry-run the same gates generate() hits. Never POST image/video endpoints."""
+        p = dict(payload or {})
+        sid = (p.get("serviceId") or "").strip()
+        mid = model_id(sid)
+        base = {"backend": self.id, "service": {"serviceId": mid or sid}}
+        if not sid:
+            return 400, {**base, "error": "缺少 NanoGPT 模型 id", "code": "missing_service"}
+        if looks_like_civitai_service(sid):
+            return 400, {
+                **base,
+                "error": "当前选中的是 Civitai 服务，不能发给 NanoGPT。请选 NanoGPT 目录里的模型。",
+                "code": "wrong_backend",
+            }
+        if not self.has_key():
+            return 401, {**base, "error": "没有 NanoGPT API Key", "code": "no_key"}
         spec = find_spec(mid)
+        if not known_nano_model(mid):
+            return 400, {**base, "error": f"NanoGPT 目录里没有 {mid}", "code": "unknown_service"}
+        errors, warnings = [], []
+        too = prompt_length_error(p.get("prompt"))
+        if too:
+            return 400, {**base, **too}
+        cat = (spec.get("category") or p.get("kind") or p.get("recipe") or "image").lower()
+        task = spec.get("task") or ""
+        is_video = cat == "video" or "video" in task
+        is_text = cat in ("text", "chat")
+        if not is_text and not (p.get("prompt") or "").strip():
+            errors.append({"code": "missing_prompt", "message": "prompt 是空的，NanoGPT 会直接打回"})
+        media = _source_images(p)
+        needs_img = bool(spec.get("needsSource")) or task == "image-to-image" or (
+            (spec.get("capabilities") or {}).get("image_to_image")
+            and not (spec.get("capabilities") or {}).get("image_generation", True)
+        )
+        needs_first = bool(spec.get("needsFirstFrame")) or task == "image-to-video"
+        if needs_img and not media:
+            errors.append({"code": "missing_input_media", "message": f"{mid} 是图生图，必须先接一张图"})
+        if is_video and needs_first and not media:
+            errors.append({"code": "missing_input_media", "message": f"{mid} 是图生视频，必须先接首帧"})
+        if is_video:
+            body = _video_body(p, spec)
+        elif is_text:
+            body = {"model": mid, "prompt": p.get("prompt") or ""}
+        else:
+            sp = spec.get("supported_parameters") or {}
+            if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
+                errors.append({
+                    "code": "missing_resolution",
+                    "message": "当前 NanoGPT 模型目录没有 resolutions，请换一个带分辨率列表的目录模型",
+                })
+            body = _image_body(p, spec)
+            if not body.get("resolution") and not body.get("size") and not any(e["code"] == "missing_resolution" for e in errors):
+                errors.append({
+                    "code": "missing_resolution",
+                    "message": "无法从目录选中 resolution token，请在构图里选一个目录分辨率",
+                })
         pricing = (spec.get("pricing") or {}).get("per_image") or {}
-        res = pick_resolution(spec, payload.get("width"), payload.get("height"), preferred=(payload or {}).get("resolution"))
+        res = pick_resolution(spec, p.get("width"), p.get("height"), preferred=p.get("resolution"))
         price = None
         if isinstance(pricing, dict) and pricing:
             key = res if res in pricing else ("auto" if "auto" in pricing else next(iter(pricing)))
@@ -1022,17 +1128,28 @@ class NanoGptProvider(Provider):
             except (TypeError, ValueError, KeyError):
                 price = None
         try:
-            n = max(1, int(payload.get("quantity") or 1))
+            n = max(1, int(p.get("quantity") or 1))
         except (TypeError, ValueError):
             n = 1
         note = "NanoGPT 按次美元计费，无黄 Buzz"
         if price is not None:
             note = f"约 ${price * n:.4f} USD · {note}"
-        return 200, {
-            "backend": self.id,
+        data = {
+            **base,
+            "operation": task or cat,
+            "submittedInput": body,
+            "warnings": warnings,
+            "checked": {"catalogSpec": True, "category": cat},
             "cost": {"total": None, "usd": price, "note": note},
-            "service": {"serviceId": mid, "resolution": res},
+            "service": {"serviceId": mid, "resolution": res, "category": cat},
         }
+        if errors:
+            data["errors"] = errors
+            data["error"] = errors[0]["message"]
+            data["code"] = errors[0]["code"]
+            return 400, data
+        data["ok"] = True
+        return 200, data
 
     def generate(self, payload: dict):
         key = nano_key()
@@ -1373,6 +1490,93 @@ def _parse_prompt_list(content: str, count: int) -> list:
         return []
     # 不足就报少, 不静默补空; 多了截断到 count。
     return items[:count]
+
+
+def pick_vision_model(explicit: str = "") -> str:
+    chosen = (explicit or "").strip()
+    if chosen.startswith("chat/"):
+        chosen = chosen[len("chat/"):]
+    if chosen:
+        return chosen
+    try:
+        items = fetch_text_catalog()
+    except CatalogFetchError as e:
+        raise CatalogFetchError(f"无法选择视觉模型：{e}", code=e.code) from e
+    ranked = []
+    for it in items:
+        mid = str(it.get("id") or "")
+        blob = " ".join(
+            [
+                mid,
+                str(it.get("name") or ""),
+                " ".join(str(t) for t in (it.get("tags") or [])),
+            ]
+        ).lower()
+        caps = it.get("capabilities") or {}
+        if caps.get("vision") or "vl" in blob or "vision" in blob:
+            score = 0
+            if "instruct" in blob:
+                score += 2
+            if "vl" in blob:
+                score += 3
+            ranked.append((score, mid))
+    ranked.sort(reverse=True)
+    if not ranked:
+        raise CatalogFetchError("NanoGPT 文本目录里没有视觉（vl/vision）模型")
+    return ranked[0][1]
+
+
+def caption_image(image_url: str, model: str = "") -> tuple[int, dict]:
+    """Vision chat completion. Caption text comes from the model, never a fixed string."""
+    key = nano_key()
+    if not key:
+        return 401, {"error": "没有 NanoGPT API Key", "code": "no_key", "backend": "nano-gpt"}
+    url = (image_url or "").strip()
+    if not url:
+        return 400, {"error": "缺少图片 url", "code": "missing_url", "backend": "nano-gpt"}
+    try:
+        mid = pick_vision_model(model)
+    except CatalogFetchError as e:
+        return 503, {"error": str(e), "code": e.code, "backend": "nano-gpt"}
+    prompt = (
+        "Describe this image so it can be reused as an image-generation prompt. "
+        "Be specific about subject, appearance, clothing, pose, setting, lighting, and camera. "
+        "Do not invent a backstory. Output only the description."
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": url}},
+            ],
+        }
+    ]
+    body = {"model": mid, "messages": messages, "max_tokens": 400}
+    code, data = json_call(CHAT_COMPLETIONS, method="POST", headers=_auth(), body=body, timeout=90)
+    if code >= 400 or not isinstance(data, dict):
+        return (
+            code if code >= 400 else 502,
+            {
+                "error": extract_error(data, f"NanoGPT vision HTTP {code}"),
+                "code": "caption_failed",
+                "backend": "nano-gpt",
+                "model": mid,
+            },
+        )
+    choices = data.get("choices") or []
+    content = ""
+    if choices and isinstance(choices[0], dict):
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    if not content:
+        return 502, {
+            "error": "NanoGPT vision 未返回描述",
+            "code": "empty_caption",
+            "backend": "nano-gpt",
+            "model": mid,
+        }
+    return 200, {"caption": content, "backend": "nano-gpt", "model": mid}
 
 
 def chat_story(payload: dict):
