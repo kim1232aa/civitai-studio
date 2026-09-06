@@ -1019,16 +1019,33 @@ class NanoGptProvider(Provider):
         return sorted(cats) or ["image", "video", "text"]
 
     def catalog(self, q, category, status) -> dict:
+        from collections import Counter
         from .catalog_ops import category_matches, enrich_catalog_item
 
         error = None
         err_code = None
+        imgvid, text = [], []
         try:
-            items = fetch_text_catalog() if category in ("chat", "text") else fetch_catalog()
+            imgvid = fetch_catalog()
         except CatalogFetchError as e:
-            items = []
-            error = str(e)
-            err_code = e.code
+            if category not in ("chat", "text"):
+                error = str(e)
+                err_code = e.code
+        try:
+            text = fetch_text_catalog()
+        except CatalogFetchError as e:
+            if category in ("chat", "text"):
+                error = str(e)
+                err_code = e.code
+        if category in ("chat", "text"):
+            items = list(text)
+            page_source = TEXT_MODELS
+        else:
+            items = list(imgvid)
+            page_source = f"{IMG_MODELS} + {VID_MODELS}"
+        cat_counts = Counter()
+        for x in list(imgvid) + list(text):
+            cat_counts[x.get("category") or "unknown"] += 1
         qn = _alnum(q)
         if qn:
             items = [x for x in items if qn in _alnum((x.get("name") or "") + " " + (x.get("id") or "") + " " + " ".join(x.get("tags") or []))]
@@ -1043,6 +1060,17 @@ class NanoGptProvider(Provider):
             "backend": self.id,
             "items": items,
             "hasKey": self.has_key(),
+            "categories": dict(cat_counts),
+            "pagination": {
+                "page": 1,
+                "pageSize": len(items),
+                "pagesFetched": 1,
+                "pages": 1,
+                "hasMore": False,
+                "source": page_source,
+                "sourceTotal": (len(text) if category in ("chat", "text") else len(imgvid)),
+                "limit": None,
+            },
         }
         if error:
             body["error"] = error

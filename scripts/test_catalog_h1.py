@@ -74,6 +74,8 @@ fal = FalProvider()
 fbody = fal.catalog("", "image", "")
 fitems = fbody.get("items") or []
 check("fal/image n=671", len(fitems) == 671, str(len(fitems)))
+check("fal 报分类实数", isinstance(fbody.get("categories"), dict) and (fbody.get("categories") or {}).get("image") == 671, str(fbody.get("categories")))
+check("fal 报分页实数", (fbody.get("pagination") or {}).get("hasMore") is False and (fbody.get("pagination") or {}).get("sourceTotal") == fbody.get("unfilteredTotal"), str(fbody.get("pagination")))
 check("fal/image 每条有 operation", all(x.get("operation") for x in fitems), str([x.get("id") for x in fitems if not x.get("operation")][:5]))
 first = fitems[0] if fitems else {}
 check(
@@ -95,12 +97,22 @@ check("cameraAngle 别名同 4 条", cam_b.get("count") == 4, str(cam_b.get("cou
 check("camera-angle operation", all(x.get("operation") == "camera-angle" for x in (cam_a.get("items") or [])), str(cam_a.get("items")))
 
 print("huggingface")
-hf = HuggingFaceProvider()
-hbody = hf.catalog("", "image", "")
-hitems = hbody.get("items") or []
-check("hf image n>0", len(hitems) > 0, str(len(hitems)))
-check("hf 图全 t2i", all(x.get("operation") == "t2i" for x in hitems), str([(x.get("id"), x.get("operation")) for x in hitems]))
-check("hf i2i=none 不进 supportedOperations", all("i2i" not in (x.get("supportedOperations") or []) for x in hitems), str(hitems[0].get("supportedOperations") if hitems else None))
+from providers import huggingface as hf_mod
+
+# H1 is the field contract. Live Hub roster is scripts/test_w3_roster.py — do not
+# hang this disk-only test on huggingface.co.
+_orig_roster = hf_mod.fetch_hf_roster
+hf_mod.fetch_hf_roster = lambda q="", category="": (list(hf_mod.load_items()), {"source": "hub", "pageSize": 100, "pagesFetched": 0, "hasMore": False, "hubCount": 0, "pipes": {}})
+try:
+    hf = HuggingFaceProvider()
+    hbody = hf.catalog("", "image", "")
+    hitems = hbody.get("items") or []
+    check("hf image n>0", len(hitems) > 0, str(len(hitems)))
+    check("hf 图全 t2i", all(x.get("operation") == "t2i" for x in hitems), str([(x.get("id"), x.get("operation")) for x in hitems]))
+    check("hf i2i=none 不进 supportedOperations", all("i2i" not in (x.get("supportedOperations") or []) for x in hitems), str(hitems[0].get("supportedOperations") if hitems else None))
+    check("hf catalog 带 categories/pagination", isinstance(hbody.get("categories"), dict) and isinstance(hbody.get("pagination"), dict), str(hbody.keys()))
+finally:
+    hf_mod.fetch_hf_roster = _orig_roster
 
 print("H8")
 caps = get_provider_capabilities("civitai")

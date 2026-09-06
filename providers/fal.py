@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 from .base import Provider
@@ -1372,6 +1373,7 @@ class FalProvider(Provider):
                 if eid and eid not in by:
                     items.append(x)
                     by[eid] = x
+        cat_counts = dict(Counter((x.get("category") or "unknown") for x in items))
         if category:
             items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
@@ -1385,6 +1387,17 @@ class FalProvider(Provider):
             "hasFal": has_key(),
             "hasKey": has_key(),
             "unfilteredTotal": unfiltered,
+            "categories": cat_counts,
+            "pagination": {
+                "page": 1,
+                "pageSize": len(items),
+                "pagesFetched": 1,
+                "pages": 1,
+                "hasMore": False,
+                "source": "docs/fal-models.json",
+                "sourceTotal": unfiltered,
+                "limit": None,
+            },
         }
 
     def owns_service(self, service_id: str) -> bool:

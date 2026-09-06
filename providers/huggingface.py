@@ -6,6 +6,11 @@ import re
 import os
 import time
 import uuid
+import threading
+import urllib.error
+import urllib.request
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import quote
 
@@ -26,6 +31,16 @@ _PREF = ("fal-ai", "nscale", "wavespeed", "together", "hf-inference")
 _SKIP_OPENAI = {"replicate"}
 _MAP_CACHE = {"at": 0.0, "items": {}}
 _MAP_TTL = 300
+_HUB_LIST_CACHE = {"at": 0.0, "pipes": {}}
+_HUB_LIST_LOCK = threading.Lock()
+_HUB_PAGE = 100
+_HUB_MAX_PAGES = 6
+_PIPE_BY_CATEGORY = {
+    "image": ("text-to-image", "image-to-image"),
+    "video": ("text-to-video", "image-to-video"),
+    "upscale": ("image-to-image", "text-to-image"),
+}
+_ADAPTER_RE = re.compile(r"(lora|lycoris|locon|lokr)", re.I)
 
 
 def hf_key() -> str:
@@ -73,6 +88,37 @@ def hub_probe(mid: str) -> tuple[int, dict]:
     return code, data if isinstance(data, dict) else {"error": str(data)}
 
 
+def _normalize_mapping(raw) -> dict:
+    """Hub `inferenceProviderMapping` is a list of {provider, status, ...} now.
+
+    Older payloads were `{providerName: {status, providerId}}`. generate/whatif
+    and the catalog live-filter all need the dict shape.
+    """
+    if isinstance(raw, dict):
+        if not raw:
+            return {}
+        if all(isinstance(v, dict) for v in raw.values()):
+            return raw
+        return {}
+    if isinstance(raw, list):
+        out = {}
+        for it in raw:
+            if not isinstance(it, dict):
+                continue
+            name = (it.get("provider") or it.get("name") or "").strip()
+            if name:
+                out[name] = it
+        return out
+    return {}
+
+
+def _has_live_provider(mapping) -> bool:
+    for info in _normalize_mapping(mapping).values():
+        if isinstance(info, dict) and (info.get("status") or "").lower() == "live":
+            return True
+    return False
+
+
 def inference_mapping(mid: str) -> dict:
     now = time.time()
     cached = (_MAP_CACHE.get("items") or {}).get(mid)
@@ -81,9 +127,7 @@ def inference_mapping(mid: str) -> dict:
     code, data = hub_probe(mid)
     mapping = {}
     if code == 200 and isinstance(data, dict):
-        mapping = data.get("inferenceProviderMapping") or {}
-        if not isinstance(mapping, dict):
-            mapping = {}
+        mapping = _normalize_mapping(data.get("inferenceProviderMapping"))
     items = dict(_MAP_CACHE.get("items") or {})
     items[mid] = mapping
     _MAP_CACHE["items"] = items
@@ -454,6 +498,256 @@ def search_loras(q: str, limit: int = 8):
     return 200, {"items": items, "backend": "huggingface"}
 
 
+def _link_next(headers) -> str:
+    link = ""
+    if isinstance(headers, dict):
+        link = headers.get("Link") or headers.get("link") or ""
+    for part in (link or "").split(","):
+        if 'rel="next"' in part:
+            m = re.search(r"<([^>]+)>", part)
+            if m:
+                return m.group(1)
+    return ""
+
+
+def _is_adapter_id(mid: str) -> bool:
+    """LoRA/LyCORIS adapters are not generation services. LoRA search is a separate API."""
+    return bool(_ADAPTER_RE.search(mid or ""))
+
+
+def _hub_get(url: str, timeout: int = 25):
+    """Hub list GET that keeps Link headers for cursor pagination."""
+    headers = _hf_headers()
+    hdrs = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0",
+    }
+    hdrs.update(headers or {})
+    req = urllib.request.Request(url, headers=hdrs, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            try:
+                parsed = json.loads(raw.decode())
+            except json.JSONDecodeError:
+                parsed = {"raw": raw[:2000].decode("utf-8", "replace")}
+            return r.status, parsed, dict(r.headers)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {"raw": raw[:2000]}
+        if isinstance(parsed, dict):
+            parsed = dict(parsed)
+            parsed.setdefault("error", extract_error(parsed, f"HTTP {e.code}"))
+        return e.code, parsed, dict(e.headers)
+    except urllib.error.URLError as e:
+        return 502, {"error": "网络错误", "detail": str(getattr(e, "reason", e))}, {}
+    except Exception as e:
+        return 502, {"error": "请求失败", "detail": str(e)}, {}
+
+
+def _pipes_for_category(category: str) -> tuple:
+    from .catalog_ops import canonical_category
+
+    want = canonical_category(category)
+    if want in _PIPE_BY_CATEGORY:
+        return _PIPE_BY_CATEGORY[want]
+    if want:
+        return tuple(k for k, spec in HF_PIPES.items() if spec[0] == want)
+    return tuple(HF_PIPES)
+
+
+def fetch_hub_pipe(pipe: str, search: str = ""):
+    """One pipeline_tag, inference_provider=all, Link-paginated.
+
+    Keeps models with a live inference provider. Drops LoRA adapters so the
+    service picker is not a wall of dead buttons. Pins are applied by the caller.
+    """
+    q = (search or "").strip()
+    url = (
+        f"{HUB}?pipeline_tag={quote(pipe)}"
+        f"&inference_provider=all&sort=downloads&limit={_HUB_PAGE}"
+        f"&expand[]=inferenceProviderMapping"
+    )
+    if q:
+        url += f"&search={quote(q)}"
+    items, seen = [], set()
+    pages = 0
+    has_more = False
+    reachable = False
+    while url and pages < _HUB_MAX_PAGES:
+        code, data, headers = _hub_get(url)
+        pages += 1
+        if code != 200 or not isinstance(data, list):
+            break
+        reachable = True
+        for it in data:
+            if not isinstance(it, dict):
+                continue
+            mid = (it.get("id") or "").strip()
+            row_pipe = it.get("pipeline_tag") or pipe
+            if not mid or mid in seen:
+                continue
+            if row_pipe not in HF_PIPES:
+                continue
+            if _is_adapter_id(mid):
+                continue
+            mapping = it.get("inferenceProviderMapping")
+            if mapping not in (None, "", [], {}) and not _has_live_provider(mapping):
+                continue
+            seen.add(mid)
+            items.append(_hf_row(mid, mid.split("/")[-1], row_pipe))
+        nxt = _link_next(headers)
+        if not nxt:
+            has_more = False
+            url = ""
+            break
+        has_more = True
+        url = nxt
+    meta = {
+        "pagesFetched": pages,
+        "pageSize": _HUB_PAGE,
+        "hasMore": bool(has_more),
+        "kept": len(items),
+        "reachable": reachable,
+        "pipe": pipe,
+    }
+    return items, meta
+
+
+def fetch_hub_pipe_cached(pipe: str, search: str = ""):
+    q = (search or "").strip()
+    if q:
+        return fetch_hub_pipe(pipe, q)
+    now = time.time()
+    with _HUB_LIST_LOCK:
+        hit = (_HUB_LIST_CACHE.get("pipes") or {}).get(pipe)
+        if hit and (now - (_HUB_LIST_CACHE.get("at") or 0)) < _MAP_TTL:
+            return list(hit.get("items") or []), dict(hit.get("meta") or {})
+    items, meta = fetch_hub_pipe(pipe)
+    with _HUB_LIST_LOCK:
+        pipes = dict(_HUB_LIST_CACHE.get("pipes") or {})
+        pipes[pipe] = {"items": list(items), "meta": dict(meta)}
+        _HUB_LIST_CACHE["pipes"] = pipes
+        _HUB_LIST_CACHE["at"] = now
+    return items, meta
+
+
+def _cached_hub_items():
+    out = []
+    seen = set()
+    for pack in (_HUB_LIST_CACHE.get("pipes") or {}).values():
+        for x in pack.get("items") or []:
+            mid = x.get("id")
+            if mid and mid not in seen:
+                seen.add(mid)
+                out.append(x)
+    return out
+
+
+def spec_for(mid: str) -> dict:
+    want = (mid or "").strip()
+    if not want:
+        return {}
+    for x in load_items():
+        if x.get("id") == want:
+            return x
+    for x in _cached_hub_items():
+        if x.get("id") == want:
+            return x
+    return {}
+
+
+def fetch_hf_roster(q: str = "", category: str = ""):
+    """Hub list + pins-on-top. Pins are never the entire roster when Hub is up.
+
+    Returns (items, meta). Hub unreachable → items=[] and meta.source=unreachable
+    so catalog() can fall back to pins.
+    """
+    qn = (q or "").strip()
+    pipes = _pipes_for_category(category)
+    if not pipes:
+        return [], {
+            "source": "hub",
+            "pageSize": _HUB_PAGE,
+            "pagesFetched": 0,
+            "hasMore": False,
+            "pipes": {},
+            "hubCount": 0,
+        }
+    pipe_meta = {}
+    hub, seen = [], set()
+    reachable = False
+
+    def _one(pipe):
+        return pipe, fetch_hub_pipe_cached(pipe, qn)
+
+    if len(pipes) == 1:
+        rows = [_one(pipes[0])]
+    else:
+        rows = []
+        with ThreadPoolExecutor(max_workers=min(4, len(pipes))) as pool:
+            futs = [pool.submit(_one, p) for p in pipes]
+            for fut in futs:
+                try:
+                    rows.append(fut.result())
+                except Exception as e:
+                    rows.append((None, ([], {"reachable": False, "error": str(e)})))
+    for pipe, pack in rows:
+        items, meta = pack if isinstance(pack, tuple) else ([], {})
+        if pipe:
+            pipe_meta[pipe] = meta
+        if meta.get("reachable"):
+            reachable = True
+        for x in items:
+            mid = x.get("id")
+            if mid and mid not in seen:
+                seen.add(mid)
+                hub.append(x)
+    if qn and qn.count("/") == 1 and " " not in qn and qn not in seen:
+        code, data = json_call(f"{HUB}/{quote(qn, safe='/')}", headers=_hf_headers(), timeout=20)
+        if code == 200 and isinstance(data, dict):
+            mid = data.get("id") or qn
+            pipe = data.get("pipeline_tag") or "text-to-image"
+            if pipe not in HF_PIPES:
+                pipe = "text-to-image"
+            hub.insert(0, _hf_row(mid, mid.split("/")[-1], pipe))
+            seen.add(mid)
+            reachable = True
+    has_more = any((m or {}).get("hasMore") for m in pipe_meta.values())
+    pages = sum(int((m or {}).get("pagesFetched") or 0) for m in pipe_meta.values())
+    meta = {
+        "source": "hub" if reachable else "unreachable",
+        "pageSize": _HUB_PAGE,
+        "pagesFetched": pages,
+        "hasMore": has_more,
+        "pipes": pipe_meta,
+        "hubCount": len(hub),
+    }
+    return hub, meta
+
+
+def _pin_on_top(hub: list, pins: list) -> list:
+    """Pins first (category-matching ones), then Hub rows not already pinned."""
+    seen = set()
+    out = []
+    for p in pins:
+        pid = p.get("id")
+        if pid and pid not in seen:
+            row = dict(p)
+            row["pinned"] = True
+            out.append(row)
+            seen.add(pid)
+    for x in hub:
+        mid = x.get("id")
+        if mid and mid not in seen:
+            out.append(x)
+            seen.add(mid)
+    return out
+
+
 class HuggingFaceProvider(Provider):
     id = "huggingface"
     label = "Hugging Face"
@@ -467,25 +761,36 @@ class HuggingFaceProvider(Provider):
     def categories(self) -> list:
         cats = {x.get("category") for x in load_items() if x.get("category")}
         cats.update({"image", "video", "upscale", "utility"})
+        for x in _cached_hub_items():
+            if x.get("category"):
+                cats.add(x.get("category"))
         return sorted(cats)
 
     def catalog(self, q, category, status) -> dict:
         qn = (q or "").strip()
         pins = list(load_items())
-        if qn:
-            items = search_hf(qn, pins)
+        hub, roster_meta = fetch_hf_roster(qn, category)
+        if roster_meta.get("source") == "unreachable":
+            items = [dict(p, pinned=True) for p in pins]
+            source = "hardcoded_fallback"
         else:
-            items = pins
+            items = _pin_on_top(hub, pins)
+            source = "hub"
         items = [_apply_upscale_category(dict(x)) for x in items]
+        unfiltered = list(items)
         if category:
             from .catalog_ops import category_matches
 
             items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
+        if qn and source == "hardcoded_fallback":
+            needle = _alnum(qn)
+            items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
         from .catalog_ops import enrich_catalog_item
 
         items = [enrich_catalog_item(x, "huggingface") for x in items]
+        cat_counts = dict(Counter((x.get("category") or "unknown") for x in unfiltered))
         return {
             "total": len(items),
             "count": len(items),
@@ -493,6 +798,16 @@ class HuggingFaceProvider(Provider):
             "items": items,
             "hasKey": self.has_key(),
             "hub": HUB,
+            "categories": cat_counts,
+            "pagination": {
+                "page": 1,
+                "pageSize": roster_meta.get("pageSize") or _HUB_PAGE,
+                "pagesFetched": roster_meta.get("pagesFetched") or 0,
+                "hasMore": bool(roster_meta.get("hasMore")),
+                "source": source,
+                "hubCount": roster_meta.get("hubCount") or 0,
+            },
+            "hubPipes": roster_meta.get("pipes") or {},
         }
 
     def owns_service(self, service_id: str) -> bool:
@@ -502,6 +817,7 @@ class HuggingFaceProvider(Provider):
         if sid.startswith(("hf/", "huggingface/")):
             return True
         ids = {x.get("id") for x in load_items()}
+        ids |= {x.get("id") for x in _cached_hub_items()}
         return sid in ids
 
     def owns_job(self, job_id: str) -> bool:
@@ -534,7 +850,7 @@ class HuggingFaceProvider(Provider):
             return 400, {**base, "error": f"不是 Hub 模型 id（应形如 owner/model）：{sid}", "code": "missing_service"}
         base["service"]["serviceId"] = mid
 
-        spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
+        spec = spec_for(mid) or {}
         code, info = hub_probe(mid)
         if code == 404:
             return 400, {**base, "error": f"Hugging Face Hub 上没有 {mid}", "code": "unknown_service"}
@@ -545,9 +861,7 @@ class HuggingFaceProvider(Provider):
                 "code": "forbidden",
             }
         reachable = code == 200
-        mapping = (info.get("inferenceProviderMapping") or {}) if reachable else {}
-        if not isinstance(mapping, dict):
-            mapping = {}
+        mapping = _normalize_mapping((info.get("inferenceProviderMapping") if reachable else None))
         task = spec.get("task") or (info.get("pipeline_tag") if reachable else "") or ""
         if reachable and not mapping:
             return 400, {
@@ -647,7 +961,7 @@ class HuggingFaceProvider(Provider):
         mid = model_id(sid)
         if not mid:
             return 400, {"error": "缺少 Hugging Face 模型 id"}
-        spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
+        spec = spec_for(mid) or {}
         mapping = inference_mapping(mid)
         candidates = _provider_candidates(mapping, mid, spec)
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})

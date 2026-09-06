@@ -4,6 +4,8 @@ import json
 import re
 import os
 import socket
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import time
 from urllib.parse import urlparse, quote
@@ -148,10 +150,12 @@ HUB_TASKS = (
     ("text-to-video-synthesis", "video", "text-to-video", ["t2v"], False, False),
     ("image-to-video", "video", "image-to-video", ["i2v"], False, True),
 )
-_HUB_CACHE = {"at": 0.0, "items": None, "totals": {}}
+_HUB_CACHE = {"at": 0.0, "items": None, "totals": {}, "by_key": {}}
 _HUB_TTL = 300
 _HUB_PAGE = 50
-_HUB_PAGES = 2
+# page_size max 50. 20 pages = 1000 / task. Smaller tasks (i2i 830, i2v 561) exhaust.
+_HUB_PAGES = 20
+_HUB_WORKERS = 8
 
 
 def _alnum(s):
@@ -199,7 +203,7 @@ def _classify_hub(it):
 
 
 def fetch_hub_search(search):
-    """One Hub search= call. Do not loop 4 tasks x 2 pages."""
+    """Hub search=. Paginate until total_count or 3 pages — typeahead must stay fast."""
     items, seen, totals = [], set(), {}
     q = (search or "").strip()
     if not q:
@@ -214,65 +218,146 @@ def fetch_hub_search(search):
             if row["id"] and row["id"] not in seen:
                 seen.add(row["id"])
                 items.append(row)
-    qs = f"search={quote(q)}&sort=downloads&page_size={_HUB_PAGE}&page_number=1"
-    code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=25)
-    block = data.get("data") if isinstance(data, dict) else None
-    models = (block.get("models") or []) if isinstance(block, dict) else []
-    try:
-        totals["search"] = int((block or {}).get("total_count") or 0)
-    except (TypeError, ValueError):
-        totals["search"] = len(models)
-    for it in models:
-        if not isinstance(it, dict):
-            continue
-        cls = _classify_hub(it)
-        if not cls:
-            continue
-        row = _hub_row(it, *cls)
-        if not row["id"] or row["id"] in seen:
-            continue
-        seen.add(row["id"])
-        items.append(row)
+    total = 0
+    search_pages = 3
+    reachable = False
+    for page in range(1, search_pages + 1):
+        qs = f"search={quote(q)}&sort=downloads&page_size={_HUB_PAGE}&page_number={page}"
+        code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=25)
+        block = data.get("data") if isinstance(data, dict) else None
+        if code != 200 or not isinstance(block, dict):
+            break
+        reachable = True
+        models = block.get("models") or []
+        try:
+            total = int(block.get("total_count") or 0)
+        except (TypeError, ValueError):
+            total = max(total, len(models))
+        for it in models:
+            if not isinstance(it, dict):
+                continue
+            cls = _classify_hub(it)
+            if not cls:
+                continue
+            row = _hub_row(it, *cls)
+            if not row["id"] or row["id"] in seen:
+                continue
+            seen.add(row["id"])
+            items.append(row)
+        if not models or page * _HUB_PAGE >= total:
+            break
+    totals["search"] = total
+    totals["_reachable"] = reachable
+    totals["_pagesFetched"] = min(search_pages, max(1, (total + _HUB_PAGE - 1) // _HUB_PAGE if total else 1))
+    totals["_hasMore"] = bool(total and len(items) < total)
+    totals["_pageSize"] = _HUB_PAGE
     return items, totals
 
 
-def fetch_hub(search=""):
+def _hub_tasks_for_category(category: str):
+    from .catalog_ops import canonical_category
+
+    want = canonical_category(category)
+    if want == "upscale":
+        return tuple(t for t in HUB_TASKS if t[1] == "image")
+    if want in ("image", "video"):
+        return tuple(t for t in HUB_TASKS if t[1] == want)
+    if want:
+        return tuple(t for t in HUB_TASKS if t[1] == want)
+    return HUB_TASKS
+
+
+def _fetch_task_page(hub_task, page, search=""):
+    qs = (
+        f"filter.task={quote(hub_task, safe='')}&sort=downloads"
+        f"&page_size={_HUB_PAGE}&page_number={page}"
+    )
+    if search:
+        qs += f"&search={quote(search)}"
+    code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=30)
+    block = data.get("data") if isinstance(data, dict) else None
+    return code, block if isinstance(block, dict) else None
+
+
+def _rows_from_block(block, hub_task, cat, task, tags, needs_src, needs_ff, seen):
+    rows = []
+    models = (block or {}).get("models") or []
+    for it in models:
+        if not isinstance(it, dict):
+            continue
+        row = _hub_row(it, cat, task, tags, needs_src, needs_ff)
+        row["hubTask"] = hub_task
+        if not row["id"] or row["id"] in seen:
+            continue
+        seen.add(row["id"])
+        rows.append(row)
+    return rows
+
+
+def fetch_hub(search="", category=""):
     if (search or "").strip():
         return fetch_hub_search(search)
     items = []
     seen = set()
     totals = {}
-    for hub_task, cat, task, tags, needs_src, needs_ff in HUB_TASKS:
-        total = 0
-        for page in range(1, _HUB_PAGES + 1):
-            qs = (
-                f"filter.task={quote(hub_task, safe='')}&sort=downloads"
-                f"&page_size={_HUB_PAGE}&page_number={page}"
-            )
-            if search:
-                qs += f"&search={quote(search)}"
-            code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=30)
-            block = data.get("data") if isinstance(data, dict) else None
-            if code != 200 or not isinstance(block, dict):
-                break
-            models = block.get("models") or []
-            try:
-                total = int(block.get("total_count") or 0)
-            except (TypeError, ValueError):
-                total = 0
-            totals[hub_task] = total
-            for it in models:
-                if not isinstance(it, dict):
+    pages_fetched = 0
+    has_more = False
+    reachable = False
+    tasks = _hub_tasks_for_category(category)
+    for hub_task, cat, task, tags, needs_src, needs_ff in tasks:
+        code, block = _fetch_task_page(hub_task, 1)
+        pages_fetched += 1
+        if code != 200 or not isinstance(block, dict):
+            totals[hub_task] = 0
+            continue
+        reachable = True
+        try:
+            total = int(block.get("total_count") or 0)
+        except (TypeError, ValueError):
+            total = len(block.get("models") or [])
+        totals[hub_task] = total
+        items.extend(_rows_from_block(block, hub_task, cat, task, tags, needs_src, needs_ff, seen))
+        last_page = min(_HUB_PAGES, max(1, (total + _HUB_PAGE - 1) // _HUB_PAGE if total else 1))
+        if total and last_page * _HUB_PAGE < total:
+            has_more = True
+        if last_page <= 1:
+            continue
+        with ThreadPoolExecutor(max_workers=_HUB_WORKERS) as pool:
+            futs = {
+                pool.submit(_fetch_task_page, hub_task, page): page
+                for page in range(2, last_page + 1)
+            }
+            for fut in as_completed(futs):
+                pages_fetched += 1
+                try:
+                    pcode, pblock = fut.result()
+                except Exception:
                     continue
-                row = _hub_row(it, cat, task, tags, needs_src, needs_ff)
-                row["hubTask"] = hub_task
-                if not row["id"] or row["id"] in seen:
+                if pcode != 200 or not isinstance(pblock, dict):
                     continue
-                seen.add(row["id"])
+                items.extend(_rows_from_block(pblock, hub_task, cat, task, tags, needs_src, needs_ff, seen))
+    if canonical_category_safe(category) == "upscale":
+        extra, extra_tot = fetch_hub_search("upscale")
+        for row in extra:
+            mid = row.get("id")
+            if mid and mid not in seen:
+                seen.add(mid)
                 items.append(row)
-            if not models or page * _HUB_PAGE >= total:
-                break
+        if extra_tot.get("_reachable"):
+            reachable = True
+    totals["_reachable"] = reachable
+    totals["_pagesFetched"] = pages_fetched
+    totals["_hasMore"] = has_more
+    totals["_pageSize"] = _HUB_PAGE
     return items, totals
+
+
+def canonical_category_safe(category: str) -> str:
+    try:
+        from .catalog_ops import canonical_category
+        return canonical_category(category)
+    except Exception:
+        return (category or "").strip()
 
 
 def search_loras(q: str, limit: int = 8):
@@ -429,44 +514,77 @@ class ModelScopeProvider(Provider):
         qn = (q or "").strip()
         now = time.time()
         totals = {}
-        cache_key = self.id
-        if (not qn) and _HUB_CACHE["items"] is not None and (now - _HUB_CACHE["at"]) < _HUB_TTL:
-            items = list(_HUB_CACHE["items"])
-            totals = dict(_HUB_CACHE.get("totals") or {})
+        from .catalog_ops import canonical_category, category_matches, enrich_catalog_item
+
+        cat_key = canonical_category(category) or ""
+        cache_key = (qn, cat_key)
+        pack = (_HUB_CACHE.get("by_key") or {}).get(cache_key)
+        if (not qn) and pack and (now - pack.get("at", 0)) < _HUB_TTL:
+            items = list(pack.get("items") or [])
+            totals = dict(pack.get("totals") or {})
+            source = pack.get("source") or "hub"
         else:
-            hub, totals = fetch_hub(search=qn)
+            hub, totals = fetch_hub(search=qn, category=category)
+            reachable = bool(totals.get("_reachable"))
             pins = load_disk()
-            seen = {x.get("id") for x in hub}
-            items = list(hub)
-            for pin in reversed(pins):
-                pid = pin.get("id")
-                if pid and pid not in seen:
-                    items.insert(0, pin)
-                    seen.add(pid)
-            if not hub:
+            if reachable:
+                # Hub is the roster. Pins that landed in Hub go to the front;
+                # missing pins are NOT injected — that was the 4-id fake roster.
+                by_id = {x.get("id"): x for x in hub if x.get("id")}
+                pinned, rest, seen = [], [], set()
+                for pin in pins:
+                    pid = pin.get("id")
+                    if pid and pid in by_id and pid not in seen:
+                        row = dict(by_id[pid])
+                        row["pinned"] = True
+                        pinned.append(row)
+                        seen.add(pid)
+                for x in hub:
+                    mid = x.get("id")
+                    if mid and mid not in seen:
+                        rest.append(x)
+                        seen.add(mid)
+                items = pinned + rest
+                source = "hub"
+            else:
                 items = list(pins)
+                source = "hardcoded_fallback"
             if not qn:
-                _HUB_CACHE["items"] = list(items)
+                by_key = dict(_HUB_CACHE.get("by_key") or {})
+                by_key[cache_key] = {
+                    "at": now,
+                    "items": list(items),
+                    "totals": dict(totals),
+                    "source": source,
+                }
+                _HUB_CACHE["by_key"] = by_key
+                union = list(_HUB_CACHE.get("items") or [])
+                seen_u = {x.get("id") for x in union}
+                for x in items:
+                    if x.get("id") and x.get("id") not in seen_u:
+                        union.append(x)
+                        seen_u.add(x.get("id"))
+                _HUB_CACHE["items"] = union
                 _HUB_CACHE["at"] = now
-                _HUB_CACHE["totals"] = totals
+                merged = dict(_HUB_CACHE.get("totals") or {})
+                merged.update(totals)
+                _HUB_CACHE["totals"] = merged
         qnl = qn.lower()
         items = [_apply_upscale_category(dict(x)) for x in items]
+        unfiltered = list(items)
         if category:
-            from .catalog_ops import category_matches
-
             items = [x for x in items if category_matches(x.get("category"), category)]
         if status:
             items = [x for x in items if x.get("status") == status]
         if qnl:
             needle = _alnum(qnl)
             items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
-        from .catalog_ops import enrich_catalog_item
-
         tagged = []
         for x in items:
             row = dict(x)
             row["backend"] = self.id
             tagged.append(enrich_catalog_item(row, self.id))
+        hub_totals = {k: v for k, v in (totals or {}).items() if not str(k).startswith("_")}
         return {
             "total": len(tagged),
             "count": len(tagged),
@@ -475,7 +593,15 @@ class ModelScopeProvider(Provider):
             "hasKey": self.has_key(),
             "baseUrl": self._base,
             "hub": HUB,
-            "hubTotals": totals,
+            "hubTotals": hub_totals,
+            "categories": dict(Counter((x.get("category") or "unknown") for x in unfiltered)),
+            "pagination": {
+                "page": 1,
+                "pageSize": totals.get("_pageSize") or _HUB_PAGE,
+                "pagesFetched": totals.get("_pagesFetched") or 0,
+                "hasMore": bool(totals.get("_hasMore")),
+                "source": source,
+            },
         }
 
     def owns_service(self, service_id: str) -> bool:
