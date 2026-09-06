@@ -15,3 +15,5 @@ docs/review.md
 docs/hf-modelscope-listing.proposed.patch
 patch_*.py
 static/_probe_clip.mp4
+data/
+.test-tmp/
