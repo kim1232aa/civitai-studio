@@ -51,36 +51,48 @@ def fal_call(url: str, method="GET", body=None, timeout=90):
     return json_call(url, method=method, headers=headers, body=body, timeout=timeout)
 
 
-def load_catalog():
-    fp = DOCS / "fal-models.json"
+# {path: (mtime, items, {id: item})}. The catalog is ~1MB / 1492 rows and
+# find_model() used to re-read and re-parse it on every single lookup.
+_CATALOG_CACHE: dict = {}
+
+
+def _load_json_items(fp: Path, keys=("items", "models")) -> tuple[list, dict]:
     if not fp.exists():
-        return []
+        return [], {}
+    try:
+        mtime = fp.stat().st_mtime
+    except OSError:
+        return [], {}
+    hit = _CATALOG_CACHE.get(str(fp))
+    if hit and hit[0] == mtime:
+        return hit[1], hit[2]
     try:
         data = json.loads(fp.read_text())
-        return data.get("items") or data.get("models") or []
     except Exception:
-        return []
+        return [], {}
+    items = []
+    for k in keys:
+        if data.get(k):
+            items = data[k]
+            break
+    by_id = {it.get("id"): it for it in items if isinstance(it, dict) and it.get("id")}
+    _CATALOG_CACHE[str(fp)] = (mtime, items, by_id)
+    return items, by_id
+
+
+def load_catalog():
+    return _load_json_items(DOCS / "fal-models.json", ("items", "models"))[0]
 
 
 def load_openapi_overlay():
-    fp = DOCS / "fal-openapi-models.json"
-    if not fp.exists():
-        return []
-    try:
-        data = json.loads(fp.read_text())
-        return data.get("models") or data.get("items") or []
-    except Exception:
-        return []
+    return _load_json_items(DOCS / "fal-openapi-models.json", ("models", "items"))[0]
 
 
 def find_model(endpoint_id: str):
-    for it in load_catalog():
-        if it.get("id") == endpoint_id:
-            return it
-    for it in load_openapi_overlay():
-        if it.get("id") == endpoint_id:
-            return it
-    return None
+    hit = _load_json_items(DOCS / "fal-models.json", ("items", "models"))[1].get(endpoint_id)
+    if hit is not None:
+        return hit
+    return _load_json_items(DOCS / "fal-openapi-models.json", ("models", "items"))[1].get(endpoint_id)
 
 
 def infer_image_fields(eid: str) -> list:
@@ -774,6 +786,215 @@ def submit(payload: dict):
 
 
 
+# --- whatif ---------------------------------------------------------------
+# Fal has no estimate endpoint. The only way to learn a price is to POST the
+# queue, and that enqueues a paid job — so whatif must never call it. Instead it
+# runs the request through the same mapper submit() uses and checks it against
+# the catalog field table (docs/fal-models.json, 1492 endpoints with
+# required/optional/imageFields). What it could NOT check is reported, not
+# papered over with a blanket 200.
+
+MASK_IMAGE_FIELDS = {"mask_url", "mask_image_url"}
+INPUT_MEDIA_OPS = {
+    "image-to-image",
+    "image-to-video",
+    "image-to-3d",
+    "video-to-video",
+    "audio-to-video",
+    "3d-to-3d",
+    "vision",
+}
+MEDIA_INPUT_FIELDS = (
+    FIRST_IMAGE_FIELDS
+    | LAST_IMAGE_FIELDS
+    | MASK_IMAGE_FIELDS
+    | {"image_urls", "video_url", "audio_url"}
+)
+
+
+def endpoint_operation(spec: dict, eid: str) -> str:
+    """t2i / i2i / i2v / ... for the endpoint.
+
+    Catalog falCategory first, except when it says text-to-* while the endpoint
+    path itself says image-to-image (fal-ai/fast-fooocus-sdxl/image-to-image and
+    friends are mislabeled in docs/fal-models.json) — the path wins there.
+    """
+    op = (spec or {}).get("falCategory") or ""
+    guess = _op_from_id(eid)
+    if op and not (op.startswith("text-to-") and guess in INPUT_MEDIA_OPS):
+        return op
+    return guess or op
+
+
+def _op_from_id(eid: str) -> str:
+    e = eid or ""
+    if "video-to-video" in e:
+        return "video-to-video"
+    if "first-last-frame" in e or "reference-to-video" in e or "image-to-video" in e:
+        return "image-to-video"
+    if "audio-to-video" in e:
+        return "audio-to-video"
+    if "text-to-video" in e:
+        return "text-to-video"
+    if "/edit" in e or "image-to-image" in e:
+        return "image-to-image"
+    return "text-to-video" if "video" in e else "text-to-image"
+
+
+def payload_media(payload: dict) -> dict:
+    p = payload or {}
+    img = (p.get("firstFrame") or p.get("sourceImage") or p.get("image_url") or p.get("image") or "").strip()
+    extra = [x for x in (p.get("images") or []) if x]
+    return {
+        "image": img or (extra[0] if extra else ""),
+        "images": extra,
+        "video": (p.get("videoUrl") or p.get("video_url") or p.get("sourceVideo") or "").strip(),
+        "audio": (p.get("audioUrl") or p.get("audio_url") or "").strip(),
+        "mask": (p.get("maskUrl") or p.get("mask_url") or p.get("maskImageUrl") or "").strip(),
+    }
+
+
+def whatif_check(payload: dict):
+    p = dict(payload or {})
+    eid = (p.get("serviceId") or p.get("endpoint") or "").strip().lstrip("/")
+
+    def wrap(extra=None):
+        d = {"backend": "fal", "service": {"serviceId": eid}}
+        if extra:
+            d.update(extra)
+        return d
+
+    if not eid:
+        return 400, wrap({"error": "缺少 Fal 模型 id", "code": "missing_service"})
+    if looks_like_civitai_service(eid):
+        return 400, wrap({
+            "error": "当前选中的是 Civitai 服务，不能发给 Fal。请在 Fal 目录里选一个模型（例如 fal-ai/flux/schnell）。",
+            "code": "wrong_backend",
+        })
+    if not has_key():
+        return 401, wrap({"error": f"没有 Fal API Key，放在 {TOKEN_PATH}", "code": "no_key"})
+    # submit() swaps in the -lora sibling; whatif has to validate the endpoint
+    # that would actually be posted, not the one the user picked.
+    lora_sibling = ""
+    if p.get("loras") and not fal_supports_lora({"id": eid}):
+        sib = fal_lora_sibling(eid)
+        if sib:
+            lora_sibling = sib
+            p["serviceId"] = sib
+            p["endpoint"] = sib
+            eid = sib
+    spec = find_model(eid)
+    known = spec is not None
+    if not known and not (eid.startswith(FAL_PREFIXES) and "/" in eid):
+        return 400, wrap({
+            "error": f"Fal 目录里没有 {eid}，也不是 Fal 端点 id（应形如 fal-ai/flux/schnell）",
+            "code": "unknown_service",
+        })
+    spec = spec or {}
+    status = (spec.get("status") or "available").lower()
+    if known and status not in ("available", "ok", ""):
+        return 400, wrap({"error": f"{eid} 目录状态是 {status}，不能提交", "code": "service_unavailable"})
+
+    inp = build_fal_input(p)
+    op = endpoint_operation(spec, eid)
+    fields = list(spec.get("imageFields") or infer_image_fields(eid))
+    required = list(spec.get("required") or [])
+    optional = list(spec.get("optional") or [])
+    media = payload_media(p)
+    errors, warnings = [], []
+
+    missing = [k for k in required if k not in inp]
+    if missing:
+        errors.append({
+            "code": "missing_required",
+            "fields": missing,
+            "message": f"{eid} 必填字段没给全：{'、'.join(missing)}",
+        })
+    # 只有端点本身就是吃图的 (falCategory / 路径) 才把输入素材算必填。
+    # imageFields 里挂了 image_url 不等于必填 —— flux-pro/v1.1-ultra、ideogram/v3
+    # 是 t2i, 那个字段是可选参考图, 拿它当必填会误杀正常文生图。
+    need_media = [k for k in fields if k in MEDIA_INPUT_FIELDS]
+    schema_media = [k for k in set(required) | set(optional) if k in MEDIA_INPUT_FIELDS]
+    got_media = bool(media["image"] or media["images"] or media["video"])
+    if op in INPUT_MEDIA_OPS and known:
+        if need_media:
+            if not any(k in inp for k in need_media):
+                errors.append({
+                    "code": "missing_input_media",
+                    "fields": need_media,
+                    "message": f"{eid} 是 {op}，必须先接输入素材（字段：{'、'.join(need_media)}）",
+                })
+        elif not got_media:
+            errors.append({
+                "code": "missing_input_media",
+                "message": f"{eid} 是 {op}，必须先接一张图",
+            })
+        elif not schema_media:
+            # 402/1492 目录端点吃图却没有任何图片字段名 (imageFields / required /
+            # optional 全空) —— build_fal_input 无处可放, 图根本发不出去, 提交
+            # 必被 Fal 打回。这里如实拒绝, 不让用户点完再撞墙。
+            errors.append({
+                "code": "no_input_field",
+                "message": f"目录里没有 {eid} 的图片字段名，接上的图传不进去，提交会被 Fal 打回",
+            })
+    elif (media["image"] or media["images"]) and not need_media and known:
+        warnings.append({
+            "code": "input_media_dropped",
+            "message": f"{eid} 是 {op}，字段表里没有图片输入，接上的图会被丢掉",
+        })
+    if media["mask"] and not any(k in MASK_IMAGE_FIELDS for k in fields):
+        warnings.append({
+            "code": "mask_dropped",
+            "message": f"{eid} 不吃 mask，maskUrl 会被丢掉",
+        })
+    if known:
+        allowed = set(required) | set(optional) | set(fields)
+        unknown = sorted(k for k in inp if k not in allowed)
+        if unknown:
+            warnings.append({
+                "code": "unknown_fields",
+                "fields": unknown,
+                "message": f"{eid} 字段表里没有：{'、'.join(unknown)}，Fal 可能直接打回",
+            })
+    else:
+        warnings.append({
+            "code": "no_schema",
+            "message": f"目录里没有 {eid} 的字段表，只校验了 id 形状，参数没校验",
+        })
+
+    data = wrap({
+        "operation": op,
+        "submittedInput": inp,
+        "warnings": warnings,
+        "checked": {
+            "schema": known,
+            "requiredFields": required,
+            "imageFields": fields,
+            "source": "docs/fal-models.json" if known else None,
+        },
+        "cost": {
+            "total": None,
+            "usd": None,
+            "note": "Fal 按次计费，官方没有预估接口，价格要提交后才知道（本次没有提交）",
+        },
+    })
+    data["service"].update({
+        "serviceId": eid,
+        "title": spec.get("name") or spec.get("title") or eid,
+        "category": spec.get("category"),
+        "operation": op,
+    })
+    if lora_sibling:
+        data["service"]["loraSibling"] = lora_sibling
+    if errors:
+        data["errors"] = errors
+        data["error"] = errors[0]["message"]
+        data["code"] = errors[0]["code"]
+        return 400, data
+    data["ok"] = True
+    return 200, data
+
+
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 SIZE_ENUM = {
     "square_hd": (1024, 1024),
@@ -1174,11 +1395,7 @@ class FalProvider(Provider):
         return submit(payload)
 
     def whatif(self, payload: dict):
-        return 200, {
-            "backend": "fal",
-            "cost": {"total": None, "note": "Fal 按次计费，无黄 Buzz 预估"},
-            "service": {"serviceId": (payload or {}).get("serviceId")},
-        }
+        return whatif_check(payload)
 
     def job_status(self, job_id: str):
         return job_status(job_id)

@@ -301,6 +301,22 @@ def search_loras(q: str, limit: int = 8):
     return 200, {"items": items, "backend": "modelscope"}
 
 
+def hub_model_probe(mid: str) -> tuple[int, dict]:
+    """One real Hub lookup for a single model id.
+
+    Returns the HTTP code untouched: whatif has to tell "no such model" (404)
+    apart from "Hub unreachable", and fetch_hub_search() swallows both.
+    """
+    q = (mid or "").strip()
+    if not q or q.count("/") != 1:
+        return 400, {}
+    code, data = json_call(f"{HUB}/{quote(q, safe='')}", headers=hub_headers(), timeout=20)
+    block = None
+    if isinstance(data, dict):
+        block = data.get("data") or data.get("Data")
+    return code, block if isinstance(block, dict) else {}
+
+
 def is_edit(mid: str) -> bool:
     low = (mid or "").lower()
     return "image-edit" in low or "image-to-image" in low or "/edit" in low
@@ -317,6 +333,51 @@ def wants_source_image(mid: str) -> bool:
     category, so this stays consistent with what the UI shows the user.
     """
     return is_edit(mid) or hub_upscale_blob({"id": mid})
+
+
+OFFICIAL_FIELDS = {
+    "model", "prompt", "negative_prompt", "size", "seed", "steps", "guidance", "image_url", "loras",
+}
+
+
+def build_ms_body(payload: dict, mid: str) -> tuple[dict, str | None]:
+    """Exact request body generate() posts. whatif() checks this same body."""
+    payload = payload or {}
+    body = {"model": mid, "prompt": payload.get("prompt") or ""}
+    if payload.get("negativePrompt"):
+        body["negative_prompt"] = payload["negativePrompt"]
+    if payload.get("seed") not in (None, "", "random"):
+        seed = _clamp_seed(payload.get("seed"))
+        if seed is not None:
+            body["seed"] = seed
+    if payload.get("steps"):
+        try:
+            body["steps"] = int(payload["steps"])
+        except (TypeError, ValueError):
+            pass
+    if payload.get("cfgScale") not in (None, ""):
+        try:
+            body["guidance"] = float(payload["cfgScale"])
+        except (TypeError, ValueError):
+            pass
+    if payload.get("width") and payload.get("height"):
+        try:
+            body["size"] = f"{int(payload['width'])}x{int(payload['height'])}"
+        except (TypeError, ValueError):
+            pass
+    ms_loras = _modelscope_loras(payload)
+    lora_skip = None
+    if ms_loras is not None:
+        body["loras"] = ms_loras
+    elif payload.get("loras"):
+        lora_skip = "魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用"
+    img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
+    extra = [x for x in (payload.get("images") or []) if x]
+    if img and img not in extra:
+        extra = [img] + extra
+    if wants_source_image(mid) and extra:
+        body["image_url"] = extra[:9]
+    return body, lora_skip
 
 
 class ModelScopeProvider(Provider):
@@ -430,12 +491,125 @@ class ModelScopeProvider(Provider):
         return pid in self._job_ids or (job_id or "").startswith(self.id + "|")
 
     def whatif(self, payload: dict):
-        return 200, {
-            "backend": self.id,
-            "cost": {"total": None, "note": f"{self.label} 按次计费，无黄 Buzz 预估"},
-            "service": {"serviceId": (payload or {}).get("serviceId")},
-            "baseUrl": self._base,
+        """Dry-run validate against the same gates generate() hits. No submit.
+
+        魔搭 has no estimate endpoint, so this checks reachability, key, model
+        identity (one real Hub lookup), the exact request body, and whether an
+        edit/upscale model was handed a source image — the case that used to go
+        out silently as plain text-to-image.
+        """
+        p = dict(payload or {})
+        sid = (p.get("serviceId") or "").strip()
+        base = {"backend": self.id, "baseUrl": self._base, "service": {"serviceId": sid}}
+        err = self._reach_error()
+        if err:
+            return 502, {**base, "error": err, "code": "unreachable"}
+        if not self._key():
+            return 401, {
+                **base,
+                "error": f"没有{self.label} API Key，放在 {self._token_path}",
+                "code": "no_key",
+            }
+        if looks_like_civitai_service(sid):
+            return 400, {
+                **base,
+                "error": f"当前选中的是 Civitai 服务，不能发给{self.label}。请选 Tongyi-MAI/Z-Image-Turbo 或 Qwen/Qwen-Image。",
+                "code": "wrong_backend",
+            }
+        mid = model_id(sid)
+        if not mid:
+            return 400, {**base, "error": f"缺少{self.label} 模型 id", "code": "missing_service"}
+        raw_model = p.get("model")
+        if isinstance(raw_model, str) and "/" in raw_model.strip():
+            want_m = model_id(raw_model.strip())
+            if want_m and want_m != mid:
+                return 400, {
+                    **base,
+                    "error": f"模型 id 不一致：serviceId={mid} model={want_m}（拒绝 remap）",
+                    "code": "model_mismatch",
+                }
+        base["service"]["serviceId"] = mid
+
+        known_ids = {x.get("id") for x in load_disk()}
+        if _HUB_CACHE.get("items"):
+            known_ids |= {x.get("id") for x in _HUB_CACHE["items"]}
+        errors, warnings = [], []
+        hub_code = None
+        if mid in known_ids:
+            source = "catalog"
+        else:
+            hub_code, block = hub_model_probe(mid)
+            if hub_code == 404:
+                return 400, {
+                    **base,
+                    "error": f"{self.label} Hub 上没有 {mid}",
+                    "code": "unknown_service",
+                }
+            if hub_code == 200 and block:
+                source = "hub"
+            else:
+                source = None
+                warnings.append({
+                    "code": "hub_unreachable",
+                    "message": f"没连上{self.label} Hub（HTTP {hub_code}），模型存在性这次没校验",
+                })
+
+        body, lora_skip = build_ms_body(p, mid)
+        if lora_skip:
+            warnings.append({"code": "lora_dropped", "message": lora_skip})
+        if not (body.get("prompt") or "").strip():
+            errors.append({"code": "missing_prompt", "message": f"prompt 是空的，{self.label} 会直接打回"})
+        needs_img = wants_source_image(mid)
+        if needs_img and not body.get("image_url"):
+            errors.append({
+                "code": "missing_input_media",
+                "message": f"{mid} 是编辑/放大模型，必须先接一张图，否则会被当成文生图跑",
+            })
+        if body.get("image_url") and not needs_img:
+            warnings.append({
+                "code": "input_media_dropped",
+                "message": f"{mid} 不是编辑模型，接上的图不会被带上",
+            })
+        if p.get("width") and p.get("height") and not body.get("size"):
+            warnings.append({
+                "code": "bad_size",
+                "message": f"宽高不是整数，size 没能拼出来：{p.get('width')}x{p.get('height')}",
+            })
+        unknown = sorted(set(body) - OFFICIAL_FIELDS)
+        if unknown:
+            warnings.append({
+                "code": "unknown_fields",
+                "fields": unknown,
+                "message": f"{self.label} 官方字段表里没有：{'、'.join(unknown)}",
+            })
+
+        data = {
+            **base,
+            "operation": "image-to-image" if needs_img else "text-to-image",
+            "submittedInput": body,
+            "warnings": warnings,
+            "checked": {
+                "reachable": True,
+                "modelSource": source,
+                "hubStatus": hub_code,
+                "endpoint": f"{self._base}/images/generations",
+            },
+            "cost": {
+                "total": None,
+                "usd": None,
+                "note": f"{self.label} 按次计费，没有预估接口（本次没有提交）",
+            },
         }
+        data["service"]["serviceId"] = mid
+        if errors:
+            data["errors"] = errors
+            data["error"] = errors[0]["message"]
+            data["code"] = errors[0]["code"]
+            return 400, data
+        data["ok"] = source is not None
+        if source is None:
+            data["verified"] = False
+        return 200, data
 
     def generate(self, payload: dict):
         err = self._reach_error()
@@ -459,47 +633,13 @@ class ModelScopeProvider(Provider):
                     "error": f"模型 id 不一致：serviceId={mid} model={want_m}（拒绝 remap）",
                     "backend": self.id,
                 }
-        body = {"model": mid, "prompt": payload.get("prompt") or ""}
-        if payload.get("negativePrompt"):
-            body["negative_prompt"] = payload["negativePrompt"]
-        if payload.get("seed") not in (None, "", "random"):
-            seed = _clamp_seed(payload.get("seed"))
-            if seed is not None:
-                body["seed"] = seed
-        if payload.get("steps"):
-            try:
-                body["steps"] = int(payload["steps"])
-            except (TypeError, ValueError):
-                pass
-        if payload.get("cfgScale") not in (None, ""):
-            try:
-                body["guidance"] = float(payload["cfgScale"])
-            except (TypeError, ValueError):
-                pass
-        if payload.get("width") and payload.get("height"):
-            try:
-                body["size"] = f"{int(payload['width'])}x{int(payload['height'])}"
-            except (TypeError, ValueError):
-                pass
-        ms_loras = _modelscope_loras(payload)
-        lora_skip = None
-        if ms_loras is not None:
-            body["loras"] = ms_loras
-        elif payload.get("loras"):
-            lora_skip = "魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用"
-        img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
-        extra = [x for x in (payload.get("images") or []) if x]
-        if img and img not in extra:
-            extra = [img] + extra
-        if wants_source_image(mid) and extra:
-            body["image_url"] = extra[:9]
+        body, lora_skip = build_ms_body(payload, mid)
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
         url = f"{self._base}/images/generations"
         code, data = json_call(url, method="POST", headers=headers, body=body, timeout=90)
-        official = {"model", "prompt", "negative_prompt", "size", "seed", "steps", "guidance", "image_url", "loras"}
-        extra_keys = set(body) - official
+        extra_keys = set(body) - OFFICIAL_FIELDS
         if code >= 400 and extra_keys:
-            slim = {k: v for k, v in body.items() if k in official}
+            slim = {k: v for k, v in body.items() if k in OFFICIAL_FIELDS}
             code, data = json_call(url, method="POST", headers=headers, body=slim, timeout=90)
             body = slim
         if not isinstance(data, dict):

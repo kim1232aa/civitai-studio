@@ -57,17 +57,28 @@ def model_id(service_id: str) -> str:
     return s
 
 
-def inference_mapping(mid: str) -> dict:
-    now = time.time()
-    cached = (_MAP_CACHE.get("items") or {}).get(mid)
-    if cached is not None and (now - _MAP_CACHE.get("at") or 0) < _MAP_TTL:
-        return cached
+def hub_probe(mid: str) -> tuple[int, dict]:
+    """One real Hub lookup for the model + its inference provider mapping.
+
+    Returns the HTTP code untouched so callers can separate 404 (no such model)
+    from a network failure — whatif needs that difference, inference_mapping()
+    does not.
+    """
     key = hf_key()
     headers = {"Accept": "application/json"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
     url = f"{HUB}/{quote(mid, safe='/')}?expand[]=inferenceProviderMapping"
     code, data = json_call(url, headers=headers, timeout=20)
+    return code, data if isinstance(data, dict) else {"error": str(data)}
+
+
+def inference_mapping(mid: str) -> dict:
+    now = time.time()
+    cached = (_MAP_CACHE.get("items") or {}).get(mid)
+    if cached is not None and (now - _MAP_CACHE.get("at") or 0) < _MAP_TTL:
+        return cached
+    code, data = hub_probe(mid)
     mapping = {}
     if code == 200 and isinstance(data, dict):
         mapping = data.get("inferenceProviderMapping") or {}
@@ -188,8 +199,7 @@ def _save_json_images(data: dict, jid: str, meta=None) -> list:
     return saved
 
 
-def _call_openai(provider: str, provider_id: str, payload: dict, key: str, timeout: int):
-    url = f"{ROUTER}/{provider}/v1/images/generations"
+def _openai_body(provider_id: str, payload: dict) -> dict:
     body = {
         "model": provider_id,
         "prompt": payload.get("prompt") or "",
@@ -202,6 +212,12 @@ def _call_openai(provider: str, provider_id: str, payload: dict, key: str, timeo
             body["size"] = f"{int(w)}x{int(h)}"
     except (TypeError, ValueError):
         pass
+    return body
+
+
+def _call_openai(provider: str, provider_id: str, payload: dict, key: str, timeout: int):
+    url = f"{ROUTER}/{provider}/v1/images/generations"
+    body = _openai_body(provider_id, payload)
     headers = _auth_headers(key)
     code, data = json_call(url, method="POST", headers=headers, body=body, timeout=timeout)
     return code, data if isinstance(data, dict) else {"error": str(data)}, body
@@ -237,9 +253,13 @@ def _force_loras(body: dict, payload: dict) -> None:
         body["loras"] = cleaned[:3]
 
 
-def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout: int):
-    pid = _maybe_lora_pid((provider_id or "").lstrip("/"), payload or {})
-    url = f"{ROUTER}/{provider}/{pid}"
+def fal_style_wants_image(pid: str, payload: dict) -> bool:
+    """Router fal/wavespeed style is the only HF path that forwards an input image."""
+    blob = ((pid or "") + " " + str((payload or {}).get("task") or "")).lower()
+    return any(x in blob for x in ("image-to-image", "kontext", "/edit", "i2i"))
+
+
+def _fal_body(pid: str, payload: dict) -> dict:
     body = {"prompt": payload.get("prompt") or ""}
     params = _prompt_body(payload)
     if params.get("negative_prompt"):
@@ -254,8 +274,7 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         body["image_size"] = {"width": params["width"], "height": params["height"]}
     if params.get("scheduler"):
         body["scheduler"] = params["scheduler"]
-    blob = (pid + " " + str((payload or {}).get("task") or "")).lower()
-    wants_img = any(x in blob for x in ("image-to-image", "kontext", "/edit", "i2i"))
+    wants_img = fal_style_wants_image(pid, payload)
     img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
     extra = [x for x in (payload.get("images") or []) if x]
     if img and img not in extra:
@@ -271,12 +290,19 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
     except Exception:
         pass
     _force_loras(body, payload or {})
+    return body
+
+
+def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout: int):
+    pid = _maybe_lora_pid((provider_id or "").lstrip("/"), payload or {})
+    url = f"{ROUTER}/{provider}/{pid}"
+    body = _fal_body(pid, payload)
     headers = _auth_headers(key)
     code, data = json_call(url, method="POST", headers=headers, body=body, timeout=timeout)
     return code, data if isinstance(data, dict) else {"error": str(data)}, body
 
 
-def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
+def _bytes_body(payload: dict, spec: dict) -> tuple[dict, str]:
     task = spec.get("task") or "text-to-image"
     params = _prompt_body(payload)
     if task == "text-to-video" and payload.get("duration"):
@@ -287,7 +313,11 @@ def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
     body = {"inputs": payload.get("prompt") or ""}
     if params:
         body["parameters"] = params
-    accept = "video/mp4" if task == "text-to-video" else "image/png"
+    return body, ("video/mp4" if task == "text-to-video" else "image/png")
+
+
+def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
+    body, accept = _bytes_body(payload, spec)
     headers = _auth_headers(key, {"Content-Type": "application/json", "Accept": accept})
     code, raw, ctype = raw_call(f"{LEGACY}/{mid}", method="POST", headers=headers, body=body, timeout=timeout)
     data = None
@@ -474,11 +504,133 @@ class HuggingFaceProvider(Provider):
         return pid in ("huggingface", "hf") or (job_id or "").startswith("hf|")
 
     def whatif(self, payload: dict):
-        return 200, {
+        """Dry-run validate against the Hub. No inference call, no charge.
+
+        Three things generate() can fail on are checked for real: the model must
+        exist on the Hub, it must have a live inference provider, and the routed
+        provider style must actually forward an input image when the model is an
+        edit model — the openai/bytes styles drop it silently.
+        """
+        p = dict(payload or {})
+        sid = (p.get("serviceId") or "").strip()
+        base = {"backend": "huggingface", "service": {"serviceId": sid}}
+        if not sid:
+            return 400, {**base, "error": "缺少 Hugging Face 模型 id", "code": "missing_service"}
+        if looks_like_civitai_service(sid):
+            return 400, {
+                **base,
+                "error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。",
+                "code": "wrong_backend",
+            }
+        if not self.has_key():
+            return 401, {**base, "error": f"没有 Hugging Face API Key，放在 {TOKEN_PATH}", "code": "no_key"}
+        mid = model_id(sid)
+        if not mid or "/" not in mid:
+            return 400, {**base, "error": f"不是 Hub 模型 id（应形如 owner/model）：{sid}", "code": "missing_service"}
+        base["service"]["serviceId"] = mid
+
+        spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
+        code, info = hub_probe(mid)
+        if code == 404:
+            return 400, {**base, "error": f"Hugging Face Hub 上没有 {mid}", "code": "unknown_service"}
+        if code in (401, 403):
+            return 401, {
+                **base,
+                "error": f"Hugging Face 拒绝访问 {mid}（HTTP {code}），可能是私有模型或 token 权限不够",
+                "code": "forbidden",
+            }
+        reachable = code == 200
+        mapping = (info.get("inferenceProviderMapping") or {}) if reachable else {}
+        if not isinstance(mapping, dict):
+            mapping = {}
+        task = spec.get("task") or (info.get("pipeline_tag") if reachable else "") or ""
+        if reachable and not mapping:
+            return 400, {
+                **base,
+                "error": f"{mid} 在 Hugging Face 上没有可用推理供应商，发出去必然失败",
+                "code": "no_inference_provider",
+                "service": {"serviceId": mid, "task": task},
+            }
+
+        candidates = _provider_candidates(mapping, mid, spec) if reachable else []
+        errors, warnings = [], []
+        if not reachable:
+            warnings.append({
+                "code": "hub_unreachable",
+                "message": f"没连上 Hugging Face Hub（HTTP {code}），推理供应商和模型存在性这次没校验",
+            })
+        if not (p.get("prompt") or "").strip():
+            errors.append({"code": "missing_prompt", "message": "prompt 是空的，Hugging Face 三条通道都要 prompt"})
+
+        needs_img = bool(spec.get("needsSource")) or task in ("image-to-image", "image-to-video")
+        media = [x for x in (p.get("images") or []) if x]
+        first = (p.get("firstFrame") or p.get("sourceImage") or p.get("image_url") or "").strip()
+        if first and first not in media:
+            media = [first] + media
+        provider, pid, style = (candidates[0] if candidates else ("", mid, ""))
+        if needs_img and not media:
+            errors.append({
+                "code": "missing_input_media",
+                "message": f"{mid} 是 {task or 'image-to-image'}，必须先接一张图",
+            })
+        if needs_img and media and style and style != "fal":
+            errors.append({
+                "code": "input_media_dropped",
+                "message": f"{mid} 会走 {provider}（{style} 通道），该通道不带输入图，图会被丢掉当成文生图跑",
+            })
+        if media and not needs_img:
+            warnings.append({
+                "code": "input_media_dropped",
+                "message": f"{mid} 的 pipeline 是 {task or '未知'}，不吃输入图，接上的图会被丢掉",
+            })
+
+        if style == "fal":
+            body = _fal_body(_maybe_lora_pid((pid or "").lstrip("/"), p), p)
+            if needs_img and media and not (body.get("image_url") or body.get("image_urls")):
+                errors.append({
+                    "code": "input_media_dropped",
+                    "message": f"{pid} 的 id 里没有 edit/i2i 标记，router 不会带上输入图",
+                })
+        elif style == "bytes":
+            body, _accept = _bytes_body(p, spec or {"task": task})
+        elif style == "openai":
+            body = _openai_body(pid, p)
+        else:
+            body = {"prompt": p.get("prompt") or ""}
+
+        data = {
             "backend": "huggingface",
-            "cost": {"total": None, "note": "Hugging Face Inference Providers 按次计费，无黄 Buzz 预估"},
-            "service": {"serviceId": (payload or {}).get("serviceId")},
+            "service": {
+                "serviceId": mid,
+                "task": task,
+                "provider": provider or None,
+                "providerId": pid,
+                "style": style or None,
+            },
+            "operation": task or None,
+            "submittedInput": body,
+            "warnings": warnings,
+            "checked": {
+                "hubReachable": reachable,
+                "hubStatus": code,
+                "providers": [n for n, _pid, _s in candidates],
+                "catalogSpec": bool(spec),
+            },
+            "cost": {
+                "total": None,
+                "usd": None,
+                "note": "Hugging Face Inference Providers 按供应商计费，没有预估接口（本次没有提交）",
+            },
         }
+        if errors:
+            data["errors"] = errors
+            data["error"] = errors[0]["message"]
+            data["code"] = errors[0]["code"]
+            return 400, data
+        data["ok"] = reachable
+        if not reachable:
+            data["verified"] = False
+        return 200, data
 
     def generate(self, payload: dict):
         key = hf_key()
