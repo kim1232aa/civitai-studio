@@ -1575,6 +1575,30 @@
     if (!Number.isFinite(n) || n <= 0) return 0.8;
     return Math.min(3, Math.max(0.05, n));
   }
+  // civitai 的 version id / model id 是两个 id 空间，裸数字能撞到别的资源
+  // （实测 122359 既是某 LoRA 的 modelId，又是 Gap_mix checkpoint 的 versionId）。
+  // 服务端 providers/civitai.py 的 _LORA_TYPES 认哪些类型，前端就照着挡，
+  // 不让 Checkpoint 混进 LoRA 列表再被当 additionalNetworks 发出去。
+  const LORA_TYPES = new Set([
+    "LORA",
+    "LORAS",
+    "LOCON",
+    "LOHA",
+    "LOKR",
+    "DORA",
+    "LYCORIS",
+    "TEXTUALINVERSION",
+  ]);
+  function normalizeLoraType(value) {
+    return String(value == null ? "" : value)
+      .toUpperCase()
+      .replace(/[\s_]/g, "");
+  }
+  // 拿不到 type 的行（URL / 裸 air / hub repo）不拦，只拦明确报了非 LoRA 类型的
+  function loraTypeUsable(type) {
+    const t = normalizeLoraType(type);
+    return !t || LORA_TYPES.has(t);
+  }
   function normalizeLoraRow(src) {
     const v = src || {};
     const versionId = String(v.versionId || v.modelVersionId || v.id || "");
@@ -1584,12 +1608,19 @@
     // （实测 122359 既是某 LoRA 的 modelId，又是另一个 checkpoint 的 versionId），
     // 带上它给服务端交叉校验，撞了就报错而不是发错资源。
     const modelId = String(v.modelId || "");
+    // /api/model-version/ 回的是 model.type（LORA / Checkpoint / …），别丢，入列前要按它拦
+    const type = String(
+      v.type ||
+        (v.model && typeof v.model === "object" && v.model.type) ||
+        "",
+    );
     const scale = clampLoraScale(v.scale != null ? v.scale : v.strength);
     return {
       air: air,
       path: path,
       versionId: versionId,
       modelId: modelId,
+      type: type,
       // 名字口径同工作台 normalizeLora：先模型名再版本名，别把版本号当名字显示。
       name: String(
         (typeof v.model === "string" && v.model) ||
@@ -1662,7 +1693,22 @@
   }
   async function addLora(raw) {
     const caps = backendCaps();
-    const row = await resolveLoraAir(normalizeLoraRow(raw), caps);
+    const draft = normalizeLoraRow(raw);
+    // 撞号的裸 version id 会取回 Checkpoint：当场说清是什么类型，不入列，也不发出去
+    if (!loraTypeUsable(draft.type)) {
+      setLoraNote(
+        "version " +
+          (draft.versionId || draft.name) +
+          " 是 " +
+          draft.type +
+          "（" +
+          (draft.name || "无名") +
+          "），不是 LoRA，没加进来",
+        true,
+      );
+      return false;
+    }
+    const row = await resolveLoraAir(draft, caps);
     if (!loraRowUsable(row, caps)) {
       if (caps && caps.lora === "air" && row.versionId && !row.air)
         setLoraNote(
@@ -1722,8 +1768,9 @@
         const data = await fetchLoraVersion(q);
         hits.replaceChildren();
         addLora(data);
-      } catch (_) {
-        hits.textContent = "没找到这个 version id";
+      } catch (e) {
+        // 502/400 的服务端原话直接展示，别把"三个端点都没回"糊成"没找到"
+        hits.textContent = String((e && e.message) || "没找到这个 version id");
       }
       return;
     }
@@ -1770,8 +1817,9 @@
         const data = await fetchLoraVersion(version.id);
         if (hits) hits.replaceChildren();
         addLora(data);
-      } catch (_) {
-        if (hits) hits.textContent = "这条取不到 version 详情";
+      } catch (e) {
+        if (hits)
+          hits.textContent = String((e && e.message) || "这条取不到 version 详情");
       }
       return;
     }
@@ -2801,7 +2849,11 @@
         if (next) aspect.value = next.value;
       }
     }
-    applyModelParamRules(item); // W2：sampler/steps/cfg/duration 随模型能力刷新
+    // W2：sampler/steps/cfg/duration 随模型能力刷新。
+    // syncParamChrome 内部就调 applyModelParamRules(selectedCatalogItem())，同一条 item，
+    // 但顺带把 loraToggle/paramChrome/seedChrome 的显隐也刷了——#service 的 change 只调
+    // 本函数，早先漏了这一步，换到声明 loras 的模型后开关仍 hidden，要再点一下节点卡才出来。
+    syncParamChrome();
     return item;
   }
   function selectedCatalogItem() {
