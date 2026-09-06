@@ -3434,7 +3434,12 @@
       ".light-desc{width:100%;min-height:64px;resize:vertical;background:#121214;border:1px solid #2a2a30;border-radius:10px;padding:8px;color:#e8e8ec}",
       ".light-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}",
       ".light-presets button{border:1px solid rgba(255,255,255,.1);background:#1a1a1f;border-radius:8px;padding:0;overflow:hidden;color:#ddd}",
-      ".light-presets button img{display:block;width:100%;height:44px;object-fit:cover}",
+      ".light-presets button{position:relative}",
+      ".light-presets button img,.light-presets button i.lp-sw{display:block;width:100%;height:44px;object-fit:cover}",
+      ".light-presets button i.lp-sw{background-size:cover}",
+      ".light-presets button img[hidden],.light-presets button i.lp-sw[hidden]{display:none}",
+      ".light-presets button .lp-hint{position:absolute;left:3px;top:3px;font-size:9px;line-height:1;",
+      "padding:2px 3px;border-radius:3px;background:rgba(0,0,0,.62);color:#cfcfd6;pointer-events:none}",
       ".light-presets button .lp0{filter:contrast(1.12) sepia(.2) saturate(1.15)}",
       ".light-presets button .lp1{filter:sepia(.35) saturate(1.25) brightness(1.08)}",
       ".light-presets button .lp2{filter:hue-rotate(190deg) saturate(1.15) brightness(.9)}",
@@ -3444,8 +3449,9 @@
       ".light-presets button .lp6{filter:saturate(1.35) hue-rotate(320deg)}",
       ".light-presets button .lp7{filter:sepia(.35) saturate(1.4)}",
       ".light-presets button .lp8{filter:grayscale(.25) contrast(1.45)}",
-      ".light-presets button .lp9{filter:sepia(.55) saturate(1.25) brightness(1.08)}",
-      ".light-presets button .lp10{filter:hue-rotate(170deg) saturate(1.45)}",
+      ".light-presets button .lp9{filter:brightness(1.18) contrast(1.25) saturate(.9)}",
+      ".light-presets button .lp10{filter:sepia(.5) saturate(1.3) brightness(1.12)}",
+      ".light-presets button .lp11{filter:hue-rotate(175deg) saturate(1.4) brightness(1.1)}",
       ".light-presets button span{display:block;font-size:10px;padding:4px 3px 6px;line-height:1.25;white-space:normal}",
       ".light-presets button.on{border-color:#fff}",
       ".light-toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#cfcfd6}",
@@ -3664,12 +3670,27 @@
         '<div class="light-row-h"><span>预设</span></div>' +
         '<div class="light-presets" id="lightPresets">' +
         LIGHT_PRESETS.map((pr, i) => {
+          // 预览是示意，不是成片：有选中图时用「当前图 + CSS 滤镜」近似该预设的色温/反差，
+          // 没有选中图时退回预设自带的 swatch 渐变。两种都打「示意」角标 + title 写明
+          // 真实光效由生成模型决定。不引入任何预生成的 light-preset-*.jpg 假资产。
           const vis =
-            '<img class="lp' + (i % 11) + '" data-light-thumb alt="" hidden>';
+            '<img class="lp' +
+            i +
+            '" data-light-thumb alt="" hidden>' +
+            '<i class="lp-sw" data-light-swatch style="background-image:' +
+            pr.swatch +
+            '"></i>' +
+            '<em class="lp-hint">示意</em>';
           return (
             '<button type="button" data-lpreset="' +
             i +
-            '">' +
+            '" title="' +
+            pr.label +
+            ' — 示意预览：' +
+            pr.kelvin +
+            'K / 光源' +
+            pr.dir +
+            '，缩略图是当前图套滤镜的近似效果，实际光影由生成模型输出决定">' +
             vis +
             "<span>" +
             pr.label +
@@ -4867,6 +4888,18 @@
       thumb.src = imageUrl;
       thumb.hidden = !imageUrl;
     }
+    // 预设缩略图跟随当前选中图；没有选中图就露 swatch 渐变，二者互斥不并存。
+    document.querySelectorAll("#lightPresets [data-light-thumb]").forEach((im) => {
+      if (imageUrl) {
+        if (im.getAttribute("src") !== imageUrl) im.src = imageUrl;
+      } else if (im.hasAttribute("src")) im.removeAttribute("src");
+      im.hidden = !imageUrl;
+    });
+    document
+      .querySelectorAll("#lightPresets [data-light-swatch]")
+      .forEach((sw) => {
+        sw.hidden = !!imageUrl;
+      });
     const wrap = $("lightThumb");
     if (wrap) {
       wrap.style.transform =
