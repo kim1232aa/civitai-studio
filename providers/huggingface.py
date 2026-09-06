@@ -373,6 +373,25 @@ def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
     return code, data, raw, ctype, body
 
 
+# 多候选路由的失败上报：last 被后一个候选覆盖，会把最有用的错（402 额度耗尽）
+# 盖成最没用的（wavespeed 400 Model not supported）。实测：SDXL 只有 fal-ai 一个候选时
+# 直接吐 402；FLUX.1-dev/Krea/schnell/Qwen-Image 有 fal-ai+wavespeed，fal-ai 同样 402 之后
+# 被 wavespeed 的 400 顶掉，UI 上看着像"模型不支持"，其实是账号额度用光。
+# 这里按可操作性排序挑一条上报，并把整条尝试链带回去，禁止只留噪音。
+_ERR_RANK = {402: 0, 401: 1, 403: 1, 429: 2, 503: 3}
+
+
+def _pick_attempt(attempts: list):
+    """Most actionable failure first; ties keep the order actually attempted."""
+    if not attempts:
+        return None
+    ranked = sorted(
+        range(len(attempts)),
+        key=lambda i: (_ERR_RANK.get(attempts[i][0], 9), i),
+    )
+    return attempts[ranked[0]]
+
+
 HF_PIPES = {
     "text-to-image": ("image", "text-to-image", ["t2i"], False, False),
     "image-to-image": ("image", "image-to-image", ["i2i"], True, False),
@@ -965,6 +984,7 @@ class HuggingFaceProvider(Provider):
         mapping = inference_mapping(mid)
         candidates = _provider_candidates(mapping, mid, spec)
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
+        attempts: list = []
         timeout = 300
         for provider, pid, style in candidates:
             if style == "openai" and provider in _SKIP_OPENAI:
@@ -986,12 +1006,14 @@ class HuggingFaceProvider(Provider):
                     meta["submittedInput"] = submitted
                     if code == 503:
                         last = (503, {"error": "模型正在加载，请稍后再试"})
+                        attempts.append((503, dict(last[1]), provider))
                         continue
                     if code >= 400:
                         err = data if isinstance(data, dict) else {"error": (raw or b"")[:400].decode("utf-8", "replace")}
                         if isinstance(err, dict):
                             err.setdefault("error", extract_error(err, f"HTTP {code}"))
                         last = (code, err)
+                        attempts.append((code, dict(err) if isinstance(err, dict) else {"error": str(err)}, provider))
                         continue
                     if isinstance(data, dict) and (data.get("error") or data.get("images") or data.get("data")):
                         saved = _save_json_images(data, jid, meta=meta)
@@ -1008,6 +1030,7 @@ class HuggingFaceProvider(Provider):
                         if isinstance(data, dict):
                             data.setdefault("error", extract_error(data, f"HTTP {code}"))
                         last = (code, data)
+                        attempts.append((code, dict(data) if isinstance(data, dict) else {"error": str(data)}, provider))
                         continue
                     saved = _save_json_images(data, jid, meta=meta)
                 else:
@@ -1018,10 +1041,12 @@ class HuggingFaceProvider(Provider):
                         if isinstance(data, dict):
                             data.setdefault("error", err_txt)
                         last = (code if code >= 400 else 400, data if isinstance(data, dict) else {"error": err_txt})
+                        attempts.append((last[0], dict(last[1]) if isinstance(last[1], dict) else {"error": err_txt}, provider))
                         continue
                     saved = _save_json_images(data, jid, meta=meta)
             except Exception as e:
                 last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
+                attempts.append((502, dict(last[1]), provider))
                 continue
             if saved:
                 out = {
@@ -1041,6 +1066,21 @@ class HuggingFaceProvider(Provider):
                     )
                 return 200, out
             last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
+            attempts.append((502, dict(last[1]), provider))
+        picked = _pick_attempt(attempts)
+        if picked:
+            code, body, provider = picked
+            body = dict(body)
+            body["provider"] = provider
+            body["attempts"] = [
+                {
+                    "provider": p_name,
+                    "status": p_code,
+                    "error": (p_body or {}).get("error"),
+                }
+                for p_code, p_body, p_name in attempts
+            ]
+            return code, body
         return last
 
     def job_status(self, job_id: str):

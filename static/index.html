@@ -2755,12 +2755,29 @@ async function poll(id) {
   waitCanceled = false;
   const btn = $('waitCancel');
   if (btn) btn.disabled = false;
+  let pollFails = 0;
   for (let i = 0; i < 180; i++) {
     if (waitCanceled) {
       stopWait();
       return;
     }
-    const j = await api('/api/jobs/' + encodeURIComponent(id));
+    let j;
+    try {
+      j = await api('/api/jobs/' + encodeURIComponent(id));
+      pollFails = 0;
+    } catch (e) {
+      // v0794: a transient status-poll error (upstream 502/504, read timeout, network blip)
+      // must not orphan an already-paid job. Retry with backoff; only hard errors abort.
+      const st = (e && e.status) || 0;
+      if (st === 404 || st === 401 || st === 403) throw e;
+      pollFails++;
+      if (pollFails >= 8) throw e;
+      const emsg = (e && e.data && (e.data.error || e.data.detail)) || (e && e.message) || '查询失败';
+      setStatus('任务查询失败，重试 ' + pollFails + '/8 · ' + String(emsg).slice(0, 80), 'warn');
+      updateWait('重连中', String(emsg).slice(0, 80), null);
+      await new Promise(r => setTimeout(r, Math.min(3000 * pollFails, 15000)));
+      continue;
+    }
     const st = (j.status || '').toLowerCase();
     const w = j.wait || {};
     const job = (((j.steps || [])[0] || {}).jobs || [])[0] || {};

@@ -104,8 +104,33 @@
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
   .mention{color:var(--teal)}
-  .bar{display:flex;align-items:center;gap:8px;margin-top:10px}
-  .bar select{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;min-width:0}
+  /* 控件多了一行塞不下：换行排布，且各控件不再被压成箭头（原来 min-width:0 会挤没）。 */
+  .bar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .bar select{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;flex:0 0 auto;max-width:180px}
+  .bar #service{flex:1 1 150px;min-width:120px}
+  .bar input#serviceFilter{flex:0 0 auto;width:110px;min-width:110px;font-size:12px;padding:6px 8px}
+  .bar input#serviceFilter::-webkit-search-cancel-button{cursor:pointer}
+  .bar input{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;color:#e8e8ec;flex:0 0 auto}
+  /* :not([hidden]) 必须留着——ID 选择器会盖过 UA 的 [hidden]{display:none}，
+     写成裸 ID 会把 sampler/参数/种子的隐藏门控直接废掉。 */
+  #samplerChrome:not([hidden]),#paramChrome:not([hidden]),#seedChrome:not([hidden]){display:contents}
+  .bar input#steps,.bar input#cfg{width:64px}
+  .bar input#seed{width:132px}
+  .bar input.bad{border-color:var(--coral)}
+  .bar button.chip-toggle{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;color:#9a9aa3;font-size:12px}
+  .bar button.chip-toggle.on{border-color:var(--teal);color:var(--teal)}
+  .lora-pane{margin-top:8px;border:1px solid #2a2a30;border-radius:12px;padding:8px;background:#121214}
+  .lora-search{display:flex;gap:6px}
+  .lora-search input{flex:1;background:#1a1a1f;border:1px solid #2e2e36;border-radius:8px;padding:6px 8px;color:#e8e8ec;min-width:0}
+  .lora-search button{background:#1a1a1f;border:1px solid #2e2e36;border-radius:8px;padding:6px 10px;color:#e8e8ec}
+  .lora-hits{margin-top:6px;font-size:12px;color:var(--muted);max-height:120px;overflow:auto}
+  .lora-hits div{border:1px solid #2a2a30;border-radius:8px;padding:5px 7px;margin-top:4px;cursor:pointer}
+  .lora-hits div:hover{border-color:var(--teal);color:#e8e8ec}
+  .lora-row{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#c8c8d0}
+  .lora-row .lora-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lora-row input{width:60px;background:#1a1a1f;border:1px solid #2e2e36;border-radius:8px;padding:4px 6px;color:#e8e8ec}
+  .lora-row button{background:transparent;border:0;color:var(--coral);font-size:14px}
+  .lora-note{margin-top:6px;font-size:11px;color:var(--muted)}
   .bar .grow{flex:1}
   .send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px;flex-shrink:0}
   .send:disabled{opacity:.4}
@@ -254,8 +279,20 @@
           <option>720P</option><option>1080P</option>
         </select>
         <span id="samplerChrome" hidden><select id="sampler" title="采样器"></select><select id="scheduler" title="调度器"></select></span>
+        <span id="paramChrome" hidden><input id="steps" type="number" min="1" max="150" placeholder="步数" title="步数 steps" /><input id="cfg" type="number" min="0" max="30" step="0.1" placeholder="CFG" title="CFG scale" /></span>
+        <span id="seedChrome" hidden><input id="seed" placeholder="种子" title="种子 seed，空则随机" /></span>
+        <button type="button" class="chip-toggle" id="loraToggle" hidden title="LoRA">LoRA</button>
         <span class="grow"></span>
         <button class="send" id="send" title="生成">↑</button>
+      </div>
+      <div class="lora-pane" id="loraPane" hidden>
+        <div class="lora-search">
+          <input id="loraQ" placeholder="名字 / version id / AIR / 直链" />
+          <button type="button" id="loraSearch">搜索</button>
+        </div>
+        <div class="lora-hits" id="loraHits"></div>
+        <div id="loraList"></div>
+        <div class="lora-note" id="loraNote"></div>
       </div>
       <div class="msg" id="msg">提示词节点可直接改。反推会写完整设定，生图走现有 compile。</div>
     </aside>

@@ -564,6 +564,7 @@
       n.kind === "shot" && state.mode === "image",
     );
     syncSamplerChrome(n);
+    syncParamChrome(n);
     if (n.kind === "text") {
       if ($("send")) $("send").disabled = false;
       setTextDockRefs(n);
@@ -1482,6 +1483,385 @@
     return out;
   }
 
+  // ===== 工作台同款参数上画布：LoRA / 步数 / CFG / 种子 =====
+  // 框架照搬 static/index.html 工作台（#loraBlock / #steps / #cfg / #seed / #hits），
+  // 不另造机制；能力口径一律取 GET /api/providers[].capabilities（禁前端手抄表）：
+  //   lora: air|path|hub_repo|none   loraPath: http|civitai_download|hub_owner_repo|none
+  //   seed: {min,max,clamp}
+  // compile 对 seed/loras 是 wire-only：seed 走 seed 节点，LoRA 走 lora_apply→loras 端口；
+  // params 旁路会被 graph_compile 显式驳回（providers/graph_compile.py:352 / :397）。
+  // steps/cfgScale 只在 t2i/i2i 白名单（graph_compile.py:386-387），视频/文本不露出，禁假支持。
+  state.loras = [];
+  state.providerCaps = {};
+  state._providerCapsPromise = null;
+
+  async function loadProviderCaps() {
+    if (!state._providerCapsPromise) {
+      state._providerCapsPromise = fetch("/api/providers")
+        .then((response) => (response.ok ? response.json() : { items: [] }))
+        .then((payload) => {
+          ((payload && payload.items) || []).forEach((item) => {
+            if (item && item.id)
+              state.providerCaps[item.id] = item.capabilities || null;
+          });
+          return state.providerCaps;
+        })
+        .catch(() => state.providerCaps);
+    }
+    return state._providerCapsPromise;
+  }
+  function backendCaps() {
+    const el = $("backend");
+    return (el && state.providerCaps[el.value]) || null;
+  }
+  function stepsEnabled(n) {
+    return !!n && n.kind === "shot" && state.mode === "image";
+  }
+  function seedEnabled(n) {
+    return !!n && n.kind === "shot" && state.mode !== "text" && !!backendCaps();
+  }
+  function loraEnabled(n) {
+    const caps = backendCaps();
+    if (
+      !n ||
+      n.kind !== "shot" ||
+      state.mode === "text" ||
+      !caps ||
+      caps.lora === "none"
+    )
+      return false;
+    // W2：civitai 模型级门——constraints 未声明 loras 键的模型不支持 LoRA
+    return modelAllowsLoRA(selectedCatalogItem());
+  }
+  function isHttpUrl(value) {
+    return /^https?:\/\//i.test(String(value == null ? "" : value));
+  }
+  function isHubRepo(value) {
+    return /^[\w.-]+\/[\w.-]+$/.test(String(value == null ? "" : value).trim());
+  }
+  // 能力表说什么就收什么；收不了的条目当场说明理由，不静默丢也不塞假值。
+  function loraRowUsable(row, caps) {
+    if (!caps || !row) return false;
+    if (caps.lora === "air") return !!(row.air || row.versionId);
+    if (caps.loraPath === "http" || caps.loraPath === "civitai_download")
+      return isHttpUrl(row.path);
+    if (caps.loraPath === "hub_owner_repo") return isHubRepo(row.path);
+    return false;
+  }
+  function loraModeHint(caps) {
+    if (!caps || caps.lora === "none") return "当前后端不支持 LoRA";
+    if (caps.lora === "air") return "认名字搜索 / version id / urn:air:…";
+    if (caps.loraPath === "http") return "只认 http(s) LoRA 直链";
+    if (caps.loraPath === "civitai_download")
+      return "只认 civitai 下载直链或 version id（换成直链后带走）";
+    if (caps.loraPath === "hub_owner_repo") return "只认 owner/repo 形式的 Hub 仓库";
+    return "";
+  }
+  function clampLoraScale(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 0.8;
+    return Math.min(3, Math.max(0.05, n));
+  }
+  function normalizeLoraRow(src) {
+    const v = src || {};
+    const versionId = String(v.versionId || v.modelVersionId || v.id || "");
+    const path = String(v.path || v.downloadUrl || v.url || "");
+    const air = String(v.air || "");
+    const scale = clampLoraScale(v.scale != null ? v.scale : v.strength);
+    return {
+      air: air,
+      path: path,
+      versionId: versionId,
+      // 名字口径同工作台 normalizeLora：先模型名再版本名，别把版本号当名字显示。
+      name: String(
+        (typeof v.model === "string" && v.model) ||
+          v.name ||
+          air ||
+          path ||
+          versionId ||
+          "LoRA",
+      ),
+      scale: scale,
+      strength: scale,
+    };
+  }
+  function setLoraNote(text, bad) {
+    const el = $("loraNote");
+    if (!el) return;
+    el.textContent = text || loraModeHint(backendCaps());
+    el.style.color = bad ? "var(--coral)" : "var(--muted)";
+  }
+  function renderLoraList() {
+    const list = $("loraList");
+    if (!list) return;
+    list.replaceChildren();
+    state.loras.forEach((row, index) => {
+      const line = document.createElement("div");
+      line.className = "lora-row";
+      const name = document.createElement("span");
+      name.className = "lora-name";
+      name.textContent = row.name;
+      name.title = row.air || row.path || row.versionId;
+      const weight = document.createElement("input");
+      weight.type = "number";
+      weight.min = "0.05";
+      weight.max = "3";
+      weight.step = "0.05";
+      weight.value = String(row.scale);
+      weight.title = "权重";
+      weight.oninput = () => {
+        const next = clampLoraScale(weight.value);
+        row.scale = next;
+        row.strength = next;
+      };
+      const drop = document.createElement("button");
+      drop.type = "button";
+      drop.textContent = "×";
+      drop.title = "移除";
+      drop.onclick = () => {
+        state.loras.splice(index, 1);
+        renderLoraList();
+      };
+      line.append(name, weight, drop);
+      list.appendChild(line);
+    });
+    setLoraNote("");
+  }
+  function addLora(raw) {
+    const caps = backendCaps();
+    const row = normalizeLoraRow(raw);
+    if (!loraRowUsable(row, caps)) {
+      setLoraNote("这条在当前后端用不了：" + loraModeHint(caps), true);
+      return false;
+    }
+    const key = row.air || row.path || row.versionId;
+    if (
+      state.loras.some((it) => (it.air || it.path || it.versionId) === key)
+    ) {
+      setLoraNote("已经加过这条 LoRA 了", true);
+      return false;
+    }
+    state.loras.push(row);
+    renderLoraList();
+    return true;
+  }
+  async function fetchLoraVersion(versionId) {
+    const response = await fetch(
+      "/api/model-version/" + encodeURIComponent(versionId),
+    );
+    const payload = await response.json();
+    if (!response.ok || payload.error)
+      throw new Error(payload.error || "HTTP " + response.status);
+    return payload;
+  }
+  function acceptsVersionId(caps) {
+    return !!caps && (caps.lora === "air" || caps.loraPath === "civitai_download");
+  }
+  async function searchLora() {
+    const caps = backendCaps();
+    const hits = $("loraHits");
+    const box = $("loraQ");
+    const q = box ? box.value.trim() : "";
+    if (!hits || !q) return;
+    if (!caps) {
+      setLoraNote("后端能力还没加载出来，先别加 LoRA", true);
+      return;
+    }
+    hits.replaceChildren();
+    if (isHttpUrl(q) || (caps.loraPath === "hub_owner_repo" && isHubRepo(q))) {
+      addLora({ path: q, name: q });
+      return;
+    }
+    if (/^urn:air:/i.test(q) || q.indexOf(":lora:") >= 0) {
+      addLora({ air: q, name: q.split(":").pop() });
+      return;
+    }
+    if (/^\d+$/.test(q) && acceptsVersionId(caps)) {
+      hits.textContent = "查 version…";
+      try {
+        const data = await fetchLoraVersion(q);
+        hits.replaceChildren();
+        addLora(data);
+      } catch (_) {
+        hits.textContent = "没找到这个 version id";
+      }
+      return;
+    }
+    hits.textContent = "搜…";
+    const backend = ($("backend") && $("backend").value) || "";
+    try {
+      const response = await fetch(
+        "/api/search?type=LORA&q=" +
+          encodeURIComponent(q) +
+          "&backend=" +
+          encodeURIComponent(backend),
+      );
+      const payload = await response.json();
+      const rows = (payload && payload.items) || [];
+      hits.replaceChildren();
+      if (!rows.length) {
+        hits.textContent = (payload && payload.note) || "没有结果";
+        return;
+      }
+      rows.forEach((item) => {
+        const version = (item.versions || [])[0] || {};
+        const line = document.createElement("div");
+        line.textContent =
+          String(item.name || item.path || version.name || "") +
+          (version.baseModel ? " · " + version.baseModel : "");
+        line.onclick = () => pickLoraHit(item, version);
+        hits.appendChild(line);
+      });
+    } catch (_) {
+      hits.textContent = "搜索失败";
+    }
+  }
+  async function pickLoraHit(item, version) {
+    const caps = backendCaps();
+    const hits = $("loraHits");
+    const path = String((item && item.path) || "");
+    if (path && (isHttpUrl(path) || isHubRepo(path))) {
+      if (hits) hits.replaceChildren();
+      addLora({ path: path, name: item.name || path });
+      return;
+    }
+    if (version && version.id && acceptsVersionId(caps)) {
+      try {
+        const data = await fetchLoraVersion(version.id);
+        if (hits) hits.replaceChildren();
+        addLora(data);
+      } catch (_) {
+        if (hits) hits.textContent = "这条取不到 version 详情";
+      }
+      return;
+    }
+    if (hits) hits.replaceChildren();
+    addLora(item);
+  }
+  // 出参形状对齐工作台 buildPayload 的 loras（server/provider 侧已按这套字段吃）。
+  function loraPayloadRows() {
+    return state.loras.map((row) => ({
+      air: row.air,
+      path: row.path,
+      url: row.path,
+      downloadUrl: row.path,
+      versionId: row.versionId,
+      name: row.name,
+      scale: row.scale,
+      strength: row.strength,
+    }));
+  }
+  function paramFieldValue(id) {
+    const el = $(id);
+    if (!el || el.disabled) return null;
+    const raw = String(el.value == null ? "" : el.value).trim();
+    if (raw === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  }
+  // steps/cfgScale：只有 t2i/i2i 收，填了才带 key，空着不发明默认。
+  function samplingGraphParams(op, shot) {
+    if (op !== "t2i" && op !== "i2i") return {};
+    if (!stepsEnabled(shot)) return {};
+    const out = {};
+    const steps = paramFieldValue("steps");
+    const cfg = paramFieldValue("cfg");
+    if (steps != null) out.steps = steps;
+    if (cfg != null) out.cfgScale = cfg;
+    return out;
+  }
+  function seedFieldRaw(shot) {
+    if (!seedEnabled(shot)) return "";
+    const el = $("seed");
+    return el ? String(el.value == null ? "" : el.value).trim() : "";
+  }
+  // 越界种子直接拦下并说明，不替用户静默取模（clamp=mod 是上游行为，不代表前端可以改数）。
+  function seedIssue(shot) {
+    const raw = seedFieldRaw(shot || nodeById(state.selected));
+    if (!raw) return "";
+    if (!/^-?\d+$/.test(raw)) return "种子只认整数，别填别的";
+    const rule = effectiveSeedRule(); // W2：模型级 seed 约束优先，其次 provider 级
+    const value = Number(raw);
+    if (rule.min != null && value < rule.min)
+      return "当前选择种子下限 " + rule.min + "，不替你静默改数";
+    if (rule.max != null && value > rule.max)
+      return "当前选择种子上限 " + rule.max + "，不替你静默取模";
+    return "";
+  }
+  function syncParamChrome(node) {
+    const n = node || nodeById(state.selected);
+    const paramWrap = $("paramChrome");
+    const seedWrap = $("seedChrome");
+    const toggle = $("loraToggle");
+    const pane = $("loraPane");
+    if (paramWrap) paramWrap.hidden = !stepsEnabled(n);
+    if (seedWrap) seedWrap.hidden = !seedEnabled(n);
+    const seed = $("seed");
+    if (seed) {
+      const rule = effectiveSeedRule(); // W2：模型级 seed 约束优先，其次 provider 级
+      seed.title =
+        rule.max == null && rule.min == null
+          ? "种子 seed，空则随机"
+          : "种子 seed，空则随机（" +
+            (rule.min == null ? "" : rule.min) +
+            "…" +
+            (rule.max == null ? "" : rule.max) +
+            "）";
+      seed.classList.toggle("bad", !!seedIssue(n));
+    }
+    if (toggle) toggle.hidden = !loraEnabled(n);
+    if (pane && !loraEnabled(n)) {
+      pane.hidden = true;
+      if (toggle) toggle.classList.remove("on");
+    }
+    if (pane && !pane.hidden) renderLoraList();
+    applyModelParamRules(); // W2：每次 dock 刷新同步模型级参数规则（显隐变化后选项/范围也要对）
+  }
+  // 换后端＝换能力面：留不住的 LoRA 当场清掉并报数，不装作还带着。
+  function pruneLorasForBackend() {
+    const caps = backendCaps();
+    const before = state.loras.length;
+    state.loras = state.loras.filter((row) => loraRowUsable(row, caps));
+    const dropped = before - state.loras.length;
+    renderLoraList();
+    if (dropped)
+      setLoraNote(
+        "换后端后有 " + dropped + " 条 LoRA 用不了，已移除：" + loraModeHint(caps),
+        true,
+      );
+    return dropped;
+  }
+  function bindParamChrome() {
+    const toggle = $("loraToggle");
+    const pane = $("loraPane");
+    if (toggle && pane)
+      toggle.onclick = () => {
+        pane.hidden = !pane.hidden;
+        toggle.classList.toggle("on", !pane.hidden);
+        if (!pane.hidden) {
+          renderLoraList();
+          setLoraNote("");
+        }
+      };
+    const search = $("loraSearch");
+    if (search) search.onclick = () => searchLora();
+    const box = $("loraQ");
+    if (box)
+      box.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          searchLora();
+        }
+      };
+    const seed = $("seed");
+    if (seed)
+      seed.oninput = () => {
+        const issue = seedIssue();
+        seed.classList.toggle("bad", !!issue);
+        if (issue) setMsg(issue, "bad");
+      };
+  }
+
   function buildGraph(shot) {
     const frame = frameAsset(shot);
     const linked = connectedAssets(shot.id);
@@ -1532,8 +1912,37 @@
           duration: parseInt($("duration").value, 10) || 5,
         },
         samplerGraphParams(op, backend),
+        samplingGraphParams(op, shot),
       ),
     });
+    const seedRaw = seedFieldRaw(shot);
+    if (/^-?\d+$/.test(seedRaw)) {
+      nodes.push({
+        id: "sd-" + shot.id,
+        op: "seed",
+        params: { value: Number(seedRaw) },
+      });
+      edges.push({
+        from: "sd-" + shot.id,
+        fromPort: "seed",
+        to: shot.id,
+        toPort: "seed",
+      });
+    }
+    const loraRows = loraEnabled(shot) ? loraPayloadRows() : [];
+    if (loraRows.length) {
+      nodes.push({
+        id: "lr-" + shot.id,
+        op: "lora_apply",
+        params: { loras: loraRows },
+      });
+      edges.push({
+        from: "lr-" + shot.id,
+        fromPort: "loras",
+        to: shot.id,
+        toPort: "loras",
+      });
+    }
     const ref = op === "i2v" ? frame : linked[0];
     if (ref && op !== "t2i")
       edges.push({
@@ -1570,6 +1979,59 @@
     if (!$("service") || !$("service").value) {
       setMsg("没有选中真实模型，不会用默认假值生成", "bad");
       return;
+    }
+    const seedProblem = seedIssue(shot);
+    if (seedProblem) {
+      setMsg(seedProblem, "bad");
+      return;
+    }
+    // W2：发送前按模型能力拦截——参考图超上限、steps/cfg 越界（compile 层同样兜底，前端先给明确原因）
+    const svcItem = selectedCatalogItem();
+    if (state.mode === "image" && svcItem && svcItem.referenceLimit != null) {
+      const usedRefs = connectedAssets(shot.id).length;
+      if (usedRefs > svcItem.referenceLimit) {
+        setMsg(
+          "该模型最多接 " +
+            svcItem.referenceLimit +
+            " 张参考图，当前已连 " +
+            usedRefs +
+            " 张",
+          "bad",
+        );
+        return;
+      }
+    }
+    if (svcItem && civitaiModel(svcItem)) {
+      const checkNum = (input, rule, label) => {
+        if (!input || !rule.defined) return "";
+        const raw = String(input.value || "").trim();
+        if (raw === "") return "";
+        const v = Number(raw);
+        if (!Number.isFinite(v)) return "";
+        if (rule.min != null && v < rule.min)
+          return label + " 下限 " + rule.min + "，当前 " + v;
+        if (rule.max != null && v > rule.max)
+          return label + " 上限 " + rule.max + "，当前 " + v;
+        return "";
+      };
+      const stepsProblem = checkNum(
+        $("steps"),
+        modelFieldRule(svcItem, "steps"),
+        "该模型步数",
+      );
+      if (stepsProblem) {
+        setMsg(stepsProblem + "，不替你静默改数", "bad");
+        return;
+      }
+      const cfgProblem = checkNum(
+        $("cfg"),
+        modelFieldRule(svcItem, "cfgScale"),
+        "该模型 CFG",
+      );
+      if (cfgProblem) {
+        setMsg(cfgProblem + "，不替你静默改数", "bad");
+        return;
+      }
     }
     $("send").disabled = true;
     setMsg("校验连线…");
@@ -1609,25 +2071,13 @@
       let j = await r.json();
       if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
       const jobId = j.id || j.jobId || j.workflowId;
+      let pollTimedOut = false;
       if (jobId && !pickUrl(j)) {
-        for (let i = 0; i < 40; i++) {
-          await new Promise((res) => setTimeout(res, 2500));
-          const st = await (
-            await fetch("/api/jobs/" + encodeURIComponent(jobId))
-          ).json();
-          if (st.error || st.status === "failed")
-            throw new Error(st.error || "任务失败");
-          if (
-            pickUrl(st) ||
-            st.status === "done" ||
-            st.status === "succeeded" ||
-            st.status === "completed"
-          ) {
-            j = st;
-            break;
-          }
-          setMsg("云端进行中 " + (i + 1) + "/40");
-        }
+        const st = await pollJob(jobId, (n) =>
+          setMsg("云端进行中 " + n + "/" + POLL_TICKS),
+        );
+        if (st) j = st;
+        else pollTimedOut = true;
       }
       const url = pickUrl(j);
       if (url) {
@@ -1640,7 +2090,12 @@
           isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库",
           "ok",
         );
-      } else setMsg("云端已返回，没有可预览地址", "warn");
+      } else if (pollTimedOut)
+        setMsg(
+          "任务还在云端跑，这轮没取回图（job " + jobId + "），别重复付费，稍后再看",
+          "warn",
+        );
+      else setMsg("云端已返回，没有可预览地址", "warn");
     } catch (e) {
       setMsg(String(e), "bad");
     }
@@ -1796,25 +2251,13 @@
       let j = await r.json();
       if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
       const jobId = j.id || j.jobId || j.workflowId;
+      let pollTimedOut = false;
       if (jobId && !pickUrl(j)) {
-        for (let i = 0; i < 40; i++) {
-          await new Promise((res) => setTimeout(res, 2500));
-          const st = await (
-            await fetch("/api/jobs/" + encodeURIComponent(jobId))
-          ).json();
-          if (st.error || st.status === "failed")
-            throw new Error(st.error || "任务失败");
-          if (
-            pickUrl(st) ||
-            st.status === "done" ||
-            st.status === "succeeded" ||
-            st.status === "completed"
-          ) {
-            j = st;
-            break;
-          }
-          setMsg("云端进行中 " + (i + 1) + "/40");
-        }
+        const st = await pollJob(jobId, (n) =>
+          setMsg("云端进行中 " + n + "/" + POLL_TICKS),
+        );
+        if (st) j = st;
+        else pollTimedOut = true;
       }
       const url = pickUrl(j);
       if (url) {
@@ -1824,7 +2267,12 @@
         drawWires();
         persist();
         setMsg("超清完成", "ok");
-      } else setMsg("云端已返回，没有可预览地址", "warn");
+      } else if (pollTimedOut)
+        setMsg(
+          "任务还在云端跑，这轮没取回图（job " + jobId + "），别重复付费，稍后再看",
+          "warn",
+        );
+      else setMsg("云端已返回，没有可预览地址", "warn");
     } catch (e) {
       setMsg(String(e), "bad");
     }
@@ -2044,6 +2492,175 @@
       meta.appendChild(badge);
     });
   }
+  // ===== W2: 逐模型能力门控 =====
+  // 层级：model(cap.constraints / 通用逐模型字段) > provider(/api/providers[].capabilities) > HTML 静态默认。
+  // civitai 每模型在 /api/capabilities 有独立 constraints 块（raw.id 匹配）；
+  // 其余后端无逐模型富约束 → 走通用字段或维持 provider 级，注释标明层级，不发明约束。
+  // 模型不声明的参数=不支持 → 禁用并写明原因，禁假值、禁死路按钮。
+  function civitaiModel(item) {
+    const backend = $("backend");
+    return !!backend && backend.value === "civitai" && !!item;
+  }
+  function modelConstraint(item, name) {
+    const itemCap = item && item.capability;
+    const c = (itemCap && itemCap.constraints) || {};
+    return c[name] != null ? c[name] : null;
+  }
+  function modelAllowsLoRA(item) {
+    if (!civitaiModel(item)) return true; // 非 civitai：LoRA 形态由 provider 级 caps.lora 门控
+    // civitai：constraints 声明 loras 键的模型才收 LoRA（image 144 块中 comfy 系才声明）
+    return modelConstraint(item, "loras") != null;
+  }
+  function effectiveSeedRule() {
+    // 模型级 constraints.seed 带 min/max 时优先（civitai 少数模型如 int32/uint32 范围）；
+    // 否则回退 provider 级 caps.seed；都没有则不限制（空=随机）。
+    const item = selectedCatalogItem();
+    const m = modelConstraint(item, "seed");
+    if (m && (m.min != null || m.max != null)) return m;
+    const caps = backendCaps();
+    return (caps && caps.seed) || {};
+  }
+  function modelFieldRule(item, name) {
+    // civitai 逐模型规则；无声明（defined=false）→ 调用方维持 provider 级现状并注明
+    if (!civitaiModel(item)) {
+      return { defined: false, min: null, max: null, enum: null };
+    }
+    const rule = modelConstraint(item, name);
+    if (rule == null) {
+      return { defined: false, min: null, max: null, enum: null };
+    }
+    return {
+      defined: true,
+      min: rule.min != null ? Number(rule.min) : null,
+      max: rule.max != null ? Number(rule.max) : null,
+      enum:
+        Array.isArray(rule.enum) && rule.enum.length
+          ? rule.enum.map(String)
+          : null,
+    };
+  }
+  function applyModelParamRules(item) {
+    const svcItem = item || selectedCatalogItem() || null;
+    const civitai = civitaiModel(svcItem);
+    const hintKey = svcItem ? String(svcItem.id || svcItem.name) : "";
+    if (state._w2HintItem !== hintKey) state._w2HintItem = hintKey;
+    // 1) sampler/scheduler：仅 civitai 且模型声明 enum 才可选；未声明=不支持，禁用写明原因
+    if (civitai) {
+      const sampler = $("sampler");
+      const scheduler = $("scheduler");
+      const sameOptions = (sel, list) =>
+        !!sel &&
+        sel.options.length === list.length &&
+        [...sel.options].every((o, i) => o.value === list[i]);
+      if (sampler) {
+        const rule = modelFieldRule(svcItem, "sampler");
+        const cur = sampler.value;
+        if (rule.defined && rule.enum) {
+          if (!sameOptions(sampler, rule.enum)) {
+            fillSamplerOptions(
+              sampler,
+              rule.enum,
+              rule.enum.includes(cur) ? cur : "",
+            );
+            if (cur && !rule.enum.includes(cur)) sampler.value = "";
+          }
+          sampler.disabled = false;
+          sampler.title = "采样器（该模型支持 " + rule.enum.length + " 项）";
+        } else if (rule.defined) {
+          sampler.value = "";
+          sampler.disabled = true;
+          sampler.title = "该模型不声明 sampler，不支持自定义采样器";
+        }
+      }
+      if (scheduler) {
+        const rule = modelFieldRule(svcItem, "scheduler");
+        const cur = scheduler.value;
+        if (rule.defined && rule.enum) {
+          if (!sameOptions(scheduler, rule.enum)) {
+            fillSamplerOptions(
+              scheduler,
+              rule.enum,
+              rule.enum.includes(cur) ? cur : "",
+            );
+            if (cur && !rule.enum.includes(cur)) scheduler.value = "";
+          }
+          scheduler.disabled = false;
+          scheduler.title = "调度器（该模型支持 " + rule.enum.length + " 项）";
+        } else if (rule.defined) {
+          scheduler.value = "";
+          scheduler.disabled = true;
+          scheduler.title = "该模型不声明 scheduler，不支持自定义调度器";
+        }
+      }
+    }
+    // 2) steps/cfg 数值范围：模型声明 min/max 就动态收紧，未声明维持 HTML 默认(1..150 / 0..30)
+    const applyRange = (input, rule, htmlMin, htmlMax, label) => {
+      if (!input) return;
+      if (!rule.defined) return; // provider 级默认，代码注释为层级说明
+      input.min = rule.min != null ? rule.min : htmlMin;
+      input.max = rule.max != null ? rule.max : htmlMax;
+      const raw = String(input.value || "").trim();
+      const v = Number(raw);
+      const rangeText =
+        input.min + "…" + input.max;
+      input.title =
+        label + "（该模型范围 " + rangeText + "）";
+      const bad =
+        raw !== "" && Number.isFinite(v) && v !== 0 && (v < Number(input.min) || v > Number(input.max));
+      input.classList.toggle("bad", bad);
+    };
+    const steps = $("steps");
+    if (steps) applyRange(steps, modelFieldRule(svcItem, "steps"), 1, 150, "步数 steps");
+    const cfg = $("cfg");
+    if (cfg) applyRange(cfg, modelFieldRule(svcItem, "cfgScale"), 0, 30, "CFG scale");
+    // 3) duration 档位：仅 civitai 视频模型声明 duration 约束时才重排，未声明不动
+    if (civitai && state.mode === "video") {
+      const durSel = $("duration");
+      const d = modelConstraint(svcItem, "duration");
+      if (durSel && d) {
+        const now = Number.parseInt(String(durSel.value || ""), 10) || 0;
+        const en =
+          Array.isArray(d.enum) && d.enum.length ? d.enum.map(Number) : null;
+        const inRange = (v) =>
+          en
+            ? en.includes(v)
+            : (d.min == null || v >= Number(d.min)) &&
+              (d.max == null || v <= Number(d.max));
+        const values = en ? en : [5, 12, 16].filter(inRange);
+        if (values.length) {
+          const opts = values.map((v) => v + "s");
+          const same =
+            durSel.options.length === opts.length &&
+            [...durSel.options].every((o, i) => o.value === opts[i]);
+          if (!same) {
+            const keep = inRange(now) ? durSel.value : "";
+            durSel.replaceChildren();
+            opts.forEach((t) => durSel.add(new Option(t, t)));
+            if (keep) durSel.value = keep;
+            else durSel.value = opts[0];
+            if (!keep && state._w2HintItem === hintKey) {
+              setMsg(
+                "该模型支持时长 " +
+                  opts.join("/") +
+                  "，已把时长切到 " +
+                  durSel.value +
+                  "（原档不在能力内，不替你做假请求）",
+                "warn",
+              );
+              state._w2HintItem = "";
+            }
+          }
+          durSel.disabled = false;
+          durSel.title =
+            "该模型时长 " +
+            (en ? en.join("/") + "s" : (d.min == null ? "" : d.min) + "…" + (d.max == null ? "" : d.max) + "s");
+        } else {
+          durSel.disabled = true;
+          durSel.title = "该模型没有可用时长档位";
+        }
+      }
+    }
+  }
   function applyServiceConstraints() {
     const service = $("service");
     if (!service) return null;
@@ -2095,6 +2712,7 @@
         if (next) aspect.value = next.value;
       }
     }
+    applyModelParamRules(item); // W2：sampler/steps/cfg/duration 随模型能力刷新
     return item;
   }
   function selectedCatalogItem() {
@@ -2201,6 +2819,10 @@
   }
   $("backend").onchange = () => {
     resetScopedMsg();
+    loadProviderCaps().then(() => {
+      pruneLorasForBackend();
+      syncParamChrome();
+    });
     loadCatalog();
   };
 
@@ -3771,12 +4393,53 @@
     return pickCatalogService(backend, "cameraAngle");
   }
 
+  // 一次瞬时 502/504/读超时不能把已付费的任务丢掉（画布 civitai 实测复现：
+  // job 12100372-20260906140244995 四次 200 后一次 502 → 轮询整个中断，钱扣了图不取）。
+  // 口径同工作台 static/index.html poll()：硬错（404/401/403）立即抛，其余退避重试 8 次。
+  async function fetchJobState(jobId) {
+    const response = await fetch("/api/jobs/" + encodeURIComponent(jobId));
+    let body = null;
+    try {
+      body = await response.json();
+    } catch (_) {
+      body = null;
+    }
+    if (!response.ok) {
+      const err = new Error((body && body.error) || "HTTP " + response.status);
+      err.status = response.status;
+      err.hard =
+        response.status === 404 ||
+        response.status === 401 ||
+        response.status === 403;
+      throw err;
+    }
+    return body || {};
+  }
+  // 上限对齐工作台 poll()（180 轮 × 2.5s）：画布原来 40 轮 ≈100 秒就撒手，
+  // civitai 排队稍久就把已付费的任务丢在云上（实测 job 12100372-20260906140958223 即此）。
+  const POLL_TICKS = 180;
   async function pollJob(jobId, onTick) {
-    for (let i = 0; i < 40; i++) {
+    let fails = 0;
+    for (let i = 0; i < POLL_TICKS; i++) {
       await new Promise((res) => setTimeout(res, 2500));
-      const st = await (
-        await fetch("/api/jobs/" + encodeURIComponent(jobId))
-      ).json();
+      let st;
+      try {
+        st = await fetchJobState(jobId);
+        fails = 0;
+      } catch (e) {
+        if (e.hard) throw e;
+        fails += 1;
+        if (fails >= 8) throw e;
+        setMsg(
+          "任务查询失败，重连中 " +
+            fails +
+            "/8 · " +
+            String(e.message || e).slice(0, 60),
+          "warn",
+        );
+        await new Promise((res) => setTimeout(res, Math.min(3000 * fails, 15000)));
+        continue;
+      }
       if (st.error || st.status === "failed")
         throw new Error(st.error || "任务失败");
       if (
@@ -3853,7 +4516,9 @@
     if (!g.ok || j.error) throw new Error(j.error || "HTTP " + g.status);
     const jobId = j.id || j.jobId || j.workflowId;
     if (jobId && !pickUrl(j)) {
-      const st = await pollJob(jobId, (n) => onMsg("云端进行中 " + n + "/40"));
+      const st = await pollJob(jobId, (n) =>
+        onMsg("云端进行中 " + n + "/" + POLL_TICKS),
+      );
       if (st) j = st;
     }
     return pickUrl(j);
@@ -5946,6 +6611,7 @@
     await _loadCatalog();
     preferDockModel();
     syncSamplerChrome();
+    syncParamChrome();
   };
   const _catalogCategory = catalogCategory;
   catalogCategory = function catalogCategory() {
@@ -6052,4 +6718,6 @@
   }
   loadOuts();
   loadSamplerDefaults();
+  bindParamChrome();
+  loadProviderCaps().then(() => syncParamChrome());
 })();
