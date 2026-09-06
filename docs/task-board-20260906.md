@@ -10,12 +10,12 @@
 
 | 项 | 值 |
 |---|---|
-| HEAD = origin | `dd38e2a`（链：`31fb9ce`→`95e2ec3`→grok `bdb0a87`+H4 `9e18203`→板 v4 `210dbc1`→**B `50ac1f8`**→**A-0 `2f29bf2`**→板 v6 `ca487eb`→**A2+P1 `626304a`**（storyboard.js：sampler 接线+nanogpt enrich 真数据）→**B html 壳 `dd38e2a`**（sampler/scheduler 两下拉静态壳，与 js `:1428` 契约同形），均已 push，D 增量+E 增量 s6-s8 双门通过） |
+| HEAD = origin | `d552027`（链：`31fb9ce`→`95e2ec3`→grok `bdb0a87`+H4 `9e18203`→板 v4 `210dbc1`→**B `50ac1f8`**→**A-0 `2f29bf2`**→板 v6 `ca487eb`→**A2+P1 `626304a`**→**B html `dd38e2a`**→**W3 `8d91fec`**（catalog roster 真实化：HF/魔搭/fal/nano 真分页）→**canvas+W2 `62f3f81`**（画布参数对齐+逐模型能力门控合批，canvas 调用 W2 函数故捆提）→**W1 `d552027`**（全量模型可选：去 CAP+分帧灌入+过滤），均已 push） |
 | 权威链 | 工作仓 `work-repo/civitai-studio`；主仓 `/home/ubuntu/work/civitai-studio` = 旧副本（落后多提交），**勿在那边提交** |
-| origin/main 另线 | `46b5544`（kim1232aa：v0791–v0793 prompt node/reverse toolbar/text gen，仓库主另线推进，与 PR #4 分支并行）；PR 分支 `feat/v0794-prompt-nodes` origin 端=`dd38e2a`（=本仓 HEAD，ls-remote 无漂移）；合 PR 时若 main 已漂移，终审留意合并策略 |
-| 服务 | `PORT=18772`（工作树源码；server.py `2f29bf2` 起，`2f29bf2→dd38e2a` 零改动故未重启，静态按磁盘现读=`dd38e2a`）。served md5 与 origin `dd38e2a` 三文件逐字一致（E 增量前置核验 + 调度 re-curl 双证）＝ A2 批次 D/E 增量验收对象 |
-| 环境陷阱 | shell `PORT=8648` 是污染值（Hermes Web UI 端口），起服务显式 `PORT=18772` |
-| PR #4 | 冻结中；解冻 = D/E/F 三门 + 终审全过后由终审 @ 调度合 PR |
+| origin/main 另线 | `46b5544`（kim1232aa：v0791–v0793 prompt node/reverse toolbar/text gen，仓库主另线推进，与 PR #4 分支并行）；PR 分支 `feat/v0794-prompt-nodes` origin 端=`d552027`（=本仓 HEAD，ls-remote 无漂移）；合 PR 时若 main 已漂移，终审留意合并策略 |
+| 服务 | 18772/18792/18795 均已停（2026-09-07 实测 http=000）；E 门全量点击须先显式 `PORT=` 起服务再测（旧基线产物仍可复用：`temp/egate-accept/`、`temp/egate-dd38e2a-*/`） |
+| 环境陷阱 | shell `PORT=8648` 是污染值（Hermes Web UI 端口），起服务显式 `PORT=` |
+| PR #4 | **已解冻**（三包已 push：W3 `8d91fec`、canvas+W2 `62f3f81`、W1 `d552027`）；门序 D→E→F→终审全过后由终审合 PR；origin 侧 `pull/4/head`=`d552027`、`pull/4/merge` 现存（GitHub 可合并占位 ref），GitHub REST `pulls/4` 公共 API 404（仓库隐私口径，结论以 ls-remote 为准） |
 
 ### 工作树文件归属（commit 前认领表，禁 `git add -A`）
 
@@ -43,9 +43,26 @@
 | **D 门（预审+正式）** | deepseek（只读） | 预审：工作树两份未 commit diff（server.py canvas 净移植 923 行、storyboard.js A 区 697 行）；正式 D：复审 `50ac1f8`+`2f29bf2` 两 commit（PUT 分支+store update_state+capabilities 接线；live 探针全过、node --check 补跑） | 裁定书：「文件:行号」驳回明细 | ✅ 正式 D 裁定完成（2026-09-06）：B `50ac1f8` **通过无保留**、A `2f29bf2` **放行含 P1**（`:1805` join nano-gpt 键域零命中＝账面不符非造假，归 A2 修）；**A2 批次落地时实证 nano-gpt constraints 真驱动 vs 空兜底**，D 增量复审；✅ **D 增量复审 `dd38e2a` 通过、无驳回项**（B 壳契约逐字同形；A2 四件套门控三模式全封死：text 走 generateFromText、video 恒 `{}`；P1 enrich 384/384 ops 保住、referenceLimit 228 命中、civitai 304 零回归——旧算法同数据确实清零=修复真实；机械门 node --check+7 测试套全 EXIT=0；md5 三角 served=worktree=origin）。**三条记档不阻塞**：①fal/nano compile 层 sampler/scheduler verbatim echo（JS 门控已挡，现网无传递路径）归 A 包② ②loadCatalog slice(0,60) `:2140` 归 A 包① ③探针 27/28 假 FAIL 系口径错（bernini-r-video 声明 t2v/i2v、探针按 t2i 核）防误报；此后任何新哈希须重走 D 复审 |
 | **E 门** | glm-5.3-flash | 对 18772 = origin `2f29bf2` 服务全量点击遍历（禁抽样，CSS selector）：每按钮/下拉/tab/弹窗点到底，前后截图（stableShot，md5 互异）+URL+控制台报错+失败请求 | 基线问题清单 | ✅ **正式 E 门通过（2026-09-06，glm-5.3-flash）**：对象=18772=origin `2f29bf2`，md5 3/3 与 origin 一致非工作树冒充；终轮 **11/11 全绿**（首轮 23/27 的 4 FAIL——putFull=400/svc 空首项/快照雷同/console 400——逐一根因排查**全坐实为探针口径**，产品行为正确）；项目 CRUD/PUT 整替换/capabilities civitai 144/144 join/backend 6/6/mode 三键/dock 逻辑/诚实报错/三 tab/DOM+文件快照 8/8 md5 互异/零 pageerror/零付费触发；无驳回项；产物 `temp/egate-accept/`；✅ **E 增量 s6-s8 对 `dd38e2a` 通过 22/22 无驳回**（2026-09-06）：s6 backend 6/6 遍历 civitai 唯一显现+compile body 实捕 `sampler=er_sde/scheduler=sgm_uniform`、fal/nano-gpt/modelscope-ai/modelscope-cn/huggingface 五后端 hidden+无 key；s7 mode 三态 text（自动切 nano-gpt）无 key / image（civitai）带 key / video 无首帧 `#send` 禁用=真门控（修正断言验证禁用本身，非产品 FAIL）；s8 boot 填值 31/7、预选 er_sde/sgm_uniform（值源 `/api/defaults`）、改选 euler 原样透传、P1「支持 1 个参考」徽标真数据驱动（:1947-1952→:2019，badCount=0）＝nano constraints **真驱动**闭环；pageErrors=0 consoleErrors=0、截图 6/6 md5 互异、清尾 items=0；产物 `temp/egate-dd38e2a-1788693359310/` |
 | **F 门预备** | pi（只读） | ①9333 源站 `src_gt_*` 同尺寸同帧对照基准清单（GT 仍断，恢复待大佬拍板①）；②storyboard.js/html 素材/机器人文案**二轮 grep 复查**（可对 `2f29bf2` 做，只读，不影响 A2 批次推进） | grep 证据 | ②已回执（pi：二轮素材/机器人文案 grep 复查完成，详见其群聊回执）；①挂 9333（GT 口径待大佬拍板）；E 门 11/11+增量 s6-s8 已过，F 门全量视觉待口径拍板后对当前 HEAD 执行 |
-| **任务卡固化** | 代码 | 本板落盘 docs/ 并 commit | ✅ 板 v6 `ca487eb`；**板 v7=本 commit**（销 A2+P1+B html、录双门增量、HEAD→`dd38e2a`） | 全房间以此为单一事实源 |
+| **任务卡固化** | 代码 | 本板落盘 docs/ 并 commit | ✅ 板 v6 `ca487eb`；板 v7=`23b582d`（销 A2+P1+B html、录双门增量、HEAD→`dd38e2a`）；**板 v7.1=本 commit**（录三包哈希+预存红裁定，HEAD→`d552027`） | 全房间以此为单一事实源 |
 
 **缺口登记（条件未到不派）**：无（E 门已补 glm-5.3-flash）。
+
+---
+
+## 1b. W1/W2/W3 三包交付（2026-09-07，origin=`d552027`）
+
+| 包 | 负责人 | commit | 内容 | 状态 |
+|---|---|---|---|---|
+| **W3 roster 真实化** | grok（代码）、Claude（提交） | `8d91fec` | HF 真 Hub 分页（748）、魔搭双站全量（1123）、fal/nano 分类分页实数（1492/384）；`test_w3_roster` PASS | ✅ 已 push |
+| **canvas 工作台参数对齐 + W2 逐模型能力门控** | Claude（写码）、代码（架构侦察） | `62f3f81` | 画布接 sampler/scheduler/steps/cfg/seed/LoRA；W2 逐模型 `cap.constraints` 门控（civitai 310 块 join）、seed clamp、referenceLimit、duration 档位、negative 控件待拍板；捆提理由：canvas 调用 W2 函数，拆开中间态 ReferenceError | ✅ 已 push |
+| **W1 全量模型可选** | gpt-5.6-sol（代码）、Claude（提交） | `d552027` | 去 `slice(0,60)`/`slice(0,20)` 截断、`SVC_LIST_SYNC=300`+rAF 分帧灌入、`#serviceFilter` 全量过滤、已选钉顶、`tryRestoreKeep` 防丢选中 | ✅ 已 push |
+
+**门序推进（2026-09-07，调度：default）**：对象=origin `d552027`，范围=三包全量（`8d91fec`+`62f3f81`+`d552027`）。
+1. **D 门复审 `62f3f81`+`d552027`**——@deepseek 只读对抗（`8d91fec` 已随 W3 测试过；新 commit 须重走 D）。**Blocker：deepseek-v4-flash HTTP 402 额度耗尽**，需充值或换模型后方可承办。
+2. **E 门全量点击**——@glm-5.3-flash 对显式 PORT 起的 HEAD 服务全量遍历（禁抽样），重点 W2 逐模型门控前端点击截图+W3 roster 实数复核；D 过以后启动。
+3. **F 门视觉**——@pi 对 HEAD 逐屏对照（9333 口径仍挂）。
+4. **终审**——Ekko。
+grok 挂账：caption 无 key=503 原文未改（协调中，等 grok 回复）。
 
 ---
 
@@ -60,6 +77,7 @@
 | dock 费用写死 7/10/18 | H7 | 不调 whatif；dock 在 storyboard.js = A 独占区 | **A 包前端**（gpt-5.6-sol，自 grok 转派） |
 | 前端从未调 `/api/whatif` | `static/storyboard.js` grep 0 命中 | G 的真校验用户不可见 | A 包接线 |
 | i2v/Fal 素材来源未证 | 账本 `28216428` 作废，其余 6 条「未验证」 | 真链路技术成立、素材未证 | 补证后重估 |
+| **预存红两测试（A-0 前旧实现遗留）** | `scripts/test_storyboard_contract_v0794.py:24`、`scripts/test_storyboard_prompt_js.py:23-25/88-103/181` | 断言 `CHAR_LIB`/`DEMO_BOT`/`fallbackRealThumb`/`loadDemo`/`light-preset-*.jpg` 引用——正是 R4-a/R4-b 明令禁止项；`test_canvas_manager_js.js:163` GREEN 门对同源 token 直接 throw，一码两测永不同绿。**deepseek 裁定（2026-09-07，只读未动文件）：处置=改测试不是补功能**——prompt_js:23-26 改反向断言（CHAR_LIB/DEMO_BOT/loadDemo 零命中，对齐 A-0 grep 零命中证明）；prompt_js:88-103/181、contract_v0794:24 删已删符号存在性断言，describePrompt/captionFromAsset 真实性推导断言保留（现行仍过）。HEAD `d552027` 实跑两条 EXIT=1（调度复核）。test-only 提交，挂进本轮 D/E/F 序列 | 待执行人认领（听调度） |
 | **画布未接 sampler/scheduler（能力躺着，产品从未接线）** | storyboard.js:1465-1473（params 只塞 serviceId/resolution/duration）/ storyboard.html:238-255（面板无控件）/ graph_compile.py:380（透传白名单丢 key） | 后端链完整：civitai.py SAMPLERS 31 / SCHEDULERS 7（含 beta）、defaults_payload 吐 defaults、生成时 :607-610 消费、:660-667 白名单在列；对照 index.html 配方台已接（:2246 随请求、:2292-2299 非 civitai 剔除、:3669 下拉填值）——画布从未接上。大佬「模型有的能力帮我完善」= 源站能力禁删、只完善。验收口径：画布发起生成 payload 实际含所选 sampler（禁死 UI；列表值源 `/api/defaults` 禁手抄；预选 DEFAULTS 的 er_sde/sgm_uniform）；换非 civitai 后端控件消失、不假支持 | 归属拆三条：grok = ✅已销（`bdb0a87`：graph_compile.py 白名单 t2i/i2i `:389-390`、i2v `:599-600` 补 sampler/scheduler；params 无该 key 不发明默认，透传不再丢）；default(B) = storyboard.html 画布面板两下拉（**已派单，冻结已解**：值源 `/api/defaults`、预选 er_sde/sgm_uniform，与 A2 同批交付）；gpt-5.6-sol(A) = storyboard.js params 收集+backend 门控+**P1 join 修复**（**A2+P1 同批已派，冻结已解**，须与 B 两下拉合批走 D 复审+E 增量 s6-s8）**→✅ 已闭环（2026-09-06）：`626304a`+`dd38e2a` 交付，D 增量+E 增量 s6-s8 双门通过，画布 sampler/scheduler 真接线落地** |
 
 ## 3. 待大佬拍板清单（不拍不动的冻结项）
@@ -70,7 +88,9 @@
 4. **光源球**：是否须 WebGL 3D；
 5. **C7 胶囊**：是否像素级对齐；
 6. **源站截图有效性**：Claude 判保留（9333 `src_gt_*` 有效；指向我方 UI 旧截图作废）；
-7. **PR #4**：三门 + 终审全过前不解冻。
+7. **PR #4**：三门 + 终审全过前不解冻（已解冻执行完毕，合 PR 归终审）。
+8. **预存红两测试处置**（deepseek 裁定=改测试，test-only）：按裁定改 or 异议另议；
+9. **打光预设缩略图合规来源**（deepseek 裁定挂账项）：缩略图能力是 A-0 断链后真窟窿（`storyboard.js:3590` 按钮只渲染 hidden img、src 从未赋值、退化成纯文字），埋子还在（hidden img+`lp0..lp10` CSS 滤镜=运行时生成半成品）。二选一：①接当前选中图 `shotImageUrl`+滤镜做预览，UI 必须标「示意预览」否则踩禁静默近似红线；②走 R1–R3 有源链路拿 12 张真缩略图（要过一次付费生成）。不拍板维持纯文字按钮。
 
 ## 4. 纪律（全房间）
 
@@ -91,3 +111,4 @@
 - 变更记录：v5（D 裁定收讫翻账，自 v4=`210dbc1`）——B `50ac1f8` **D通过**、A-0 `2f29bf2` **D放行**、D 门裁定完成、E 门转正式进行中（23/27、4 FAIL 查根因）、**冻结至 E 门结论**；deepseek 补记：`loadCatalog` `items.slice(0,60)`（`storyboard.js:2052`）上限并入 A 包①核验范围，不构成对 A-0 的新驳回。
 - 变更记录：v6（E 门收讫翻账，v5 未 commit 随本版一并落）——**E 门 11/11 通过**（glm-5.3-flash，md5 3/3 对 origin `2f29bf2`，4 FAIL 全坐实探针口径、无驳回）；**冻结解除**；D 门 P1 记录（`capabilityForCatalogItem` `:1805` nano-gpt join 键域不交）归 gpt-5.6-sol 随 A2 同批修；新派单：gpt-5.6-sol=A2+P1、default=sampler/scheduler 两下拉（同批合批走 D+E 增量）、pi=素材 grep 二轮回执（只读）；F 门全量视觉仍挂 9333（待大佬拍板①）；origin/main 另线被 kim1232aa 推至 `46b5544`（v0791–v0793），PR 分支 `feat/v0794-prompt-nodes` origin 端仍=`2f29bf2` 未动，push 目标不受影响。
 - 变更记录：v7（D/E 双门增量收讫翻账，自 v6=`ca487eb`）——HEAD 链→`dd38e2a`（**A2+P1 `626304a`**+**B html 壳 `dd38e2a`** 落库，origin 端同点无漂移，ls-remote 已核）；§1 销两单并录 **D 增量裁定（通过无驳回**；三条不阻塞照录：fal/nano verbatim echo 归 A 包②、slice(0,60) 归①、27/28 假 FAIL 系探针口径**）**与 **E 增量 s6-s8（22/22 PASS 无驳回**；s6 backend 6/6 仅 civitai 显 key、s7 mode 三态含 video 禁发真门控、s8 填值 31/7 预选真值源+P1 徽标真驱动**）**；P1 闭环＝nano constraints **真驱动**；18772 served=`dd38e2a` 字节双证（server.py 零改动未重启）；F ② pi grep 回执已交、①挂 9333；A 包后续清单逐条另起 commit 待派；default 三 TODO+E2 桥仍挂。
+- 变更记录：v7.1（2026-09-07，PR #4 解冻拆提收讫翻账，自 v7=`23b582d`）——**三包已推 origin，HEAD→`d552027`**（W3 `8d91fec`+canvas/W2 合批 `62f3f81`+W1 `d552027`，工作树与 origin 零 diff）；**录 deepseek 预存红裁定**（改测试非补功能，§2 挂账行）+**打光预设缩略图合规来源挂拍板 ⑨**；门序推进派单固化（§1b：D→E→F→终审，D Blocker=deepseek-v4-flash 402）；PR #4 origin 侧 `pull/4/head`=`d552027`、merge ref 现存、REST pulls/4 公共 API 404（隐私口径以 ls-remote 为准）；服务快照更正：18772/18792/18795 已停，E 门须显式 PORT 起服务。
