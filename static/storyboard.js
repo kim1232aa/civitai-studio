@@ -1553,7 +1553,9 @@
   // 能力表说什么就收什么；收不了的条目当场说明理由，不静默丢也不塞假值。
   function loraRowUsable(row, caps) {
     if (!caps || !row) return false;
-    if (caps.lora === "air") return !!(row.air || row.versionId);
+    // civitai 侧 lora_map 只吃 air：光有 version id 的行进了列表也带不走，
+    // 所以入列前必须先换成 air（addLora 里换），换不出的不算可用。
+    if (caps.lora === "air") return !!row.air;
     if (caps.loraPath === "http" || caps.loraPath === "civitai_download")
       return isHttpUrl(row.path);
     if (caps.loraPath === "hub_owner_repo") return isHubRepo(row.path);
@@ -1578,11 +1580,16 @@
     const versionId = String(v.versionId || v.modelVersionId || v.id || "");
     const path = String(v.path || v.downloadUrl || v.url || "");
     const air = String(v.air || "");
+    // modelId 只从显式字段取：搜索命中项的 id 是 modelId，两个 id 空间会撞
+    // （实测 122359 既是某 LoRA 的 modelId，又是另一个 checkpoint 的 versionId），
+    // 带上它给服务端交叉校验，撞了就报错而不是发错资源。
+    const modelId = String(v.modelId || "");
     const scale = clampLoraScale(v.scale != null ? v.scale : v.strength);
     return {
       air: air,
       path: path,
       versionId: versionId,
+      modelId: modelId,
       // 名字口径同工作台 normalizeLora：先模型名再版本名，别把版本号当名字显示。
       name: String(
         (typeof v.model === "string" && v.model) ||
@@ -1638,11 +1645,33 @@
     });
     setLoraNote("");
   }
-  function addLora(raw) {
+  // 只有 version id 的行先换成 air 再入列；换不出来就不入列，并说清是哪条、为什么。
+  async function resolveLoraAir(row, caps) {
+    if (!caps || caps.lora !== "air") return row;
+    if (row.air || !row.versionId) return row;
+    try {
+      const data = await fetchLoraVersion(row.versionId);
+      const air = String((data && data.air) || "");
+      if (air)
+        return Object.assign({}, row, {
+          air: air,
+          name: row.name || data.name || air,
+        });
+    } catch (_) {}
+    return row;
+  }
+  async function addLora(raw) {
     const caps = backendCaps();
-    const row = normalizeLoraRow(raw);
+    const row = await resolveLoraAir(normalizeLoraRow(raw), caps);
     if (!loraRowUsable(row, caps)) {
-      setLoraNote("这条在当前后端用不了：" + loraModeHint(caps), true);
+      if (caps && caps.lora === "air" && row.versionId && !row.air)
+        setLoraNote(
+          "version " +
+            row.versionId +
+            " 换不出 air，civitai 生成链带不走这条，没加进来",
+          true,
+        );
+      else setLoraNote("这条在当前后端用不了：" + loraModeHint(caps), true);
       return false;
     }
     const key = row.air || row.path || row.versionId;
@@ -1747,7 +1776,15 @@
       return;
     }
     if (hits) hits.replaceChildren();
-    addLora(item);
+    // 这条命中没带 version：item.id 是 modelId，绝不能当 versionId 用，
+    // 宁可当场说"这条加不了"，也不发一个指向别的资源的 air。
+    addLora({
+      air: item && item.air,
+      path: item && item.path,
+      name: (item && item.name) || "",
+      versionId: (version && version.id) || "",
+      modelId: item && item.id,
+    });
   }
   // 出参形状对齐工作台 buildPayload 的 loras（server/provider 侧已按这套字段吃）。
   function loraPayloadRows() {
@@ -1757,6 +1794,7 @@
       url: row.path,
       downloadUrl: row.path,
       versionId: row.versionId,
+      modelId: row.modelId,
       name: row.name,
       scale: row.scale,
       strength: row.strength,
@@ -1998,7 +2036,8 @@
     }
     // W2：发送前按模型能力拦截——参考图超上限、steps/cfg 越界（compile 层同样兜底，前端先给明确原因）
     const svcItem = selectedCatalogItem();
-    if (state.mode === "image" && svcItem && svcItem.referenceLimit != null) {
+    // W2/P3：image 和 video 都拦——civitai video 侧同样有模型声明 referenceLimit
+    if (svcItem && svcItem.referenceLimit != null) {
       const usedRefs = connectedAssets(shot.id).length;
       if (usedRefs > svcItem.referenceLimit) {
         setMsg(
@@ -2042,6 +2081,43 @@
       if (cfgProblem) {
         setMsg(cfgProblem + "，不替你静默改数", "bad");
         return;
+      }
+    }
+    // W2/P4：时长发送前校验。下拉被禁用（该模型没有可用档位）时 value 还留着旧值，
+    // 没这道拦截会把旧的 12s 原样发出去——照样是静默假请求。
+    if (state.mode === "video" && svcItem && civitaiModel(svcItem)) {
+      const durRule = modelConstraint(svcItem, "duration");
+      const durSel = $("duration");
+      if (durRule && durSel) {
+        const want = Number.parseInt(String(durSel.value || ""), 10);
+        const durEnum =
+          Array.isArray(durRule.enum) && durRule.enum.length
+            ? durRule.enum.map(Number)
+            : null;
+        const okDur =
+          Number.isFinite(want) &&
+          (durEnum
+            ? durEnum.indexOf(want) >= 0
+            : (durRule.min == null || want >= Number(durRule.min)) &&
+              (durRule.max == null || want <= Number(durRule.max)));
+        if (!okDur) {
+          const allowText = durEnum
+            ? "只收 " + durEnum.join("/") + "s"
+            : "范围 " +
+              (durRule.min == null ? "" : durRule.min) +
+              "…" +
+              (durRule.max == null ? "" : durRule.max) +
+              "s";
+          setMsg(
+            "该模型不支持 " +
+              (durSel.value || "空") +
+              " 时长（" +
+              allowText +
+              "），不替你静默改数",
+            "bad",
+          );
+          return;
+        }
       }
     }
     $("send").disabled = true;
@@ -2617,7 +2693,9 @@
       input.title =
         label + "（该模型范围 " + rangeText + "）";
       const bad =
-        raw !== "" && Number.isFinite(v) && v !== 0 && (v < Number(input.min) || v > Number(input.max));
+        raw !== "" &&
+        Number.isFinite(v) &&
+        (v < Number(input.min) || v > Number(input.max));
       input.classList.toggle("bad", bad);
     };
     const steps = $("steps");

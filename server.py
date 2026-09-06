@@ -718,7 +718,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": str(e)})
         if path.startswith("/api/model-version/"):
             vid = urllib.parse.unquote(path.split("/api/model-version/", 1)[1])
-            code, data = civitai(f"{SITE}/model-versions/{vid}")
+            # air 是 civitai 生成链唯一认的 LoRA 标识，公开 model-versions 端点常年不回 air。
+            # 走 provider 的 fetch_version_air：公开→mini→鉴权三跳，缺 air 用 modelId@versionId 合成，带缓存。
+            data = civitai_prov.fetch_version_air(vid)
+            code = 200 if (isinstance(data, dict) and (data.get("id") or data.get("air"))) else 502
+            if code != 200:
+                return self._json(
+                    502,
+                    {"error": f"取不到 version {vid}：civitai 公开/mini/鉴权三个端点都没回可用数据"},
+                )
             if isinstance(data, dict):
                 files = []
                 for f in (data.get("files") or []):
@@ -734,10 +742,14 @@ class Handler(BaseHTTPRequestHandler):
                 vid = data.get("id")
                 if not download and vid:
                     download = f"https://civitai.com/api/download/models/{vid}"
+                air = (data.get("air") or "").strip()
                 return self._json(code, {
                     "id": data.get("id"),
+                    "modelId": data.get("modelId"),
                     "name": data.get("name"),
-                    "air": data.get("air"),
+                    "air": air,
+                    # 换不出 air 就直说，前端据此拒收，不让它进 LoRA 列表装作能用
+                    "airError": "" if air else "这条版本换不出 air，civitai 生成链带不走它",
                     "baseModel": data.get("baseModel"),
                     "model": (data.get("model") or {}).get("name"),
                     "type": (data.get("model") or {}).get("type"),

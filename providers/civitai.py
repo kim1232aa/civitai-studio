@@ -220,12 +220,51 @@ def match_service(
     return scored[0][1] if scored else None
 
 
+class LoraResolveError(ValueError):
+    def __init__(self, message, row_name="", code="lora_unresolved"):
+        super().__init__(message)
+        self.row_name = row_name
+        self.code = code
+
+
+def _row_air(item: dict) -> str:
+    """行里没 air 就拿 version id 换一次；fetch_version_air 自带公开→mini→鉴权三跳、
+    缺 air 时用 modelId@versionId 合成，并带缓存。"""
+    air = (item.get("air") or "").strip()
+    if air:
+        return air
+    vid = str(item.get("versionId") or item.get("modelVersionId") or "").strip()
+    if not vid.isdigit():
+        return ""
+    ver = fetch_version_air(vid) or {}
+    # modelId / versionId 两个 id 空间会撞（实测 122359 既是某 LoRA 的 modelId，
+    # 又是另一个 checkpoint 的 versionId）。行里带了 modelId 就交叉校验，
+    # 对不上说明这个数字不是 version id，宁可报错也不发错资源。
+    want_mid = str(item.get("modelId") or "").strip()
+    got_mid = str(ver.get("modelId") or "").strip()
+    if want_mid and got_mid and want_mid != got_mid:
+        return ""
+    return (ver.get("air") or "").strip()
+
+
 def lora_map(payload: dict) -> dict:
+    # civitai 生成链只认 air。换不出 air 的行一律报错退出，不能界面上收了、请求里悄悄不带。
     out = {}
     for item in payload.get("loras") or []:
-        air = (item.get("air") or "").strip()
-        if not air:
+        if not isinstance(item, dict):
             continue
+        air = _row_air(item)
+        if not air:
+            name = str(
+                item.get("name") or item.get("versionId") or item.get("path") or ""
+            ).strip()
+            raise LoraResolveError(
+                "LoRA「"
+                + (name or "未命名")
+                + "」换不出 civitai air（version id 查不到或不是 civitai 资源），"
+                + "这条带不走，请删掉或换一条再生成",
+                row_name=name,
+            )
         try:
             out[air] = float(item.get("strength", 1))
         except (TypeError, ValueError):
@@ -1607,6 +1646,13 @@ class CivitaiProvider(Provider):
                 "backend": "civitai",
                 "service": {"serviceId": e.service_id},
             }
+        except LoraResolveError as e:
+            return 400, {
+                "error": str(e),
+                "code": e.code,
+                "backend": "civitai",
+                "lora": {"name": e.row_name},
+            }
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=False)
         if isinstance(data, dict):
@@ -1628,6 +1674,13 @@ class CivitaiProvider(Provider):
                 "code": e.code,
                 "backend": "civitai",
                 "service": {"serviceId": e.service_id},
+            }
+        except LoraResolveError as e:
+            return 400, {
+                "error": str(e),
+                "code": e.code,
+                "backend": "civitai",
+                "lora": {"name": e.row_name},
             }
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=True)
