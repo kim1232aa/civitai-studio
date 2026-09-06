@@ -2,14 +2,8 @@
   const $ = (id) => document.getElementById(id);
   const STORE = "nl-storyboard-v0794";
   const STORE_OLD = "nl-storyboard-v0793";
-  // v0791-v0793 shared this single URL across all six demo nodes. If a restored
-  // session still carries it, the cache predates the prompt-node contract — drop it.
   const STALE_SHARED_DEMO =
     "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
-  const DEMO_BOT = "/static/demo-bot.jpg";
-  const DEMO_WORK = "/static/demo-work.jpg";
-  const DEMO_BED = "/static/demo-bed.jpg";
-  const DEMO_BATH = "/static/demo-bath.jpg";
   const vp = $("viewport");
   const world = $("world");
   const wires = $("wires");
@@ -32,82 +26,11 @@
     atFilter: "",
     _atTarget: null,
     _pendingService: "",
+    capabilities: [],
+    catalogItems: [],
+    catalogById: {},
+    _capabilitiesPromise: null,
     _catalogSeq: 0,
-  };
-
-  const CHAR_LIB = {
-    家用机器人: {
-      subject: "一台白色圆润的家用陪伴机器人",
-      look: "哑光白外壳，圆润流线造型，胸口有柔光屏幕",
-      outfit: "无服装，机身自带浅蓝色反光饰条",
-      scene: "现代家居室内",
-      light: "柔和顶光，暖色补光",
-      composition: "居中偏左，留白给人物",
-      frame: "中景",
-      camera: "固定镜头",
-      constraints: "外壳造型与反光饰条保持一致，禁止更改机身比例",
-      negative: "生锈，破损，多余肢体，畸变，水印",
-    },
-    "大白-居家装": {
-      subject: "机器人管家「大白」，居家便服造型",
-      look: "圆润白色外壳，佩戴米色围裙式外装甲",
-      outfit: "居家围裙外装甲，脚踝处有软垫轮",
-      scene: "温馨现代卧室",
-      light: "自然窗光，暖黄补光",
-      composition: "三分法构图，靠近窗边",
-      frame: "中近景",
-      camera: "缓慢推进",
-      constraints: "围裙颜色与家居风格统一，禁止更换材质",
-      negative: "模糊，畸变，多余肢体，水印",
-    },
-    "大白-职场装": {
-      subject: "机器人管家「大白」，职场西装造型",
-      look: "圆润白色外壳，佩戴深灰色简约职场装甲",
-      outfit: "简约西装式装甲，胸前佩戴身份牌",
-      scene: "现代办公室",
-      light: "冷白顶光，专业感强",
-      composition: "居中构图，背景虚化",
-      frame: "中景",
-      camera: "固定镜头",
-      constraints: "装甲版型不变，保持职场感配色",
-      negative: "模糊，畸变，多余肢体，水印，卡通化",
-    },
-    扫地机器人: {
-      subject: "小型圆盘状扫地机器人",
-      look: "黑色哑光圆盘，顶部一圈激光雷达",
-      outfit: "无服装，机身贴有品牌反光条",
-      scene: "室内地面视角",
-      light: "低角度自然光",
-      composition: "低机位特写",
-      frame: "特写",
-      camera: "固定镜头",
-      constraints: "圆盘比例与雷达位置保持一致",
-      negative: "模糊，畸变，多余部件，水印",
-    },
-    温馨现代卧室: {
-      subject: "一间温馨现代风格卧室",
-      look: "原木色家具，米白色墙面，绿植点缀",
-      outfit: "—",
-      scene: "卧室内景，靠窗床铺",
-      light: "清晨自然光透过纱帘",
-      composition: "对称构图，床铺居中",
-      frame: "全景",
-      camera: "固定镜头，轻微横摇",
-      constraints: "家具摆位与色调保持一致",
-      negative: "杂乱，畸变家具，水印",
-    },
-    现代感洗手间: {
-      subject: "一间现代简约风格洗手间",
-      look: "灰白瓷砖，黑色金属五金件",
-      outfit: "—",
-      scene: "洗手间内景，台盆与镜面",
-      light: "顶部射灯，冷白光",
-      composition: "居中对称，镜面反射",
-      frame: "中景",
-      camera: "固定镜头",
-      constraints: "瓷砖纹理与五金件保持一致",
-      negative: "潮湿污渍，畸变，水印",
-    },
   };
 
   function uid(prefix) {
@@ -167,23 +90,12 @@
   }
 
   function describePrompt(asset, caption) {
-    const bible = CHAR_LIB[(asset && asset.title) || ""] || {};
-    const subject =
-      (caption && String(caption).trim()) ||
-      bible.subject ||
-      (asset ? asset.title : "主体");
-    return [
-      "主体：" + subject,
-      "外观：" + (bible.look || "参照参考图"),
-      "服装：" + (bible.outfit || "参照参考图"),
-      "场景：" + (bible.scene || "参照参考图"),
-      "光线：" + (bible.light || "自然光"),
-      "构图：" + (bible.composition || "居中"),
-      "画面：" + (bible.frame || "中景"),
-      "运镜：" + (bible.camera || "固定镜头"),
-      "约束：" + (bible.constraints || "保持一致性，禁止畸变"),
-      "负面：" + (bible.negative || "模糊，畸变，多余肢体，水印"),
-    ].join("\n");
+    if (!asset || !asset.url) return "";
+    return String(caption || "")
+      .split("\n")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join("\n");
   }
 
   async function captionFromAsset(asset) {
@@ -215,19 +127,27 @@
   }
 
   async function reverseFromImage(asset) {
-    if (!asset) return null;
-    let caption = "";
-    try {
-      caption = await captionFromAsset(asset);
-    } catch (_) {
-      caption = "";
-    }
-    const text = describePrompt(asset, caption);
+    if (!asset || !asset.url) return null;
     let node = state.nodes.find(
       (n) =>
         n.kind === "text" &&
         state.edges.some((e) => e.from === asset.id && e.to === n.id),
     );
+    const userCaption = node ? String(node.text || "").trim() : "";
+    let visualCaption = "";
+    try {
+      visualCaption = await captionFromAsset(asset);
+    } catch (_) {
+      visualCaption = "";
+    }
+    const text = describePrompt(
+      asset,
+      [userCaption, visualCaption].filter(Boolean).join("\n"),
+    );
+    if (!text) {
+      setMsg("未能从真实资产取得描述，请先填写提示词", "warn");
+      return null;
+    }
     if (node) {
       node.text = text;
     } else {
@@ -301,81 +221,6 @@
     await generate();
   }
 
-  function loadDemo() {
-    const assetsSeed = [
-      {
-        id: "a-bot",
-        kind: "character",
-        title: "家用机器人",
-        x: 48,
-        y: 24,
-        url: DEMO_BOT,
-      },
-      {
-        id: "a-home",
-        kind: "character",
-        title: "大白-居家装",
-        x: 48,
-        y: 260,
-        url: DEMO_BOT,
-      },
-      {
-        id: "a-work",
-        kind: "character",
-        title: "大白-职场装",
-        x: 48,
-        y: 496,
-        url: DEMO_WORK,
-      },
-      {
-        id: "a-vac",
-        kind: "character",
-        title: "扫地机器人",
-        x: 48,
-        y: 732,
-        url: DEMO_BOT,
-      },
-      {
-        id: "s-bed",
-        kind: "scene",
-        title: "温馨现代卧室",
-        x: 48,
-        y: 992,
-        url: DEMO_BED,
-      },
-      {
-        id: "s-bath",
-        kind: "scene",
-        title: "现代感洗手间",
-        x: 48,
-        y: 1228,
-        url: DEMO_BATH,
-      },
-    ];
-    const textSeeds = [
-      { title: "分镜1提示词", asset: "a-bot", x: 560, y: 80 },
-      { title: "分镜2提示词", asset: "a-work", x: 560, y: 410 },
-      { title: "分镜3提示词", asset: "s-bed", x: 560, y: 740 },
-    ];
-    const textNodes = [];
-    const edges = [];
-    textSeeds.forEach((seed, i) => {
-      const textId = "text-" + (i + 1);
-      const primary = assetsSeed.find((a) => a.id === seed.asset);
-      textNodes.push({
-        id: textId,
-        kind: "text",
-        title: seed.title,
-        x: seed.x,
-        y: seed.y,
-        text: describePrompt(primary, ""),
-      });
-      edges.push({ from: seed.asset, to: textId });
-    });
-    state.nodes = assetsSeed.concat(textNodes);
-    state.edges = edges;
-  }
-
   function persist() {
     try {
       localStorage.setItem(
@@ -405,7 +250,13 @@
         "null";
       const p = JSON.parse(raw);
       if (!p || !p.nodes || !p.nodes.length) return false;
-      if (p.nodes.some((n) => n.url === STALE_SHARED_DEMO)) return false;
+      if (
+        p.nodes.some((n) => {
+          const url = String((n && n.url) || "");
+          return url === STALE_SHARED_DEMO || url.startsWith("/static/demo-");
+        })
+      )
+        return false;
       state.cam = p.cam || state.cam;
       state.nodes = p.nodes;
       state.edges = p.edges || [];
@@ -898,7 +749,8 @@
     else linkAssetToShot(asset, shot);
   }
   function toggleAssetOnText(asset, text) {
-    if (!asset || !text || text.kind !== "text" || !isImageSource(asset)) return;
+    if (!asset || !text || text.kind !== "text" || !isImageSource(asset))
+      return;
     if (state.edges.some((e) => e.from === asset.id && e.to === text.id)) {
       state.edges = state.edges.filter(
         (e) => !(e.from === asset.id && e.to === text.id),
@@ -1086,9 +938,7 @@
       e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost")
     )
       return;
-    const edge = e.target.closest(
-      ".wire-hit[data-edge-from][data-edge-to]",
-    );
+    const edge = e.target.closest(".wire-hit[data-edge-from][data-edge-to]");
     if (edge) {
       e.preventDefault();
       e.stopPropagation();
@@ -1524,6 +1374,7 @@
       $("backend").value = toolUi.prevBackend;
       toolUi.prevBackend = "";
     }
+    resetScopedMsg();
     renderDock();
     loadCatalog();
     persist();
@@ -1534,6 +1385,7 @@
       $("backend").value = toolUi.prevBackend;
       toolUi.prevBackend = "";
     }
+    resetScopedMsg();
     renderDock();
     loadCatalog();
     persist();
@@ -1545,6 +1397,7 @@
         if (!toolUi.prevBackend) toolUi.prevBackend = $("backend").value;
         $("backend").value = "nano-gpt";
       }
+      resetScopedMsg();
       renderDock();
       loadCatalog();
       persist();
@@ -1567,8 +1420,7 @@
   function resetScopedMsg() {
     const el = $("msg");
     if (!el) return;
-    const src = el.dataset.source || "";
-    if (src && src !== "general") setMsg("");
+    if (el.textContent || el.dataset.source) setMsg("");
   }
 
   function buildGraph(shot) {
@@ -1596,14 +1448,20 @@
     if (state.mode === "video") op = "i2v";
     else if (state.mode !== "text" && linked[0]) op = "i2i";
     const aspect = $("aspect").value || "16:9";
+    const selectedResolution = $("res").value || "";
+    const selectedModel = selectedCatalogItem();
+    const modelResolutions = (selectedModel && selectedModel.resolutions) || [];
     const res =
-      $("res").value === "1080P"
-        ? aspect === "9:16"
-          ? "1080x1920"
-          : "1920x1080"
-        : aspect === "9:16"
-          ? "720x1280"
-          : "1280x720";
+      modelResolutions.length &&
+      resolutionMatches(selectedResolution, modelResolutions)
+        ? selectedResolution
+        : selectedResolution === "1080P"
+          ? aspect === "9:16"
+            ? "1080x1920"
+            : "1920x1080"
+          : aspect === "9:16"
+            ? "720x1280"
+            : "1280x720";
     nodes.push({
       id: shot.id,
       op: op,
@@ -1944,27 +1802,262 @@
       return true;
     });
   }
+  function capabilityForCatalogItem(item) {
+    const id = String((item && item.id) || "");
+    if (!id) return null;
+    return (
+      state.capabilities.find(
+        (cap) => String(cap && cap.raw && cap.raw.id) === id,
+      ) || null
+    );
+  }
+  function uniqueValues(values) {
+    const seen = new Set();
+    return (values || []).filter((value) => {
+      if (value == null || value === "") return false;
+      const key = String(value);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  function constraintEnum(cap, names) {
+    const constraints = (cap && cap.constraints) || {};
+    for (const name of names) {
+      const value = constraints[name];
+      if (value && Array.isArray(value.enum)) return value.enum;
+    }
+    return [];
+  }
+  function resolutionScore(value) {
+    const text = String(value == null ? "" : value)
+      .trim()
+      .toLowerCase();
+    const k = text.match(/^(\d+(?:\.\d+)?)k$/);
+    if (k) return Number(k[1]) * 1000;
+    const p = text.match(/^(\d+)p$/);
+    if (p) return Number(p[1]);
+    const dimensions = text.match(/(\d+)\s*x\s*(\d+)/);
+    if (dimensions)
+      return Math.max(Number(dimensions[1]), Number(dimensions[2]));
+    const number = Number(text);
+    return Number.isFinite(number) ? number : 0;
+  }
+  function resolutionMatches(option, supported) {
+    const left = String(option || "")
+      .trim()
+      .toLowerCase();
+    return (supported || []).some((value) => {
+      const right = String(value || "")
+        .trim()
+        .toLowerCase();
+      return (
+        left === right ||
+        (resolutionScore(left) > 0 &&
+          resolutionScore(left) === resolutionScore(right))
+      );
+    });
+  }
+  function enrichCatalogItem(item) {
+    const cap = capabilityForCatalogItem(item);
+    const params = (item && item.supported_parameters) || {};
+    const resolutions = uniqueValues(
+      (item && item.resolutions) ||
+        params.resolutions ||
+        constraintEnum(cap, ["resolution"]),
+    );
+    const aspectRatios = uniqueValues(
+      (item && (item.aspectRatios || item.aspect_ratio_values)) ||
+        constraintEnum(cap, ["aspectRatio", "aspect_ratio"]),
+    );
+    const frameFields = uniqueValues((cap && cap.frameFields) || []);
+    const constraints = (cap && cap.constraints) || {};
+    const referenceLimit = frameFields.reduce((limit, field) => {
+      const rule = constraints[field];
+      if (!rule || rule.type !== "array") return limit;
+      const value = rule.maxItems == null ? rule.maxLength : rule.maxItems;
+      return value == null ? limit : Math.max(limit || 0, Number(value));
+    }, null);
+    const supportedOperations = uniqueValues(
+      (cap && cap.operation ? [cap.operation] : []).concat(
+        constraintEnum(cap, ["operation"]),
+        item && item.operation ? [item.operation] : [],
+      ),
+    );
+    const maxResolution =
+      resolutions
+        .slice()
+        .sort((a, b) => resolutionScore(b) - resolutionScore(a))[0] || "";
+    return Object.assign({}, item, {
+      capability: cap
+        ? {
+            status: cap.status || "",
+            constraints: constraints,
+            frameFields: frameFields,
+            extraFlags: cap.extraFlags || {},
+            resolutions: resolutions,
+            maxResolution: maxResolution,
+            referenceLimit: referenceLimit,
+            supportedOperations: supportedOperations,
+          }
+        : null,
+      resolutions: resolutions,
+      maxResolution: maxResolution,
+      referenceLimit: referenceLimit,
+      supportedOperations: supportedOperations,
+      aspectRatios: aspectRatios,
+    });
+  }
+  async function loadCapabilities() {
+    if (!state._capabilitiesPromise) {
+      state._capabilitiesPromise = fetch("/api/capabilities")
+        .then((response) =>
+          response.ok ? response.json() : { capabilities: [] },
+        )
+        .then((payload) => {
+          state.capabilities = Array.isArray(payload && payload.capabilities)
+            ? payload.capabilities
+            : [];
+          return state.capabilities;
+        })
+        .catch(() => {
+          state.capabilities = [];
+          return state.capabilities;
+        });
+    }
+    return state._capabilitiesPromise;
+  }
+  function serviceBadges(item) {
+    if (!item) return [];
+    const labels = [];
+    const highRes = (item.resolutions || []).filter((value) =>
+      /^([24])k$/i.test(String(value).trim()),
+    );
+    if (highRes.length) labels.push(highRes.join(" / ").toUpperCase());
+    else if (item.maxResolution) labels.push(String(item.maxResolution));
+    if (item.referenceLimit != null)
+      labels.push("支持 " + item.referenceLimit + " 个参考");
+    return labels;
+  }
+  function ensureServiceMeta() {
+    const service = $("service");
+    if (!service) return null;
+    let meta = $("serviceMeta");
+    if (meta) return meta;
+    meta = document.createElement("span");
+    meta.id = "serviceMeta";
+    meta.style.cssText =
+      "display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:10px;";
+    service.insertAdjacentElement("afterend", meta);
+    return meta;
+  }
+  function renderServiceMeta(item) {
+    const meta = ensureServiceMeta();
+    if (!meta) return;
+    meta.replaceChildren();
+    serviceBadges(item).forEach((label) => {
+      const badge = document.createElement("span");
+      badge.className = "service-badge";
+      badge.textContent = label;
+      badge.style.cssText =
+        "border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:2px 5px;color:#ddd;white-space:nowrap;";
+      meta.appendChild(badge);
+    });
+  }
+  function applyServiceConstraints() {
+    const service = $("service");
+    if (!service) return null;
+    const item = state.catalogById[service.value] || null;
+    renderServiceMeta(item);
+    const supportedResolutions = (item && item.resolutions) || [];
+    const res = $("res");
+    if (res) {
+      if (supportedResolutions.length) {
+        supportedResolutions.forEach((value) => {
+          if ([...res.options].some((option) => option.value === String(value)))
+            return;
+          const option = document.createElement("option");
+          option.value = String(value);
+          option.textContent = String(value);
+          res.appendChild(option);
+        });
+      }
+      [...res.options].forEach((option) => {
+        option.disabled =
+          supportedResolutions.length > 0 &&
+          !resolutionMatches(option.value, supportedResolutions);
+      });
+      if (res.selectedOptions[0] && res.selectedOptions[0].disabled) {
+        const next = [...res.options].find((option) => !option.disabled);
+        if (next) res.value = next.value;
+      }
+    }
+    const supportedAspects = (item && item.aspectRatios) || [];
+    const aspect = $("aspect");
+    if (aspect) {
+      supportedAspects.forEach((value) => {
+        if (
+          [...aspect.options].some((option) => option.value === String(value))
+        )
+          return;
+        const option = document.createElement("option");
+        option.value = String(value);
+        option.textContent = String(value);
+        aspect.appendChild(option);
+      });
+      [...aspect.options].forEach((option) => {
+        option.disabled =
+          supportedAspects.length > 0 &&
+          !supportedAspects.some((value) => String(value) === option.value);
+      });
+      if (aspect.selectedOptions[0] && aspect.selectedOptions[0].disabled) {
+        const next = [...aspect.options].find((option) => !option.disabled);
+        if (next) aspect.value = next.value;
+      }
+    }
+    return item;
+  }
+  function selectedCatalogItem() {
+    const service = $("service");
+    return state.catalogById[(service && service.value) || ""] || null;
+  }
   async function loadCatalog() {
     const seq = ++state._catalogSeq;
     const category = catalogCategory();
     const backend = selectDefaultBackendForCategory(category);
     $("service").innerHTML = '<option value="">选择模型</option>';
     try {
-      const r = await fetch(
-        "/api/catalog?backend=" +
-          encodeURIComponent(backend) +
-          "&category=" +
-          encodeURIComponent(category),
-      );
-      const j = await r.json();
+      const [response, capabilities] = await Promise.all([
+        fetch(
+          "/api/catalog?backend=" +
+            encodeURIComponent(backend) +
+            "&category=" +
+            encodeURIComponent(category),
+        ),
+        loadCapabilities(),
+      ]);
+      const j = await response.json();
+      state.capabilities = capabilities;
       if (seq !== state._catalogSeq) return;
-      const items = dedupeCatalogItems(j.items || j.models || []);
+      const items = dedupeCatalogItems(j.items || j.models || []).map(
+        enrichCatalogItem,
+      );
+      state.catalog = items;
+      state.catalogItems = items;
+      state.catalogById = {};
+      items.forEach((item) => {
+        const id = item.id || item.name || "";
+        if (id) state.catalogById[id] = item;
+      });
       items.slice(0, 60).forEach((it) => {
         const id = it.id || it.name || "";
         if (!id) return;
         const o = document.createElement("option");
         o.value = id;
-        o.textContent = it.name || id;
+        const badges = serviceBadges(it);
+        o.textContent = [it.name || id, badges.join(" · ")]
+          .filter(Boolean)
+          .join(" · ");
         $("service").appendChild(o);
       });
       if (state._pendingService) {
@@ -1976,8 +2069,10 @@
       if (!$("service").value && $("service").options.length > 1) {
         $("service").selectedIndex = 1;
       }
+      applyServiceConstraints();
       if (items.length === 0) {
         $("service").innerHTML = '<option value="">无可用模型</option>';
+        renderServiceMeta(null);
         setMsg(
           backend +
             " 的 " +
@@ -1986,10 +2081,23 @@
             (category === "text" ? "，文本/故事请用 nano-gpt" : ""),
           "warn",
         );
-      } else if ($("msg") && /目录为空|圈选消除|发送走/.test($("msg").textContent || "")) {
+      } else if (
+        $("msg") &&
+        /目录为空|圈选消除|发送走/.test($("msg").textContent || "")
+      ) {
         setMsg("");
       }
-    } catch (_) {}
+    } catch (_) {
+      renderServiceMeta(null);
+    }
+  }
+  if ($("service") && !$("service").dataset.capabilityBound) {
+    $("service").dataset.capabilityBound = "1";
+    $("service").addEventListener("change", () => {
+      resetScopedMsg();
+      applyServiceConstraints();
+      persist();
+    });
   }
   async function loadOuts() {
     try {
@@ -2011,7 +2119,10 @@
       renderRail();
     } catch (_) {}
   }
-  $("backend").onchange = loadCatalog;
+  $("backend").onchange = () => {
+    resetScopedMsg();
+    loadCatalog();
+  };
 
   // ===== grok: 多角度 + 画面切分（末尾新区块，勿改上方 Claude 打光/消除笔/故事） =====
   // 源站 UI：四 tab 共用三滑杆。旋转 -90..180 / 倾斜 ±30 / 镜头 特写-中景-广角。
@@ -2035,7 +2146,7 @@
   function mapSekoZoomToFal(slot) {
     const s = Number(slot);
     if (s <= 0) return 10; // 特写
-    if (s >= 2) return 0;  // 广角
+    if (s >= 2) return 0; // 广角
     return 5;
   }
 
@@ -2124,23 +2235,6 @@
       prompt: "back light",
     },
   ];
-  const LIGHT_PRESET_THUMBS = [
-    "/static/light-preset-01.jpg",
-    "/static/light-preset-02.jpg",
-    "/static/light-preset-03.jpg",
-    "/static/light-preset-04.jpg",
-    "/static/light-preset-05.jpg",
-    "/static/light-preset-06.jpg",
-    "/static/light-preset-07.jpg",
-    "/static/light-preset-08.jpg",
-    "/static/light-preset-09.jpg",
-    "/static/light-preset-10.jpg",
-    "/static/light-preset-11.jpg",
-    "/static/light-preset-12.jpg",
-  ];
-  function fallbackRealThumb(i) {
-    return LIGHT_PRESET_THUMBS[i % LIGHT_PRESET_THUMBS.length] || DEMO_BOT;
-  }
   const LIGHT_PRESETS = [
     {
       label: "伦勃朗光",
@@ -2659,11 +2753,7 @@
         '<div class="light-presets" id="lightPresets">' +
         LIGHT_PRESETS.map((pr, i) => {
           const vis =
-            '<img class="lp' +
-            (i % 11) +
-            '" src="' +
-            esc(fallbackRealThumb(i)) +
-            '" alt="">';
+            '<img class="lp' + (i % 11) + '" data-light-thumb alt="" hidden>';
           return (
             '<button type="button" data-lpreset="' +
             i +
@@ -2764,11 +2854,25 @@
         '<label>向后推演 <input id="storyBack" type="range" min="0" max="8" step="1" value="5"><b id="storyBackVal">5s</b></label>' +
         '<label>向前推演 <input id="storyForward" type="range" min="0" max="8" step="1" value="0"><b id="storyForwardVal">0s</b></label>' +
         '<div class="story-seg" id="storyAspectBtns">' +
-        STORY_ASPECTS.map((a) => '<button type="button" data-story-aspect="' + a + '">' + a + '</button>').join("") +
-        '</div>' +
+        STORY_ASPECTS.map(
+          (a) =>
+            '<button type="button" data-story-aspect="' +
+            a +
+            '">' +
+            a +
+            "</button>",
+        ).join("") +
+        "</div>" +
         '<div class="story-seg" id="storyModelBtns">' +
-        STORY_MODEL_TYPES.map((m) => '<button type="button" data-story-model="' + m.id + '">' + m.label + '</button>').join("") +
-        '</div>';
+        STORY_MODEL_TYPES.map(
+          (m) =>
+            '<button type="button" data-story-model="' +
+            m.id +
+            '">' +
+            m.label +
+            "</button>",
+        ).join("") +
+        "</div>";
       const refs = $("refs");
       if (refs && refs.parentNode) refs.parentNode.insertBefore(box, refs);
     }
@@ -2863,9 +2967,7 @@
     if (!removed.length) return false;
     const removedIds = new Set();
     removed.forEach((edge) => clearEdgeReferences(edge, removedIds));
-    state.edges = state.edges.filter(
-      (e) => !(e.from === from && e.to === to),
-    );
+    state.edges = state.edges.filter((e) => !(e.from === from && e.to === to));
     state.selectedEdge = null;
     renderCards();
     drawWires();
@@ -2924,9 +3026,7 @@
     persist();
     const memberCount = removedIds.size - 1;
     setMsg(
-      memberCount > 0
-        ? "已删除分组及" + memberCount + "个成员"
-        : "已删除节点",
+      memberCount > 0 ? "已删除分组及" + memberCount + "个成员" : "已删除节点",
       "ok",
     );
     return true;
@@ -2973,9 +3073,7 @@
     const stage = document.querySelector(".stage");
     if (!menu || !stage) return;
     const card = e.target.closest(".card");
-    const edge = e.target.closest(
-      ".wire-hit[data-edge-from][data-edge-to]",
-    );
+    const edge = e.target.closest(".wire-hit[data-edge-from][data-edge-to]");
     const targetId = card ? card.dataset.id : "";
     const targetEdge = edge
       ? { from: edge.dataset.edgeFrom, to: edge.dataset.edgeTo }
@@ -3145,7 +3243,8 @@
     bar.style.display = "flex";
     const bw = Math.min(bar.offsetWidth || 0, Math.max(0, s.width - 16));
     const cx = r.left - s.left + r.width / 2;
-    bar.style.left = Math.max(8, Math.min(cx - bw / 2, s.width - bw - 8)) + "px";
+    bar.style.left =
+      Math.max(8, Math.min(cx - bw / 2, s.width - bw - 8)) + "px";
     bar.style.top = Math.max(8, r.top - s.top - 42) + "px";
   }
 
@@ -3789,8 +3888,10 @@
     if ($("lightKelvinVal"))
       $("lightKelvinVal").textContent = lightUi.kelvin + " K";
     if ($("lightRim")) $("lightRim").checked = !!lightUi.rim;
-    document.querySelectorAll("#lightPresets img").forEach((img, i) => {
-      img.src = fallbackRealThumb(i);
+    const imageUrl = shot ? shotImageUrl(shot) : "";
+    document.querySelectorAll("#lightPresets img").forEach((img) => {
+      img.src = imageUrl;
+      img.hidden = !imageUrl;
     });
     if ($("lightDesc") && $("lightDesc") !== document.activeElement)
       $("lightDesc").value = lightUi.desc;
@@ -3807,7 +3908,10 @@
       dot.style.top = d.y * 100 + "%";
     }
     const thumb = document.querySelector("#lightThumb img");
-    if (thumb) thumb.src = shot ? shotImageUrl(shot) : fallbackRealThumb(lightUi.preset >= 0 ? lightUi.preset : 0);
+    if (thumb) {
+      thumb.src = imageUrl;
+      thumb.hidden = !imageUrl;
+    }
     const wrap = $("lightThumb");
     if (wrap) {
       wrap.style.transform =
@@ -4162,7 +4266,11 @@
     attachInpaintOverlay();
     placeEraseBar();
     placeShotBar();
-    setMsg("在图上圈选要消除的区域，再点「消除 ◆1」。未点发送。", "ok", "inpaint");
+    setMsg(
+      "在图上圈选要消除的区域，再点「消除 ◆1」。未点发送。",
+      "ok",
+      "inpaint",
+    );
   }
   function closeInpaintBar() {
     inpaintUi.on = false;
@@ -4267,8 +4375,10 @@
   function syncStoryControls() {
     if ($("storyBack")) $("storyBack").value = String(storyUi.backward);
     if ($("storyForward")) $("storyForward").value = String(storyUi.forward);
-    if ($("storyBackVal")) $("storyBackVal").textContent = storyUi.backward + "s";
-    if ($("storyForwardVal")) $("storyForwardVal").textContent = storyUi.forward + "s";
+    if ($("storyBackVal"))
+      $("storyBackVal").textContent = storyUi.backward + "s";
+    if ($("storyForwardVal"))
+      $("storyForwardVal").textContent = storyUi.forward + "s";
     document.querySelectorAll("[data-story-aspect]").forEach((b) => {
       b.classList.toggle("on", b.dataset.storyAspect === storyUi.aspect);
     });
@@ -4286,7 +4396,13 @@
       storyText,
     ].join("\n");
   }
-  function buildStoryFrameGraph(backend, serviceId, promptText, frameId, seedShot) {
+  function buildStoryFrameGraph(
+    backend,
+    serviceId,
+    promptText,
+    frameId,
+    seedShot,
+  ) {
     const source = seedShot && shotImageUrl(seedShot);
     const nodes = [
       { id: "p-" + frameId, op: "prompt", params: { text: promptText } },
@@ -4305,7 +4421,11 @@
       },
     ];
     if (source) {
-      nodes.push({ id: "src-" + frameId, op: "image", params: { url: source } });
+      nodes.push({
+        id: "src-" + frameId,
+        op: "image",
+        params: { url: source },
+      });
       edges.push({
         from: "src-" + frameId,
         fromPort: "image",
@@ -4329,10 +4449,15 @@
   function storySpecs() {
     const out = [];
     if (storyUi.backward > 0)
-      out.push({ id: "backward", label: "向后推演", seconds: storyUi.backward });
+      out.push({
+        id: "backward",
+        label: "向后推演",
+        seconds: storyUi.backward,
+      });
     if (storyUi.forward > 0)
       out.push({ id: "forward", label: "向前推演", seconds: storyUi.forward });
-    if (!out.length) out.push({ id: "backward", label: "向后推演", seconds: 5 });
+    if (!out.length)
+      out.push({ id: "backward", label: "向后推演", seconds: 5 });
     return out;
   }
   async function planStoryText(model, text) {
@@ -4348,9 +4473,15 @@
   async function generateStoryFrames(seedShot, storyText, textNode) {
     setMsg("故事推演：挑选图片模型…");
     const svc = await pickNineT2i();
-    if (!svc.serviceId) throw new Error("故事推演找不到图片模型，不能只写文本空壳");
+    if (!svc.serviceId)
+      throw new Error("故事推演找不到图片模型，不能只写文本空壳");
     // buildGraph → compile → generate → poll: each story frame uses runCompiledGenerate().
-    const graphs = buildStoryGraph(seedShot, storyText, svc.backend, svc.serviceId);
+    const graphs = buildStoryGraph(
+      seedShot,
+      storyText,
+      svc.backend,
+      svc.serviceId,
+    );
     const made = [];
     for (let i = 0; i < graphs.length; i++) {
       const spec = storySpecs()[i];
@@ -4418,7 +4549,8 @@
     }
     const isText = toolUi.story || state.mode === "text";
     if (dock) dock.classList.toggle("story-mode", !!toolUi.story);
-    if ($("storyControls")) $("storyControls").classList.toggle("show", !!toolUi.story);
+    if ($("storyControls"))
+      $("storyControls").classList.toggle("show", !!toolUi.story);
     if (toolUi.story) syncStoryControls();
     const isVid = state.mode === "video";
     const isImg = state.mode === "image";
@@ -4511,13 +4643,15 @@
       );
       const j = await r.json();
       if (seq !== state._catalogSeq) return;
-      dedupeCatalogItems(j.items || j.models || []).slice(0, 60).forEach((it) => {
-        const id = it.id || it.name || "";
-        const o = document.createElement("option");
-        o.value = id;
-        o.textContent = it.name || id;
-        $("service").appendChild(o);
-      });
+      dedupeCatalogItems(j.items || j.models || [])
+        .slice(0, 60)
+        .forEach((it) => {
+          const id = it.id || it.name || "";
+          const o = document.createElement("option");
+          o.value = id;
+          o.textContent = it.name || id;
+          $("service").appendChild(o);
+        });
       if (!$("service").value && $("service").options.length > 1)
         $("service").selectedIndex = 1;
     } catch (_) {}
@@ -5751,32 +5885,6 @@
     return _handlePromptInput(ta, node);
   };
 
-  function sekoRelayoutSeedCards() {
-    const t1 = nodeById("text-1"),
-      s1 = nodeById("shot-1"),
-      t2 = nodeById("text-2");
-    if (!t1 || !s1 || !t2) return false;
-    if (s1.x + 640 <= t2.x + 8) return false;
-    const textW = 320,
-      gap = 80,
-      colW = 1120;
-    for (let i = 0; i < 6; i++) {
-      const text = nodeById("text-" + (i + 1));
-      const shot = nodeById("shot-" + (i + 1));
-      if (!text || !shot) continue;
-      const col = i % 2,
-        row = Math.floor(i / 2);
-      const textX = 560 + col * colW;
-      const textY = 80 + row * 430;
-      text.x = textX;
-      text.y = textY;
-      shot.x = textX + textW + gap;
-      shot.y = textY;
-    }
-    persist();
-    return true;
-  }
-
   const _box = box;
   box = function box(n) {
     if (n && n.kind === "group") return { w: n.w || 400, h: n.h || 280 };
@@ -5812,9 +5920,6 @@
     return _cardHTML(n);
   };
 
-  window.__sekoLoadDemo = loadDemo;
-
-
   bindCamOnce();
   window.__sekoSelect = selectNode;
   window.__sekoSelectEdge = selectEdge;
@@ -5849,8 +5954,10 @@
     return true;
   };
 
-  if (!restore()) loadDemo();
-  sekoRelayoutSeedCards();
+  if (!restore()) {
+    state.nodes = [];
+    state.edges = [];
+  }
   applyCam();
   renderCards();
   drawWires();
