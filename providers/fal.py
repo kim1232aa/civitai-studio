@@ -179,11 +179,30 @@ def overlay_image_fields(item: dict) -> dict:
     has_first = any(f in FIRST_IMAGE_FIELDS for f in fields)
     has_many = "image_urls" in fields
     has_last = any(f in LAST_IMAGE_FIELDS for f in fields)
-    if is_video:
+    is_t2v = (
+        "text-to-video" in fcat
+        or "/t2v" in eid.lower()
+        or eid.rstrip("/").endswith("video-01")  # classic MiniMax t2v (no image fields)
+        or ("text-to-video" in blob and "image-to-video" not in blob)
+    )
+    is_i2v = (
+        has_first
+        or "image-to-video" in blob
+        or "first-last" in blob
+        or "reference-to-video" in blob
+        or "start-end-to-video" in blob
+    ) and not is_t2v
+    # Pure t2v: never advertise first-frame / i2v
+    if is_video and is_t2v and not has_first:
         out["needsSource"] = False
-        out["needsFirstFrame"] = bool(
-            has_first or "image-to-video" in blob or "first-last" in blob or "reference-to-video" in blob
-        )
+        out["needsFirstFrame"] = False
+        out["supportsI2v"] = False
+        if not fields:
+            out["imageFields"] = []
+    elif is_video:
+        out["needsSource"] = False
+        out["needsFirstFrame"] = bool(is_i2v or has_first)
+        out["supportsI2v"] = bool(out["needsFirstFrame"])
     elif has_many and not has_first:
         out["needsSource"] = False
     elif has_first:
@@ -204,6 +223,10 @@ def overlay_image_fields(item: dict) -> dict:
     caps["maxRefs"] = out["maxRefs"]
     caps["maxImages"] = out["maxImages"]
     caps["refImagesField"] = out.get("refImagesField") or caps.get("refImagesField")
+    if "supportsI2v" in out:
+        caps["supportsI2v"] = bool(out["supportsI2v"])
+    elif is_video:
+        caps["supportsI2v"] = bool(out.get("needsFirstFrame"))
     out["capabilities"] = caps
     if fal_supports_lora(out):
         out["supportsLora"] = True
