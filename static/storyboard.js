@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0815b";
-  const STORE_OLDS = ["nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0815c";
+  const STORE_OLDS = ["nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -1713,7 +1713,20 @@
     return PROVIDER_REF_CAPS[backend] || { maxRefs: 9, refImagesField: "images" };
   }
 
+  // Multi-ref bag names vs singular FIRST slots (Fal image_url / start_image_url / …).
+  const MULTI_REF_FIELDS = ["image_urls", "images", "input_references"];
+  const SINGULAR_FIRST_FIELDS = ["image_url", "start_image_url", "first_frame_url", "image"];
+
+  function catalogImageFields(it) {
+    if (!it) return [];
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const raw = caps.imageFields || it.imageFields || [];
+    return Array.isArray(raw) ? raw.map(String) : [];
+  }
+
   // Resolve caps from catalog item.capabilities (or top-level), clamped to provider default.
+  // Catalog may only tighten. If imageFields has NO multi bag and only singular FIRST,
+  // force maxRefs=1 so Fal single-image endpoints cannot silently drop N-1 refs.
   function resolveRefCaps(it) {
     const prov = providerRefDefaults();
     const caps = (it && it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
@@ -1723,12 +1736,33 @@
     const ceil = Number(prov.maxRefs) || 9;
     if (max > ceil) max = ceil; // catalog may only tighten
     if (!(max > 0)) max = 1; // slice(0, caps.maxRefs||caps.maxImages||1)
+    const fields = catalogImageFields(it);
+    if (fields.length) {
+      const hasMulti = fields.some((f) => MULTI_REF_FIELDS.indexOf(f) >= 0);
+      const hasSingularFirst = fields.some((f) => SINGULAR_FIRST_FIELDS.indexOf(f) >= 0);
+      // No multi bag + singular FIRST (or any non-multi schema) → maxRefs=1 (catalog tighten).
+      if (!hasMulti && (hasSingularFirst || fields.length > 0)) max = Math.min(max, 1);
+    }
     const field = (caps.refImagesField || (it && it.refImagesField) || prov.refImagesField || "images");
     return { maxRefs: max, refImagesField: String(field) };
   }
 
   function maxRefCount(it) {
     return resolveRefCaps(it).maxRefs;
+  }
+
+  // Deduped linked+primary URLs (same order as attachExtraImages) for over-cap hard gate.
+  function countRefUrls(payload, shot) {
+    if (!shot) return [];
+    const linked = connectedAssets(shot.id);
+    const primaryNode = frameAsset(shot);
+    const primary = (payload && (payload.firstFrame || payload.sourceImage)) || (primaryNode && primaryNode.url) || "";
+    const urls = [];
+    if (primary) urls.push(primary);
+    linked.forEach((a) => {
+      if (a && a.url && urls.indexOf(a.url) < 0) urls.push(a.url);
+    });
+    return urls;
   }
 
   // After compile: pack [primary, ...other linked] onto studio-inbound images[]
@@ -1917,6 +1951,14 @@
       }
     }
     const stageOp = stage ? stage.op : "";
+    // Hard gate: over-cap refs must block — never silent-drop N-1 on single-slot endpoints.
+    const refUrls = countRefUrls(payload, shot);
+    const refCap = maxRefCount(catalogItemForService());
+    if (refUrls.length > refCap) {
+      setMsg(prefix + "参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "bad");
+      if (!opts.keepSend) $("send").disabled = false;
+      return { status: "blocked", stageOp: stageOp };
+    }
     attachExtraImages(payload, shot);
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
@@ -1954,6 +1996,7 @@
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
         if (nxt) {
           persist();
+          setShotBusy(shot, false);
           setMsg(prefix + "完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
           if (!opts.keepSend) $("send").disabled = false;
           renderDock();

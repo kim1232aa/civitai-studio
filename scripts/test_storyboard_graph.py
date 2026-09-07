@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0815b" in js, "STORE must bump to v0815b")
-    assert_true("nl-storyboard-v0815" in js, "STORE_OLDS must keep v0815 for migrate")
+    assert_true("nl-storyboard-v0815c" in js, "STORE must bump to v0815c")
+    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS must keep v0815b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815b-ref-images" in html, "stamp must be v0815b-ref-images")
+    assert_true("v0815c-ref-cap" in html, "stamp must be v0815c-ref-cap")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,17 +282,17 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0815b-ref-images" in html, "html stamp")
-    assert_true("nl-storyboard-v0815b" in js, "STORE v0815b")
+    assert_true("v0815c-ref-cap" in html, "html stamp")
+    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
 
 
 def test_v0815_gen_hardgate():
-    """v0815b: multi-ref always packs payload.images[]; caps still from capabilities."""
+    """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815b-ref-images" in html, "html stamp v0815b-ref-images")
-    assert_true("nl-storyboard-v0815b" in js, "STORE v0815b")
-    assert_true("nl-storyboard-v0815" in js, "STORE_OLDS prepend v0815")
+    assert_true("v0815c-ref-cap" in html, "html stamp v0815c-ref-cap")
+    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
+    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS prepend v0815b")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
@@ -337,6 +337,46 @@ def test_v0815_gen_hardgate():
     assert_true("payload.image_url = sliced[0]" in body, "modelscope sets image_url alongside images[]")
 
 
+def test_v0815c_ref_cap_single_slot_and_overcap_block():
+    """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0815c-ref-cap" in html, "stamp v0815c-ref-cap")
+    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
+    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS has v0815b")
+    assert_true("MULTI_REF_FIELDS" in js, "multi field list")
+    assert_true("SINGULAR_FIRST_FIELDS" in js, "singular FIRST list")
+    assert_true("function catalogImageFields" in js, "catalogImageFields helper")
+    assert_true("function countRefUrls" in js, "countRefUrls for over-cap")
+    # resolveRefCaps tightens when no multi bag
+    i = js.find("function resolveRefCaps")
+    j = js.find("function maxRefCount", i)
+    body = js[i:j]
+    assert_true("hasMulti" in body, "resolve checks hasMulti")
+    assert_true("Math.min(max, 1)" in body, "force maxRefs=1 for single-slot")
+    assert_true("image_urls" in js and "input_references" in js, "multi names present")
+    # over-cap hard gate in runShotStep
+    k = js.find("async function runShotStep")
+    m = js.find("async function runSelected", k)
+    if m < 0:
+        m = js.find("function runSelected", k)
+    run = js[k:m if m > 0 else k + 8000]
+    assert_true("refUrls.length > refCap" in run, "over-cap compare in runShotStep")
+    assert_true('status: "blocked"' in run and "超过上限" in run, "over-cap returns blocked with setMsg")
+    assert_true("不静默丢弃" in run or "超过上限" in run, "loud over-cap message")
+    # count check before fetch / attach path
+    assert_true("countRefUrls(payload, shot)" in run, "count before generate")
+    assert_true(run.find("countRefUrls") < run.find("attachExtraImages(payload, shot)"),
+                "count/gate before attachExtraImages")
+    # P1: setShotBusy cleared on status more
+    assert_true('status: "more"' in run, "more status kept")
+    more_idx = run.find('status: "more"')
+    window = run[max(0, more_idx - 400):more_idx]
+    assert_true("setShotBusy(shot, false)" in window, "setShotBusy false before return more")
+    # gate untouched
+    assert_true("stages[0].payload" not in js, "no stages[0] fake-run")
+
+
 
 def main():
     tests = [
@@ -355,6 +395,7 @@ def main():
         test_selbar_scoped_layout_skips_exclusive_outside_asset,
         test_empty_boot_no_robot_demo,
         test_v0815_gen_hardgate,
+        test_v0815c_ref_cap_single_slot_and_overcap_block,
     ]
     failed = 0
     for fn in tests:
