@@ -339,9 +339,12 @@ def compile_graph(graph: dict | None) -> dict:
                     return _err(f"i2i {nid} 的 image 口无有效图", blocked=True, nodeId=nid)
                 payload["sourceImage"] = img
 
-            for k in ("resolution", "width", "height", "steps", "cfgScale", "quantity"):
+            for k in ("resolution", "width", "height", "steps", "cfgScale", "cfg", "quantity", "sampler", "scheduler"):
                 if k in params:
                     payload[k] = deepcopy(params[k])
+            # Prefer cfgScale; keep cfg alias when only cfg present
+            if "cfgScale" not in payload and "cfg" in payload:
+                payload["cfgScale"] = payload["cfg"]
 
             wired_loras = inputs.get("loras")
             merged = _merge_loras(bundled_loras, wired_loras)
@@ -435,9 +438,11 @@ def compile_graph(graph: dict | None) -> dict:
                     blocked=True,
                     nodeId=nid,
                 )
-            for k in ("resolution", "duration", "aspectRatio", "width", "height"):
+            for k in ("resolution", "duration", "aspectRatio", "width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler"):
                 if k in params:
                     payload[k] = deepcopy(params[k])
+            if "cfgScale" not in payload and "cfg" in payload:
+                payload["cfgScale"] = payload["cfg"]
             wired_loras = inputs.get("loras")
             merged = _merge_loras(bundled_loras, wired_loras)
             if "loras" in params and "loras" not in inputs and not bundled_loras:

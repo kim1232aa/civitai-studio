@@ -1,7 +1,10 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0819b";
-  const STORE_OLDS = ["nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0820";
+  const STORE_OLDS = ["nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
+  const FAL_PARAM_IDS = ["duration", "aspect", "res"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -291,6 +294,13 @@
         duration: $("duration") && $("duration").value,
         aspect: $("aspect") && $("aspect").value,
         res: $("res") && $("res").value,
+        width: $("width") && $("width").value,
+        height: $("height") && $("height").value,
+        steps: $("steps") && $("steps").value,
+        cfg: $("cfg") && $("cfg").value,
+        sampler: $("sampler") && $("sampler").value,
+        scheduler: $("scheduler") && $("scheduler").value,
+        seed: $("seed") && $("seed").value,
         loras: Array.isArray(state.loras) ? state.loras : [],
       }));
     } catch (_) {}
@@ -321,6 +331,14 @@
       if (p.duration && $("duration")) $("duration").value = p.duration;
       if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
       if (p.res && $("res")) $("res").value = p.res;
+      if (p.width != null && $("width")) $("width").value = p.width;
+      if (p.height != null && $("height")) $("height").value = p.height;
+      if (p.steps != null && $("steps")) $("steps").value = p.steps;
+      if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
+      if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
+      if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
+      if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
+      if (p.seed != null && $("seed")) $("seed").value = p.seed;
       state._pendingService = p.service || "";
       state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
       if (isClassicRobotDemo(state.nodes)) {
@@ -721,6 +739,8 @@
       $("dockTitle").textContent = (n.title || "分镜") + (expanded ? " · Composer" : " · Composer（已折叠）");
     }
     $("prompt").value = n.prompt || "";
+    applyComfyParamsToUi(n);
+    syncParamSurface();
     ["text", "image", "video", "audio"].forEach((m) => {
       const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
       if (el) el.classList.toggle("on", state.mode === m);
@@ -1738,13 +1758,21 @@
   if ($("modeImg")) $("modeImg").onclick = () => setMode("image");
   if ($("modeVid")) $("modeVid").onclick = () => setMode("video");
   if ($("modeAud")) $("modeAud").onclick = () => setMode("audio");
-  ["backend", "service", "duration", "aspect", "res"].forEach((id) => {
+  ["backend", "service", "duration", "aspect", "res"].concat(COMFY_PARAM_IDS).forEach((id) => {
     if ($(id)) $(id).addEventListener("change", () => {
+      if (COMFY_PARAM_IDS.indexOf(id) >= 0) writeComfyParamsToShot(nodeById(state.selected));
       persist();
       if (id === "duration" && state.mode === "video") {
         renderCards(); drawWires(); positionDock();
       }
+      if (id === "backend" || id === "service") syncParamSurface();
     });
+    if ($(id) && COMFY_PARAM_IDS.indexOf(id) >= 0) {
+      $(id).addEventListener("input", () => {
+        writeComfyParamsToShot(nodeById(state.selected));
+        persist();
+      });
+    }
   });
 
   function setMsg(t, cls) {
@@ -1929,6 +1957,118 @@
     renderLoras();
     persist();
   }
+  function ensureSelectOpt(sel, value) {
+    if (!sel || value == null || value === "") return;
+    const v = String(value);
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === v) { found = true; break; }
+    }
+    if (!found) {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    }
+    sel.value = v;
+  }
+  function fillSelectOpts(sel, arr, cur) {
+    if (!sel) return;
+    const want = cur != null && cur !== "" ? String(cur) : (sel.value || "");
+    sel.innerHTML = "";
+    (arr || []).forEach(function (x) {
+      const o = document.createElement("option");
+      o.value = String(x); o.textContent = String(x);
+      sel.appendChild(o);
+    });
+    if (want) ensureSelectOpt(sel, want);
+  }
+  function usesCivitaiComfyParams() {
+    return currentBackend() === "civitai";
+  }
+  function syncParamSurface() {
+    const civ = usesCivitaiComfyParams();
+    const falBox = $("falParams");
+    const comfyBox = $("comfyParams");
+    if (falBox) falBox.classList.toggle("hidden", !!civ);
+    if (comfyBox) comfyBox.classList.toggle("hidden", !civ);
+  }
+  function readComfyParamsFromUi() {
+    const width = $("width") ? parseInt($("width").value, 10) : NaN;
+    const height = $("height") ? parseInt($("height").value, 10) : NaN;
+    const steps = $("steps") ? parseInt($("steps").value, 10) : NaN;
+    const cfgRaw = $("cfg") ? String($("cfg").value).trim() : "";
+    const cfg = cfgRaw === "" ? NaN : parseFloat(cfgRaw);
+    const sampler = $("sampler") ? String($("sampler").value || "").trim() : "";
+    const scheduler = $("scheduler") ? String($("scheduler").value || "").trim() : "";
+    const seedRaw = $("seed") ? String($("seed").value || "").trim() : "";
+    const out = {};
+    if (Number.isFinite(width)) out.width = width;
+    if (Number.isFinite(height)) out.height = height;
+    if (Number.isFinite(steps)) out.steps = steps;
+    if (Number.isFinite(cfg)) { out.cfgScale = cfg; out.cfg = cfg; }
+    if (sampler) out.sampler = sampler;
+    if (scheduler) out.scheduler = scheduler;
+    if (seedRaw !== "" && seedRaw !== "random") {
+      const seedNum = Number(seedRaw);
+      out.seed = Number.isFinite(seedNum) ? seedNum : seedRaw;
+    }
+    return out;
+  }
+  function writeComfyParamsToShot(shot) {
+    if (!shot || shot.kind !== "shot") return;
+    const p = readComfyParamsFromUi();
+    ["width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler", "seed"].forEach(function (k) {
+      if (p[k] != null) shot[k] = p[k];
+      else delete shot[k];
+    });
+    // keep cfg mirror on shot for STORE hang / fixture
+    if (p.cfgScale != null && shot.cfg == null) shot.cfg = p.cfgScale;
+  }
+  function applyComfyParamsToUi(src) {
+    if (!src) return;
+    if (src.width != null && $("width")) $("width").value = src.width;
+    if (src.height != null && $("height")) $("height").value = src.height;
+    if (src.steps != null && $("steps")) $("steps").value = src.steps;
+    const cfgVal = src.cfg != null ? src.cfg : src.cfgScale;
+    if (cfgVal != null && $("cfg")) $("cfg").value = cfgVal;
+    if (src.sampler && $("sampler")) ensureSelectOpt($("sampler"), src.sampler);
+    if (src.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), src.scheduler);
+    if (src.seed != null && $("seed")) $("seed").value = src.seed;
+  }
+  // Pack civitai comfy params onto generate payload — never silently drop.
+  function packComfyParamsForPayload() {
+    if (!usesCivitaiComfyParams()) return null;
+    const p = readComfyParamsFromUi();
+    if (!Object.keys(p).length) return null;
+    return p;
+  }
+  async function loadComfyDefaults() {
+    try {
+      const r = await fetch("/api/defaults");
+      const j = await r.json();
+      const d = j.defaults || {};
+      fillSelectOpts($("sampler"), j.samplers || [], ($("sampler") && $("sampler").value) || d.sampler || "er_sde");
+      fillSelectOpts($("scheduler"), j.schedulers || [], ($("scheduler") && $("scheduler").value) || d.scheduler || "sgm_uniform");
+      // Only fill empty UI slots so STORE/shot restore wins.
+      if ($("width") && !$("width").value && d.width != null) $("width").value = d.width;
+      if ($("height") && !$("height").value && d.height != null) $("height").value = d.height;
+      if ($("steps") && !$("steps").value && d.steps != null) $("steps").value = d.steps;
+      if ($("cfg") && !$("cfg").value && d.cfgScale != null) $("cfg").value = d.cfgScale;
+      if (d.sampler && $("sampler") && !$("sampler").value) ensureSelectOpt($("sampler"), d.sampler);
+      if (d.scheduler && $("scheduler") && !$("scheduler").value) ensureSelectOpt($("scheduler"), d.scheduler);
+      state._civitaiDefaultService = (d.serviceId || CIVITAI_PREF_SERVICE);
+    } catch (_) {
+      fillSelectOpts($("sampler"), ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], "er_sde");
+      fillSelectOpts($("scheduler"), ["sgm_uniform", "simple", "normal", "karras", "exponential", "ddim_uniform", "beta"], "sgm_uniform");
+      if ($("width") && !$("width").value) $("width").value = 960;
+      if ($("height") && !$("height").value) $("height").value = 1440;
+      if ($("steps") && !$("steps").value) $("steps").value = 8;
+      if ($("cfg") && !$("cfg").value) $("cfg").value = 1;
+      state._civitaiDefaultService = CIVITAI_PREF_SERVICE;
+    }
+    syncParamSurface();
+  }
+
   // Pack like index.html base.loras (~2231) + slimPayload (~2302): path/url/versionId/air/scale.
   function packLorasForPayload() {
     const list = Array.isArray(state.loras) ? state.loras : [];
@@ -2190,16 +2330,28 @@
     let op = "t2i";
     if (state.mode === "video") op = "i2v";
     else if (linked[0]) op = "i2i";
-    const aspect = $("aspect").value || "16:9";
-    const res = $("res").value === "1080P" ? (aspect === "9:16" ? "1080x1920" : "1920x1080") : (aspect === "9:16" ? "720x1280" : "1280x720");
+    const aspect = ($("aspect") && $("aspect").value) || "16:9";
+    const res = ($("res") && $("res").value === "1080P") ? (aspect === "9:16" ? "1080x1920" : "1920x1080") : (aspect === "9:16" ? "720x1280" : "1280x720");
+    const be = ($("backend") && $("backend").value) || "fal";
+    const genParams = {
+      serviceId: $("service").value || (be === "civitai"
+        ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
+        : (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell")),
+    };
+    if (be === "civitai") {
+      // width/height/steps/cfgScale/sampler/scheduler — seed packed in runShotStep (wire-only compile rule)
+      const comfy = readComfyParamsFromUi();
+      ["width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler"].forEach(function (k) {
+        if (comfy[k] != null) genParams[k] = comfy[k];
+      });
+    } else {
+      genParams.resolution = res;
+      genParams.duration = parseInt(($("duration") && $("duration").value) || "5", 10) || 5;
+      genParams.aspectRatio = aspect;
+    }
     nodes.push({
       id: shot.id, op: op,
-      params: {
-        serviceId: $("service").value || (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell"),
-        resolution: res,
-        duration: parseInt($("duration").value, 10) || 5,
-        aspectRatio: ($("aspect") && $("aspect").value) || "16:9",
-      },
+      params: genParams,
     });
     const ref = (op === "i2v") ? frame : linked[0];
     if (ref) edges.push({ from: ref.id, fromPort: "image", to: shot.id, toPort: "image" });
@@ -2333,6 +2485,19 @@
     {
       const packedLoras = packLorasForPayload();
       if (packedLoras && packedLoras.length) payload.loras = packedLoras;
+    }
+    // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
+    {
+      const packedComfy = packComfyParamsForPayload();
+      if (packedComfy) {
+        Object.keys(packedComfy).forEach(function (k) {
+          if (packedComfy[k] != null && packedComfy[k] !== "") payload[k] = packedComfy[k];
+        });
+      }
+      if (usesCivitaiComfyParams()) {
+        const sid = ($("service") && $("service").value) || state._civitaiDefaultService || CIVITAI_PREF_SERVICE;
+        if (sid) payload.serviceId = sid;
+      }
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
@@ -2783,9 +2948,25 @@
     $("service").innerHTML = '<option value="">默认模型</option>';
     state.catalogById = state.catalogById || {};
     try {
-      const r = await fetch("/api/catalog?backend=" + encodeURIComponent($("backend").value));
+      const be = $("backend").value;
+      const r = await fetch("/api/catalog?backend=" + encodeURIComponent(be));
       const j = await r.json();
-      const items = (j.items || j.models || []).slice(0, 60);
+      let items = (j.items || j.models || []).slice();
+      const pref = (be === "civitai")
+        ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
+        : "";
+      // Keep preferred service in the option list even when catalog is capped.
+      const CAP = 60;
+      if (pref) {
+        const prefItem = items.find(function (it) { return (it.id || it.name) === pref; });
+        let head = items.slice(0, CAP);
+        if (prefItem && !head.some(function (it) { return (it.id || it.name) === pref; })) {
+          head = [prefItem].concat(head.filter(function (it) { return (it.id || it.name) !== pref; })).slice(0, CAP);
+        }
+        items = head;
+      } else {
+        items = items.slice(0, CAP);
+      }
       state.catalog = items;
       // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
       const byId = {};
@@ -2803,7 +2984,11 @@
       if (state._pendingService) {
         $("service").value = state._pendingService;
         state._pendingService = "";
+      } else if (pref && !$("service").value) {
+        if (byId[pref]) $("service").value = pref;
       }
+      syncParamSurface();
+      syncLoraUi();
     } catch (_) {}
   }
   async function loadOuts() {
@@ -2819,6 +3004,7 @@
     } catch (_) {}
   }
   $("backend").onchange = function () {
+    syncParamSurface();
     loadCatalog();
     syncLoraUi();
   };
@@ -2835,7 +3021,8 @@
   drawWires();
   bindLoraUi();
   syncLoraUi();
-  loadCatalog();
+  syncParamSurface();
+  loadComfyDefaults().then(function () { return loadCatalog(); });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
 })();
