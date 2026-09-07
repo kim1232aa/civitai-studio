@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821d";
-  const STORE_OLDS = ["nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821e";
+  const STORE_OLDS = ["nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821e: POST /api/upload-out → /out (no blob soft-fallback)
   // v0821d: new-shot / loadDemo prompt stays empty (no 【镜头 shell)
   // v0821c: fal i2v preview writeback + local /out → data URL
   // v0821b: real i2v endpoint (plain video-01 is t2v and drops first frame)
@@ -1102,6 +1103,7 @@
     });
   }
   async function uploadOut(f) {
+    // Must land under /out so Fal materialize can read it. Never soft-fall to blob:.
     try {
       const dataUrl = await readFileAsDataUrl(f);
       const r = await fetch("/api/upload-out", {
@@ -1109,13 +1111,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl: dataUrl, filename: f.name }),
       });
-      const j = await r.json();
-      if (r.ok && j && j.url) return j.url;
-      setMsg((j && j.error) || "上传未成功，改用本地预览", "warn");
+      let j = null;
+      try { j = await r.json(); } catch (_) {}
+      if (r.ok && j && j.url && String(j.url).indexOf("/out/") === 0) return j.url;
+      setMsg((j && j.error) || ("上传失败 HTTP " + r.status), "bad");
+      return "";
     } catch (e) {
-      setMsg("上传失败，改用本地预览", "warn");
+      setMsg("上传失败：" + ((e && e.message) || e), "bad");
+      return "";
     }
-    return URL.createObjectURL(f);
   }
 
 
@@ -1596,6 +1600,10 @@
     if (!f) return;
     setMsg("正在上传…");
     const url = await uploadOut(f);
+    if (!url || String(url).indexOf("/out/") !== 0) {
+      $("file").value = "";
+      return;
+    }
     const id = uid("asset");
     const n = assets().length;
     const node = { id: id, kind: "character", title: f.name.replace(/\.[^.]+$/, ""), x: 220, y: 24 + n * 40, url: url };

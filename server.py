@@ -669,6 +669,57 @@ def save_fal_result(data: dict) -> list[dict]:
     return saved
 
 
+
+def save_upload_out(data_url: str, filename: str = "") -> dict:
+    """Persist a browser data URL under /out and return a studio-relative url.
+
+    Used by storyboard local upload (POST /api/upload-out). Relative /out paths
+    are later materialized to data URLs before Fal submit.
+    """
+    import base64
+    import re
+    import time
+    s = (data_url or "").strip()
+    if not s.startswith("data:"):
+        raise ValueError("需要 dataUrl")
+    m = re.match(r"^data:([^;]+);base64,(.+)$", s, re.S)
+    if not m:
+        raise ValueError("dataUrl 不是合法 base64 data URI")
+    ctype = (m.group(1) or "application/octet-stream").split(";")[0].strip().lower()
+    try:
+        raw = base64.b64decode(m.group(2), validate=False)
+    except Exception as e:
+        raise ValueError(f"base64 解码失败: {e}") from e
+    if not raw:
+        raise ValueError("空文件")
+    ext = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+        "video/mp4": ".mp4",
+        "video/webm": ".webm",
+    }.get(ctype)
+    if not ext:
+        name = (filename or "").lower()
+        for e in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"):
+            if name.endswith(e):
+                ext = ".jpg" if e == ".jpeg" else e
+                break
+        else:
+            ext = ".bin"
+    safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", (filename or "upload").rsplit("/", 1)[-1])[:60] or "upload"
+    if "." in safe:
+        safe = safe.rsplit(".", 1)[0]
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    out_name = f"upload_{stamp}_{safe}{ext}"
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / out_name).write_bytes(raw)
+    kind = "video" if ext in (".mp4", ".webm") else "image"
+    return {"file": out_name, "url": f"/out/{out_name}", "bytes": len(raw), "kind": kind, "contentType": ctype}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "CivitaiStudio/2.0"
 
@@ -966,6 +1017,17 @@ class Handler(BaseHTTPRequestHandler):
                 endpoint=payload.get("endpoint") or payload.get("serviceId"),
             )
             return self._json(code, data)
+        if path == "/api/upload-out":
+            try:
+                data_url = payload.get("dataUrl") or payload.get("data_url") or ""
+                filename = payload.get("filename") or payload.get("fileName") or "upload"
+                info = save_upload_out(data_url, filename)
+                return self._json(200, info)
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            except Exception as e:
+                print("[web] upload-out", e, flush=True)
+                return self._json(500, {"error": "上传失败"})
         if path == "/api/graph/compile":
             from providers.graph_compile import compile_graph
             result = compile_graph(payload.get("graph") if isinstance(payload.get("graph"), dict) else payload)
