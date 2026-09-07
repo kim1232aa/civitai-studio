@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0816" in js, "STORE must bump to v0816")
-    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS must keep v0815c for migrate")
+    assert_true("nl-storyboard-v0816b" in js, "STORE must bump to v0816b")
+    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS must keep v0816 for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816-sb-lora" in html, "stamp must be v0816-sb-lora")
+    assert_true("v0816b-sb-lora-bind" in html, "stamp must be v0816b-sb-lora-bind")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,17 +282,17 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0816-sb-lora" in html, "html stamp")
-    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
+    assert_true("v0816b-sb-lora-bind" in html, "html stamp")
+    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
 
 
 def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816-sb-lora" in html, "html stamp v0816-sb-lora")
-    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
-    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS prepend v0815c")
+    assert_true("v0816b-sb-lora-bind" in html, "html stamp v0816b-sb-lora-bind")
+    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
+    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS prepend v0816")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
@@ -339,12 +339,12 @@ def test_v0815_gen_hardgate():
 
 
 def test_v0816_sb_lora():
-    """v0816-sb-lora: Composer LoRA UI + payload.loras packing; stamp/STORE."""
+    """v0816b-sb-lora-bind: Composer LoRA UI wired at boot + payload.loras packing."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816-sb-lora" in html, "html stamp v0816-sb-lora")
-    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
-    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS has v0815c")
+    assert_true("v0816b-sb-lora-bind" in html, "html stamp v0816b-sb-lora-bind")
+    assert_true('const STORE = "nl-storyboard-v0816b"' in js, "STORE v0816b")
+    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS has v0816")
     # UI markers in Composer dock
     assert_true('id="loraBlock"' in html, "loraBlock in storyboard.html")
     assert_true('data-sb-lora="1"' in html or "data-sb-lora" in html, "sb-lora marker")
@@ -359,8 +359,15 @@ def test_v0816_sb_lora():
     assert_true("function renderLoras" in js, "renderLoras")
     assert_true("function showLoraBlock" in js, "showLoraBlock")
     assert_true("function syncLoraUi" in js, "syncLoraUi")
+    assert_true("function bindLoraUi" in js, "bindLoraUi defined")
     assert_true("function normalizeLora" in js, "normalizeLora")
     assert_true("/api/search?type=LORA" in js, "search via /api/search type=LORA")
+    # bindLoraUi must be invoked at boot (not only defined)
+    assert_true(js.count("bindLoraUi()") >= 2, "bindLoraUi() called at least once outside def")
+    boot_tail = js[js.rfind("bindImportModal();"):]
+    assert_true("bindLoraUi();" in boot_tail, "boot-tail calls bindLoraUi();")
+    assert_true("syncLoraUi();" in boot_tail, "boot-tail calls syncLoraUi();")
+    assert_true("syncLoraUi()" in js[js.find("$(\"backend\")"):], "backend onchange syncs LoRA UI")
     # Pack into generate payload after attachExtraImages
     k = js.find("async function runShotStep")
     m = js.find("async function runSelected", k)
@@ -392,9 +399,9 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816-sb-lora" in html, "stamp v0816-sb-lora")
-    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
-    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS has v0815c")
+    assert_true("v0816b-sb-lora-bind" in html, "stamp v0816b-sb-lora-bind")
+    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
+    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS has v0816")
     assert_true("MULTI_REF_FIELDS" in js, "multi field list")
     assert_true("SINGULAR_FIRST_FIELDS" in js, "singular FIRST list")
     assert_true("function catalogImageFields" in js, "catalogImageFields helper")
