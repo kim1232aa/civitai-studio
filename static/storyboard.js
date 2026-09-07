@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0796";
-  const STORE_OLDS = ["nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0797";
+  const STORE_OLDS = ["nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -1219,6 +1219,44 @@
     return first(data.saved) || first(data.files) || first(data.urls) || first(data.images) || first(data.videos) || "";
   }
 
+  function hasUnresolvedStageOut(obj) {
+    if (Array.isArray(obj)) return obj.some(hasUnresolvedStageOut);
+    if (obj && typeof obj === "object") {
+      if (obj.__stageOut__) return true;
+      return Object.keys(obj).some((k) => hasUnresolvedStageOut(obj[k]));
+    }
+    return false;
+  }
+
+  function fillStageRefs(payload, urls) {
+    const p = JSON.parse(JSON.stringify(payload || {}));
+    function walk(v) {
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === "object") {
+        if (v.__stageOut__) {
+          const u = urls[String(v.__stageOut__)];
+          return u || v;
+        }
+        const out = {};
+        Object.keys(v).forEach((k) => { out[k] = walk(v[k]); });
+        return out;
+      }
+      return v;
+    }
+    return walk(p);
+  }
+
+  function nextRunnableStage(j, urls) {
+    const stages = (j && j.stages) || [];
+    for (let i = 0; i < stages.length; i++) {
+      const s = stages[i];
+      if (urls[String(s.id)]) continue;
+      const needs = s.needs || [];
+      if (needs.every((id) => urls[String(id)])) return s;
+    }
+    return null;
+  }
+
   async function generate() {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
@@ -1242,17 +1280,36 @@
       setMsg(String(e), "bad"); $("send").disabled = false; return;
     }
     if (!compiled.ok) { setMsg(compiled.error || "校验未通过", "bad"); $("send").disabled = false; return; }
-    // Never one-shot a multi-step plan via stages[0] or sink payload.
+    // Never one-shot a multi-step plan via stage-zero payload or whole compile body.
     var staged = !!(compiled.multiStep || compiled.execute === "staged" ||
       (Array.isArray(compiled.stages) && compiled.stages.length > 1));
+    let payload = null;
+    let stage = null;
     if (staged) {
-      setMsg((compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通（step runner 未接入）", "warn");
-      $("send").disabled = false;
-      return;
+      if (!shot.stageUrls) shot.stageUrls = {};
+      stage = nextRunnableStage(compiled, shot.stageUrls);
+      if (!stage || !stage.payload) {
+        setMsg((compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "warn");
+        $("send").disabled = false;
+        return;
+      }
+      payload = fillStageRefs(stage.payload, shot.stageUrls);
+      if (hasUnresolvedStageOut(payload)) {
+        setMsg("上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "bad");
+        $("send").disabled = false;
+        return;
+      }
+    } else {
+      // single-step only — never stage-zero payload fallback
+      const payload = compiled.payload;
+      if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
+      // assign outer for shared /api/generate path below
     }
-    const payload = compiled.payload;
-    if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
-    setMsg("正在请求云 API…");
+    if (!staged) {
+      payload = compiled.payload;
+      if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
+    }
+    setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1271,7 +1328,18 @@
         }
       }
       const url = pickUrl(j);
-      if (url) {
+      if (url && stage) {
+        shot.stageUrls[String(stage.id)] = url;
+        const nxt = nextRunnableStage(compiled, shot.stageUrls);
+        if (nxt) {
+          setMsg("完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
+        } else {
+          shot.url = url;
+          if (!isVideoUrl(url)) promoteResult(shot, url);
+          renderCards(); drawWires(); persist();
+          setMsg(isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库", "ok");
+        }
+      } else if (url) {
         shot.url = url;
         if (!isVideoUrl(url)) promoteResult(shot, url);
         renderCards(); drawWires(); persist();

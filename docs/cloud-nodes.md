@@ -27,6 +27,7 @@ Comfy 手感的连线画布。执行走云 API（Fal / Nano / 魔搭 / Civitai /
 1. 校验连线 → `POST /api/graph/compile`
 2. 单步：运行此步 → `POST /api/generate`，若返回 job id 则轮询 `/api/jobs/{id}`
 3. 多步：按钮变成「运行下一步 · op」。上游成片 url 填进 `__stageOut__`。禁止一次 generate 假跑整链。
+   LiteGraph 已有 step runner（`fillStageRefs` / `nextRunnableStage`）；`invalidate()` 会清空 `stageUrls`，避免拓扑变更后复用陈旧成片。
 
 Hugging Face 无官方 i2v，校验会红。
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-<title>节点画布 · Night Lab · LiteGraph · v0795-nav</title>
+<title>节点画布 · Night Lab · LiteGraph · v0797-step</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/css/litegraph.css" />
 <link rel="stylesheet" href="/static/litegraph.css" />
 <style>
@@ -66,7 +66,7 @@
       <a class="on" href="/litegraph" aria-current="page">LiteGraph</a>
     </nav>
     <span class="muted">LiteGraph · 双击搜节点 · 端口拖线 · 执行走云 API</span>
-    <span class="stamp">v0795-nav</span>
+    <span class="stamp">v0797-step</span>
   </header>
   <div class="wrap">
     <aside class="rail">
@@ -216,6 +216,7 @@
     epoch += 1;
     lastCompile = null;
     lastEpoch = -1;
+    stageUrls = {};
     $("btnGen").disabled = true;
     $("btnGen").textContent = "运行此步";
     $("dockMsg").textContent = reason || "图已变更 · 请重新校验";
@@ -386,19 +387,31 @@
     if (n && n.properties) n.properties.previewUrl = url;
   }
 
+  function hasUnresolvedStageOut(obj) {
+    if (Array.isArray(obj)) return obj.some(hasUnresolvedStageOut);
+    if (obj && typeof obj === "object") {
+      if (obj.__stageOut__) return true;
+      return Object.keys(obj).some((k) => hasUnresolvedStageOut(obj[k]));
+    }
+    return false;
+  }
+
   function fillStageRefs(payload) {
     const p = JSON.parse(JSON.stringify(payload || {}));
-    function fill(v) {
-      if (v && typeof v === "object" && v.__stageOut__) {
-        const u = stageUrls[String(v.__stageOut__)];
-        return u || v;
+    function walk(v) {
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === "object") {
+        if (v.__stageOut__) {
+          const u = stageUrls[String(v.__stageOut__)];
+          return u || v;
+        }
+        const out = {};
+        Object.keys(v).forEach((k) => { out[k] = walk(v[k]); });
+        return out;
       }
       return v;
     }
-    ["sourceImage", "firstFrame", "imageUrl", "image_url", "image"].forEach((k) => {
-      if (p[k] != null) p[k] = fill(p[k]);
-    });
-    return p;
+    return walk(p);
   }
 
   function nextRunnableStage(j) {
@@ -469,7 +482,7 @@
         return;
       }
       payload = fillStageRefs(stage.payload);
-      if (payload.sourceImage && typeof payload.sourceImage === "object" && payload.sourceImage.__stageOut__) {
+      if (hasUnresolvedStageOut(payload)) {
         $("dockMsg").textContent = "上游还没有成片地址，不能偷配方台图";
         $("dockMsg").className = "bad";
         return;
@@ -525,13 +538,23 @@
       } else if (url && lastCompile.sink) {
         attachPreview(lastCompile.sink, url);
       }
-      $("dockMsg").textContent = url ? (stage ? ("完成 " + stage.op + " · 可再校验跑下一步") : "此步完成") : "云端已返回，没有可预览地址";
-      $("dockMsg").className = url ? "ok" : "warn";
-      if (lastCompile.multiStep) {
+      if (lastCompile.multiStep || lastCompile.execute === "staged") {
         const nxt = nextRunnableStage(lastCompile);
         $("btnGen").disabled = !nxt;
         $("btnGen").textContent = nxt ? ("运行下一步 · " + nxt.op) : "运行此步";
+        if (url && nxt) {
+          $("dockMsg").textContent = "完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片";
+          $("dockMsg").className = "warn";
+        } else if (url) {
+          $("dockMsg").textContent = "完成 " + (stage ? stage.op + " · 多步链已全部有成片" : "此步完成");
+          $("dockMsg").className = "ok";
+        } else {
+          $("dockMsg").textContent = "云端已返回，没有可预览地址";
+          $("dockMsg").className = "warn";
+        }
       } else {
+        $("dockMsg").textContent = url ? "此步完成" : "云端已返回，没有可预览地址";
+        $("dockMsg").className = url ? "ok" : "warn";
         $("btnGen").disabled = false;
       }
     } catch (e) {
