@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0798-sb-invalidate</title>
+<title>画布 · Night Lab · v0799-composer-skill</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -143,6 +143,26 @@
   .atbox button:hover{background:#222}
   .atbox img{width:28px;height:28px;object-fit:cover;border-radius:6px}
 
+
+  .composer-acts{display:flex;gap:6px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+  .act-btn{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;
+    padding:6px 12px;font-size:12px;height:30px;line-height:1}
+  .act-btn:hover{border-color:#4a4a54;color:#fff}
+  .act-btn.on{border-color:#5ee0c5;color:#fff;box-shadow:0 0 0 1px rgba(94,224,197,.25)}
+  .skillbox{position:absolute;left:50%;bottom:250px;transform:translateX(-50%);z-index:19;width:min(480px,86vw);
+    background:#16161a;border:1px solid #2c2c34;border-radius:14px;padding:0;display:none;max-height:340px;
+    overflow:hidden;box-shadow:0 18px 48px rgba(0,0,0,.45)}
+  .skillbox.show{display:flex;flex-direction:column}
+  .skillbox .sk-hd{display:flex;gap:4px;padding:10px 10px 6px;overflow:auto;border-bottom:1px solid #24242a;flex-shrink:0}
+  .skillbox .sk-cat{border:0;background:transparent;color:#8b8b94;border-radius:999px;padding:5px 10px;font-size:11px;white-space:nowrap}
+  .skillbox .sk-cat.on{background:#26262e;color:#fff}
+  .skillbox .sk-list{overflow:auto;padding:8px;flex:1;min-height:0}
+  .skillbox .sk-item{display:flex;flex-direction:column;gap:2px;width:100%;background:transparent;border:0;color:#ddd;
+    padding:8px 10px;border-radius:10px;text-align:left}
+  .skillbox .sk-item:hover{background:#222}
+  .skillbox .sk-item .sk-title{font-size:13px;color:#eee}
+  .skillbox .sk-item .sk-preview{font-size:11px;color:#7a7a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .skillbox .sk-empty{padding:28px 12px;text-align:center;color:#5a5a64;font-size:12px}
   .dur{margin-left:6px;font-size:10px;line-height:1;padding:2px 6px;border-radius:999px;
     background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#c8c8d0}
   .zoom .zpresets{display:flex;gap:2px;margin-left:4px;padding-left:6px;border-left:1px solid #2a2a30}
@@ -211,7 +231,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0798-sb-invalidate</span>
+      <span class="stamp">v0799-composer-skill</span>
     </div>
   </header>
   <div class="stage">
@@ -223,6 +243,7 @@
     </div>
     <aside class="rail" id="assetRail" aria-label="资产索引"></aside>
     <div class="atbox" id="atbox"></div>
+    <div class="skillbox" id="skillbox" aria-label="Skill 选择"></div>
     <div class="viewport" id="viewport">
       <div class="world" id="world">
         <div class="grid"></div>
@@ -250,7 +271,12 @@
         <button type="button" id="modeAud" class="stub" data-mode="audio">音频生成</button>
       </div>
       <div class="refs" id="refs"></div>
-      <textarea class="prompt" id="prompt" placeholder="点击查看或编辑提示词"></textarea>
+      <div class="composer-acts" id="composerActs">
+        <button type="button" class="act-btn" id="btnSkill" title="输入 / 也可打开">Skill</button>
+        <button type="button" class="act-btn" id="btnAttach" title="上传或导入附件">附件</button>
+        <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产并 @ 提到提示词">画布引用</button>
+      </div>
+      <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
       <div class="bar">
         <select id="backend">
           <option value="fal">fal</option>
@@ -273,7 +299,7 @@
         <span class="grow"></span>
         <button class="send" id="send" title="生成">↑</button>
       </div>
-      <div class="msg" id="msg">点分镜卡编辑提示词。连上的资产会变成 @引用。</div>
+      <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；@ 或「画布引用」连接资产。</div>
     </aside>
   </div>
 </div>

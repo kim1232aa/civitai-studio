@@ -1,13 +1,41 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0797";
-  const STORE_OLDS = ["nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0798";
+  const STORE_OLDS = ["nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
   const wires = $("wires");
   const dock = $("dock");
   const DEMO = "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
+
+  const SKILL_CATS = ["官方精选", "成片工作流", "短剧", "剧本策划", "美术资产", "营销广告"];
+  const SKILLS = [
+    { id: "one-take", title: "一镜到底", category: "官方精选",
+      template: "请描述你的一镜到底创意：\n场景：\n主体：@角色\n运镜：缓推 / 跟拍 / 环绕\n情绪：" },
+    { id: "storyboard-shot", title: "分镜镜头卡", category: "官方精选",
+      template: "【镜头】\n场景：@场景\n画面：\n角色：@角色\n运镜：固定镜头\n对白：" },
+    { id: "i2i-restyle", title: "图生图·风格重绘", category: "官方精选",
+      template: "基于 @图片1 重新绘制：保持构图与角色身份，强化光影与材质细节。风格：" },
+    { id: "i2v-motion", title: "图生视频·运镜", category: "成片工作流",
+      template: "以首帧 @图片1 生成视频。\n动作：\n运镜：缓慢推进\n时长提示：自然流畅，避免跳切。" },
+    { id: "multi-shot", title: "多镜连贯成片", category: "成片工作流",
+      template: "请按镜头顺序描述成片：\n镜1（建立）：@场景\n镜2（人物）：@角色\n镜3（反应）：\n转场：硬切 / 叠化" },
+    { id: "drama-hook", title: "短剧开场钩子", category: "短剧",
+      template: "短剧第1集开场（3秒钩子）：\n冲突：\n角色：@角色\n台词（一句）：\n画面冲击点：" },
+    { id: "drama-twist", title: "反转分镜", category: "短剧",
+      template: "反转镜头：前半误导，后半揭晓。\n角色：@角色\n误导信息：\n真相：\n表情特写：" },
+    { id: "script-beat", title: "场次节拍", category: "剧本策划",
+      template: "场次节拍表：\n目标：\n障碍：\n转折：\n收束：\n出场角色：@角色" },
+    { id: "script-outline", title: "三幕大纲", category: "剧本策划",
+      template: "三幕大纲：\n第一幕（建置）：\n第二幕（对抗）：\n第三幕（解决）：\n主题：" },
+    { id: "char-sheet", title: "角色设定图", category: "美术资产",
+      template: "角色设定三视图：正面 / 侧面 / 背面。\n角色：@角色\n服装：\n配色：\n关键道具：" },
+    { id: "scene-concept", title: "场景概念图", category: "美术资产",
+      template: "场景概念图：@场景\n时间：晨 / 黄昏 / 夜\n氛围：\n镜头：广角建立镜头\n细节道具：" },
+    { id: "ad-hook", title: "广告前3秒", category: "营销广告",
+      template: "广告前3秒钩子：产品出镜 + 痛点一句话。\n产品：\n受众：\n画面：@角色 使用产品\nCTA：" },
+  ];
 
   const state = {
     cam: { x: 90, y: 36, s: 0.5 },
@@ -28,6 +56,7 @@
     importFilter: "all",
     importSelected: {},
     importLibrary: [],
+    skillCat: "官方精选",
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -444,6 +473,10 @@
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
       dock.classList.remove("near");
+      hideSkillbox();
+      hideAtbox();
+      const picker = $("picker");
+      if (picker) picker.classList.remove("show");
       renderRail();
       return;
     }
@@ -621,6 +654,7 @@
   function showAtbox(query) {
     const box = $("atbox");
     if (!box) return;
+    hideSkillbox();
     const q = String(query || "").toLowerCase();
     const pool = assets().concat(shots().filter(isImageSource));
     const list = pool.filter((a) => !q || sourceTitle(a).toLowerCase().indexOf(q) >= 0);
@@ -652,7 +686,98 @@
     }
     linkAssetToShot(asset, shot);
     hideAtbox();
+    hideSkillbox();
     renderCards(); drawWires(); renderDock(); persist();
+  }
+
+  function slashQueryAt(before) {
+    const slash = before.lastIndexOf("/");
+    if (slash < 0) return null;
+    if (slash > 0 && !/[\s\n]/.test(before.charAt(slash - 1))) return null;
+    const q = before.slice(slash + 1);
+    if (/[\s\n]/.test(q)) return null;
+    return { slash: slash, query: q };
+  }
+  function hideSkillbox() {
+    const box = $("skillbox");
+    if (box) box.classList.remove("show");
+    const btn = $("btnSkill");
+    if (btn) btn.classList.remove("on");
+  }
+  function showSkillbox(query, opts) {
+    const box = $("skillbox");
+    if (!box) return;
+    hideAtbox();
+    const picker = $("picker");
+    if (picker) picker.classList.remove("show");
+    const q = String(query || "").trim().toLowerCase();
+    const filterMode = !!(opts && opts.filter);
+    let cat = state.skillCat || SKILL_CATS[0];
+    if (filterMode && q) {
+      const hit = SKILLS.find((s) =>
+        s.title.toLowerCase().indexOf(q) >= 0 || s.id.toLowerCase().indexOf(q) >= 0);
+      if (hit) cat = hit.category;
+    }
+    if (SKILL_CATS.indexOf(cat) < 0) cat = SKILL_CATS[0];
+    state.skillCat = cat;
+    const catsHtml = SKILL_CATS.map((c) =>
+      '<button type="button" class="sk-cat' + (c === cat ? " on" : "") + '" data-skcat="' + esc(c) + '">' + esc(c) + "</button>"
+    ).join("");
+    let list = SKILLS.filter((s) => s.category === cat);
+    if (filterMode && q) {
+      list = SKILLS.filter((s) =>
+        s.title.toLowerCase().indexOf(q) >= 0 ||
+        s.id.toLowerCase().indexOf(q) >= 0 ||
+        s.category.toLowerCase().indexOf(q) >= 0
+      );
+    }
+    let body;
+    if (!list.length) {
+      body = '<div class="sk-empty">' + (filterMode && q ? "没有匹配的 Skill" : "该分类暂无 Skill") + "</div>";
+    } else {
+      body = list.map((s) =>
+        '<button type="button" class="sk-item" data-skill="' + esc(s.id) + '">' +
+        '<span class="sk-title">' + esc(s.title) + "</span>" +
+        '<span class="sk-preview">' + esc(String(s.template || "").split("\n").join(" ")) + "</span>" +
+        "</button>"
+      ).join("");
+    }
+    box.innerHTML = '<div class="sk-hd">' + catsHtml + '</div><div class="sk-list">' + body + "</div>";
+    box.classList.add("show");
+    const btn = $("btnSkill");
+    if (btn) btn.classList.add("on");
+  }
+  function applySkill(skill) {
+    if (!skill) return;
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return;
+    const ta = $("prompt");
+    const tpl = skill.template || "";
+    let next = tpl;
+    if (ta) {
+      const v = ta.value || "";
+      const caret = ta.selectionStart != null ? ta.selectionStart : v.length;
+      const before = v.slice(0, caret);
+      const sq = slashQueryAt(before);
+      if (sq) {
+        next = v.slice(0, sq.slash) + tpl + v.slice(caret);
+      } else {
+        next = tpl;
+      }
+      shot.prompt = next;
+      ta.value = next;
+      try {
+        const pos = next.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      } catch (_) {}
+    } else {
+      shot.prompt = next;
+    }
+    hideSkillbox();
+    hideAtbox();
+    renderCards(); drawWires(); renderDock(); persist();
+    setMsg("已插入 Skill「" + skill.title + "」· 不会触发生成", "ok");
   }
 
   function readFileAsDataUrl(f) {
@@ -778,6 +903,7 @@
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
     hideAtbox();
+    hideSkillbox();
     const picker = $("picker");
     if (picker) picker.classList.remove("show");
     renderImportModal();
@@ -915,7 +1041,7 @@
   }
 
   vp.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost,.minimap,.import-backdrop")) return;
+    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop")) return;
     if (e.target.closest("path.edge")) return;
     const port = e.target.closest(".port");
     const card = e.target.closest(".card");
@@ -1136,22 +1262,40 @@
   });
 
   function togglePicker() {
+    openCanvasPicker(true);
+  }
+  function openCanvasPicker(toggle) {
     const box = $("picker");
-    box.classList.toggle("show");
+    if (!box) return;
     hideAtbox();
+    hideSkillbox();
+    if (toggle && box.classList.contains("show")) {
+      box.classList.remove("show");
+      const cref = $("btnCanvasRef");
+      if (cref) cref.classList.remove("on");
+      return;
+    }
     const list = assets().concat(shots().filter(isImageSource));
     box.innerHTML = list.map((a) =>
       '<button type="button" data-asset="' + esc(a.id) + '">' +
       (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") + esc(sourceTitle(a)) + "</button>"
     ).join("") || "<div style='color:#888;padding:8px'>还没有资产</div>";
+    box.classList.add("show");
+    const cref = $("btnCanvasRef");
+    if (cref) cref.classList.add("on");
   }
   $("picker").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-asset]");
     if (!btn) return;
     const asset = nodeById(btn.dataset.asset);
     const shot = nodeById(state.selected);
-    if (asset && shot) toggleAssetOnShot(asset, shot);
+    if (asset && shot) {
+      // 画布引用：确保 @ + 真实 edge（已连则保持/再次 mention）
+      linkAssetToShot(asset, shot);
+    }
     $("picker").classList.remove("show");
+    const cref = $("btnCanvasRef");
+    if (cref) cref.classList.remove("on");
     renderCards(); drawWires(); renderDock(); persist();
   });
   if ($("atbox")) {
@@ -1162,6 +1306,33 @@
       if (asset) insertMention(asset);
     });
   }
+  if ($("skillbox")) {
+    $("skillbox").addEventListener("click", (e) => {
+      const cat = e.target.closest("[data-skcat]");
+      if (cat) {
+        state.skillCat = cat.dataset.skcat;
+        showSkillbox("", { filter: false });
+        return;
+      }
+      const item = e.target.closest("[data-skill]");
+      if (!item) return;
+      const skill = SKILLS.find((s) => s.id === item.dataset.skill);
+      if (skill) applySkill(skill);
+    });
+  }
+  if ($("btnSkill")) {
+    $("btnSkill").onclick = () => {
+      const box = $("skillbox");
+      if (box && box.classList.contains("show")) hideSkillbox();
+      else showSkillbox("", { filter: false });
+    };
+  }
+  if ($("btnAttach")) {
+    $("btnAttach").onclick = () => openImportModal();
+  }
+  if ($("btnCanvasRef")) {
+    $("btnCanvasRef").onclick = () => openCanvasPicker(true);
+  }
 
   $("prompt").addEventListener("input", () => {
     const n = nodeById(state.selected);
@@ -1171,9 +1342,18 @@
     const caret = ta.selectionStart || v.length;
     const before = v.slice(0, caret);
     const at = before.lastIndexOf("@");
-    if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
+    const atOpen = at >= 0 && !/[\s\n]/.test(before.slice(at + 1));
+    const sq = slashQueryAt(before);
+    if (atOpen && (!sq || at > sq.slash)) {
+      hideSkillbox();
       showAtbox(before.slice(at + 1));
-    } else hideAtbox();
+    } else if (sq && (!atOpen || sq.slash > at)) {
+      hideAtbox();
+      showSkillbox(sq.query, { filter: true });
+    } else {
+      hideAtbox();
+      hideSkillbox();
+    }
   });
 
   function setMode(mode) {
