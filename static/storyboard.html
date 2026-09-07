@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0821e-upload-out</title>
+<title>画布 · Night Lab · v0821f-send-noop</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -129,8 +129,8 @@
   .bar .param-group{display:contents}
   .bar .param-group.hidden{display:none}
   .bar .grow{flex:1;min-width:8px}
-  .send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px;flex-shrink:0}
-  .send:disabled{opacity:.4}
+  .send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px;flex-shrink:0;cursor:pointer}
+  .send:disabled{background:#3a3a44;color:#8b8b94;opacity:1;cursor:not-allowed;box-shadow:none}
   .msg{margin-top:8px;font-size:12px;color:var(--muted);min-height:1.2em}
   .msg.ok{color:var(--ok)} .msg.bad{color:var(--coral)} .msg.warn{color:var(--buzz)}
   .hidden-file{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
@@ -339,7 +339,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0821e-upload-out</span>
+      <span class="stamp">v0821f-send-noop</span>
     </div>
   </header>
   <div class="stage">
@@ -455,7 +455,7 @@
           <input id="seed" type="text" title="种子" placeholder="seed" />
         </span>
         <span class="grow"></span>
-        <button class="send" id="send" title="生成">↑</button>
+        <button type="button" class="send" id="send" title="生成">↑</button>
       </div>
       <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；「画布引用」只连线，不写 @filename；手动 @ 可选。</div>
       </div>

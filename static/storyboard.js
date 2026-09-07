@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821e";
-  const STORE_OLDS = ["nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821f";
+  const STORE_OLDS = ["nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821f: send ↑ no-op — clear stale needFrame warn; never silent-return; disabled gray
   // v0821e: POST /api/upload-out → /out (no blob soft-fallback)
   // v0821d: new-shot / loadDemo prompt stays empty (no 【镜头 shell)
   // v0821c: fal i2v preview writeback + local /out → data URL
@@ -101,6 +102,8 @@
     if (shot.firstFrameId) {
       const hit = linked.find((a) => a.id === shot.firstFrameId);
       if (hit) return hit;
+      // orphan firstFrameId (edge gone / asset deleted): heal to linked[0] or clear
+      shot.firstFrameId = linked[0] ? linked[0].id : "";
     }
     return linked[0] || null;
   }
@@ -759,11 +762,17 @@
     const frame = frameAsset(n);
     const needFrame = state.mode === "video" && !frame;
     const stub = isStubMode();
-    if ($("send")) $("send").disabled = needFrame || stub;
+    if ($("send")) $("send").disabled = !!(needFrame || stub);
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
-      setMsg("视频需要先连一张首帧图", "warn");
+      setMsg("缺首帧 · 视频需要先连一张首帧图", "warn");
+    } else if (state.mode === "video" && frame) {
+      // v0821f: clear stale needFrame warn when thumb is hung (was CLICK_NOOP confusion)
+      const cur = ($("msg") && $("msg").textContent) || "";
+      if (/缺首帧|视频需要先连一张首帧图|本版未接/.test(cur)) {
+        setMsg("首帧已就绪 · 可生成");
+      }
     }
     let frameHtml = "";
     if (state.mode === "video") {
@@ -774,7 +783,7 @@
               (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") + esc(sourceTitle(a)) + "</button>";
           }).join("") + "</div>";
       } else {
-        frameHtml = '<div class="frame-slot missing">视频需要先连一张首帧图</div>';
+        frameHtml = '<div class="frame-slot missing">缺首帧</div>';
       }
     }
     const promoteBtn = n.url && !isVideoUrl(n.url)
@@ -2577,9 +2586,16 @@
   async function runShotStep(shotId, opts) {
     opts = opts || {};
     const shot = nodeById(shotId);
-    if (!shot || shot.kind !== "shot") return { status: "blocked" };
-    if (state.groupRunAbort) return { status: "aborted" };
     const prefix = opts.progressPrefix ? (opts.progressPrefix + " · ") : "";
+    if (!shot || shot.kind !== "shot") {
+      // v0821f: never silent — asset/empty selection was a CLICK_NOOP with no msg
+      setMsg(prefix + "请先选中分镜再生成", "bad");
+      return { status: "blocked" };
+    }
+    if (state.groupRunAbort) {
+      setMsg(prefix + "已中止", "warn");
+      return { status: "aborted" };
+    }
     if (isStubMode()) {
       setMsg(prefix + (state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
       return { status: "blocked" };
@@ -2762,9 +2778,23 @@
   }
 
   async function generate() {
-    await runShotStep(state.selected, {});
+    // v0821f: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
+    setMsg("校验连线…");
+    if ($("send")) $("send").disabled = true;
+    try {
+      await runShotStep(state.selected, {});
+    } finally {
+      // renderDock / runShotStep re-enable; belt-and-suspenders if early-return skipped that
+      const n = nodeById(state.selected);
+      const blocked = !n || n.kind !== "shot" || isStubMode() ||
+        (state.mode === "video" && !frameAsset(n));
+      if ($("send") && !state.runningGroup) $("send").disabled = !!blocked;
+    }
   }
-  $("send").onclick = generate;
+  if ($("send")) {
+    $("send").type = "button";
+    $("send").onclick = generate;
+  }
 
   async function runShotUntilDone(shotId, progressPrefix) {
     // Loop nextRunnableStage for one shot via the same step runner — do not skip gates.
