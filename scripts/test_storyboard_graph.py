@@ -255,10 +255,11 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0817" in js, "STORE must bump to v0817")
+    assert_true("nl-storyboard-v0817b" in js, "STORE must bump to v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817-no-at-filename" in html, "stamp must be v0817-no-at-filename")
+    assert_true("v0817b-unmention-at-tag" in html, "stamp must be v0817b-unmention-at-tag")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,17 +283,19 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0817-no-at-filename" in html, "html stamp")
-    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
+    assert_true("v0817b-unmention-at-tag" in html, "html stamp")
+    assert_true("nl-storyboard-v0817b" in js, "STORE v0817b")
 
 
 def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
-    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
-    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS prepend v0816b")
+    assert_true("v0817b-unmention-at-tag" in html, "html stamp v0817b-unmention-at-tag")
+    assert_true("nl-storyboard-v0817b" in js, "STORE v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS prepend v0817")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
@@ -339,11 +342,12 @@ def test_v0815_gen_hardgate():
 
 
 def test_v0816_sb_lora():
-    """LoRA UI + packing still green under v0817 stamp."""
+    """LoRA UI + packing still green under v0817b stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
-    assert_true('const STORE = "nl-storyboard-v0817"' in js, "STORE v0817")
+    assert_true("v0817b-unmention-at-tag" in html, "html stamp v0817b-unmention-at-tag")
+    assert_true('const STORE = "nl-storyboard-v0817b"' in js, "STORE v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     # UI markers in Composer dock
     assert_true('id="loraBlock"' in html, "loraBlock in storyboard.html")
@@ -399,8 +403,9 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817-no-at-filename" in html, "stamp v0817-no-at-filename")
-    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
+    assert_true("v0817b-unmention-at-tag" in html, "stamp v0817b-unmention-at-tag")
+    assert_true("nl-storyboard-v0817b" in js, "STORE v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     assert_true("MULTI_REF_FIELDS" in js, "multi field list")
     assert_true("SINGULAR_FIRST_FIELDS" in js, "singular FIRST list")
@@ -438,14 +443,16 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
 
 
 def test_v0817_no_at_filename():
-    """v0817: link/mention must not append @sourceTitle into shot.prompt."""
+    """v0817 lineage: link/mention must not append @sourceTitle; kept under v0817b stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
-    assert_true('const STORE = "nl-storyboard-v0817"' in js, "STORE v0817")
+    assert_true("v0817b-unmention-at-tag" in html, "html stamp v0817b-unmention-at-tag")
+    assert_true('const STORE = "nl-storyboard-v0817b"' in js, "STORE v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     assert_true("function isRawFileTitle" in js, "isRawFileTitle helper")
     assert_true("function mentionDisplayTag" in js, "mentionDisplayTag helper")
+    assert_true("function tagsForAsset" in js, "tagsForAsset helper")
     # mention must be a no-op (no prompt += tag / sourceTitle append)
     i = js.find("function mention(asset, shot)")
     assert_true(i >= 0, "mention fn")
@@ -461,11 +468,17 @@ def test_v0817_no_at_filename():
     assert_true("shot.prompt" not in link, "linkAssetToShot must not write shot.prompt")
     assert_true('"+ sourceTitle' not in link and '"@" + sourceTitle' not in link,
                 "linkAssetToShot must not build @sourceTitle")
-    # unmention still strips leftover @rawTitle for old canvases
+    # unmention strips via tagsForAsset (legacy @sourceTitle + display @图片N)
     u0 = js.find("function unmention(asset, shot)")
     u1 = js.find("function invalidateStageProgress", u0)
     un = js[u0:u1]
-    assert_true('"@" + sourceTitle' in un or "'@' + sourceTitle" in un, "unmention still strips @sourceTitle")
+    assert_true("tagsForAsset" in un, "unmention uses tagsForAsset")
+    # unlink must unmention BEFORE filtering edges (index-stable @图片N)
+    ul0 = js.find("function unlinkAssetFromShot")
+    ul1 = js.find("function toggleAssetOnShot", ul0)
+    ul = js[ul0:ul1]
+    assert_true(ul.find("unmention(asset, shot)") < ul.find("state.edges = state.edges.filter"),
+                "unmention before edge removal")
     # insertMention uses mentionDisplayTag, not raw sourceTitle
     im0 = js.find("function insertMention")
     im1 = js.find("function slashQueryAt", im0)
@@ -489,6 +502,130 @@ def test_v0817_no_at_filename():
     assert_true("stages[0].payload" not in js, "gate untouched")
 
 
+def _sim_is_raw_file_title(t):
+    import re
+    s = str(t or "").strip()
+    if not s:
+        return True
+    if re.match(
+        r"^(nano[-_]?gpt|modelscope|fal[_-]|comfy|out[_-]|seedream|kling|runway|luma|minimax|ideogram|flux[_-]|wan[_-]|vidu)",
+        s,
+        re.I,
+    ):
+        return True
+    cjk = re.compile(r"[\u4e00-\u9fff]")
+    if (not cjk.search(s)) and re.search(r"[0-9a-f]{8,}", s, re.I) and re.search(r"[_-]", s):
+        return True
+    if (not cjk.search(s)) and re.match(r"^[a-z0-9]+(?:[_-][a-z0-9]+){2,}_?\d*$", s, re.I) and len(s) >= 20:
+        return True
+    return False
+
+
+def _sim_mention_display_tag(asset, linked_ids, titles_by_id):
+    """Mirror mentionDisplayTag while asset is still in linked list."""
+    try:
+        idx = linked_ids.index(asset["id"])
+    except ValueError:
+        idx = len(linked_ids)
+    title = titles_by_id[asset["id"]]
+    if title and not _sim_is_raw_file_title(title):
+        return "@" + title
+    return "@图片" + str(idx + 1)
+
+
+def _sim_tags_for_asset(asset, linked_ids, titles_by_id):
+    tags = []
+    title = titles_by_id[asset["id"]]
+    if title:
+        legacy = "@" + title
+        if legacy not in tags:
+            tags.append(legacy)
+    display = _sim_mention_display_tag(asset, linked_ids, titles_by_id)
+    if display not in tags:
+        tags.append(display)
+    return tags
+
+
+def _sim_unmention(prompt, asset, linked_ids, titles_by_id):
+    import re
+    text = prompt or ""
+    for tag in _sim_tags_for_asset(asset, linked_ids, titles_by_id):
+        if tag and tag in text:
+            text = text.replace(tag, "")
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
+
+def test_v0817b_unmention_at_tag():
+    """v0817b: insertMention @图片N / human tag must be stripped on unmention/unlink."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0817b-unmention-at-tag" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0817b"' in js, "STORE v0817b")
+    assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
+    assert_true("function tagsForAsset" in js, "tagsForAsset")
+    assert_true("seedream" in js[js.find("function isRawFileTitle"):js.find("function mentionDisplayTag")],
+                "isRawFileTitle covers seedream")
+    # Static: unmention ↔ insertMention alignment
+    assert_true("tagsForAsset" in js[js.find("function unmention"):js.find("function invalidateStageProgress")],
+                "unmention calls tagsForAsset")
+    assert_true("mentionDisplayTag" in js[js.find("function insertMention"):js.find("function slashQueryAt")],
+                "insertMention uses mentionDisplayTag")
+    ul = js[js.find("function unlinkAssetFromShot"):js.find("function toggleAssetOnShot")]
+    assert_true(ul.find("unmention(asset, shot)") < ul.find("state.edges = state.edges.filter"),
+                "unlink unmentions before edge drop")
+
+    # Simulate atbox insert of raw-title asset → @图片1, then unmention while still linked
+    raw = {"id": "a-raw", "title": "nano-gpt_img_ef80f1b1f425_0"}
+    human = {"id": "a-human", "title": "家用机器人"}
+    titles = {raw["id"]: raw["title"], human["id"]: human["title"]}
+    linked = [raw["id"]]  # sole linked image → @图片1
+    display = _sim_mention_display_tag(raw, linked, titles)
+    assert_true(display == "@图片1", display)
+    prompt = "基于 " + display + " 重绘"
+    assert_true("@图片1" in prompt, prompt)
+    # chip off / unmention while edge still present
+    after = _sim_unmention(prompt, raw, linked, titles)
+    assert_true("@图片1" not in after, "orphan @图片1 must be stripped: " + after)
+    assert_true("@" + raw["title"] not in after, "no leftover @sourceTitle")
+    assert_true("基于" in after, after)
+
+    # Human title path: insert @家用机器人, unmention strips it
+    linked_h = [human["id"]]
+    d2 = _sim_mention_display_tag(human, linked_h, titles)
+    assert_true(d2 == "@家用机器人", d2)
+    p2 = "角色：" + d2 + " 站立"
+    after2 = _sim_unmention(p2, human, linked_h, titles)
+    assert_true("@家用机器人" not in after2, after2)
+
+    # Index stability: two linked; unlink middle asset's @图片2 (not shifted post-unlink)
+    a1 = {"id": "a1", "title": "seedream_abc123_out_0"}
+    a2 = {"id": "a2", "title": "seedream_def456_out_1"}
+    a3 = {"id": "a3", "title": "seedream_ghi789_out_2"}
+    titles3 = {a1["id"]: a1["title"], a2["id"]: a2["title"], a3["id"]: a3["title"]}
+    linked3 = [a1["id"], a2["id"], a3["id"]]
+    t1 = _sim_mention_display_tag(a1, linked3, titles3)
+    t2 = _sim_mention_display_tag(a2, linked3, titles3)
+    t3 = _sim_mention_display_tag(a3, linked3, titles3)
+    assert_true((t1, t2, t3) == ("@图片1", "@图片2", "@图片3"), (t1, t2, t3))
+    prompt3 = " ".join([t1, t2, t3])
+    # unmention a2 while still linked → strip @图片2 only
+    after3 = _sim_unmention(prompt3, a2, linked3, titles3)
+    assert_true("@图片2" not in after3, after3)
+    assert_true("@图片1" in after3 and "@图片3" in after3, after3)
+    # Wrong order (post-unlink index) would compute a2 as @图片3 — ensure we document pre-unlink
+    linked_after = [a1["id"], a3["id"]]
+    wrong = _sim_mention_display_tag(a2, linked_after, titles3)
+    assert_true(wrong == "@图片3", "post-unlink index shifts — why unmention must run first")
+    assert_true(wrong not in ["@图片2"], "shifted tag differs from insert-time tag")
+
+    assert_true("stages[0].payload" not in js, "gate untouched")
+    assert_true("function attachExtraImages" in js, "images packing kept")
+    assert_true("function packLorasForPayload" in js, "LoRA packing kept")
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -509,6 +646,7 @@ def main():
         test_v0815c_ref_cap_single_slot_and_overcap_block,
         test_v0816_sb_lora,
         test_v0817_no_at_filename,
+        test_v0817b_unmention_at_tag,
     ]
     failed = 0
     for fn in tests:

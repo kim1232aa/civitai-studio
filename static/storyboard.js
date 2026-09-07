@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0817";
-  const STORE_OLDS = ["nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0817b";
+  const STORE_OLDS = ["nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -104,7 +104,8 @@
   function isRawFileTitle(t) {
     const s = String(t || "").trim();
     if (!s) return true;
-    if (/^(nano[-_]?gpt|modelscope|fal[_-]|comfy|out[_-])/i.test(s)) return true;
+    // provider / pipeline file-id prefixes (never dump into prompt)
+    if (/^(nano[-_]?gpt|modelscope|fal[_-]|comfy|out[_-]|seedream|kling|runway|luma|minimax|ideogram|flux[_-]|wan[_-]|vidu)/i.test(s)) return true;
     // long hex / uuid fragments without CJK (e.g. nano-gpt_img_ef80f1b1f425_0)
     if (!/[\u4e00-\u9fff]/.test(s) && /[0-9a-f]{8,}/i.test(s) && /[_-]/.test(s)) return true;
     if (!/[\u4e00-\u9fff]/.test(s) && /^[a-z0-9]+(?:[_-][a-z0-9]+){2,}_?\d*$/i.test(s) && s.length >= 20) return true;
@@ -118,6 +119,18 @@
     const title = sourceTitle(asset);
     if (title && !isRawFileTitle(title)) return "@" + title;
     return "@图片" + (idx + 1);
+  }
+  /** All @ aliases insertMention may have written for this asset (while still linked). */
+  function tagsForAsset(asset, shot) {
+    const tags = [];
+    const title = sourceTitle(asset);
+    if (title) {
+      const legacy = "@" + title;
+      if (tags.indexOf(legacy) < 0) tags.push(legacy);
+    }
+    const display = mentionDisplayTag(asset, shot);
+    if (display && tags.indexOf(display) < 0) tags.push(display);
+    return tags;
   }
   function mediaBadge(n) {
     if (!n || !n.url) return "";
@@ -779,17 +792,28 @@
     return null;
   }
 
-  // v0817-no-at-filename: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
+  // v0817b-unmention-at-tag: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
   // Real images travel edges → attachExtraImages → payload.images[]. Prompt stays human text.
+  // insertMention may write mentionDisplayTag (@图片N / human); unmention strips tagsForAsset aliases.
   function mention(asset, shot) {
     return;
   }
-  // Cleanup leftover @rawTitle from pre-v0817 canvases; unlink no longer requires strip for new links.
+  // Strip every tag insertMention / legacy mention could have left for this asset.
+  // Caller must invoke while edge is still present so @图片N index matches insert time.
   function unmention(asset, shot) {
-    if (!shot) return;
-    const tag = "@" + sourceTitle(asset);
-    if ((shot.prompt || "").includes(tag)) {
-      shot.prompt = shot.prompt.split(tag).join("").replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+    if (!shot || !asset) return;
+    const tags = tagsForAsset(asset, shot);
+    let text = shot.prompt || "";
+    let changed = false;
+    for (let i = 0; i < tags.length; i++) {
+      const tag = tags[i];
+      if (tag && text.indexOf(tag) >= 0) {
+        text = text.split(tag).join("");
+        changed = true;
+      }
+    }
+    if (changed) {
+      shot.prompt = text.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
       if ($("prompt") && state.selected === shot.id) $("prompt").value = shot.prompt;
     }
   }
@@ -814,8 +838,9 @@
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
     const had = state.edges.some((e) => e.from === asset.id && e.to === shot.id);
-    state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
+    // unmention BEFORE edge removal so tagsForAsset/@图片N matches insertMention index
     unmention(asset, shot);
+    state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
     if (had) invalidateStageProgress(shot);
   }
@@ -898,10 +923,10 @@
   function insertMention(asset) {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
-    // Edge first (mention is no-op); then optional human-friendly @ tag for typed atbox.
+    // Edge first (mention is no-op); then display tag from tagsForAsset/mentionDisplayTag.
     linkAssetToShot(asset, shot);
     const ta = $("prompt");
-    const tag = mentionDisplayTag(asset, shot);
+    const tag = mentionDisplayTag(asset, shot); // same as tagsForAsset display; unmention strips all aliases
     if (ta) {
       const v = ta.value || "";
       const caret = ta.selectionStart || v.length;
@@ -1707,7 +1732,7 @@
 
 
 
-  // --- v0817-no-at-filename (+ v0816b LoRA bind kept) ---
+  // --- v0817b-unmention-at-tag (+ v0817 no-at-filename + v0816b LoRA bind) ---
   function currentBackend() {
     return ($("backend") && $("backend").value) || "fal";
   }
