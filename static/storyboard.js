@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821g";
-  const STORE_OLDS = ["nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821h";
+  const STORE_OLDS = ["nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821h: send gate via aria-disabled (not disabled=true) so click always fires setMsg
   // v0821g: always 首帧已就绪; bind send click+pointerdown; larger hit/z-index; missing-frame bad
   // v0821f: send ↑ no-op — clear stale needFrame warn; never silent-return; disabled gray
   // v0821e: POST /api/upload-out → /out (no blob soft-fallback)
@@ -2620,7 +2621,7 @@
         return { status: "blocked" };
       }
     }
-    if (!opts.keepSend) $("send").disabled = true;
+    if (!opts.keepSend) markSendBusy(true);
     setMsg(prefix + "校验连线…");
     let compiled;
     try {
@@ -2631,16 +2632,16 @@
       compiled = await r.json();
     } catch (e) {
       setMsg(prefix + String(e), "bad");
-      if (!opts.keepSend) $("send").disabled = false;
+      if (!opts.keepSend) markSendBusy(false);
       return { status: "error" };
     }
     if (state.groupRunAbort) {
-      if (!opts.keepSend) $("send").disabled = false;
+      if (!opts.keepSend) markSendBusy(false);
       return { status: "aborted" };
     }
     if (!compiled.ok) {
       setMsg(prefix + (compiled.error || "校验未通过"), "bad");
-      if (!opts.keepSend) $("send").disabled = false;
+      if (!opts.keepSend) markSendBusy(false);
       return { status: "blocked" };
     }
     // Never one-shot a multi-step plan via stage-zero payload or whole compile body.
@@ -2653,13 +2654,13 @@
       stage = nextRunnableStage(compiled, shot.stageUrls);
       if (!stage || !stage.payload) {
         setMsg(prefix + (compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "warn");
-        if (!opts.keepSend) $("send").disabled = false;
+        if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked", stageOp: stage && stage.op };
       }
       payload = fillStageRefs(stage.payload, shot.stageUrls);
       if (hasUnresolvedStageOut(payload)) {
         setMsg(prefix + "上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "bad");
-        if (!opts.keepSend) $("send").disabled = false;
+        if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked", stageOp: stage.op };
       }
     } else {
@@ -2667,7 +2668,7 @@
       payload = compiled.payload;
       if (!payload) {
         setMsg(prefix + "没有 payload", "bad");
-        if (!opts.keepSend) $("send").disabled = false;
+        if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked" };
       }
     }
@@ -2677,7 +2678,7 @@
     const refCap = maxRefCount(catalogItemForService());
     if (refUrls.length > refCap) {
       setMsg(prefix + "参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "bad");
-      if (!opts.keepSend) $("send").disabled = false;
+      if (!opts.keepSend) markSendBusy(false);
       return { status: "blocked", stageOp: stageOp };
     }
     attachExtraImages(payload, shot);
@@ -2699,7 +2700,7 @@
         const sid = ($("service") && $("service").value) || "";
         if (!sid) {
           setMsg(prefix + "请先选择 Civitai 服务（不会默认填入 Krea2）", "bad");
-          if (!opts.keepSend) $("send").disabled = false;
+          if (!opts.keepSend) markSendBusy(false);
           return { status: "blocked", stageOp: stageOp };
         }
         payload.serviceId = sid;
@@ -2720,7 +2721,7 @@
         for (let i = 0; i < 40; i++) {
           if (state.groupRunAbort) {
             setShotBusy(shot, false);
-            if (!opts.keepSend) $("send").disabled = false;
+            if (!opts.keepSend) markSendBusy(false);
             return { status: "aborted", stageOp: stageOp };
           }
           await new Promise((res) => setTimeout(res, 2500));
@@ -2732,7 +2733,7 @@
       }
       if (state.groupRunAbort) {
         setShotBusy(shot, false);
-        if (!opts.keepSend) $("send").disabled = false;
+        if (!opts.keepSend) markSendBusy(false);
         return { status: "aborted", stageOp: stageOp };
       }
       const url = pickUrl(j);
@@ -2743,7 +2744,7 @@
           persist();
           setShotBusy(shot, false);
           setMsg(prefix + "完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
-          if (!opts.keepSend) $("send").disabled = false;
+          if (!opts.keepSend) markSendBusy(false);
           renderDock();
           return { status: "more", stageOp: stage.op };
         }
@@ -2759,49 +2760,105 @@
       } else {
         setShotBusy(shot, false);
         setMsg(prefix + "云端已返回，没有可预览地址", "warn");
-        if (!opts.keepSend) $("send").disabled = false;
+        if (!opts.keepSend) markSendBusy(false);
         renderDock();
         return { status: "blocked", stageOp: stageOp };
       }
     } catch (e) {
       setShotBusy(shot, false);
       setMsg(prefix + String(e), "bad");
-      if (!opts.keepSend) $("send").disabled = false;
+      if (!opts.keepSend) markSendBusy(false);
       renderDock();
       return { status: "error", stageOp: stageOp };
     }
     setShotBusy(shot, false);
-    if (!opts.keepSend) $("send").disabled = false;
+    if (!opts.keepSend) markSendBusy(false);
     renderDock();
     return { status: "done", stageOp: stageOp };
+  }
+
+  function setSendVisual(blocked, reason) {
+    const btn = $("send");
+    if (!btn) return;
+    // v0821h P0: NEVER native disabled for gate — browser swallows clicks → no setMsg
+    btn.disabled = false;
+    const on = !!blocked;
+    btn.setAttribute("aria-disabled", on ? "true" : "false");
+    btn.classList.toggle("is-blocked", on);
+    const why = reason || (on ? "blocked" : "enabled");
+    btn.title = on ? ("不可生成 · " + why) : "生成 · enabled";
+    btn.setAttribute("data-testid", "composer-send");
+    btn.setAttribute("data-enabled", on ? "0" : "1");
+    btn.setAttribute("data-reason", why);
+  }
+
+  function markSendBusy(on) {
+    fireSend._busy = !!on;
+    const btn = $("send");
+    if (!btn) return;
+    if (on) {
+      setSendVisual(true, "busy");
+      return;
+    }
+    if (state.runningGroup) {
+      setSendVisual(true, "group-running");
+      return;
+    }
+    const n = nodeById(state.selected);
+    if (!n || n.kind !== "shot") {
+      setSendVisual(true, "no-shot");
+      return;
+    }
+    const needFrame = state.mode === "video" && !frameAsset(n);
+    syncSendGate(needFrame, isStubMode());
   }
 
   function syncSendGate(needFrame, stub) {
     const btn = $("send");
     if (!btn) return;
+    if (fireSend._busy) {
+      setSendVisual(true, "busy");
+      return;
+    }
+    if (state.runningGroup) {
+      setSendVisual(true, "group-running");
+      return;
+    }
     const blocked = !!(needFrame || stub);
-    btn.disabled = blocked;
     let reason = "enabled";
     if (stub) reason = "stub-mode";
     else if (needFrame) reason = "need-frame";
-    else if (state.runningGroup) reason = "group-running";
-    btn.title = blocked ? ("不可生成 · " + reason) : "生成 · enabled";
-    btn.setAttribute("data-testid", "composer-send");
-    btn.setAttribute("data-enabled", blocked ? "0" : "1");
-    btn.setAttribute("data-reason", reason);
+    setSendVisual(blocked, reason);
   }
 
   function fireSend(e) {
     const btn = $("send");
     if (!btn) return;
-    // disabled buttons normally swallow events; still guard
-    if (btn.disabled) return;
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
+    // in-flight / group: clicks still fire → show 进行中… (not silent)
+    if (fireSend._busy || state.runningGroup || btn.getAttribute("data-reason") === "busy") {
+      if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
+      setMsg("进行中…", "warn");
+      return;
+    }
     const now = Date.now();
     if (fireSend._at && (now - fireSend._at) < 450) return;
     fireSend._at = now;
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+    }
+    const n = nodeById(state.selected);
+    if (!n || n.kind !== "shot") {
+      setMsg("请先选中分镜再生成", "bad");
+      return;
+    }
+    if (isStubMode()) {
+      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "bad");
+      return;
+    }
+    if (state.mode === "video" && !frameAsset(n)) {
+      setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+      return;
     }
     generate();
   }
@@ -2811,6 +2868,7 @@
     if (!btn || btn.dataset.nlSendBound === "1") return;
     btn.dataset.nlSendBound = "1";
     btn.type = "button";
+    btn.disabled = false;
     btn.setAttribute("data-testid", "composer-send");
     btn.onclick = null;
     // capture click + pointerdown fallback (index #go lesson: elevate hit; avoid silent noop)
@@ -2819,27 +2877,13 @@
   }
 
   async function generate() {
-    // v0821f/g: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
+    // v0821f/g/h: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
     setMsg("校验连线…");
-    if ($("send")) $("send").disabled = true;
+    markSendBusy(true);
     try {
       await runShotStep(state.selected, {});
     } finally {
-      // renderDock / runShotStep re-enable; belt-and-suspenders if early-return skipped that
-      const n = nodeById(state.selected);
-      const needFrame = !n || n.kind !== "shot" ? false :
-        (state.mode === "video" && !frameAsset(n));
-      const stub = !n || n.kind !== "shot" || isStubMode();
-      if ($("send") && !state.runningGroup) {
-        if (!n || n.kind !== "shot") {
-          $("send").disabled = true;
-          $("send").title = "不可生成 · no-shot";
-          $("send").setAttribute("data-enabled", "0");
-          $("send").setAttribute("data-reason", "no-shot");
-        } else {
-          syncSendGate(needFrame, isStubMode());
-        }
-      }
+      markSendBusy(false);
     }
   }
   bindSendButton();
@@ -2861,7 +2905,7 @@
     if (!targets.length || state.runningGroup) return;
     state.runningGroup = true;
     state.groupRunAbort = false;
-    $("send").disabled = true;
+    markSendBusy(true);
     syncGroupRunBtn();
     const total = targets.length;
     let stopped = false;
@@ -2895,7 +2939,7 @@
       setMsg("整组完成 · " + total + " 镜", "ok");
     }
     state.runningGroup = false;
-    $("send").disabled = false;
+    markSendBusy(false);
     syncGroupRunBtn();
     syncSelBar();
     renderDock();

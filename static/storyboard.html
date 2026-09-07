@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0821g-send-bind</title>
+<title>画布 · Night Lab · v0821h-send-aria</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -132,7 +132,7 @@
   .send{width:48px;height:48px;border:0;border-radius:50%;background:#fff;color:#111;font-size:20px;flex-shrink:0;cursor:pointer;
     position:relative;z-index:5;pointer-events:auto;touch-action:manipulation;margin:2px}
   .send::before{content:"";position:absolute;inset:-12px;border-radius:50%}
-  .send:disabled{background:#3a3a44;color:#8b8b94;opacity:1;cursor:not-allowed;box-shadow:none}
+  .send:disabled,.send.is-blocked,.send[aria-disabled="true"]{background:#3a3a44;color:#8b8b94;opacity:1;cursor:not-allowed;box-shadow:none}
   .msg{margin-top:8px;font-size:12px;color:var(--muted);min-height:1.2em}
   .msg.ok{color:var(--ok)} .msg.bad{color:var(--coral)} .msg.warn{color:var(--buzz)}
   .hidden-file{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
@@ -341,7 +341,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0821g-send-bind</span>
+      <span class="stamp">v0821h-send-aria</span>
     </div>
   </header>
   <div class="stage">
