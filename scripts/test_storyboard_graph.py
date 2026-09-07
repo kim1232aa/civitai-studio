@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821b" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "stamp must be v0821-hardgate-i2v-refs")
+    assert_true("v0821b-i2v-detect" in html, "stamp must be v0821b-i2v-detect")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true("nl-storyboard-v0821" in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true("nl-storyboard-v0821" in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "stamp v0821-hardgate-i2v-refs")
-    assert_true("nl-storyboard-v0821" in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "stamp v0821b-i2v-detect")
+    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -584,11 +584,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821-hardgate-i2v-refs: unmention/link helpers still present."""
+    """v0817b lineage under v0821b-i2v-detect: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,8 +606,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +680,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -715,8 +715,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -741,8 +741,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -781,8 +781,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -840,8 +840,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -911,8 +911,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp v0821-hardgate-i2v-refs")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0820c")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -974,9 +974,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821-hardgate-i2v-refs" in html, "html stamp")
-    assert_true('<span class="stamp">v0821-hardgate-i2v-refs</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821"' in js, "STORE v0821")
+    assert_true("v0821b-i2v-detect" in html, "html stamp")
+    assert_true('<span class="stamp">v0821b-i2v-detect</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1051,6 +1051,81 @@ def test_v0821_hardgate_i2v_refs():
 
 
 
+def test_v0821b_i2v_detect():
+    """v0821b: pure t2v (video-01) is NOT i2v; image-to-video is; filter excludes t2v."""
+    import json
+    import subprocess
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
+    assert_true('<span class="stamp">v0821b-i2v-detect</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0821b")
+    assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
+    assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
+                "FAL_I2V_DEFAULT unchanged")
+    assert_true("function catalogItemSupportsI2v" in js, "predicate present")
+    assert_true("Do NOT treat category=video alone as i2v" in js,
+                "no category=video-alone true")
+    assert_true('id === "fal-ai/minimax/video-01"' in js, "exact video-01 reject")
+    # filter + hard-block still wired to predicate
+    assert_true("filterCatalogForMode" in js and "catalogItemSupportsI2v" in js, "filter uses predicate")
+    run_i = js.find("async function runShotStep")
+    run = js[run_i:run_i + 16000]
+    assert_true("catalogItemSupportsI2v(itVid)" in run, "runShotStep hard-block uses predicate")
+    assert_true("当前服务不吃首帧" in run, "hard-block message")
+
+    # Behavioral: extract real predicate + deps and evaluate with node
+    start = js.find("function catalogItemSupportsI2v")
+    assert_true(start >= 0, "fn start")
+    end = js.find("function catalogItemSupportsImage", start)
+    fn_src = js[start:end]
+    # SINGULAR_FIRST_FIELDS + catalogImageFields needed
+    sf_i = js.find("const SINGULAR_FIRST_FIELDS")
+    sf_line = js[sf_i:js.find(";", sf_i) + 1]
+    cif_i = js.find("function catalogImageFields")
+    cif_end = js.find("\n  function resolveRefCaps", cif_i)
+    cif_src = js[cif_i:cif_end]
+    harness = """
+%s
+%s
+%s
+const cases = [
+  [{ id: "fal-ai/minimax/video-01", category: "video" }, false],
+  [{ id: "fal-ai/minimax/video-01/image-to-video", category: "video" }, true],
+  [{ id: "fal-ai/foo/text-to-video", category: "video" }, false],
+  [{ id: "other/model/start-end", category: "video" }, true],
+  [{ id: "x/i2v/bar", category: "video" }, true],
+  [{ id: "pure/t2v/clip", category: "video" }, false],
+  [{ id: "vendor/vid", category: "video", needsFirstFrame: true }, true],
+  [{ id: "vendor/vid2", category: "video", imageFields: ["image_url"] }, true],
+  [{ id: "vendor/vid3", category: "video", capabilities: { imageFields: ["start_image_url"] } }, true],
+  [{ id: "fal-ai/flux/schnell", category: "image" }, false],
+];
+const out = cases.map(([it, expect]) => {
+  const got = catalogItemSupportsI2v(it);
+  return { id: it.id, expect, got, ok: got === expect };
+});
+const filtered = [
+  { id: "fal-ai/minimax/video-01", category: "video" },
+  { id: "fal-ai/minimax/video-01/image-to-video", category: "video" },
+  { id: "fal-ai/flux/schnell", category: "image" },
+].filter(catalogItemSupportsI2v).map(x => x.id);
+console.log(JSON.stringify({ out, filtered }));
+""" % (sf_line, cif_src, fn_src)
+    proc = subprocess.run(
+        ["node", "-e", harness],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(proc.returncode == 0, "node harness failed: %s%s" % (proc.stdout, proc.stderr))
+    data = json.loads(proc.stdout.strip().splitlines()[-1])
+    for row in data["out"]:
+        assert_true(row["ok"], "predicate %s: expect %s got %s" % (row["id"], row["expect"], row["got"]))
+    assert_true("fal-ai/minimax/video-01" not in data["filtered"], "filter excludes pure t2v video-01")
+    assert_true("fal-ai/minimax/video-01/image-to-video" in data["filtered"], "filter keeps i2v")
+    assert_true("fal-ai/flux/schnell" not in data["filtered"], "filter excludes image t2i")
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -1080,6 +1155,7 @@ def main():
         test_v0820b_apply_import,
         test_v0820c_hard_service,
         test_v0821_hardgate_i2v_refs,
+        test_v0821b_i2v_detect,
     ]
     failed = 0
     for fn in tests:

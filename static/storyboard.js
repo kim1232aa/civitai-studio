@@ -1,9 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821";
-  const STORE_OLDS = ["nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821b";
+  const STORE_OLDS = ["nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821: real i2v endpoint (plain video-01 is t2v and drops first frame)
+  // v0821b: real i2v endpoint (plain video-01 is t2v and drops first frame)
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
@@ -2265,23 +2265,30 @@
     return null;
   }
 
-  // v0821: catalog row supports i2v first-frame (not pure t2v / t2i).
+  // v0821b: catalog row supports i2v first-frame (not pure t2v / t2i).
+  // Pure t2v (e.g. fal-ai/minimax/video-01) must be false — category=video alone is NOT enough.
   function catalogItemSupportsI2v(it) {
     if (!it) return false;
     const id = String(it.id || it.name || "").toLowerCase();
     const cat = String(it.category || it.falCategory || it.kind || "").toLowerCase();
     const fields = catalogImageFields(it);
     const hasFirst = fields.some(function (f) {
-      return SINGULAR_FIRST_FIELDS.indexOf(f) >= 0 || f === "image_urls" || f === "images";
+      return SINGULAR_FIRST_FIELDS.indexOf(f) >= 0 || f === "image_urls" || f === "images" ||
+             f === "start_image" || f === "first_frame";
     });
+    // Explicit pure t2v — never treat as i2v (plain video-01 drops the frame).
+    if (id === "fal-ai/minimax/video-01") return false;
+    if (id.indexOf("text-to-video") >= 0 || id.indexOf("/t2v") >= 0) return false;
+    // Id ends with bare /video-01 (no /image-to-video etc. suffix path)
+    if (/\/video-01$/.test(id)) return false;
     if (it.needsFirstFrame) return true;
     if (id.indexOf("image-to-video") >= 0 || id.indexOf("start-end") >= 0 ||
         id.indexOf("reference-to-video") >= 0 || id.indexOf("first-last") >= 0 ||
         id.indexOf("/i2v") >= 0) return true;
-    if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || id.indexOf("video") >= 0)) return true;
-    // Civitai / non-fal video services without fal-style imageFields
-    if ((cat === "video" || it.kind === "video") && id.indexOf("text-to-video") < 0 &&
-        id.indexOf("/t2v") < 0) return true;
+    // Catalog declares first-frame / start_image / image_url input for a video endpoint
+    if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || id.indexOf("video") >= 0 ||
+        it.kind === "video")) return true;
+    // Do NOT treat category=video alone as i2v — that wrongly includes pure t2v.
     return false;
   }
   function catalogItemSupportsImage(it) {
@@ -2541,11 +2548,11 @@
       setMsg(prefix + "视频需要先连一张首帧图，不能偷配方台", "bad");
       return { status: "blocked" };
     }
-    // v0821: do not silently run i2v on t2i flux / pure t2v that drops the frame.
+    // v0821b: do not silently run i2v on t2i flux / pure t2v that drops the frame.
     if (state.mode === "video") {
       const sidVid = ($("service") && $("service").value) || "";
-      const itVid = catalogItemForService();
-      if (sidVid && itVid && !catalogItemSupportsI2v(itVid)) {
+      const itVid = catalogItemForService() || (sidVid ? { id: sidVid } : null);
+      if (sidVid && !catalogItemSupportsI2v(itVid)) {
         setMsg(prefix + "当前服务不吃首帧（非 i2v），请改选视频/图生视频模型", "bad");
         return { status: "blocked" };
       }
