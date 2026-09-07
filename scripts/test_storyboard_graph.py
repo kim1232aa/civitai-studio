@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821c" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821d" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "stamp must be v0821c-fal-i2v-preview")
+    assert_true("v0821d-empty-prompt" in html, "stamp must be v0821d-empty-prompt")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true("nl-storyboard-v0821d" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true("nl-storyboard-v0821d" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "stamp v0821c-fal-i2v-preview")
-    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "stamp v0821d-empty-prompt")
+    assert_true("nl-storyboard-v0821d" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -516,8 +516,10 @@ def test_v0817_no_at_filename():
     ci = js[ci0:ci1]
     assert_true("linkAssetToShot" in ci, "import still auto-links")
     assert_true("shot.prompt" not in ci, "import must not write shot.prompt")
-    # default new-shot template has no @asset auto-fill
-    assert_true('prompt: "【镜头"' in js or "prompt: \"【镜头" in js, "human shot template")
+    # default new-shot / loadDemo must NOT auto-fill 【镜头 shell (Skill templates OK)
+    assert_true('prompt: "【镜头' not in js and 'prompt: "【镜头" +' not in js,
+                "create-path must not prefill 【镜头 template")
+    assert_true('template: "【镜头】' in js or "template: \"【镜头】" in js, "Skill storyboard-shot template kept")
     assert_true("@角色" in js, "Skill human placeholders OK")
     # normalizePrompt still rewrites remaining @title → @图片N
     assert_true("function normalizePrompt" in js, "normalizePrompt kept")
@@ -584,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821c-fal-i2v-preview: unmention/link helpers still present."""
+    """v0817b lineage under v0821d-empty-prompt: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -602,12 +604,53 @@ def test_v0817b_unmention_at_tag():
     assert_true("function packLorasForPayload" in js, "LoRA packing kept")
 
 
+
+def test_empty_prompt_on_new_shot_and_load_demo():
+    """v0821d-empty-prompt: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('<span class="stamp">v0821d-empty-prompt</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0821d")
+    assert_true('"nl-storyboard-v0821c"' in js, "STORE_OLDS keeps v0821c")
+    # loadDemo body
+    i = js.find("function loadDemo()")
+    assert_true(i >= 0, "loadDemo missing")
+    j = js.find("function persist()", i)
+    boot = js[i:j]
+    assert_true("【镜头" not in boot, "loadDemo must not seed 【镜头 shell")
+    assert_true('prompt: ""' in boot or "prompt: ''" in boot, "loadDemo prompt empty")
+    # btnAdd create path
+    a = js.find('$("btnAdd").onclick')
+    assert_true(a >= 0, "btnAdd missing")
+    b = js.find("function resolveLayoutScope", a)
+    add = js[a:b]
+    assert_true("【镜头" not in add, "btnAdd must not prefill 【镜头 shell")
+    assert_true('prompt: ""' in add or "prompt: ''" in add, "btnAdd prompt empty")
+    # ensureActiveShotForImport already empty
+    e = js.find("function ensureActiveShotForImport()")
+    f = js.find("async function applyImport", e)
+    ens = js[e:f]
+    assert_true('prompt: ""' in ens or "prompt: ''" in ens, "import-created shot prompt empty")
+    assert_true("【镜头" not in ens, "import create must not seed 【镜头")
+    # Skill templates remain user-chosen inserts only
+    assert_true('id: "storyboard-shot"' in js, "storyboard-shot Skill kept")
+    assert_true("function applySkill" in js, "applySkill kept")
+    # link / mention / import-media paths must not write 【镜头 into prompt
+    k = js.find("function linkAssetToShot")
+    m = js.find("function unlinkAssetFromShot", k)
+    assert_true("【镜头" not in js[k:m], "linkAssetToShot must not write 【镜头")
+    im0 = js.find("function insertMention")
+    im1 = js.find("function slashQueryAt", im0)
+    assert_true("【镜头" not in js[im0:im1], "insertMention must not write 【镜头")
+
+
 def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +723,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -715,8 +758,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -741,8 +784,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -781,8 +824,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -840,8 +883,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -911,8 +954,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -974,9 +1017,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('<span class="stamp">v0821d-empty-prompt</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1057,9 +1100,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
-    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821b")
+    assert_true("v0821d-empty-prompt" in html, "html stamp v0821d-empty-prompt")
+    assert_true('<span class="stamp">v0821d-empty-prompt</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1179,9 +1222,9 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
-    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821c")
+    assert_true("v0821d-empty-prompt" in html, "html stamp")
+    assert_true('<span class="stamp">v0821d-empty-prompt</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821d"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
@@ -1282,6 +1325,7 @@ def main():
         test_v0817_no_at_filename,
         test_v0817b_unmention_at_tag,
         test_v0817c_no_at_in_prompt,
+        test_empty_prompt_on_new_shot_and_load_demo,
         test_v0818_sticky_composer_bar,
         test_v0819_canvas_stage,
         test_v0819b_expand_prompt,
