@@ -724,15 +724,28 @@ class Handler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if path in ("/cloud-nodes.html", "/cloud-nodes"):
+        # Seko storyboard canvas (PLAN-v0789): /storyboard + /cloud-nodes share one shell.
+        if path in ("/storyboard.html", "/storyboard", "/cloud-nodes.html", "/cloud-nodes"):
+            fp = STATIC / "storyboard.html"
+            if not fp.exists():
+                return self._json(404, {"error": "storyboard.html missing"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(fp.stat().st_size))
+            self.end_headers()
+            self.wfile.write(fp.read_bytes())
+            return
+        # LiteGraph legacy shell (top-bar link /litegraph)
+        if path in ("/litegraph.html", "/litegraph"):
             fp = STATIC / "cloud-nodes.html"
             if not fp.exists():
                 return self._json(404, {"error": "cloud-nodes.html missing"})
             return self._bytes(200, fp.read_bytes(), "text/html; charset=utf-8")
-        # Cache-bust entry: always land on multi-step chain demo (forces ?demo=chain)
+        # Cache-bust: old chain demo lived on LiteGraph shell
         if path in ("/cloud-nodes-chain.html", "/cloud-nodes-chain"):
             self.send_response(302)
-            self.send_header("Location", "/cloud-nodes.html?demo=chain&v=0780")
+            self.send_header("Location", "/litegraph?demo=chain&v=0780")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return
