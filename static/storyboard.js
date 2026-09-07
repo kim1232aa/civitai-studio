@@ -1,8 +1,11 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0820c";
-  const STORE_OLDS = ["nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821";
+  const STORE_OLDS = ["nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821: real i2v endpoint (plain video-01 is t2v and drops first frame)
+  const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
+  const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
   const SNAP_PX = 36;
@@ -338,7 +341,10 @@
       if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
       if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
       if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
-      if (p.seed != null && $("seed")) $("seed").value = p.seed;
+      if (p.seed != null && $("seed")) {
+        $("seed").value = p.seed;
+        $("seed").title = String(p.seed);
+      }
       state._pendingService = p.service || "";
       state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
       if (isClassicRobotDemo(state.nodes)) {
@@ -772,14 +778,20 @@
       ? '<button class="chip-btn" type="button" data-act="promote" title="收进资产库">入库</button>'
       : "";
     const refCap = maxRefCount(catalogItemForService());
+    // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink;
+    // fill remaining slots with unlinked suggestions up to maxRefs.
+    const remain = Math.max(0, refCap - linked.length);
     const refHint = linked.length > refCap
-      ? '<span class="chip-btn" title="参考图上限">最多 ' + refCap + ' 张参考</span>'
-      : (linked.length ? '<span class="chip-btn" title="参考图上限">参考 ' + linked.length + '/' + refCap + '</span>' : "");
+      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + linked.length + '/' + refCap + ' · 超出，请减少连线</span>'
+      : '<span class="ref-cap-hint" title="参考图上限">参考 ' + linked.length + '/' + refCap +
+          (remain ? (' · 还可 ' + remain) : '') + '</span>';
+    const suggest = list.filter((a) => !linked.some((x) => x.id === a.id)).slice(0, remain);
+    const chipNodes = linked.concat(suggest);
     $("refs").innerHTML = frameHtml +
       '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
       '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
       promoteBtn + refHint +
-      linked.concat(list.filter((a) => !linked.includes(a))).slice(0, refCap).map((a) => {
+      chipNodes.map((a) => {
         const on = linked.some((x) => x.id === a.id) ? " on" : "";
         return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
           (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
@@ -1749,6 +1761,28 @@
 
   function setMode(mode) {
     state.mode = mode;
+    // v0821: refresh service list for image vs i2v; drop silent t2i/flux when video.
+    const be = ($("backend") && $("backend").value) || "fal";
+    const sid = ($("service") && $("service").value) || "";
+    if (typeof loadCatalog === "function") {
+      loadCatalog().then(function () {
+        if (mode === "video" && sid) {
+          const it = state.catalogById && state.catalogById[sid];
+          if (it && !catalogItemSupportsI2v(it)) {
+            if ($("service")) $("service").value = "";
+            if (be === "fal" && $("service")) {
+              ensureSelectOpt($("service"), FAL_I2V_DEFAULT);
+              $("service").value = FAL_I2V_DEFAULT;
+            }
+          }
+        }
+        renderCards();
+        drawWires();
+        renderDock();
+        persist();
+      });
+      return;
+    }
     renderCards();
     drawWires();
     renderDock();
@@ -1769,6 +1803,7 @@
     });
     if ($(id) && COMFY_PARAM_IDS.indexOf(id) >= 0) {
       $(id).addEventListener("input", () => {
+        if (id === "seed" && $("seed")) $("seed").title = String($("seed").value || "");
         writeComfyParamsToShot(nodeById(state.selected));
         persist();
       });
@@ -1834,11 +1869,30 @@
     if (l.versionId && /^\d+$/.test(String(l.versionId))) return true;
     return false;
   }
+  function loraDisplayName(v) {
+    // Prefer human model name over raw AIR / version id crumbs (v0821).
+    v = v || {};
+    const cands = [];
+    if (typeof v.model === "string" && v.model) cands.push(v.model);
+    if (v.model && typeof v.model === "object" && v.model.name) cands.push(v.model.name);
+    if (v.modelName) cands.push(v.modelName);
+    if (v.name) cands.push(v.name);
+    for (let i = 0; i < cands.length; i++) {
+      const s = String(cands[i] || "").trim();
+      if (!s) continue;
+      if (looksAir(s)) continue;
+      if (/^civitai:\d+/i.test(s)) continue;
+      if (/^\d+@\d+$/.test(s)) continue;
+      if (/:lora:/i.test(s)) continue;
+      return s;
+    }
+    return "LoRA";
+  }
   function normalizeLora(v) {
     v = v || {};
     const air = v.air || "";
     const path = (v.path && !looksAir(v.path) ? v.path : "") || loraDownloadUrl(v) || "";
-    const name = (typeof v.model === "string" && v.model) || v.name || "LoRA";
+    const name = loraDisplayName(v);
     const strength = clampLoraScale(v.strength != null ? v.strength : v.scale, 0.8);
     return {
       air: air,
@@ -2033,7 +2087,10 @@
     if (cfgVal != null && $("cfg")) $("cfg").value = cfgVal;
     if (src.sampler && $("sampler")) ensureSelectOpt($("sampler"), src.sampler);
     if (src.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), src.scheduler);
-    if (src.seed != null && $("seed")) $("seed").value = src.seed;
+    if (src.seed != null && $("seed")) {
+      $("seed").value = src.seed;
+      $("seed").title = String(src.seed);
+    }
   }
   // Pack civitai comfy params onto generate payload — never silently drop.
   function packComfyParamsForPayload() {
@@ -2208,7 +2265,43 @@
     return null;
   }
 
-  // Provider defaults (capabilities): catalog may only tighten, never raise.
+  // v0821: catalog row supports i2v first-frame (not pure t2v / t2i).
+  function catalogItemSupportsI2v(it) {
+    if (!it) return false;
+    const id = String(it.id || it.name || "").toLowerCase();
+    const cat = String(it.category || it.falCategory || it.kind || "").toLowerCase();
+    const fields = catalogImageFields(it);
+    const hasFirst = fields.some(function (f) {
+      return SINGULAR_FIRST_FIELDS.indexOf(f) >= 0 || f === "image_urls" || f === "images";
+    });
+    if (it.needsFirstFrame) return true;
+    if (id.indexOf("image-to-video") >= 0 || id.indexOf("start-end") >= 0 ||
+        id.indexOf("reference-to-video") >= 0 || id.indexOf("first-last") >= 0 ||
+        id.indexOf("/i2v") >= 0) return true;
+    if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || id.indexOf("video") >= 0)) return true;
+    // Civitai / non-fal video services without fal-style imageFields
+    if ((cat === "video" || it.kind === "video") && id.indexOf("text-to-video") < 0 &&
+        id.indexOf("/t2v") < 0) return true;
+    return false;
+  }
+  function catalogItemSupportsImage(it) {
+    if (!it) return true;
+    const id = String(it.id || it.name || "").toLowerCase();
+    const cat = String(it.category || it.falCategory || it.kind || "").toLowerCase();
+    if (cat === "video" || it.kind === "video") return false;
+    if (id.indexOf("image-to-video") >= 0 || id.indexOf("text-to-video") >= 0) return false;
+    return true;
+  }
+  function filterCatalogForMode(items) {
+    const list = Array.isArray(items) ? items : [];
+    if (state.mode === "video") return list.filter(catalogItemSupportsI2v);
+    if (state.mode === "image" || state.mode === "text" || state.mode === "audio") {
+      return list.filter(catalogItemSupportsImage);
+    }
+    return list;
+  }
+
+    // Provider defaults (capabilities): catalog may only tighten, never raise.
   // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope=1+image_url.
   const PROVIDER_REF_CAPS = {
     civitai: { maxRefs: 9, refImagesField: "images" },
@@ -2313,6 +2406,26 @@
         payload[field] = sliced;
       }
     }
+    // v0821: also stamp provider-correct singular FIRST (Fal start_image_url / image_url / …)
+    // so packed inbound keeps first-frame even when compile default was t2v-ish.
+    if (primary || sliced[0]) {
+      const firstUrl = primary || sliced[0];
+      const imgFields = catalogImageFields(catalogItemForService());
+      let stamped = false;
+      imgFields.forEach(function (f) {
+        if (SINGULAR_FIRST_FIELDS.indexOf(f) >= 0) {
+          if (!payload[f]) payload[f] = firstUrl;
+          stamped = true;
+        }
+      });
+      // Fal i2v common aliases when catalog row lacks imageFields
+      if (!stamped && state.mode === "video") {
+        if (!payload.start_image_url && !payload.image_url && !payload.first_frame_url) {
+          payload.start_image_url = firstUrl;
+          payload.image_url = firstUrl;
+        }
+      }
+    }
     return payload;
   }
 
@@ -2340,7 +2453,8 @@
     const pickedService = ($("service") && $("service").value) || "";
     let serviceId = pickedService;
     if (!serviceId && be !== "civitai") {
-      serviceId = (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell");
+      // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
+      serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
     }
     const genParams = {
       serviceId: serviceId,
@@ -2426,6 +2540,15 @@
     if (state.mode === "video" && !frameAsset(shot)) {
       setMsg(prefix + "视频需要先连一张首帧图，不能偷配方台", "bad");
       return { status: "blocked" };
+    }
+    // v0821: do not silently run i2v on t2i flux / pure t2v that drops the frame.
+    if (state.mode === "video") {
+      const sidVid = ($("service") && $("service").value) || "";
+      const itVid = catalogItemForService();
+      if (sidVid && itVid && !catalogItemSupportsI2v(itVid)) {
+        setMsg(prefix + "当前服务不吃首帧（非 i2v），请改选视频/图生视频模型", "bad");
+        return { status: "blocked" };
+      }
     }
     // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
     if (currentBackend() === "civitai") {
@@ -3122,8 +3245,10 @@
       const r = await fetch("/api/catalog?backend=" + encodeURIComponent(be));
       const j = await r.json();
       let items = (j.items || j.models || []).slice();
+      // v0821: mode-filter so video Composer lists i2v services (not silent t2i flux).
+      items = filterCatalogForMode(items);
       // CIVITAI_PREF / _civitaiDefaultService = catalog ordering hint only (not generate fallback).
-      const pref = (be === "civitai")
+      const pref = (be === "civitai" && state.mode !== "video")
         ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
         : "";
       // Keep preferred service in the option list even when catalog is capped.
@@ -3137,6 +3262,14 @@
         items = head;
       } else {
         items = items.slice(0, CAP);
+      }
+      // Fal video empty-service: ensure i2v default is listed (never plain video-01 t2v).
+      if (be === "fal" && state.mode === "video") {
+        const hasI2v = items.some(function (it) { return (it.id || it.name) === FAL_I2V_DEFAULT; });
+        if (!hasI2v) {
+          items = [{ id: FAL_I2V_DEFAULT, name: "MiniMax Video-01 Image to Video", category: "video",
+            needsFirstFrame: true, imageFields: ["image_url"] }].concat(items).slice(0, CAP);
+        }
       }
       state.catalog = items;
       // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
