@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0818-sticky-composer-bar</title>
+<title>画布 · Night Lab · v0819-canvas-stage</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -81,13 +81,13 @@
   .dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(720px,calc(100% - 494px));
     z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;padding:0;
     box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(18px);display:none;
-    flex-direction:column;max-height:40vh;overflow:hidden}
+    flex-direction:column;max-height:52vh;overflow:hidden}
   .dock.show{display:flex}
   .dock.collapsed{max-height:none;overflow:visible}
   .dock.collapsed .dock-body{display:none}
-  .dock.expanded{max-height:40vh}
+  .dock.expanded{max-height:52vh}
   .dock.expanded .dock-body{display:flex;flex-direction:column;overflow:hidden;padding:10px 14px 12px;min-height:0;flex:1}
-  .dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+  .dock-scroll{flex:1 1 auto;min-height:140px;overflow:auto}
   .dock-foot{flex:0 0 auto;position:sticky;bottom:0;background:#16161af2;padding-top:2px;z-index:1}
   .dock-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
     border-bottom:1px solid transparent;cursor:default}
@@ -114,7 +114,7 @@
   .frame-slot{display:flex;align-items:center;gap:8px;flex:1 0 100%;margin:0 0 2px;color:#9a9aa3;font-size:12px}
   .frame-slot img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #2e2e36}
   .frame-slot.missing{color:#e85d4c}
-  .prompt{width:100%;min-height:72px;max-height:120px;resize:vertical;background:#121214;border:1px solid #2a2a30;
+  .prompt{width:100%;min-height:120px;max-height:180px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
   .mention{color:var(--teal)}
@@ -174,7 +174,11 @@
   .lora-row input{flex:1;min-width:0;background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;color:#e8e8ec;font-size:12px}
   .lora-row button{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;padding:6px 12px;font-size:12px;flex-shrink:0}
   .lora-row button:hover{border-color:#4a4a54;color:#fff}
-  .lora-hits{margin-top:6px;max-height:120px;overflow:auto;font-size:12px;color:#9a9aa3}
+  .lora-hits{margin-top:6px;max-height:72px;overflow:auto;font-size:12px;color:#9a9aa3}
+  @media (max-height:720px){
+    .lora-hits{max-height:48px}
+    .dock.expanded{max-height:50vh}
+  }
   .lora-hits div{padding:6px 8px;border-radius:8px;cursor:pointer;color:#ddd}
   .lora-hits div:hover{background:#222}
   .lora{background:#1a1a1f;border:1px solid #2e2e36;border-radius:10px;padding:8px 10px;margin-top:8px}
@@ -290,6 +294,11 @@
   .selbar button:disabled{opacity:.35;cursor:not-allowed}
   .selbar button.primary{background:rgba(94,224,197,.16);border-color:rgba(94,224,197,.55);color:#b8f5e6}
 
+  .canvas-tip{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:12;
+    pointer-events:none;display:none;padding:10px 18px;border-radius:999px;
+    background:#16161acc;border:1px solid #2e2e36;color:#9a9aa3;font-size:13px;letter-spacing:.04em;
+    box-shadow:0 8px 28px rgba(0,0,0,.35);backdrop-filter:blur(10px);white-space:nowrap}
+  .canvas-tip.show{display:block}
   .composer-chip{position:absolute;right:16px;bottom:18px;z-index:22;display:none;
     align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;
     border:1px solid #34343e;background:#16161af2;color:#e8e8ec;font-size:12px;font-weight:600;
@@ -313,7 +322,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0818-sticky-composer-bar</span>
+      <span class="stamp">v0819-canvas-stage</span>
     </div>
   </header>
   <div class="stage">
@@ -356,6 +365,7 @@
         <button type="button" data-z="fit">Fit</button>
       </div>
     </div>
+    <div class="canvas-tip show" id="canvasTip" role="note">选分镜→写画面→LoRA→↑</div>
     <button type="button" class="composer-chip" id="composerChip" title="重新打开 Composer" hidden><span class="dot" aria-hidden="true"></span>Composer</button>
     <div class="picker" id="picker"></div>
     <aside class="dock" id="dock" aria-label="Composer">

@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0818";
-  const STORE_OLDS = ["nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0819";
+  const STORE_OLDS = ["nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -63,7 +63,7 @@
     skillCat: "官方精选",
     runningGroup: false,
     groupRunAbort: false,
-    dockMode: "expanded",
+    dockMode: "collapsed",
     lastComposerShot: null,
     loras: [],
   };
@@ -650,6 +650,16 @@
     rail.innerHTML = tabs + body;
   }
 
+
+  function syncCanvasTip() {
+    const tip = $("canvasTip");
+    if (!tip) return;
+    // Show onboarding when Composer is not expanded — canvas is the main stage.
+    const hide = state.dockMode === "expanded" && dock && dock.classList.contains("show");
+    tip.hidden = !!hide;
+    tip.classList.toggle("show", !hide);
+  }
+
   function syncComposerChip() {
     const chip = $("composerChip");
     if (!chip) return;
@@ -675,7 +685,7 @@
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
-      syncComposerChip();
+      syncComposerChip(); syncCanvasTip();
       renderRail();
       requestAnimationFrame(positionDock);
       return;
@@ -690,7 +700,7 @@
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
-      syncComposerChip();
+      syncComposerChip(); syncCanvasTip();
       renderRail();
       requestAnimationFrame(positionDock);
       return;
@@ -747,7 +757,7 @@
         return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
           (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
       }).join("");
-    syncComposerChip();
+    syncComposerChip(); syncCanvasTip();
     renderRail();
     requestAnimationFrame(positionDock);
   }
@@ -764,9 +774,15 @@
     const n = nodeById(id);
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
-      // Hard gate: selecting a shot opens Composer expanded (prompt+send visible).
-      if (!opts.keepClosed) state.dockMode = "expanded";
-      else if (opts.expand) state.dockMode = "expanded";
+      // v0819-canvas-stage: boot/first paint stays collapsed (canvas = stage);
+      // intentional shot click expands; {collapsed:true} keeps bottom bar; expand capsule still works.
+      if (opts.keepClosed) {
+        /* leave dockMode (closed/chip path) */
+      } else if (opts.collapsed) {
+        state.dockMode = "collapsed";
+      } else if (opts.expand || !opts.keepClosed) {
+        state.dockMode = "expanded";
+      }
     }
     renderCards();
     drawWires();
@@ -2807,5 +2823,5 @@
   syncLoraUi();
   loadCatalog();
   loadOuts();
-  selectNode(state.selected || "shot-1");
+  selectNode(state.selected || "shot-1", { collapsed: true });
 })();
