@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0816b" in js, "STORE must bump to v0816b")
-    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS must keep v0816 for migrate")
+    assert_true("nl-storyboard-v0817" in js, "STORE must bump to v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816b-sb-lora-bind" in html, "stamp must be v0816b-sb-lora-bind")
+    assert_true("v0817-no-at-filename" in html, "stamp must be v0817-no-at-filename")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,17 +282,17 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0816b-sb-lora-bind" in html, "html stamp")
-    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
+    assert_true("v0817-no-at-filename" in html, "html stamp")
+    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
 
 
 def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816b-sb-lora-bind" in html, "html stamp v0816b-sb-lora-bind")
-    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
-    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS prepend v0816")
+    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
+    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS prepend v0816b")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
@@ -339,12 +339,12 @@ def test_v0815_gen_hardgate():
 
 
 def test_v0816_sb_lora():
-    """v0816b-sb-lora-bind: Composer LoRA UI wired at boot + payload.loras packing."""
+    """LoRA UI + packing still green under v0817 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816b-sb-lora-bind" in html, "html stamp v0816b-sb-lora-bind")
-    assert_true('const STORE = "nl-storyboard-v0816b"' in js, "STORE v0816b")
-    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS has v0816")
+    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
+    assert_true('const STORE = "nl-storyboard-v0817"' in js, "STORE v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     # UI markers in Composer dock
     assert_true('id="loraBlock"' in html, "loraBlock in storyboard.html")
     assert_true('data-sb-lora="1"' in html or "data-sb-lora" in html, "sb-lora marker")
@@ -399,9 +399,9 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0816b-sb-lora-bind" in html, "stamp v0816b-sb-lora-bind")
-    assert_true("nl-storyboard-v0816b" in js, "STORE v0816b")
-    assert_true("nl-storyboard-v0816" in js, "STORE_OLDS has v0816")
+    assert_true("v0817-no-at-filename" in html, "stamp v0817-no-at-filename")
+    assert_true("nl-storyboard-v0817" in js, "STORE v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
     assert_true("MULTI_REF_FIELDS" in js, "multi field list")
     assert_true("SINGULAR_FIRST_FIELDS" in js, "singular FIRST list")
     assert_true("function catalogImageFields" in js, "catalogImageFields helper")
@@ -436,6 +436,59 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
 
 
 
+
+def test_v0817_no_at_filename():
+    """v0817: link/mention must not append @sourceTitle into shot.prompt."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0817-no-at-filename" in html, "html stamp v0817-no-at-filename")
+    assert_true('const STORE = "nl-storyboard-v0817"' in js, "STORE v0817")
+    assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
+    assert_true("function isRawFileTitle" in js, "isRawFileTitle helper")
+    assert_true("function mentionDisplayTag" in js, "mentionDisplayTag helper")
+    # mention must be a no-op (no prompt += tag / sourceTitle append)
+    i = js.find("function mention(asset, shot)")
+    assert_true(i >= 0, "mention fn")
+    j = js.find("function unmention(asset, shot)", i)
+    body = js[i:j]
+    assert_true("shot.prompt" not in body, "mention must not write shot.prompt")
+    assert_true("sourceTitle" not in body, "mention must not build @sourceTitle tag")
+    assert_true("return;" in body or "return" in body, "mention is no-op")
+    # linkAssetToShot may still call mention (no-op) but must not itself append tag
+    k = js.find("function linkAssetToShot")
+    m = js.find("function unlinkAssetFromShot", k)
+    link = js[k:m]
+    assert_true("shot.prompt" not in link, "linkAssetToShot must not write shot.prompt")
+    assert_true('"+ sourceTitle' not in link and '"@" + sourceTitle' not in link,
+                "linkAssetToShot must not build @sourceTitle")
+    # unmention still strips leftover @rawTitle for old canvases
+    u0 = js.find("function unmention(asset, shot)")
+    u1 = js.find("function invalidateStageProgress", u0)
+    un = js[u0:u1]
+    assert_true('"@" + sourceTitle' in un or "'@' + sourceTitle" in un, "unmention still strips @sourceTitle")
+    # insertMention uses mentionDisplayTag, not raw sourceTitle
+    im0 = js.find("function insertMention")
+    im1 = js.find("function slashQueryAt", im0)
+    im = js[im0:im1]
+    assert_true("mentionDisplayTag" in im, "insertMention uses mentionDisplayTag")
+    assert_true('"@" + sourceTitle(asset)' not in im, "insertMention must not use raw sourceTitle tag")
+    # import confirms via linkAssetToShot only (no direct prompt write)
+    ci0 = js.find("function confirmImportSelection")
+    ci1 = js.find("function setZoomScale", ci0)
+    ci = js[ci0:ci1]
+    assert_true("linkAssetToShot" in ci, "import still auto-links")
+    assert_true("shot.prompt" not in ci, "import must not write shot.prompt")
+    # default new-shot template has no @asset auto-fill
+    assert_true('prompt: "【镜头"' in js or "prompt: \"【镜头" in js, "human shot template")
+    assert_true("@角色" in js, "Skill human placeholders OK")
+    # normalizePrompt still rewrites remaining @title → @图片N
+    assert_true("function normalizePrompt" in js, "normalizePrompt kept")
+    # LoRA / images packing untouched markers
+    assert_true("function attachExtraImages" in js, "attachExtraImages kept")
+    assert_true("function packLorasForPayload" in js, "packLoras kept")
+    assert_true("stages[0].payload" not in js, "gate untouched")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -455,6 +508,7 @@ def main():
         test_v0815_gen_hardgate,
         test_v0815c_ref_cap_single_slot_and_overcap_block,
         test_v0816_sb_lora,
+        test_v0817_no_at_filename,
     ]
     failed = 0
     for fn in tests:

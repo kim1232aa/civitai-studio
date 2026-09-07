@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0816b";
-  const STORE_OLDS = ["nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0817";
+  const STORE_OLDS = ["nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -99,6 +99,25 @@
     if (!n) return "";
     if (n.kind === "shot") return (n.title || "分镜") + "成片";
     return n.title || "资产";
+  }
+  /** Raw outs / provider file ids — must never land in the prompt textarea. */
+  function isRawFileTitle(t) {
+    const s = String(t || "").trim();
+    if (!s) return true;
+    if (/^(nano[-_]?gpt|modelscope|fal[_-]|comfy|out[_-])/i.test(s)) return true;
+    // long hex / uuid fragments without CJK (e.g. nano-gpt_img_ef80f1b1f425_0)
+    if (!/[\u4e00-\u9fff]/.test(s) && /[0-9a-f]{8,}/i.test(s) && /[_-]/.test(s)) return true;
+    if (!/[\u4e00-\u9fff]/.test(s) && /^[a-z0-9]+(?:[_-][a-z0-9]+){2,}_?\d*$/i.test(s) && s.length >= 20) return true;
+    return false;
+  }
+  /** Manual @ / atbox only: human title or @图片N — never raw file-hash titles. */
+  function mentionDisplayTag(asset, shot) {
+    const linked = connectedAssets(shot.id);
+    let idx = linked.findIndex((a) => a.id === asset.id);
+    if (idx < 0) idx = linked.length;
+    const title = sourceTitle(asset);
+    if (title && !isRawFileTitle(title)) return "@" + title;
+    return "@图片" + (idx + 1);
   }
   function mediaBadge(n) {
     if (!n || !n.url) return "";
@@ -760,15 +779,12 @@
     return null;
   }
 
+  // v0817-no-at-filename: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
+  // Real images travel edges → attachExtraImages → payload.images[]. Prompt stays human text.
   function mention(asset, shot) {
-    shot = shot || nodeById(state.selected);
-    if (!shot || shot.kind !== "shot") return;
-    const tag = "@" + sourceTitle(asset);
-    if (!(shot.prompt || "").includes(tag)) {
-      shot.prompt = (shot.prompt ? shot.prompt + " " : "") + tag;
-      if ($("prompt") && state.selected === shot.id) $("prompt").value = shot.prompt;
-    }
+    return;
   }
+  // Cleanup leftover @rawTitle from pre-v0817 canvases; unlink no longer requires strip for new links.
   function unmention(asset, shot) {
     if (!shot) return;
     const tag = "@" + sourceTitle(asset);
@@ -882,8 +898,10 @@
   function insertMention(asset) {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
+    // Edge first (mention is no-op); then optional human-friendly @ tag for typed atbox.
+    linkAssetToShot(asset, shot);
     const ta = $("prompt");
-    const tag = "@" + sourceTitle(asset);
+    const tag = mentionDisplayTag(asset, shot);
     if (ta) {
       const v = ta.value || "";
       const caret = ta.selectionStart || v.length;
@@ -898,7 +916,6 @@
       shot.prompt = next;
       ta.value = next;
     }
-    linkAssetToShot(asset, shot);
     hideAtbox();
     hideSkillbox();
     renderCards(); drawWires(); renderDock(); persist();
@@ -1541,7 +1558,7 @@
     const asset = nodeById(btn.dataset.asset);
     const shot = nodeById(state.selected);
     if (asset && shot) {
-      // 画布引用：确保 @ + 真实 edge（已连则保持/再次 mention）
+      // 画布引用：真实 edge + chips only（v0817: 不往 prompt 塞 @filename）
       linkAssetToShot(asset, shot);
     }
     $("picker").classList.remove("show");
@@ -1690,7 +1707,7 @@
 
 
 
-  // --- v0816b-sb-lora-bind: wire bindLoraUi at boot + syncLoraUi ---
+  // --- v0817-no-at-filename (+ v0816b LoRA bind kept) ---
   function currentBackend() {
     return ($("backend") && $("backend").value) || "fal";
   }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0816b-sb-lora-bind</title>
+<title>画布 · Night Lab · v0817-no-at-filename</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -311,7 +311,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0816b-sb-lora-bind</span>
+      <span class="stamp">v0817-no-at-filename</span>
     </div>
   </header>
   <div class="stage">
@@ -376,7 +376,7 @@
       <div class="composer-acts" id="composerActs">
         <button type="button" class="act-btn" id="btnSkill" title="输入 / 也可打开">Skill</button>
         <button type="button" class="act-btn" id="btnAttach" title="上传或导入附件">附件</button>
-        <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产并 @ 提到提示词">画布引用</button>
+        <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产（连线到当前分镜，不写入 @filename）">画布引用</button>
       </div>
       <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
 
@@ -415,7 +415,7 @@
         <span class="grow"></span>
         <button class="send" id="send" title="生成">↑</button>
       </div>
-      <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；@ 或「画布引用」连接资产。</div>
+      <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；「画布引用」只连线，不写 @filename；手动 @ 可选。</div>
       </div>
     </aside>
   </div>
