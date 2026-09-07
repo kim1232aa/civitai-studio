@@ -264,6 +264,74 @@ def test_js_text_mode_does_not_build_image_graph():
     check("PH_STORY" in JS, "story placeholder must stay on story dock")
 
 
+def _slice_after(token, size=500):
+    idx = JS.find(token)
+    check(idx >= 0, f"missing token: {token}")
+    return JS[idx : idx + size]
+
+
+def test_js_text_mode_card_gen_calls_generateText():
+    """卡片「生图」在文本模式下必须走 generateText，不能再强制切回图片。"""
+    window = _slice_after('btn.dataset.textact === "gen"', 420)
+    check("generateText" in window, window)
+    check(
+        "state.mode === \"text\"" in window or "state.mode==='text'" in window,
+        "card gen must branch on text mode:\n" + window,
+    )
+
+
+def test_js_gen_text_act_calls_generateText():
+    window = _slice_after('act.dataset.act === "gen-text"', 280)
+    check("generateText" in window, window)
+    check("generateFromText" not in window, "gen-text still forces image:\n" + window)
+
+
+def test_js_generateFromText_refuses_text_catalog_model():
+    start = JS.find("async function generateFromText")
+    check(start >= 0, "generateFromText missing")
+    end = JS.find("function persist()", start)
+    body = JS[start:end]
+    check('category === "text"' in body or 'category === "chat"' in body, body)
+    check("文本模型" in body, "generateFromText must name the refusal in 人话")
+    check("await generate()" in body, "prompt-card 生图 path must remain")
+
+
+def test_whatif_text_does_not_require_resolution():
+    originals = {
+        "nano_key": nano.nano_key,
+        "find_spec": nano.find_spec,
+    }
+    nano.nano_key = lambda: "fixture-key"
+    nano.find_spec = lambda mid: {
+        "id": mid,
+        "category": "text",
+        "task": "text-generation",
+        "supported_parameters": {},
+        "capabilities": {},
+        "pricing": {},
+    }
+    try:
+        code, result = NanoGptProvider().whatif(
+            {
+                "backend": "nano-gpt",
+                "serviceId": "z-ai/glm-5.3-flash",
+                "kind": "text",
+                "recipe": "text",
+                "prompt": "写一句旁白",
+            }
+        )
+    finally:
+        nano.nano_key = originals["nano_key"]
+        nano.find_spec = originals["find_spec"]
+    check(code == 200, (code, result))
+    check(result.get("ok") is True, result)
+    check("没有 resolutions" not in str(result), result)
+    check(result.get("code") != "missing_resolution", result)
+    submitted = result.get("submittedInput") or {}
+    check("resolution" not in submitted, submitted)
+    check(submitted.get("model") == "z-ai/glm-5.3-flash", submitted)
+
+
 if __name__ == "__main__":
     tests = [
         test_canvas_text_compiles_without_resolution,
@@ -274,6 +342,10 @@ if __name__ == "__main__":
         test_owns_service_includes_text_catalog,
         test_http_compile_and_generate_return_text,
         test_js_text_mode_does_not_build_image_graph,
+        test_js_text_mode_card_gen_calls_generateText,
+        test_js_gen_text_act_calls_generateText,
+        test_js_generateFromText_refuses_text_catalog_model,
+        test_whatif_text_does_not_require_resolution,
     ]
     failures = []
     for test in tests:
@@ -285,4 +357,4 @@ if __name__ == "__main__":
             print(f"FAIL {test.__name__}: {exc}")
     if failures:
         raise SystemExit(1)
-    print("PASS nanogpt-text-canvas 8/8")
+    print("PASS nanogpt-text-canvas 12/12")

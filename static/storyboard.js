@@ -229,6 +229,13 @@
       renderDock();
       return;
     }
+    const item = selectedCatalogItem();
+    const category = String((item && item.category) || "").toLowerCase();
+    if (category === "text" || category === "chat") {
+      setMsg("当前选中的是文本模型，不能拿去生图。请先切到图片模型", "bad");
+      renderDock();
+      return;
+    }
     await generate();
   }
 
@@ -1099,8 +1106,10 @@
     if (!btn) return;
     const n = nodeById(btn.dataset.id);
     if (!n) return;
-    if (btn.dataset.textact === "gen") generateFromText(n);
-    else if (btn.dataset.textact === "rev") {
+    if (btn.dataset.textact === "gen") {
+      if (state.mode === "text") generateText(n);
+      else generateFromText(n);
+    } else if (btn.dataset.textact === "rev") {
       const src = connectedNodes(n.id).find(isImageSource);
       if (src) {
         setMsg("正在反推…");
@@ -1153,7 +1162,7 @@
     }
     if (act.dataset.act === "gen-text") {
       const n = nodeById(state.selected);
-      if (n) generateFromText(n);
+      if (n) generateText(n);
     }
     if (act.dataset.act === "rev-text") {
       const n = nodeById(state.selected);
