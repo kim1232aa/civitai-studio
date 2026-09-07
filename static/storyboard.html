@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0820-civitai-comfy-params</title>
+<title>画布 · Night Lab · v0820b-apply-import</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -265,6 +265,13 @@
   .import-card.on .icheck::after{content:"";position:absolute;left:5px;top:2px;width:5px;height:9px;
     border:solid #0b0b0d;border-width:0 2px 2px 0;transform:rotate(45deg)}
   .import-empty{padding:48px 16px;text-align:center;color:#6a6a74;font-size:13px}
+  .import-url-row{display:flex;gap:8px;padding:8px 18px 4px;align-items:center;flex-wrap:wrap}
+  .import-url-row input{flex:1;min-width:180px;background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;
+    padding:7px 12px;color:#e8e8ec;font-size:12px}
+  .import-url-row button{border:1px solid #2e2e36;background:#1a1a1f;color:#ddd;border-radius:999px;
+    padding:7px 14px;font-size:12px;flex-shrink:0}
+  .import-url-row button:hover{border-color:#4a4a54;color:#fff}
+  .import-url-row button:disabled{opacity:.45;cursor:not-allowed}
   .import-ft{display:flex;align-items:center;gap:12px;padding:12px 18px 16px;border-top:1px solid #24242a}
   .import-ft label{display:inline-flex;align-items:center;gap:8px;color:#c8c8d0;font-size:12px;cursor:pointer}
   .import-ft .grow{flex:1}
@@ -331,7 +338,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0820-civitai-comfy-params</span>
+      <span class="stamp">v0820b-apply-import</span>
     </div>
   </header>
   <div class="stage">
@@ -476,6 +483,10 @@
       <button type="button" class="pill" data-ifilter="audio">音频</button>
       <span class="spacer"></span>
       <button type="button" class="local-up" id="importLocalBtn">本地上传</button>
+    </div>
+    <div class="import-url-row" id="importUrlRow">
+      <input id="importUrl" type="text" placeholder="Civitai 图 id / 链接，如 https://civitai.red/images/134923572" autocomplete="off" />
+      <button type="button" class="primary" id="importUrlBtn">导入参数</button>
     </div>
     <div class="import-body" id="importBody"></div>
     <div class="import-ft">

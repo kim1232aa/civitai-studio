@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0820" in js, "STORE must bump to v0820")
+    assert_true("nl-storyboard-v0820b" in js, "STORE must bump to v0820b")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "stamp must be v0820-civitai-comfy-params")
+    assert_true("v0820b-apply-import" in html, "stamp must be v0820b-apply-import")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
+    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "stamp v0820-civitai-comfy-params")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0820b-apply-import" in html, "stamp v0820b-apply-import")
+    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -584,11 +584,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0820-civitai-comfy-params: unmention/link helpers still present."""
+    """v0817b lineage under v0820b-apply-import: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,8 +606,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +680,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0819")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -715,8 +715,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0819")
+    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -741,8 +741,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0820")
+    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -780,8 +780,9 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0820")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     # UI surface
@@ -834,6 +835,76 @@ def test_v0820_civitai_comfy_params():
     assert_true('id="dockFoot"' in html, "sticky foot kept")
 
 
+def test_v0820b_apply_import():
+    """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0820b-apply-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820b")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
+    assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
+    # applyImport path
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport")
+    assert_true("function runImportFromUrl" in js or "async function runImportFromUrl" in js, "runImportFromUrl")
+    assert_true("function looksCivitaiServiceId" in js, "looksCivitaiServiceId")
+    assert_true("function ensureActiveShotForImport" in js, "ensureActiveShotForImport")
+    assert_true('"/api/import"' in js or "'/api/import'" in js or "/api/import" in js, "POSTs /api/import")
+    # Must NOT call paid generate from import path
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    assert_true(i >= 0 and j > i, "applyImport block")
+    block = js[i:j]
+    assert_true("/api/generate" not in block, "applyImport must not call /api/generate")
+    assert_true(
+        ('value = "civitai"' in block)
+        or (".value=\"civitai\"" in block.replace(" ", ""))
+        or ("value = 'civitai'" in block)
+        or ('$("backend").value = "civitai"' in block),
+        "forces backend civitai",
+    )
+    assert_true("loadCatalog" in block, "reloads catalog")
+    assert_true("applyComfyParamsToUi" in block, "fills comfy params")
+    assert_true("normalizeLora" in block, "packs loras")
+    assert_true("setDockMode" in block and "expanded" in block, "expands Composer")
+    assert_true("不会回退" in block or "flux/schnell" in block, "hard error forbids fal fallback")
+    assert_true("缺少 serviceId" in block or "无法挂载" in block, "empty service hard error")
+    # URL entry in import modal
+    assert_true('id="importUrl"' in html, "importUrl input")
+    assert_true('id="importUrlBtn"' in html, "importUrlBtn")
+    assert_true("importUrlBtn" in js, "wires importUrlBtn")
+    assert_true("runImportFromUrl" in js, "runImportFromUrl wired")
+    # Spot-check fixture shape must remain nameable
+    for field in ("backend", "serviceId", "steps", "cfgScale", "sampler", "scheduler", "seed", "width", "height", "loras"):
+        assert_true(field in js, "mentions " + field)
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 turbo serviceId")
+    # Mock JSON shape exercise via source contract (no live /api/import)
+    mock = {
+        "backend": "civitai",
+        "serviceId": "image/comfy/krea2/turbo/createImage",
+        "prompt": "real prompt from fixture",
+        "negativePrompt": "",
+        "width": 944,
+        "height": 1664,
+        "steps": 8,
+        "cfgScale": 1,
+        "sampler": "er_sde",
+        "scheduler": "simple",
+        "seed": 467475143677094,
+        "loras": [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8}],
+    }
+    assert_true(mock["backend"] == "civitai", "mock backend")
+    assert_true(mock["serviceId"] == "image/comfy/krea2/turbo/createImage", "mock service")
+    assert_true(abs(float(mock["loras"][0]["strength"]) - 0.8) < 1e-6, "mock lora strength")
+    # Lineage
+    assert_true("packComfyParamsForPayload" in js, "v0820 comfy pack kept")
+    assert_true("mentionTags" not in js, "v0817c no @ in prompt")
+    assert_true('id="dockFoot"' in html, "v0818 sticky foot")
+    assert_true('dockMode: "collapsed"' in js, "v0819 canvas-stage")
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -860,6 +931,7 @@ def main():
         test_v0819_canvas_stage,
         test_v0819b_expand_prompt,
         test_v0820_civitai_comfy_params,
+        test_v0820b_apply_import,
     ]
     failed = 0
     for fn in tests:

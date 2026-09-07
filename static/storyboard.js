@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0820";
-  const STORE_OLDS = ["nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0820b";
+  const STORE_OLDS = ["nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
@@ -2889,6 +2889,141 @@
   }
   if ($("btnImport")) $("btnImport").onclick = () => openImportModal();
 
+  function looksCivitaiServiceId(id) {
+    const s = String(id || "");
+    return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
+  }
+  function ensureActiveShotForImport() {
+    let shot = nodeById(state.selected);
+    if (shot && shot.kind === "shot") return shot;
+    const list = shots();
+    if (list.length) {
+      selectNode(list[0].id, { expand: true });
+      return nodeById(list[0].id);
+    }
+    const id = uid("shot");
+    const n = {
+      id: id, kind: "shot", title: "分镜1",
+      x: 560, y: 80, url: "", firstFrameId: "",
+      prompt: "",
+    };
+    state.nodes.push(n);
+    selectNode(id, { expand: true });
+    return n;
+  }
+  // v0820b-apply-import: port index.html applyImport onto storyboard Composer.
+  // Never silent-fall back to fal/flux/schnell after a civitai import.
+  async function applyImport(j) {
+    j = j || {};
+    const civitaiSid = looksCivitaiServiceId(j.serviceId);
+    const wantCivitai = (j.backend === "civitai") || civitaiSid;
+    const shot = ensureActiveShotForImport();
+    let hardErr = "";
+
+    if (wantCivitai) {
+      if ($("backend")) $("backend").value = "civitai";
+      syncParamSurface();
+      const sid = String(j.serviceId || "").trim();
+      state._pendingService = sid || "";
+      await loadCatalog();
+      if (!sid) {
+        if ($("service")) $("service").value = "";
+        hardErr = "Civitai 导入缺少 serviceId，无法挂载（不会回退 fal/flux/schnell）";
+      } else {
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) $("service").value = sid;
+        if (!$("service") || $("service").value !== sid) {
+          hardErr = "无法挂载服务 " + sid + "（不会回退 fal/flux/schnell）";
+        }
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) {
+          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+        }
+      }
+    }
+
+    // Prompt only — never inject @filename from import media (v0817c)
+    if (j.prompt != null) {
+      const p = String(j.prompt);
+      if ($("prompt")) $("prompt").value = p;
+      if (shot) shot.prompt = p;
+    }
+    if (shot && j.negativePrompt != null) shot.negativePrompt = j.negativePrompt || "";
+
+    applyComfyParamsToUi(j);
+    if (shot) {
+      ["width", "height", "steps", "sampler", "scheduler", "seed"].forEach(function (k) {
+        if (j[k] != null) shot[k] = j[k];
+        else delete shot[k];
+      });
+      const cfgVal = j.cfg != null ? j.cfg : j.cfgScale;
+      if (cfgVal != null) { shot.cfg = cfgVal; shot.cfgScale = cfgVal; }
+      else { delete shot.cfg; delete shot.cfgScale; }
+    }
+
+    if (Array.isArray(j.loras)) {
+      state.loras = j.loras.map(normalizeLora);
+    } else if (wantCivitai) {
+      state.loras = [];
+    }
+    syncLoraUi();
+
+    if (j.kind === "video") state.mode = "video";
+    else if (j.kind === "image") state.mode = "image";
+
+    setDockMode("expanded");
+    renderCards();
+    drawWires();
+    renderDock();
+    persist();
+
+    const nLora = Array.isArray(state.loras) ? state.loras.length : 0;
+    if (hardErr) {
+      setMsg(hardErr, "bad");
+      return;
+    }
+    if (j.empty && j.error) {
+      setMsg(j.error, "bad");
+      return;
+    }
+    const extra = [];
+    if (j.comfyNodeCount) extra.push(j.comfyNodeCount + " 节点 Comfy");
+    if (j.importSource) extra.push(j.importSource);
+    const extraTxt = extra.length ? " · " + extra.join(" · ") : "";
+    setMsg("已导入参数" + (nLora ? (" · " + nLora + " 个 LoRA") : " · 未识别 LoRA") + extraTxt + "，自己点生成。", "ok");
+  }
+  async function runImportFromUrl(raw) {
+    raw = String(raw || "").trim();
+    if (!raw) { setMsg("请填 Civitai 图 id 或完整网址", "bad"); return; }
+    const civ = raw.match(/\/images\/(\d+)/i)
+      || raw.match(/[?&](?:imageId|id)=(\d+)/i)
+      || (/^\d+$/.test(raw) ? [null, raw] : null);
+    const body = civ
+      ? { backend: "civitai", q: String(civ[1]) }
+      : { backend: "civitai", q: raw };
+    const btn = $("importUrlBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "导入中"; }
+    try {
+      const r = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      let j = null;
+      try { j = await r.json(); } catch (_) { j = null; }
+      if (!r.ok || !j || j.error) {
+        setMsg("导入失败 " + ((j && j.error) || r.statusText || ("HTTP " + r.status)), "bad");
+        return;
+      }
+      closeImportModal();
+      await applyImport(j);
+    } catch (e) {
+      setMsg("导入失败 " + (e && e.message ? e.message : String(e)), "bad");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "导入参数"; }
+    }
+  }
+
   function bindImportModal() {
     const modal = $("importModal");
     if (!modal) return;
@@ -2899,6 +3034,20 @@
     if ($("importCancel")) $("importCancel").onclick = closeImportModal;
     if ($("importConfirm")) $("importConfirm").onclick = confirmImportSelection;
     if ($("importLocalBtn")) $("importLocalBtn").onclick = () => $("file").click();
+    if ($("importUrlBtn")) {
+      $("importUrlBtn").onclick = () => {
+        const v = ($("importUrl") && $("importUrl").value) || "";
+        runImportFromUrl(v);
+      };
+    }
+    if ($("importUrl")) {
+      $("importUrl").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          runImportFromUrl(($("importUrl") && $("importUrl").value) || "");
+        }
+      });
+    }
     if ($("importTabs")) {
       $("importTabs").addEventListener("click", (e) => {
         const btn = e.target.closest("[data-itab]");
