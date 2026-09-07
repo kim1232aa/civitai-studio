@@ -260,7 +260,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "stamp must be v0817c-persist-at-tag")
+    assert_true("v0817c-no-at-in-prompt" in html, "stamp must be v0817c-no-at-in-prompt")
 
 
 def test_empty_boot_no_robot_demo():
@@ -284,7 +284,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
     assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
 
 
@@ -292,7 +292,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp v0817c-persist-at-tag")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
     assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS prepend v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -348,7 +348,7 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0817c stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp v0817c-persist-at-tag")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
     assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -407,7 +407,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "stamp v0817c-persist-at-tag")
+    assert_true("v0817c-no-at-in-prompt" in html, "stamp v0817c-no-at-in-prompt")
     assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -451,7 +451,7 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0817c stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp v0817c-persist-at-tag")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
     assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -489,7 +489,8 @@ def test_v0817_no_at_filename():
     im0 = js.find("function insertMention")
     im1 = js.find("function slashQueryAt", im0)
     im = js[im0:im1]
-    assert_true("mentionDisplayTag" in im, "insertMention uses mentionDisplayTag")
+    assert_true("linkAssetToShot" in im, "insertMention links edge")
+    assert_true("mentionDisplayTag" not in im, "insertMention must not write display tags")
     assert_true('"@" + sourceTitle(asset)' not in im, "insertMention must not use raw sourceTitle tag")
     # import confirms via linkAssetToShot only (no direct prompt write)
     ci0 = js.find("function confirmImportSelection")
@@ -506,6 +507,7 @@ def test_v0817_no_at_filename():
     assert_true("function attachExtraImages" in js, "attachExtraImages kept")
     assert_true("function packLorasForPayload" in js, "packLoras kept")
     assert_true("stages[0].payload" not in js, "gate untouched")
+
 
 
 
@@ -528,75 +530,51 @@ def _sim_is_raw_file_title(t):
     return False
 
 
-def _sim_next_picture_tag(mention_tags):
-    """Mirror nextPictureTag: max persisted @图片N + 1."""
-    import re
-    max_n = 0
-    for tag in (mention_tags or {}).values():
-        m = re.match(r"^@图片(\d+)$", str(tag or ""))
-        if m:
-            max_n = max(max_n, int(m.group(1)))
-    return "@图片" + str(max_n + 1)
-
-
-def _sim_mention_display_tag(asset, titles_by_id, mention_tags):
-    """Mirror mentionDisplayTag using persisted tags / next free — not live linked index for removal."""
-    title = titles_by_id[asset["id"]]
-    if title and not _sim_is_raw_file_title(title):
-        return "@" + title
-    if mention_tags and asset["id"] in mention_tags:
-        return mention_tags[asset["id"]]
-    return _sim_next_picture_tag(mention_tags)
-
-
-def _sim_tags_for_asset(asset, titles_by_id, mention_tags):
-    """Persisted tag + legacy @sourceTitle only — never recompute @图片N from linked order."""
+def _sim_tags_for_asset_legacy(asset, titles_by_id):
+    """Legacy unmention cleanup: @+sourceTitle only."""
     tags = []
     title = titles_by_id[asset["id"]]
     if title:
         legacy = "@" + title
         if legacy not in tags:
             tags.append(legacy)
-    if mention_tags and asset["id"] in mention_tags:
-        persisted = mention_tags[asset["id"]]
-        if persisted and persisted not in tags:
-            tags.append(persisted)
     return tags
 
 
-def _sim_insert_mention(prompt, asset, titles_by_id, mention_tags):
-    """Assign display tag at insert time and persist on mention_tags[assetId]."""
-    tag = _sim_mention_display_tag(asset, titles_by_id, mention_tags)
-    mention_tags[asset["id"]] = tag
-    if tag not in (prompt or ""):
-        prompt = ((prompt + " ") if prompt else "") + tag
-    return prompt, tag
-
-
-def _sim_unmention(prompt, asset, titles_by_id, mention_tags):
-    """Strip persisted tag (+ legacy); delete mention_tags record. Order vs edge drop irrelevant."""
+def _sim_insert_mention_no_at(prompt, partial_at_query=None):
+    """Mirror insertMention: clear partial @query only; never append @tag."""
     import re
     text = prompt or ""
-    for tag in _sim_tags_for_asset(asset, titles_by_id, mention_tags):
+    if partial_at_query is not None:
+        # e.g. prompt ends with @nan → remove from @ to end of query
+        at = text.rfind("@")
+        if at >= 0:
+            text = text[:at]
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text
+
+
+def _sim_unmention_legacy(prompt, asset, titles_by_id):
+    import re
+    text = prompt or ""
+    for tag in _sim_tags_for_asset_legacy(asset, titles_by_id):
         if tag and tag in text:
             text = text.replace(tag, "")
-    if mention_tags is not None and asset["id"] in mention_tags:
-        del mention_tags[asset["id"]]
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage retained under v0817c: unmention strips tags; stamp/STORE current."""
+    """v0817b lineage under v0817c-no-at-in-prompt: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("function tagsForAsset" in js, "tagsForAsset")
-    assert_true("mentionTags" in js, "persisted mentionTags")
+    assert_true("function unmention" in js, "unmention")
     ul = js[js.find("function unlinkAssetFromShot"):js.find("function toggleAssetOnShot")]
     assert_true(ul.find("unmention(asset, shot)") < ul.find("state.edges = state.edges.filter"),
                 "unlink unmentions before edge drop")
@@ -605,74 +583,74 @@ def test_v0817b_unmention_at_tag():
     assert_true("function packLorasForPayload" in js, "LoRA packing kept")
 
 
-def test_v0817c_persist_at_tag():
-    """v0817c: persist insertMention tag; unlink earlier asset must not leave orphan @图片N."""
+def test_v0817c_no_at_in_prompt():
+    """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-persist-at-tag" in html, "html stamp")
+    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
 
-    # Static: persist on insert; strip persisted on unmention; never recompute @图片N for removal
-    assert_true("function nextPictureTag" in js, "nextPictureTag helper")
-    assert_true("shot.mentionTags" in js, "shot.mentionTags persist")
+    # insertMention: link only — no mentionDisplayTag / no @ append / no mentionTags
     im = js[js.find("function insertMention"):js.find("function slashQueryAt")]
-    assert_true("mentionTags[asset.id] = tag" in im or "shot.mentionTags[asset.id] = tag" in im,
-                "insertMention persists tag")
-    assert_true("mentionDisplayTag" in im, "insertMention uses mentionDisplayTag")
-    un = js[js.find("function unmention(asset, shot)"):js.find("function invalidateStageProgress")]
-    assert_true("tagsForAsset" in un, "unmention uses tagsForAsset")
-    assert_true("delete shot.mentionTags[asset.id]" in un, "unmention clears persisted tag")
-    tf = js[js.find("function tagsForAsset"):js.find("function mediaBadge")]
-    assert_true("mentionDisplayTag" not in tf, "tagsForAsset must not recompute via mentionDisplayTag")
-    assert_true("mentionTags" in tf, "tagsForAsset reads persisted mentionTags")
-    ul = js[js.find("function unlinkAssetFromShot"):js.find("function toggleAssetOnShot")]
-    assert_true(ul.find("unmention(asset, shot)") < ul.find("state.edges = state.edges.filter"),
-                "unmention-before-edge-removal documented")
+    assert_true("linkAssetToShot(asset, shot)" in im, "insertMention links edge")
+    assert_true("mentionDisplayTag" not in im, "insertMention must not call mentionDisplayTag")
+    assert_true("mentionTags" not in im, "no persist mentionTags")
+    assert_true('"@" +' not in im and "'@' +" not in im, "insertMention must not build @tag")
+    assert_true("shot.prompt = next" in im or "shot.prompt=next" in im.replace(" ", ""),
+                "may clear partial @query into shot.prompt")
+    # Must clear @query without inserting a replacement tag (slice to at, then caret — no tag concat)
+    assert_true("v.slice(0, at) + v.slice(caret)" in im or "v.slice(0,at)+v.slice(caret)" in im.replace(" ", ""),
+                "clears @query without inserting tag")
+    assert_true("nextPictureTag" not in js, "nextPictureTag removed")
+    assert_true("mentionTags" not in js, "mentionTags removed")
 
-    # String-sim: insert A→@图片1, B→@图片2; unlink A first; then B — no orphans
-    a = {"id": "a-raw", "title": "nano-gpt_img_aaaaaaaa_0"}
-    b = {"id": "b-raw", "title": "seedream_bbbbbbbb_out_1"}
+    # mention no-op; link does not write prompt
+    i = js.find("function mention(asset, shot)")
+    j = js.find("function unmention(asset, shot)", i)
+    body = js[i:j]
+    assert_true("shot.prompt" not in body, "mention must not write shot.prompt")
+    k = js.find("function linkAssetToShot")
+    m = js.find("function unlinkAssetFromShot", k)
+    link = js[k:m]
+    assert_true("shot.prompt" not in link, "linkAssetToShot must not write shot.prompt")
+
+    # String-sim: multi link/unlink leaves human prompt unchanged (no @ added)
+    human_prompt = "基于参考图重绘，强化光影"
+    # atbox pick with partial @query
+    with_query = human_prompt + " @nan"
+    after_insert = _sim_insert_mention_no_at(with_query, partial_at_query="nan")
+    assert_true("@" not in after_insert, "no @ left after atbox pick: " + after_insert)
+    assert_true("基于参考图重绘" in after_insert, after_insert)
+    # second asset pick with no @query — prompt unchanged
+    after_insert2 = _sim_insert_mention_no_at(after_insert, partial_at_query=None)
+    assert_true(after_insert2 == after_insert, "multi insert leaves prompt unchanged")
+    assert_true("@图片" not in after_insert2 and "@标题" not in after_insert2, after_insert2)
+
+    # Unlink does not invent @; legacy @sourceTitle strip only
+    a = {"id": "a1", "title": "nano-gpt_img_aaaaaaaa_0"}
+    b = {"id": "a2", "title": "家用机器人"}
     titles = {a["id"]: a["title"], b["id"]: b["title"]}
-    mention_tags = {}
-    prompt = "基于"
-    prompt, t_a = _sim_insert_mention(prompt, a, titles, mention_tags)
-    assert_true(t_a == "@图片1", t_a)
-    assert_true(mention_tags[a["id"]] == "@图片1", mention_tags)
-    prompt, t_b = _sim_insert_mention(prompt, b, titles, mention_tags)
-    assert_true(t_b == "@图片2", t_b)
-    assert_true("@图片1" in prompt and "@图片2" in prompt, prompt)
+    # clean modern prompt — unlink must not change it
+    p_clean = "基于参考图重绘"
+    assert_true(_sim_unmention_legacy(p_clean, a, titles) == p_clean, "clean prompt unchanged on unlink A")
+    assert_true(_sim_unmention_legacy(p_clean, b, titles) == p_clean, "clean prompt unchanged on unlink B")
+    # legacy canvas with @家用机器人
+    p_legacy = "角色：@家用机器人 站立"
+    after_legacy = _sim_unmention_legacy(p_legacy, b, titles)
+    assert_true("@家用机器人" not in after_legacy, after_legacy)
+    # raw @filename legacy
+    p_raw = "x @" + a["title"] + " y"
+    after_raw = _sim_unmention_legacy(p_raw, a, titles)
+    assert_true("@" + a["title"] not in after_raw, after_raw)
 
-    # Unlink A first (earlier asset) — strip persisted @图片1 even if linked order would drift later
-    after_a = _sim_unmention(prompt, a, titles, mention_tags)
-    assert_true("@图片1" not in after_a, "orphan @图片1 must be gone: " + after_a)
-    assert_true("@图片2" in after_a, "B tag remains: " + after_a)
-    assert_true(a["id"] not in mention_tags, "A mentionTags cleared")
-    assert_true(mention_tags.get(b["id"]) == "@图片2", mention_tags)
-
-    # Recompute-from-index would wrongly think sole remaining B is @图片1 — document the bug
-    wrong_recompute = "@图片1"  # linked index 0 after A gone
-    assert_true(wrong_recompute != mention_tags[b["id"]], "persisted B tag must not drift to @图片1")
-
-    # Unlink B → strip persisted @图片2; no orphan @图片N
-    after_b = _sim_unmention(after_a, b, titles, mention_tags)
-    assert_true("@图片1" not in after_b and "@图片2" not in after_b, "no orphan @图片N: " + after_b)
-    assert_true(b["id"] not in mention_tags, "B mentionTags cleared")
-
-    # Human title path still persists + strips
-    human = {"id": "a-human", "title": "家用机器人"}
-    titles_h = {human["id"]: human["title"]}
-    mt_h = {}
-    p2, th = _sim_insert_mention("角色：", human, titles_h, mt_h)
-    assert_true(th == "@家用机器人", th)
-    after_h = _sim_unmention(p2, human, titles_h, mt_h)
-    assert_true("@家用机器人" not in after_h, after_h)
-
-    assert_true("stages[0].payload" not in js, "gate untouched")
+    # images[] still via edges / attachExtraImages
     assert_true("function attachExtraImages" in js, "images packing kept")
+    assert_true("payload.images = sliced" in js, "images[] via edges")
     assert_true("function packLorasForPayload" in js, "LoRA packing kept")
+    assert_true("stages[0].payload" not in js, "gate untouched")
 
 
 
@@ -697,7 +675,7 @@ def main():
         test_v0816_sb_lora,
         test_v0817_no_at_filename,
         test_v0817b_unmention_at_tag,
-        test_v0817c_persist_at_tag,
+        test_v0817c_no_at_in_prompt,
     ]
     failed = 0
     for fn in tests:

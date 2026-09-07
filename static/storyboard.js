@@ -111,35 +111,22 @@
     if (!/[\u4e00-\u9fff]/.test(s) && /^[a-z0-9]+(?:[_-][a-z0-9]+){2,}_?\d*$/i.test(s) && s.length >= 20) return true;
     return false;
   }
-  /** Next free @图片N from max persisted mentionTags (insert-time only). */
-  function nextPictureTag(shot) {
-    let maxN = 0;
-    const mt = (shot && shot.mentionTags) || {};
-    Object.keys(mt).forEach((id) => {
-      const m = /^@图片(\d+)$/.exec(String(mt[id] || ""));
-      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
-    });
-    return "@图片" + (maxN + 1);
-  }
-  /** Manual @ / atbox only: human title or @图片N — never raw file-hash titles. */
+  /** Legacy display helper (human @title or @图片N). Not used to write prompt anymore. */
   function mentionDisplayTag(asset, shot) {
+    const linked = connectedAssets(shot.id);
+    let idx = linked.findIndex((a) => a.id === asset.id);
+    if (idx < 0) idx = linked.length;
     const title = sourceTitle(asset);
     if (title && !isRawFileTitle(title)) return "@" + title;
-    if (shot && shot.mentionTags && shot.mentionTags[asset.id]) return shot.mentionTags[asset.id];
-    // Assign next free @图片N at insert time only (do not use for unlink/removal).
-    return nextPictureTag(shot);
+    return "@图片" + (idx + 1);
   }
-  /** Aliases to strip on unmention: persisted insert tag + legacy @sourceTitle. Never recompute @图片N. */
+  /** Legacy @+sourceTitle only — cleanup old canvases. Never invent @图片N for strip or insert. */
   function tagsForAsset(asset, shot) {
     const tags = [];
     const title = sourceTitle(asset);
     if (title) {
       const legacy = "@" + title;
       if (tags.indexOf(legacy) < 0) tags.push(legacy);
-    }
-    if (shot && shot.mentionTags && shot.mentionTags[asset.id]) {
-      const persisted = shot.mentionTags[asset.id];
-      if (persisted && tags.indexOf(persisted) < 0) tags.push(persisted);
     }
     return tags;
   }
@@ -803,13 +790,12 @@
     return null;
   }
 
-  // v0817c-persist-at-tag: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
-  // Real images travel edges → attachExtraImages → payload.images[]. Prompt stays human text.
-  // insertMention persists tag on shot.mentionTags[assetId]; unmention strips that record (never recompute @图片N).
+  // v0817c-no-at-in-prompt: atbox / insertMention / 画布引用 / link → edge + chip only.
+  // Never write @图片N / @标题 / @sourceTitle into prompt. Images via edges → attachExtraImages → images[].
   function mention(asset, shot) {
     return;
   }
-  // Strip persisted insertMention tag + legacy @+title alias for this assetId; clear mentionTags record.
+  // Optional legacy cleanup for old canvases that still have @ aliases in prompt.
   function unmention(asset, shot) {
     if (!shot || !asset) return;
     const tags = tagsForAsset(asset, shot);
@@ -821,10 +807,6 @@
         text = text.split(tag).join("");
         changed = true;
       }
-    }
-    if (shot.mentionTags && shot.mentionTags[asset.id] != null) {
-      delete shot.mentionTags[asset.id];
-      changed = true;
     }
     if (changed) {
       shot.prompt = text.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
@@ -852,7 +834,7 @@
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
     const had = state.edges.some((e) => e.from === asset.id && e.to === shot.id);
-    // unmention strips persisted shot.mentionTags[assetId] (order vs edge removal no longer index-sensitive)
+    // legacy @ cleanup while edge still present; new flows write no @ so this is a no-op
     unmention(asset, shot);
     state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
@@ -937,25 +919,20 @@
   function insertMention(asset) {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
-    // Edge first (mention is no-op); assign display tag at insert time and persist on shot.mentionTags.
+    // v0817c-no-at-in-prompt: link edge + chip only — never append @图片N / @标题 into prompt.
     linkAssetToShot(asset, shot);
     const ta = $("prompt");
-    const tag = mentionDisplayTag(asset, shot);
-    if (!shot.mentionTags) shot.mentionTags = {};
-    shot.mentionTags[asset.id] = tag; // persist so unlink never recomputes @图片N from linked order
     if (ta) {
       const v = ta.value || "";
       const caret = ta.selectionStart || v.length;
       const before = v.slice(0, caret);
       const at = before.lastIndexOf("@");
-      let next;
+      // Clear partial @query typed to open atbox; do not replace with a tag.
       if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
-        next = v.slice(0, at) + tag + " " + v.slice(caret);
-      } else if (v.indexOf(tag) < 0) {
-        next = (v ? v + " " : "") + tag;
-      } else next = v;
-      shot.prompt = next;
-      ta.value = next;
+        const next = (v.slice(0, at) + v.slice(caret)).replace(/[ \t]{2,}/g, " ");
+        shot.prompt = next;
+        ta.value = next;
+      }
     }
     hideAtbox();
     hideSkillbox();
@@ -1748,7 +1725,7 @@
 
 
 
-  // --- v0817c-persist-at-tag (+ v0817b unmention + v0817 no-at-filename + v0816b LoRA bind) ---
+  // --- v0817c-no-at-in-prompt (+ no @ from atbox; legacy unmention cleanup; v0816b LoRA) ---
   function currentBackend() {
     return ($("backend") && $("backend").value) || "fal";
   }
