@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821b";
-  const STORE_OLDS = ["nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821c";
+  const STORE_OLDS = ["nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821c: fal i2v preview writeback + local /out → data URL
   // v0821b: real i2v endpoint (plain video-01 is t2v and drops first frame)
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
@@ -2499,10 +2500,28 @@
   }
 
   function pickUrl(data) {
+    // v0821c: fal video lands as result.video.url / video.url — not only images[]/saved[].
     if (!data) return "";
     if (typeof data.url === "string") return data.url;
-    const first = (arr) => arr && arr[0] && (arr[0].url || arr[0].path || arr[0]);
-    return first(data.saved) || first(data.files) || first(data.urls) || first(data.images) || first(data.videos) || "";
+    const first = (arr) => {
+      if (!arr || !arr[0]) return "";
+      const x = arr[0];
+      if (typeof x === "string") return x;
+      return (x && (x.url || x.path)) || "";
+    };
+    const fromList = first(data.saved) || first(data.files) || first(data.urls) || first(data.images) || first(data.videos);
+    if (fromList) return fromList;
+    if (data.image) return data.image.url || (typeof data.image === "string" ? data.image : "");
+    if (data.video) return data.video.url || (typeof data.video === "string" ? data.video : "");
+    const res = data.result;
+    if (res && typeof res === "object") {
+      if (typeof res.url === "string") return res.url;
+      if (res.video) return res.video.url || (typeof res.video === "string" ? res.video : "");
+      if (res.image) return res.image.url || (typeof res.image === "string" ? res.image : "");
+      const nested = first(res.images) || first(res.videos) || first(res.saved) || first(res.files);
+      if (nested) return nested;
+    }
+    return "";
   }
 
   function hasUnresolvedStageOut(obj) {

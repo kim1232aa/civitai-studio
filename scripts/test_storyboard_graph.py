@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821b" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821c" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "stamp must be v0821b-i2v-detect")
+    assert_true("v0821c-fal-i2v-preview" in html, "stamp must be v0821c-fal-i2v-preview")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "stamp v0821b-i2v-detect")
-    assert_true("nl-storyboard-v0821b" in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "stamp v0821c-fal-i2v-preview")
+    assert_true("nl-storyboard-v0821c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -584,11 +584,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821b-i2v-detect: unmention/link helpers still present."""
+    """v0817b lineage under v0821c-fal-i2v-preview: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,8 +606,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +680,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -715,8 +715,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -741,8 +741,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -781,8 +781,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -840,8 +840,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -911,8 +911,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0820c")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -974,9 +974,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp")
-    assert_true('<span class="stamp">v0821b-i2v-detect</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0821")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1057,9 +1057,10 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821b-i2v-detect" in html, "html stamp v0821b-i2v-detect")
-    assert_true('<span class="stamp">v0821b-i2v-detect</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821b"' in js, "STORE v0821b")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp v0821c-fal-i2v-preview")
+    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821b")
+    assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
                 "FAL_I2V_DEFAULT unchanged")
@@ -1168,6 +1169,97 @@ console.log(JSON.stringify(out));
 
 
 
+def test_v0821c_fal_i2v_preview():
+    """v0821c: local /out → data URL for fal; pickUrl reads video.url; 422 no-media → failed."""
+    import base64
+    import json
+    from providers.fal import (
+        build_fal_input, materialize_fal_media, local_out_to_data_url,
+        fal_output_error, job_status,
+    )
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821c-fal-i2v-preview" in html, "html stamp")
+    assert_true('<span class="stamp">v0821c-fal-i2v-preview</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821c"' in js, "STORE v0821c")
+    assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
+    # pickUrl must map fal video shapes
+    i = js.find("function pickUrl")
+    assert_true(i >= 0, "pickUrl")
+    block = js[i:i + 1200]
+    assert_true("data.video" in block and "result.video" in block or "res.video" in block, "pickUrl video.url")
+    assert_true("v0821c" in block or "fal video" in block, "v0821c note on pickUrl")
+
+    frame = "/out/12100372-20260907215435634_0.jpg"
+    fp = ROOT / "out" / "12100372-20260907215435634_0.jpg"
+    assert_true(fp.is_file(), "fixture frame exists")
+    data_url = local_out_to_data_url(frame)
+    assert_true(isinstance(data_url, str) and data_url.startswith("data:image/jpeg;base64,"), data_url[:40])
+    raw = base64.b64decode(data_url.split(",", 1)[1])
+    assert_true(raw == fp.read_bytes(), "roundtrip bytes")
+
+    inp = build_fal_input({
+        "serviceId": "fal-ai/minimax/video-01/image-to-video",
+        "prompt": "固定镜头",
+        "firstFrame": frame,
+        "sourceImage": frame,
+    })
+    assert_true(inp.get("image_url") == frame, "build keeps local path for meta")
+    out = materialize_fal_media(inp)
+    assert_true(out.get("image_url", "").startswith("data:image/jpeg;base64,"), out.get("image_url", "")[:48])
+    # https untouched
+    https_inp = {"image_url": "https://cdn.example/a.jpg", "prompt": "x"}
+    assert_true(materialize_fal_media(https_inp)["image_url"] == "https://cdn.example/a.jpg", "https passthrough")
+    # missing local → error
+    try:
+        materialize_fal_media({"image_url": "/out/does-not-exist-xyz.jpg"})
+        assert_true(False, "should raise")
+    except ValueError as e:
+        assert_true("无法读取" in str(e) or "不存在" in str(e), str(e))
+
+    err = fal_output_error({
+        "detail": [{
+            "loc": ["body", "image_url"],
+            "msg": "Failed to download the file. Please check if the URL is accessible and try again.",
+            "type": "file_download_error",
+            "input": "/out/12100372-20260907215435634_0.jpg",
+        }]
+    })
+    assert_true(err and "Failed to download" in err, err)
+
+    # Live job that failed with relative /out must now report failed (not forever-processing).
+    jid = "fal|fal-ai/minimax/video-01/image-to-video|01a07e0c-d910-7702-9eb4-e27fa6411d73"
+    code, data = job_status(jid)
+    assert_true(code == 200, data)
+    assert_true(data.get("status") == "failed", data)
+    assert_true("download" in (data.get("error") or "").lower() or "image_url" in (data.get("error") or ""), data)
+
+    # Node harness: pickUrl extracts fal video.url / result.video.url / saved
+    import subprocess
+    end = js.find("function hasUnresolvedStageOut", i)
+    assert_true(end > i, "pickUrl end")
+    fn = js[i:end]
+    node = subprocess.run(
+        ["node", "-e", fn + r"""
+const cases = [
+  [{ saved: [{ url: "/out/a.mp4" }] }, "/out/a.mp4"],
+  [{ video: { url: "https://v3.fal.media/files/x.mp4" } }, "https://v3.fal.media/files/x.mp4"],
+  [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
+  [{ result: { images: [{ url: "https://cdn/i.jpg" }] } }, "https://cdn/i.jpg"],
+  [{ status: "succeeded" }, ""],
+];
+const out = cases.map(([d, exp]) => ({ got: pickUrl(d), exp, ok: pickUrl(d) === exp }));
+console.log(JSON.stringify(out));
+"""],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node pickUrl: %s%s" % (node.stdout, node.stderr))
+    rows = json.loads(node.stdout.strip().splitlines()[-1])
+    for r in rows:
+        assert_true(r["ok"], r)
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -1198,6 +1290,7 @@ def main():
         test_v0820c_hard_service,
         test_v0821_hardgate_i2v_refs,
         test_v0821b_i2v_detect,
+        test_v0821c_fal_i2v_preview,
     ]
     failed = 0
     for fn in tests:

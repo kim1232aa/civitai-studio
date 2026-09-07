@@ -380,6 +380,104 @@ def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
             inp["lora_scale"] = cleaned[0]["scale"]
 
 
+MIME_BY_EXT = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+}
+
+MEDIA_URL_KEYS = (
+    "image_url", "start_image_url", "first_frame_url", "image",
+    "end_image_url", "tail_image_url", "last_frame_url",
+    "image_urls", "video_url", "audio_url",
+)
+
+
+def local_out_to_data_url(url: str) -> str | None:
+    """Turn studio-local /out/<file> into a data URL fal can fetch. None if not local."""
+    if not isinstance(url, str):
+        return None
+    s = url.strip()
+    if not s.startswith("/out/"):
+        return None
+    name = Path(s.split("?", 1)[0]).name
+    if not name or name in (".", "..") or "/" in name or "\\" in name:
+        return None
+    fp = ROOT / "out" / name
+    if not fp.is_file():
+        return None
+    import base64
+    raw = fp.read_bytes()
+    mime = MIME_BY_EXT.get(fp.suffix.lower(), "application/octet-stream")
+    return f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+
+
+def materialize_fal_media(inp: dict) -> dict:
+    """Rewrite local /out paths in fal outbound fields to data URLs.
+
+    Relative /out/... is unreachable from fal workers (file_download_error).
+    http(s) and existing data: URLs are left alone. Missing local files raise.
+    """
+    if not isinstance(inp, dict):
+        return inp
+    out = dict(inp)
+
+    def one(val, key):
+        if isinstance(val, list):
+            return [one(v, key) for v in val]
+        if not isinstance(val, str) or not val.strip():
+            return val
+        s = val.strip()
+        if s.startswith("http://") or s.startswith("https://") or s.startswith("data:"):
+            return s
+        if s.startswith("/out/"):
+            data = local_out_to_data_url(s)
+            if not data:
+                raise ValueError(f"Fal 无法读取本地首帧/参考图 {s}（文件不存在或不可读）")
+            return data
+        return s
+
+    for key in MEDIA_URL_KEYS:
+        if key not in out:
+            continue
+        out[key] = one(out[key], key)
+    return out
+
+
+def fal_output_error(obj) -> str | None:
+    """Extract fal 422 / validation error text from result or platform json_output."""
+    if not isinstance(obj, dict):
+        return None
+    detail = obj.get("detail")
+    if isinstance(detail, list) and detail:
+        msgs = []
+        for it in detail:
+            if isinstance(it, dict):
+                m = it.get("msg") or it.get("message") or it.get("type")
+                loc = it.get("loc")
+                if m:
+                    msgs.append(f"{'.'.join(str(x) for x in loc)}: {m}" if isinstance(loc, list) else str(m))
+            elif it:
+                msgs.append(str(it))
+        if msgs:
+            return "; ".join(msgs)
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    for k in ("error", "message", "msg"):
+        v = obj.get(k)
+        if isinstance(v, str) and v.strip() and v.strip() not in ("HTTP 405", "HTTP 404"):
+            return v.strip()
+        if isinstance(v, dict) and v.get("message"):
+            return str(v.get("message"))
+    return None
+
+
 def build_fal_input(payload: dict) -> dict:
     eid = (payload.get("serviceId") or payload.get("endpoint") or "").strip()
     spec = find_model(eid) or {}
@@ -604,7 +702,11 @@ def submit(payload: dict):
             payload["serviceId"] = eid
             payload["endpoint"] = eid
     inp = build_fal_input(payload)
-    code, data = fal_call(f"{QUEUE}/{eid}", method="POST", body=inp)
+    try:
+        outbound = materialize_fal_media(inp)
+    except ValueError as e:
+        return 400, {"error": str(e), "backend": "fal", "endpoint": eid, "submittedInput": inp}
+    code, data = fal_call(f"{QUEUE}/{eid}", method="POST", body=outbound)
     if isinstance(data, dict):
         rid = data.get("request_id") or data.get("requestId")
         jid = f"fal|{eid}|{rid}" if rid else None
@@ -879,11 +981,32 @@ def job_status(job_id: str):
             except Exception as e:
                 data["saveError"] = str(e)
         if not data.get("saved"):
-            # COMPLETED on the queue is not "got the file". Keep polling.
-            data["status"] = "processing"
-            data["wait"] = data.get("wait") or {}
-            data["wait"]["log"] = data.get("saveError") or "Fal 已完成，正在取媒体 URL"
-            data.pop("saveError", None)
+            # COMPLETED with no media: either still fetching, or fal 422/validation
+            # (e.g. file_download_error on relative /out paths). Surface as failed.
+            err = fal_output_error(result) if isinstance(result, dict) else None
+            if not err and isinstance(data.get("result"), dict):
+                err = fal_output_error(data.get("result"))
+            if not err:
+                pc2, plat2 = platform_payloads(eid, rid)
+                if pc2 == 200 and isinstance(plat2, dict):
+                    items2 = plat2.get("items") or []
+                    item2 = items2[0] if items2 else None
+                    if isinstance(item2, dict):
+                        err = fal_output_error(item2.get("json_output") or item2.get("output") or {})
+                        if not err and item2.get("status_code") and int(item2.get("status_code") or 0) >= 400:
+                            err = f"Fal HTTP {item2.get('status_code')}"
+            if err:
+                data["status"] = "failed"
+                data["error"] = err
+                data["wait"] = data.get("wait") or {}
+                data["wait"]["log"] = err
+                data.pop("saveError", None)
+            else:
+                # COMPLETED on the queue is not "got the file". Keep polling.
+                data["status"] = "processing"
+                data["wait"] = data.get("wait") or {}
+                data["wait"]["log"] = data.get("saveError") or "Fal 已完成，正在取媒体 URL"
+                data.pop("saveError", None)
     # Always 200 so the browser poll does not throw on provider 405 leftovers.
     return 200, data
 
