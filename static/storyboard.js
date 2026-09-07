@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0810";
-  const STORE_OLDS = ["nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0811";
+  const STORE_OLDS = ["nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -2016,18 +2016,72 @@
   };
   function autoLayout() {
     const g = findActiveGroup();
-    const scopeIds = g ? (g.memberIds || []).slice() : null;
-    const shotList = shots().filter((n) => !scopeIds || scopeIds.indexOf(n.id) >= 0);
+    const multiShotIds = (state.multi || []).map(nodeById).filter((n) => n && n.kind === "shot").map((n) => n.id);
+    // Scope: active group members > multi-select shots (>=2) > full canvas
+    let scopeIds = null;
+    if (g) {
+      scopeIds = (g.memberIds || []).slice();
+    } else if (multiShotIds.length >= 2) {
+      scopeIds = multiShotIds.slice();
+    }
+    let shotList = shots().filter((n) => !scopeIds || scopeIds.indexOf(n.id) >= 0);
+    if (scopeIds && scopeIds.length) {
+      // Prefer selection/group order so rearrange is stable & predictable
+      const order = {};
+      scopeIds.forEach((id, i) => { order[id] = i; });
+      shotList = shotList.slice().sort((a, b) => {
+        const oa = order[a.id];
+        const ob = order[b.id];
+        if (oa == null && ob == null) return (a.x - b.x) || (a.y - b.y);
+        if (oa == null) return 1;
+        if (ob == null) return -1;
+        return oa - ob;
+      });
+    } else {
+      shotList = shotList.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    }
     const assetList = assets().filter((n) => {
       if (!scopeIds) return true;
       return state.edges.some((e) => e.from === n.id && scopeIds.indexOf(e.to) >= 0);
     });
-    const startX = scopeIds ? (shotList[0] ? shotList[0].x : 560) : 560;
-    const startY = scopeIds ? (shotList[0] ? Math.min.apply(null, shotList.map((s) => s.y)) : 80) : 80;
+    const startX = scopeIds
+      ? (shotList.length ? Math.min.apply(null, shotList.map((s) => s.x)) : 560)
+      : 560;
+    const startY = scopeIds
+      ? (shotList.length ? Math.min.apply(null, shotList.map((s) => s.y)) : 80)
+      : 80;
     const gapX = 720;
+    const gapY = 430;
+    const EPS = 12;
+    function planRow() {
+      return shotList.map((_, i) => ({ x: startX + i * gapX, y: startY }));
+    }
+    function planCol() {
+      return shotList.map((_, i) => ({ x: startX, y: startY + i * gapY }));
+    }
+    function planGrid2() {
+      return shotList.map((_, i) => ({
+        x: startX + (i % 2) * gapX,
+        y: startY + Math.floor(i / 2) * gapY,
+      }));
+    }
+    function nearlySame(plan) {
+      if (!shotList.length) return true;
+      return shotList.every((n, i) => {
+        const t = plan[i];
+        return Math.abs(n.x - t.x) < EPS && Math.abs(n.y - t.y) < EPS;
+      });
+    }
+    // Prefer row; if already there, try column; then 2-col grid; finally nudge Y so chrome moves
+    let plan = planRow();
+    if (nearlySame(plan)) plan = planCol();
+    if (nearlySame(plan)) plan = planGrid2();
+    if (nearlySame(plan)) {
+      plan = planRow().map((t) => ({ x: t.x, y: t.y + gapY }));
+    }
     shotList.forEach((n, i) => {
-      n.x = startX + i * gapX;
-      n.y = startY;
+      n.x = plan[i].x;
+      n.y = plan[i].y;
     });
     const placed = {};
     shotList.forEach((shot) => {
@@ -2053,7 +2107,9 @@
         placed[a.id] = true;
       });
     }
+    // Preserve multi-select + group chrome (state.multi / groups untouched)
     renderCards(); drawWires(); persist();
+    syncSelBar();
   }
   $("btnAuto").onclick = () => { autoLayout(); };
   $("btnFit").onclick = () => { fitCam(); };
