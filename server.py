@@ -279,11 +279,13 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
     op = (inp.get("operation") or (svc or {}).get("operation") or "")
     cap = find_cap(engine, op, inp.get("version") or (svc or {}).get("version"), inp.get("provider") or (svc or {}).get("provider"))
     frames = list((cap or {}).get("frameFields") or [])
-    first = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("startImage") or payload.get("image") or "").strip()
+    from providers.ref_images import payload_ref_images, primary_frame, max_refs
+    from providers.capabilities import get_provider_capabilities
+    caps = get_provider_capabilities("civitai")
+    first = primary_frame(payload) or (payload.get("startImage") or "").strip()
     last = (payload.get("lastFrame") or payload.get("endImage") or payload.get("endSourceImage") or "").strip()
-    extra = [x for x in (payload.get("images") or payload.get("referenceImages") or []) if x]
-    if first and first not in extra:
-        extra = [first] + extra
+    extra = payload_ref_images(payload, backend="civitai", caps=caps, item=cap if isinstance(cap, dict) else None)
+    ref_cap = max_refs(backend="civitai", caps=caps, item=cap if isinstance(cap, dict) else None, payload=payload)
     FIRST_NAMES = {"firstFrame", "sourceImage", "image", "sourceImageUrl"}
     LAST_NAMES = {"lastFrame", "endImage", "endSourceImage"}
     ver = str(inp.get("version") or (svc or {}).get("version") or "")
@@ -315,9 +317,9 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
         elif name == "startImage" and first:
             inp[name] = first
         elif name == "images" and extra:
-            inp[name] = extra[:9]
+            inp[name] = extra[:ref_cap]
         elif name == "referenceImages" and extra:
-            inp[name] = extra[:9]
+            inp[name] = extra[:ref_cap]
         elif name == "sourceVideo" and payload.get("sourceVideo"):
             inp[name] = payload["sourceVideo"]
         elif name == "sourceAudio" and payload.get("sourceAudio"):

@@ -474,12 +474,21 @@ class ModelScopeProvider(Provider):
             body["loras"] = ms_loras
         elif payload.get("loras"):
             lora_skip = "魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用"
-        img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
-        extra = [x for x in (payload.get("images") or []) if x]
-        if img and img not in extra:
-            extra = [img] + extra
-        if is_edit(mid) and extra:
-            body["image_url"] = extra[:9]
+        from .ref_images import payload_ref_images, primary_frame, max_refs
+        from .capabilities import get_provider_capabilities
+        caps = get_provider_capabilities(self.id)
+        img = primary_frame(payload)
+        extra = payload_ref_images(payload, backend=self.id, caps=caps)
+        ref_cap = max_refs(backend=self.id, caps=caps, payload=payload)
+        kind = str((payload or {}).get("kind") or (payload or {}).get("recipe") or "").lower()
+        task = str((payload or {}).get("task") or "").lower()
+        is_video = kind == "video" or "image-to-video" in task or "i2v" in task
+        # i2v: always land first frame into official image_url (string)
+        if is_video and img:
+            body["image_url"] = img
+        elif (is_edit(mid) or img) and extra:
+            # i2i / edit: list when multi, else string — Hub accepts either
+            body["image_url"] = extra[:ref_cap] if len(extra) > 1 else extra[0]
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
         url = f"{self._base}/images/generations"
         code, data = json_call(url, method="POST", headers=headers, body=body, timeout=90)

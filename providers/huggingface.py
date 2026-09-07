@@ -256,15 +256,19 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         body["scheduler"] = params["scheduler"]
     blob = (pid + " " + str((payload or {}).get("task") or "")).lower()
     wants_img = any(x in blob for x in ("image-to-image", "kontext", "/edit", "i2i"))
-    img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or "").strip()
-    extra = [x for x in (payload.get("images") or []) if x]
-    if img and img not in extra:
-        extra = [img] + extra
+    from .ref_images import payload_ref_images, primary_frame, max_refs
+    from .capabilities import get_provider_capabilities
+    caps = get_provider_capabilities("huggingface")
+    img = primary_frame(payload)
+    extra = payload_ref_images(payload, backend="huggingface", caps=caps)
+    ref_cap = max_refs(backend="huggingface", caps=caps, payload=payload)
     if extra and wants_img:
         if len(extra) == 1:
             body["image_url"] = extra[0]
         else:
-            body["image_urls"] = extra[:9]
+            body["image_urls"] = extra[:ref_cap]
+    elif img and wants_img:
+        body["image_url"] = img
     try:
         from . import fal as fal_mod
         fal_mod.apply_fal_loras(body, payload, fal_mod.find_model(pid) or {"id": pid}, pid)

@@ -631,25 +631,18 @@ def _loras(payload: dict) -> list:
 
 
 def _source_images(payload: dict) -> list:
-    seen, out = set(), []
-
-    def add(u):
-        s = (u or "").strip()
-        if not s or s in seen:
-            return
-        if not (s.startswith("http") or s.startswith("data:image")):
-            return
-        seen.add(s)
-        out.append(s)
-
-    add((payload or {}).get("sourceImage"))
-    add((payload or {}).get("firstFrame"))
-    add((payload or {}).get("image_url"))
-    add((payload or {}).get("imageUrl"))
-    add((payload or {}).get("imageDataUrl"))
-    for u in (payload or {}).get("images") or []:
-        add(u)
-    return out
+    """Collect + clamp refs for Nano input_references (provider maxRefs default 5)."""
+    from .ref_images import payload_ref_images
+    from .capabilities import get_provider_capabilities
+    caps = get_provider_capabilities("nano-gpt")
+    # Prefer catalog-declared max on the model row when present
+    item = None
+    try:
+        mid = model_id((payload or {}).get("serviceId") or "")
+        item = find_spec(mid) if mid else None
+    except Exception:
+        item = None
+    return payload_ref_images(payload, backend="nano-gpt", caps=caps, item=item or {})
 
 
 def _row_image(it: dict) -> dict:

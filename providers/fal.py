@@ -349,11 +349,14 @@ def build_fal_input(payload: dict) -> dict:
     prompt = payload.get("prompt") or ""
     if prompt_key:
         inp[prompt_key] = prompt
-    img = (payload.get("firstFrame") or payload.get("sourceImage") or payload.get("image_url") or payload.get("image") or "").strip()
+    from .ref_images import payload_ref_images, primary_frame, max_refs
+    from .capabilities import get_provider_capabilities
+    caps = get_provider_capabilities("fal")
+    # catalog item may narrow maxRefs for single-image endpoints
+    img = primary_frame(payload)
     last = (payload.get("lastFrame") or payload.get("endImage") or "").strip()
-    extra = [x for x in (payload.get("images") or []) if x]
-    if img and img not in extra:
-        extra = [img] + extra
+    extra = payload_ref_images(payload, backend="fal", caps=caps, item=spec)
+    ref_cap = max_refs(backend="fal", caps=caps, item=spec, payload=payload)
     FIRST = {"image_url", "start_image_url", "first_frame_url", "image"}
     LAST = {"end_image_url", "tail_image_url", "last_frame_url"}
     if not fields:
@@ -365,7 +368,7 @@ def build_fal_input(payload: dict) -> dict:
     for name in fields:
         if name == "image_urls":
             if extra:
-                inp["image_urls"] = extra[:9]
+                inp["image_urls"] = extra[:ref_cap]
         elif name == "video_url" and vid:
             inp["video_url"] = vid
         elif name in FIRST and img:
