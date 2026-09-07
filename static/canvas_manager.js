@@ -5,6 +5,7 @@
   const API_ROOT = "/api/canvas-projects";
   const ACTIVE_PROJECT_KEY = "civitai-studio-active-project";
   const ACTIVE_WORKSPACE_KEY = "civitai-studio-active-workspace";
+  const WORKSPACES = ["story", "canvas", "editor"];
 
   function clone(value) {
     if (typeof structuredClone === "function") return structuredClone(value);
@@ -18,6 +19,14 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  // 页头/标题栏用：名字后跟 id 短码，重名项目也能从界面上分辨内容落在哪一个。
+  function projectLabel(project) {
+    if (!project) return "";
+    const name = String(project.name == null ? "" : project.name).trim() || "未命名项目";
+    const short = String(project.id == null ? "" : project.id).replace(/^project-/, "").slice(0, 8);
+    return short ? `${name} · ${short}` : name;
   }
 
   function projectPath(apiRoot, projectId, ...parts) {
@@ -282,7 +291,7 @@
     }
 
     setWorkspace(workspace) {
-      const value = ["story", "canvas", "editor"].includes(workspace) ? workspace : "canvas";
+      const value = WORKSPACES.includes(workspace) ? workspace : "canvas";
       this.workspace = value;
       this.writeStorage(ACTIVE_WORKSPACE_KEY, value);
       this.render();
@@ -366,7 +375,7 @@
       if (this.workspace === "story") {
         const script = (project && project.script) || {};
         return `<section class="cm-workspace cm-story-workspace">
-          <div class="cm-workspace-head"><div><h2>剧本策划</h2><p class="cm-note">${project ? "" : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存剧本</button></div>
+          <div class="cm-workspace-head"><div><h2>剧本策划</h2><p class="cm-note" data-active-project="${project ? escapeHtml(project.id) : ""}">${project ? `当前项目：${escapeHtml(projectLabel(project))}` : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存剧本</button></div>
           <div class="cm-story-grid">
             <label><span>剧本</span><textarea data-workspace-field="script" placeholder="暂无剧本内容">${escapeHtml(script.script || "")}</textarea></label>
             <label><span>场景</span><textarea data-workspace-field="scenes" placeholder="暂无场景内容">${escapeHtml(script.scenes || "")}</textarea></label>
@@ -378,7 +387,7 @@
       if (this.workspace === "editor") {
         const content = project && project.editor && project.editor.content || "";
         return `<section class="cm-workspace cm-editor-workspace">
-          <div class="cm-workspace-head"><div><h2>编辑器</h2><p class="cm-note">${project ? "" : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存内容</button></div>
+          <div class="cm-workspace-head"><div><h2>编辑器</h2><p class="cm-note" data-active-project="${project ? escapeHtml(project.id) : ""}">${project ? `当前项目：${escapeHtml(projectLabel(project))}` : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存内容</button></div>
           <textarea class="cm-editor" data-workspace-field="editor" placeholder="暂无编辑内容">${escapeHtml(content)}</textarea>
         </section>`;
       }
@@ -417,7 +426,7 @@
         .join("");
       const status = this.loading ? "加载中…" : (this.error ? escapeHtml(this.error) : "");
       const title = global.document && global.document.getElementById("projTitle");
-      if (title) title.textContent = project ? project.name : "未命名项目";
+      if (title) title.textContent = project ? projectLabel(project) : "未选择项目";
       this.root.innerHTML = `
         <div class="cm-head">
           <nav class="cm-tabs" role="tablist" aria-label="工作区">
@@ -488,7 +497,11 @@
     if (!target) return null;
     const manager = new CanvasManager({ ...(options || {}), root: target });
     const rememberedWorkspace = manager.readStorage(ACTIVE_WORKSPACE_KEY);
-    if (rememberedWorkspace) manager.workspace = rememberedWorkspace;
+    if (WORKSPACES.includes(rememberedWorkspace)) {
+      manager.workspace = rememberedWorkspace;
+      // 剧本/编辑器是独立工作区，面板收起就等于把用户扔回画布页；刷新后要停在原处。
+      if (rememberedWorkspace !== "canvas" && target.classList) target.classList.add("show");
+    }
     target.classList.add("canvas-manager");
     target.addEventListener("canvas-manager:open", () => target.classList.add("show"));
     manager.load();

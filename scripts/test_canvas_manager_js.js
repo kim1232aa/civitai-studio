@@ -210,6 +210,51 @@ FakeServer.prototype.handle = async function (url, options) {
   console.log("setWorkspace persists:", global.localStorage.getItem("civitai-studio-active-workspace"));
   if (global.localStorage.getItem("civitai-studio-active-workspace") !== "story") throw new Error("workspace not persisted");
 
+  // 页头必须写明内容落在哪个 active 项目上（截图可判），空项目只能走空态文案。
+  const headProject = mkProject("镜头A", "project-a");
+  manager.workspace = "story";
+  const storyHead = manager.renderWorkspace(headProject, headProject.canvases, headProject.assets, headProject.activeCanvasId);
+  manager.workspace = "editor";
+  const editorHead = manager.renderWorkspace(headProject, headProject.canvases, headProject.assets, headProject.activeCanvasId);
+  const emptyHead = manager.renderWorkspace(null, [], [], "");
+  const wantLabel = "当前项目：镜头A · a";
+  console.log("workspace head shows active project:", storyHead.includes(wantLabel) && editorHead.includes(wantLabel));
+  if (!storyHead.includes(wantLabel) || !editorHead.includes(wantLabel)) throw new Error("workspace head missing active project name");
+  if (!storyHead.includes('data-active-project="project-a"')) throw new Error("workspace head not anchored to active project id");
+  if (!emptyHead.includes("暂无项目") || emptyHead.includes("当前项目：")) throw new Error("empty workspace head leaked a project name");
+  manager.workspace = "canvas";
+
+  // 刷新恢复：记住的是 story/editor 就必须把面板打开，否则用户被扔回画布页。
+  const mkMountRoot = () => {
+    const classes = new Set();
+    return {
+      classes,
+      dataset: {},
+      innerHTML: "",
+      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), toggle() {}, contains: (c) => classes.has(c) },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      addEventListener() {},
+      dispatchEvent() {},
+    };
+  };
+  const mountWith = async (remembered) => {
+    global.localStorage.setItem("civitai-studio-active-workspace", remembered);
+    const root = mkMountRoot();
+    const mounted = global.mountCanvasManager(root, { fetchImpl: global.fetch });
+    await mounted.load();
+    return { workspace: mounted.workspace, shown: root.classes.has("show") };
+  };
+  const storyMount = await mountWith("story");
+  const editorMount = await mountWith("editor");
+  const canvasMount = await mountWith("canvas");
+  const bogusMount = await mountWith("not-a-workspace");
+  console.log("mount restores workspace + panel:", JSON.stringify({ storyMount, editorMount, canvasMount, bogusMount }));
+  if (storyMount.workspace !== "story" || !storyMount.shown) throw new Error("remembered story workspace did not reopen panel");
+  if (editorMount.workspace !== "editor" || !editorMount.shown) throw new Error("remembered editor workspace did not reopen panel");
+  if (canvasMount.workspace !== "canvas" || canvasMount.shown) throw new Error("canvas workspace must not force the panel open");
+  if (bogusMount.workspace !== "canvas" || bogusMount.shown) throw new Error("bogus stored workspace was not rejected");
+
   const source = SCRIPT + JSON.stringify(server.projects);
   if (/机器人|扫地|demo-|DEMO_BOT|light-preset|CHAR_LIB|loadDemo/i.test(source)) throw new Error("seed/robot content found");
   console.log("no robot/demo/seed content");
