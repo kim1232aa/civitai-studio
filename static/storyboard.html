@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0809-composer-p1</title>
+<title>画布 · Night Lab · v0810-selbar-layout</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -285,7 +285,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0809-composer-p1</span>
+      <span class="stamp">v0810-selbar-layout</span>
     </div>
   </header>
   <div class="stage">
@@ -302,6 +302,7 @@
     </div>
     <div class="selbar" id="selBar" role="toolbar" aria-label="多选操作">
       <span>已选 <span class="n" id="selCount">0</span> 项</span>
+      <button type="button" id="selAuto" title="自动布局">▦ 自动布局</button>
       <button type="button" class="primary" id="selGroup">成组</button>
       <button type="button" id="selUngroup">解组</button>
       <button type="button" id="selGroupRun" disabled>▶ 整组</button>
