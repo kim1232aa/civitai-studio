@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0805";
-  const STORE_OLDS = ["nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0806";
+  const STORE_OLDS = ["nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -184,17 +184,24 @@
   function syncSelBar() {
     const bar = $("selBar");
     if (!bar) return;
+    const g = findActiveGroup();
     const n = (state.multi && state.multi.length) ? state.multi.length : (state.selected ? 1 : 0);
     const countEl = $("selCount");
-    if (countEl) countEl.textContent = String(n);
-    const show = n >= 2 || !!findActiveGroup();
-    bar.classList.toggle("on", show);
-    const run = $("selGroupRun");
-    if (run) {
-      const targets = groupRunTargets();
-      run.disabled = !targets.length || state.runningGroup;
+    if (countEl) {
+      countEl.textContent = g ? ((g.name || "组") + " · " + n) : String(n);
     }
-    syncGroupRunBtn();
+    const show = n >= 2 || !!g;
+    bar.classList.toggle("on", show);
+    const targets = groupRunTargets();
+    const why = state.runningGroup
+      ? "整组执行中…"
+      : (!targets.length ? "组内/多选需要分镜才能 ▶整组逐步跑" : "按拓扑逐步跑组内分镜");
+    ["selGroupRun", "btnGroupRun"].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      el.disabled = !targets.length || state.runningGroup;
+      el.title = why;
+    });
   }
   function syncGroupRunBtn() {
     const btn = $("btnGroupRun");
@@ -426,14 +433,16 @@
         maxX = Math.max(maxX, n.x + b.w);
         maxY = Math.max(maxY, n.y + b.h);
       });
-      const pad = 28;
+      const pad = 40;
       const left = minX - pad;
-      const top = minY - pad - 8;
+      const top = minY - pad - 10;
       const w = maxX - minX + pad * 2;
-      const h = maxY - minY + pad * 2 + 8;
+      const h = maxY - minY + pad * 2 + 12;
+      const shotN = members.filter((n) => n.kind === "shot").length;
+      const label = (g.name || "组") + " · " + members.length + "项" + (shotN ? (" · " + shotN + "分镜") : " · 无分镜");
       world.insertAdjacentHTML("beforeend",
         '<div class="group-bound" data-gid="' + esc(g.id) + '" style="left:' + left + 'px;top:' + top +
-        'px;width:' + w + 'px;height:' + h + 'px"><span class="gname">' + esc(g.name || "组") + '</span></div>');
+        'px;width:' + w + 'px;height:' + h + 'px"><span class="gname">' + esc(label) + '</span></div>');
     });
   }
   function renderCards() {
@@ -442,6 +451,7 @@
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
     drawMinimap();
     syncGroupRunBtn();
+    syncSelBar();
   }
 
   function worldBounds() {
@@ -1794,6 +1804,7 @@
     state.runningGroup = false;
     $("send").disabled = false;
     syncGroupRunBtn();
+    syncSelBar();
     renderDock();
   }
 
@@ -1819,11 +1830,16 @@
     renderCards(); drawWires(); persist();
     syncGroupRunBtn();
     syncSelBar();
+    const bound = world.querySelector('.group-bound[data-gid="' + g.id + '"]');
+    if (bound) {
+      bound.classList.add("flash");
+      setTimeout(() => bound.classList.remove("flash"), 800);
+    }
     const shotN = ids.map(nodeById).filter((n) => n && n.kind === "shot").length;
-    if (shotN < 2) {
-      setMsg("已成组 · " + name + "（" + ids.length + "）· 整组执行需要组内至少 2 个分镜", "warn");
+    if (shotN < 1) {
+      setMsg("已成组 · " + name + "（虚线框「" + name + "」）· ▶整组需组内有分镜", "warn");
     } else {
-      setMsg("已成组 · " + name + "（" + ids.length + "）· 可用顶栏「▶ 整组」逐步跑", "ok");
+      setMsg("已成组 · " + name + "（虚线框已标）· 可用「▶ 整组」逐步跑", "ok");
     }
   }
   function ungroupSelection() {
