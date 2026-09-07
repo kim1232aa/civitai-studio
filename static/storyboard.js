@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0807";
-  const STORE_OLDS = ["nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0808";
+  const STORE_OLDS = ["nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -62,6 +62,7 @@
     runningGroup: false,
     groupRunAbort: false,
     dockMode: "collapsed",
+    lastComposerShot: null,
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -541,12 +542,20 @@
     const stage = dock.parentElement;
     if (!stage) return;
     const sr = stage.getBoundingClientRect();
-    const dockW = Math.min(860, Math.max(280, sr.width - 48));
+    // Keep left ~200px clear for minimap + zoom; center when room allows.
+    const clearL = 200;
+    const clearR = 24;
+    let dockW = Math.min(720, Math.max(280, sr.width - clearL - clearR));
+    let left = (sr.width - dockW) / 2;
+    if (left < clearL) left = Math.min(clearL, Math.max(12, sr.width - dockW - clearR));
+    if (left + dockW > sr.width - clearR) {
+      dockW = Math.max(280, sr.width - clearR - left);
+    }
     dock.style.width = dockW + "px";
-    dock.style.left = "50%";
+    dock.style.left = left + "px";
     dock.style.top = "auto";
     dock.style.bottom = "14px";
-    dock.style.transform = "translateX(-50%)";
+    dock.style.transform = "none";
     dock.classList.remove("near");
     const visible = dock.classList.contains("show");
     const dh = visible ? (dock.offsetHeight || (state.dockMode === "expanded" ? 220 : 44)) : 0;
@@ -593,6 +602,20 @@
     rail.innerHTML = tabs + body;
   }
 
+  function syncComposerChip() {
+    const chip = $("composerChip");
+    if (!chip) return;
+    const sel = nodeById(state.selected);
+    const remembered = nodeById(state.lastComposerShot);
+    const shot = (sel && sel.kind === "shot") ? sel : (remembered && remembered.kind === "shot" ? remembered : null);
+    const show = state.dockMode === "closed" && !!shot;
+    chip.classList.toggle("show", show);
+    chip.hidden = !show;
+    if (show) {
+      chip.title = "重新打开 · " + (shot.title || "分镜");
+    }
+  }
+
   function renderDock() {
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
@@ -604,10 +627,12 @@
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
+      syncComposerChip();
       renderRail();
       requestAnimationFrame(positionDock);
       return;
     }
+    state.lastComposerShot = n.id;
     if (state.dockMode === "closed") {
       dock.classList.remove("show");
       dock.classList.remove("collapsed");
@@ -617,6 +642,7 @@
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
+      syncComposerChip();
       renderRail();
       requestAnimationFrame(positionDock);
       return;
@@ -669,6 +695,7 @@
         return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
           (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
       }).join("");
+    syncComposerChip();
     renderRail();
     requestAnimationFrame(positionDock);
   }
@@ -684,7 +711,8 @@
     }
     const n = nodeById(id);
     if (n && n.kind === "shot") {
-      if (state.dockMode === "closed") state.dockMode = "collapsed";
+      state.lastComposerShot = n.id;
+      if (state.dockMode === "closed" && !opts.keepClosed) state.dockMode = "collapsed";
       if (opts.expand) state.dockMode = "expanded";
     }
     renderCards();
@@ -1236,11 +1264,18 @@
       vp.setPointerCapture(e.pointerId);
       return;
     }
-    // empty canvas click clears multi
+    // empty canvas click clears multi; collapse expanded Composer (pan still starts)
     if (!e.shiftKey) {
       setMulti(state.selected ? [state.selected] : []);
       syncGroupRunBtn();
       renderCards();
+    }
+    if (state.dockMode === "expanded") {
+      hideSkillbox();
+      hideAtbox();
+      const picker = $("picker");
+      if (picker) picker.classList.remove("show");
+      setDockMode("collapsed");
     }
     state.pan = { x: e.clientX - state.cam.x, y: e.clientY - state.cam.y };
     vp.classList.add("grabbing");
@@ -1523,7 +1558,21 @@
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
+      const cur = nodeById(state.selected);
+      if (cur && cur.kind === "shot") state.lastComposerShot = cur.id;
       setDockMode("closed");
+    };
+  }
+  if ($("composerChip")) {
+    $("composerChip").onclick = (e) => {
+      e.stopPropagation();
+      const id = (nodeById(state.selected) && nodeById(state.selected).kind === "shot")
+        ? state.selected
+        : state.lastComposerShot;
+      const shot = nodeById(id);
+      if (!shot || shot.kind !== "shot") return;
+      if (state.selected !== shot.id) selectNode(shot.id, { keepClosed: true });
+      setDockMode("collapsed");
     };
   }
   if ($("dockHd")) {
