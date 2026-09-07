@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0820b" in js, "STORE must bump to v0820b")
+    assert_true("nl-storyboard-v0820c" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "stamp must be v0820b-apply-import")
+    assert_true("v0820c-hard-service" in html, "stamp must be v0820c-hard-service")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true("nl-storyboard-v0820c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
-    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true("nl-storyboard-v0820c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "stamp v0820b-apply-import")
-    assert_true("nl-storyboard-v0820b" in js, "STORE v0820b")
+    assert_true("v0820c-hard-service" in html, "stamp v0820c-hard-service")
+    assert_true("nl-storyboard-v0820c" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -584,11 +584,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0820b-apply-import: unmention/link helpers still present."""
+    """v0817b lineage under v0820c-hard-service: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,8 +606,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0818")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +680,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0819")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -715,8 +715,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0819")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -741,8 +741,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp v0820b-apply-import")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -780,8 +780,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -839,8 +839,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820b-apply-import" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820b"' in js, "STORE v0820b")
+    assert_true("v0820c-hard-service" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -905,6 +905,68 @@ def test_v0820b_apply_import():
 
 
 
+
+def test_v0820c_hard_service():
+    """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0820c-hard-service" in html, "html stamp v0820c-hard-service")
+    assert_true('const STORE = "nl-storyboard-v0820c"' in js, "STORE v0820c")
+    assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
+    assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 id kept as ordering hint")
+
+    # buildGraph: must NOT soft-fill CIVITAI_PREF / _civitaiDefaultService into serviceId
+    i = js.find("function buildGraph")
+    assert_true(i >= 0, "buildGraph")
+    j = js.find("function pickUrl", i)
+    bg = js[i:j]
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in bg,
+                "buildGraph must not soft-fill CIVITAI_PREF into serviceId")
+    assert_true("CIVITAI_PREF_SERVICE" not in bg or "hard-service" in bg,
+                "buildGraph must not reference CIVITAI_PREF as generate fallback")
+    # Fal defaults may remain for non-civitai
+    assert_true("fal-ai/flux/schnell" in bg, "fal empty-service default kept")
+    assert_true('be !== "civitai"' in bg or "be !== 'civitai'" in bg,
+                "fal defaults gated to non-civitai")
+    assert_true("pickedService" in bg or '($("service") && $("service").value)' in bg,
+                "buildGraph uses explicit #service value")
+
+    # runShotStep: hard-error path present; no soft-fill
+    k = js.find("async function runShotStep")
+    assert_true(k >= 0, "runShotStep")
+    run = js[k:k + 12000]
+    assert_true("请先选择 Civitai 服务" in run, "hard error message in runShotStep")
+    assert_true('setMsg(' in run and '"bad"' in run, "hard error uses setMsg bad")
+    assert_true("不会默认填入 Krea2" in run, "hard error mentions no Krea2 default")
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in run,
+                "runShotStep must not soft-fill CIVITAI_PREF")
+    assert_true('return { status: "blocked"' in run, "aborts generate on empty service")
+    # payload.serviceId from UI only
+    assert_true("payload.serviceId = sid" in run or "payload.serviceId=sid" in run.replace(" ", ""),
+                "sets payload.serviceId from explicit sid")
+
+    # loadCatalog: pref ordering hint OK; no auto-select pref into empty #service
+    lc = js.find("async function loadCatalog")
+    assert_true(lc >= 0, "loadCatalog")
+    lc_end = js.find("async function loadOuts", lc)
+    cat = js[lc:lc_end]
+    assert_true("ordering hint" in cat or "catalog ordering" in cat.lower() or "Catalog ordering" in cat
+                or "ordering hint only" in js,
+                "documents pref as ordering hint")
+    assert_true("Do NOT auto-select CIVITAI_PREF" in cat or "auto-select" in cat,
+                "must not auto-select pref when empty")
+    # pendingService path (applyImport) still selects explicit id
+    assert_true("_pendingService" in cat, "applyImport pendingService path kept")
+
+    # Lineage: applyImport + v0820 comfy pack intact
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport kept")
+    assert_true("packComfyParamsForPayload" in js, "v0820 comfy pack kept")
+    assert_true("不会回退" in js or "flux/schnell" in js, "applyImport hard error kept")
+    assert_true('id="comfyParams"' in html, "comfy UI kept")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -932,6 +994,7 @@ def main():
         test_v0819b_expand_prompt,
         test_v0820_civitai_comfy_params,
         test_v0820b_apply_import,
+        test_v0820c_hard_service,
     ]
     failed = 0
     for fn in tests:

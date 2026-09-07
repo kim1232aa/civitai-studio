@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0820b";
-  const STORE_OLDS = ["nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0820c";
+  const STORE_OLDS = ["nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
@@ -2056,6 +2056,7 @@
       if ($("cfg") && !$("cfg").value && d.cfgScale != null) $("cfg").value = d.cfgScale;
       if (d.sampler && $("sampler") && !$("sampler").value) ensureSelectOpt($("sampler"), d.sampler);
       if (d.scheduler && $("scheduler") && !$("scheduler").value) ensureSelectOpt($("scheduler"), d.scheduler);
+      // Catalog ordering hint only — never soft-fill into generate/buildGraph.
       state._civitaiDefaultService = (d.serviceId || CIVITAI_PREF_SERVICE);
     } catch (_) {
       fillSelectOpts($("sampler"), ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], "er_sde");
@@ -2064,6 +2065,7 @@
       if ($("height") && !$("height").value) $("height").value = 1440;
       if ($("steps") && !$("steps").value) $("steps").value = 8;
       if ($("cfg") && !$("cfg").value) $("cfg").value = 1;
+      // Catalog ordering hint only — never soft-fill into generate/buildGraph.
       state._civitaiDefaultService = CIVITAI_PREF_SERVICE;
     }
     syncParamSurface();
@@ -2333,10 +2335,15 @@
     const aspect = ($("aspect") && $("aspect").value) || "16:9";
     const res = ($("res") && $("res").value === "1080P") ? (aspect === "9:16" ? "1080x1920" : "1920x1080") : (aspect === "9:16" ? "720x1280" : "1280x720");
     const be = ($("backend") && $("backend").value) || "fal";
+    // v0820c-hard-service: civitai must not invent Krea2 when #service is empty.
+    // Fal empty-service defaults stay for fal backends only.
+    const pickedService = ($("service") && $("service").value) || "";
+    let serviceId = pickedService;
+    if (!serviceId && be !== "civitai") {
+      serviceId = (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell");
+    }
     const genParams = {
-      serviceId: $("service").value || (be === "civitai"
-        ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
-        : (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell")),
+      serviceId: serviceId,
     };
     if (be === "civitai") {
       // width/height/steps/cfgScale/sampler/scheduler — seed packed in runShotStep (wire-only compile rule)
@@ -2420,6 +2427,14 @@
       setMsg(prefix + "视频需要先连一张首帧图，不能偷配方台", "bad");
       return { status: "blocked" };
     }
+    // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
+    if (currentBackend() === "civitai") {
+      const civSid = ($("service") && $("service").value) || "";
+      if (!civSid) {
+        setMsg(prefix + "请先选择 Civitai 服务（不会默认填入 Krea2）", "bad");
+        return { status: "blocked" };
+      }
+    }
     if (!opts.keepSend) $("send").disabled = true;
     setMsg(prefix + "校验连线…");
     let compiled;
@@ -2495,8 +2510,14 @@
         });
       }
       if (usesCivitaiComfyParams()) {
-        const sid = ($("service") && $("service").value) || state._civitaiDefaultService || CIVITAI_PREF_SERVICE;
-        if (sid) payload.serviceId = sid;
+        // Explicit UI selection only — never CIVITAI_PREF / _civitaiDefaultService soft-fill.
+        const sid = ($("service") && $("service").value) || "";
+        if (!sid) {
+          setMsg(prefix + "请先选择 Civitai 服务（不会默认填入 Krea2）", "bad");
+          if (!opts.keepSend) $("send").disabled = false;
+          return { status: "blocked", stageOp: stageOp };
+        }
+        payload.serviceId = sid;
       }
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
@@ -3101,6 +3122,7 @@
       const r = await fetch("/api/catalog?backend=" + encodeURIComponent(be));
       const j = await r.json();
       let items = (j.items || j.models || []).slice();
+      // CIVITAI_PREF / _civitaiDefaultService = catalog ordering hint only (not generate fallback).
       const pref = (be === "civitai")
         ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
         : "";
@@ -3131,11 +3153,11 @@
       });
       state.catalogById = byId;
       if (state._pendingService) {
+        // applyImport may SELECT an explicit j.serviceId (intentional, not soft-fill).
         $("service").value = state._pendingService;
         state._pendingService = "";
-      } else if (pref && !$("service").value) {
-        if (byId[pref]) $("service").value = pref;
       }
+      // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       syncParamSurface();
       syncLoraUi();
     } catch (_) {}
