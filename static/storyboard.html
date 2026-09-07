@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0819-canvas-stage</title>
+<title>画布 · Night Lab · v0819b-expand-prompt</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -81,14 +81,16 @@
   .dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(720px,calc(100% - 494px));
     z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;padding:0;
     box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(18px);display:none;
-    flex-direction:column;max-height:52vh;overflow:hidden}
+    flex-direction:column;max-height:72vh;overflow:hidden}
   .dock.show{display:flex}
   .dock.collapsed{max-height:none;overflow:visible}
   .dock.collapsed .dock-body{display:none}
-  .dock.expanded{max-height:52vh}
+  .dock.expanded{max-height:72vh}
   .dock.expanded .dock-body{display:flex;flex-direction:column;overflow:hidden;padding:10px 14px 12px;min-height:0;flex:1}
-  .dock-scroll{flex:1 1 auto;min-height:140px;overflow:auto}
-  .dock-foot{flex:0 0 auto;position:sticky;bottom:0;background:#16161af2;padding-top:2px;z-index:1}
+  .dock-scroll{flex:1 1 auto;min-height:180px;overflow:auto}
+  .dock.expanded .dock-scroll{min-height:200px}
+  .dock-foot{flex:0 0 auto;max-height:46%;overflow:auto;position:sticky;bottom:0;background:#16161af2;padding-top:2px;z-index:1}
+  .dock.expanded .lora-block{max-height:110px;overflow:auto}
   .dock-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
     border-bottom:1px solid transparent;cursor:default}
   .dock.expanded .dock-hd{border-bottom-color:#2a2a32}
@@ -177,7 +179,9 @@
   .lora-hits{margin-top:6px;max-height:72px;overflow:auto;font-size:12px;color:#9a9aa3}
   @media (max-height:720px){
     .lora-hits{max-height:48px}
-    .dock.expanded{max-height:50vh}
+    .dock.expanded{max-height:68vh}
+    .dock.expanded .dock-scroll{min-height:180px}
+    .dock.expanded .lora-block{max-height:88px}
   }
   .lora-hits div{padding:6px 8px;border-radius:8px;cursor:pointer;color:#ddd}
   .lora-hits div:hover{background:#222}
@@ -322,7 +326,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0819-canvas-stage</span>
+      <span class="stamp">v0819b-expand-prompt</span>
     </div>
   </header>
   <div class="stage">

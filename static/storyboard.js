@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0819";
-  const STORE_OLDS = ["nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0819b";
+  const STORE_OLDS = ["nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -569,6 +569,13 @@
     if (mode !== "collapsed" && mode !== "expanded" && mode !== "closed") mode = "collapsed";
     state.dockMode = mode;
     renderDock();
+    if (mode === "expanded") {
+      // First paint of expanded dock: show modes+#prompt at top of dock-scroll.
+      requestAnimationFrame(() => {
+        const sc = $("dockScroll");
+        if (sc) sc.scrollTop = 0;
+      });
+    }
   }
 
   function positionDock() {
@@ -759,7 +766,14 @@
       }).join("");
     syncComposerChip(); syncCanvasTip();
     renderRail();
-    requestAnimationFrame(positionDock);
+    requestAnimationFrame(() => {
+      positionDock();
+      // Expand path (selectNode / setDockMode): keep #prompt in first paint, not scrolled under foot.
+      if (expanded) {
+        const sc = $("dockScroll");
+        if (sc) sc.scrollTop = 0;
+      }
+    });
   }
 
   function selectNode(id, opts) {
@@ -774,7 +788,7 @@
     const n = nodeById(id);
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
-      // v0819-canvas-stage: boot/first paint stays collapsed (canvas = stage);
+      // v0819b-expand-prompt: boot/first paint stays collapsed (canvas = stage);
       // intentional shot click expands; {collapsed:true} keeps bottom bar; expand capsule still works.
       if (opts.keepClosed) {
         /* leave dockMode (closed/chip path) */

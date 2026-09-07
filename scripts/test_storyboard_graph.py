@@ -255,14 +255,15 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0819" in js, "STORE must bump to v0819")
+    assert_true("nl-storyboard-v0819b" in js, "STORE must bump to v0819b")
+    assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS must keep v0817c for migrate")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS must keep v0817b for migrate")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "stamp must be v0819-canvas-stage")
+    assert_true("v0819b-expand-prompt" in html, "stamp must be v0819b-expand-prompt")
 
 
 def test_empty_boot_no_robot_demo():
@@ -286,8 +287,9 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0819-canvas-stage" in html, "html stamp")
-    assert_true("nl-storyboard-v0819" in js, "STORE v0819")
+    assert_true("v0819b-expand-prompt" in html, "html stamp")
+    assert_true("nl-storyboard-v0819b" in js, "STORE v0819b")
+    assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
 
@@ -296,8 +298,9 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp v0819-canvas-stage")
-    assert_true("nl-storyboard-v0819" in js, "STORE v0819")
+    assert_true("v0819b-expand-prompt" in html, "html stamp v0819b-expand-prompt")
+    assert_true("nl-storyboard-v0819b" in js, "STORE v0819b")
+    assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS prepend v0817")
@@ -354,8 +357,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp v0819-canvas-stage")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0818")
+    assert_true("v0819b-expand-prompt" in html, "html stamp v0819b-expand-prompt")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -414,8 +417,9 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "stamp v0819-canvas-stage")
-    assert_true("nl-storyboard-v0819" in js, "STORE v0819")
+    assert_true("v0819b-expand-prompt" in html, "stamp v0819b-expand-prompt")
+    assert_true("nl-storyboard-v0819b" in js, "STORE v0819b")
+    assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -460,8 +464,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp v0819-canvas-stage")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0818")
+    assert_true("v0819b-expand-prompt" in html, "html stamp v0819b-expand-prompt")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -576,11 +580,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0819-canvas-stage: unmention/link helpers still present."""
+    """v0817b lineage under v0819b-expand-prompt: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0818")
+    assert_true("v0819b-expand-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -598,8 +602,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0818")
+    assert_true("v0819b-expand-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -672,8 +676,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0819")
+    assert_true("v0819b-expand-prompt" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -693,7 +697,7 @@ def test_v0818_sticky_composer_bar():
     assert_true(".dock.expanded .dock-body{display:flex;flex-direction:column" in html
                 or "display:flex;flex-direction:column;overflow:hidden" in html,
                 "expanded dock-body is flex column")
-    assert_true(".dock-scroll{flex:1 1 auto;min-height:140px;overflow:auto}" in html, "dock-scroll min-height keeps prompt")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:180px;overflow:auto}" in html, "dock-scroll min-height keeps prompt")
     assert_true(".dock-foot{" in html and "flex:0 0 auto" in html, "dock-foot flex-none")
     assert_true("position:sticky;bottom:0" in html, "dock-foot sticky bottom")
     # Untouched behaviors
@@ -707,8 +711,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0819-canvas-stage" in html, "html stamp v0819-canvas-stage")
-    assert_true('const STORE = "nl-storyboard-v0819"' in js, "STORE v0819")
+    assert_true("v0819b-expand-prompt" in html, "html stamp v0819b-expand-prompt")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -719,8 +723,45 @@ def test_v0819_canvas_stage():
     assert_true('id="canvasTip"' in html, "canvasTip element")
     assert_true("选分镜→写画面→LoRA→↑" in html, "empty-canvas onboarding tip")
     assert_true("min-height:120px" in html, "prompt min-height ≥120 when expanded")
-    assert_true("min-height:140px" in html, "dock-scroll min-height keeps prompt visible")
+    assert_true("min-height:180px" in html, "dock-scroll min-height keeps prompt visible")
     assert_true('id="dockFoot"' in html and "flex:0 0 auto" in html, "dock-foot still present")
+    # Untouched
+    assert_true("stages[0].payload" not in js, "gate untouched")
+    assert_true("function attachExtraImages" in js, "images packing kept")
+    assert_true("function packLorasForPayload" in js, "LoRA packing kept")
+    assert_true("mentionTags" not in js, "no-@-in-prompt lineage kept")
+
+
+
+def test_v0819b_expand_prompt():
+    """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0819b-expand-prompt" in html, "html stamp v0819b-expand-prompt")
+    assert_true('const STORE = "nl-storyboard-v0819b"' in js, "STORE v0819b")
+    assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
+    assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
+    # Default collapsed + tip kept from v0819
+    assert_true('dockMode: "collapsed"' in js, "default dockMode still collapsed")
+    assert_true("function syncCanvasTip" in js, "canvasTip behavior kept")
+    assert_true('id="canvasTip"' in html, "canvasTip element kept")
+    # Expand layout: taller dock, scroll min-height, foot capped, lora capped
+    assert_true(".dock.expanded{max-height:72vh}" in html or "max-height:72vh" in html,
+                "expanded dock max-height raised")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:180px;overflow:auto}" in html,
+                "dock-scroll min-height 180px")
+    assert_true(".dock.expanded .dock-scroll{min-height:200px}" in html,
+                "expanded dock-scroll min-height 200px")
+    assert_true("min-height:120px" in html, "prompt min-height ≥120")
+    assert_true(".dock-foot{" in html and "max-height:46%" in html,
+                "dock-foot capped so it cannot eat >50% of dock")
+    assert_true(".dock.expanded .lora-block{max-height:110px;overflow:auto}" in html,
+                "lora-block capped when expanded; overflow on lora not whole dock")
+    # Expand path resets scrollTop so first frame shows modes+#prompt
+    assert_true("scrollTop = 0" in js or "scrollTop=0" in js.replace(" ", ""),
+                "expand path sets dockScroll.scrollTop=0")
+    assert_true('setDockMode("expanded")' in js, "chip/select opens expanded")
+    assert_true('dockMode: "collapsed"' in js, "collapsed default untouched")
     # Untouched
     assert_true("stages[0].payload" not in js, "gate untouched")
     assert_true("function attachExtraImages" in js, "images packing kept")
@@ -753,6 +794,7 @@ def main():
         test_v0817c_no_at_in_prompt,
         test_v0818_sticky_composer_bar,
         test_v0819_canvas_stage,
+        test_v0819b_expand_prompt,
     ]
     failed = 0
     for fn in tests:
