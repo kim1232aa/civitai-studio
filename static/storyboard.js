@@ -1,13 +1,14 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0813";
-  const STORE_OLDS = ["nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0814";
+  const STORE_OLDS = ["nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
   const wires = $("wires");
   const dock = $("dock");
-  const DEMO = "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
+  const ROBOT_DEMO_IDS = { "a-bot": 1, "a-home": 1, "a-work": 1, "a-vac": 1, "s-bed": 1, "s-bath": 1 };
+  const ROBOT_DEMO_TITLES = { "家用机器人": 1, "大白-居家装": 1, "大白-职场装": 1, "扫地机器人": 1, "温馨现代卧室": 1, "现代感洗手间": 1 };
 
   const SKILL_CATS = ["官方精选", "成片工作流", "短剧", "剧本策划", "美术资产", "营销广告"];
   const SKILLS = [
@@ -223,37 +224,28 @@
     syncGroupRunBtn();
   }
 
-  function loadDemo() {
-    const list = [
-      { id: "a-bot", kind: "character", title: "家用机器人", x: 48, y: 24, url: DEMO },
-      { id: "a-home", kind: "character", title: "大白-居家装", x: 48, y: 260, url: DEMO },
-      { id: "a-work", kind: "character", title: "大白-职场装", x: 48, y: 496, url: DEMO },
-      { id: "a-vac", kind: "character", title: "扫地机器人", x: 48, y: 732, url: DEMO },
-      { id: "s-bed", kind: "scene", title: "温馨现代卧室", x: 48, y: 992, url: DEMO },
-      { id: "s-bath", kind: "scene", title: "现代感洗手间", x: 48, y: 1228, url: DEMO },
-    ];
-    const shotNodes = [];
-    for (let i = 0; i < 6; i++) {
-      shotNodes.push({
-        id: "shot-" + (i + 1),
-        kind: "shot",
-        title: "分镜" + (i + 1),
-        x: 560 + (i % 2) * 720,
-        y: 80 + Math.floor(i / 2) * 430,
-        url: "",
-        firstFrameId: "",
-        prompt: "【镜头" + (i + 1) + "】\n场景：@温馨现代卧室\n画面：室内固定镜头，人物与家用机器人同框，晨光从窗帘缝里进来。\n运镜：固定镜头。",
-      });
+  function isClassicRobotDemo(nodes) {
+    if (!nodes || !nodes.length) return false;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (ROBOT_DEMO_IDS[n.id] || ROBOT_DEMO_TITLES[n.title]) return true;
     }
-    state.nodes = list.concat(shotNodes);
-    state.edges = [
-      { from: "a-bot", to: "shot-1" }, { from: "a-home", to: "shot-1" }, { from: "s-bed", to: "shot-1" },
-      { from: "a-bot", to: "shot-2" }, { from: "s-bed", to: "shot-2" },
-      { from: "a-work", to: "shot-3" }, { from: "a-vac", to: "shot-4" },
-      { from: "s-bed", to: "shot-5" }, { from: "s-bath", to: "shot-6" },
-    ];
-    const s1 = nodeById("shot-1");
-    if (s1) s1.firstFrameId = "a-bot";
+    return false;
+  }
+
+  /** Seko-aligned empty canvas: one blank shot, no cast assets. */
+  function loadDemo() {
+    state.nodes = [{
+      id: "shot-1",
+      kind: "shot",
+      title: "分镜1",
+      x: 560,
+      y: 80,
+      url: "",
+      firstFrameId: "",
+      prompt: "【镜头1】\n场景：\n画面：\n运镜：固定镜头。",
+    }];
+    state.edges = [];
   }
 
   function persist() {
@@ -297,6 +289,13 @@
       if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
       if (p.res && $("res")) $("res").value = p.res;
       state._pendingService = p.service || "";
+      if (isClassicRobotDemo(state.nodes)) {
+        // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
+        state.nodes = [];
+        state.edges = [];
+        state.groups = [];
+        return false;
+      }
       return true;
     } catch (_) { return false; }
   }
@@ -405,7 +404,7 @@
         ? (isVideoUrl(n.url)
             ? '<video src="' + esc(n.url) + '" muted></video>'
             : '<img src="' + esc(n.url) + '" alt="">')
-        : '<div class="face"><div style="font-size:22px">▢</div><div class="hint">点击查看或编辑提示词</div></div>';
+        : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
       return '<div class="card shot' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +

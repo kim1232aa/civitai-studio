@@ -255,10 +255,35 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0813" in js, "STORE must bump to v0813")
+    assert_true("nl-storyboard-v0814" in js, "STORE must bump to v0814")
+    assert_true("nl-storyboard-v0813" in js, "STORE_OLDS must keep v0813 for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0813-selbar-layout" in html, "stamp must be v0813-selbar-layout")
+    assert_true("v0814-empty-boot" in html, "stamp must be v0814-empty-boot")
 
+
+def test_empty_boot_no_robot_demo():
+    """loadDemo / boot must be empty-canvas; no robot cast or dead DEMO jpg."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    # Banned robot demo titles must not appear in boot/loadDemo path
+    for bad in ("家用机器人", "扫地机器人", "大白-居家装", "大白-职场装", "温馨现代卧室", "现代感洗手间"):
+        assert_true(bad not in js or "ROBOT_DEMO_TITLES" in js, "unexpected: bare check")
+    # Stronger: loadDemo body must not seed those titles as assets
+    # Extract approximate loadDemo function text
+    i = js.find("function loadDemo()")
+    assert_true(i >= 0, "loadDemo missing")
+    j = js.find("function persist()", i)
+    boot = js[i:j]
+    for bad in ("家用机器人", "扫地机器人", "大白-居家装", "大白-职场装", "温馨现代卧室", "现代感洗手间", "a-bot", "a-vac", "a-home"):
+        assert_true(bad not in boot, "robot demo still in loadDemo: " + bad)
+    assert_true("fal_fal-ai_flux_schnell_01a05be2" not in js, "dead DEMO jpg path must be gone")
+    assert_true("const DEMO" not in js, "DEMO constant must be removed")
+    assert_true("state.edges = []" in boot or "state.edges=[]" in boot.replace(" ", ""), "empty boot edges=[]")
+    assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
+    assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
+    assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
+    assert_true("v0814-empty-boot" in html, "html stamp")
+    assert_true("nl-storyboard-v0814" in js, "STORE v0814")
 
 def main():
     tests = [
@@ -275,6 +300,7 @@ def main():
         test_ui_blocks_stages0_fake_run,
         test_ui_clears_stage_urls_on_disconnect,
         test_selbar_scoped_layout_skips_exclusive_outside_asset,
+        test_empty_boot_no_robot_demo,
     ]
     failed = 0
     for fn in tests:
