@@ -1,6 +1,6 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0802";
+  const STORE = "nl-storyboard-v0805";
   const STORE_OLDS = ["nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
@@ -135,11 +135,13 @@
       seen[id] = true;
       return true;
     });
+    syncSelBar();
   }
   function toggleMulti(id) {
     if (!id || !nodeById(id)) return;
     if (isMulti(id)) state.multi = state.multi.filter((x) => x !== id);
     else state.multi = state.multi.concat([id]);
+    syncSelBar();
   }
   function pruneGroups() {
     const alive = {};
@@ -177,6 +179,22 @@
     const multiShots = state.multi.map(nodeById).filter((n) => n && n.kind === "shot");
     if (multiShots.length) return multiShots;
     return [];
+  }
+
+  function syncSelBar() {
+    const bar = $("selBar");
+    if (!bar) return;
+    const n = (state.multi && state.multi.length) ? state.multi.length : (state.selected ? 1 : 0);
+    const countEl = $("selCount");
+    if (countEl) countEl.textContent = String(n);
+    const show = n >= 2 || !!findActiveGroup();
+    bar.classList.toggle("on", show);
+    const run = $("selGroupRun");
+    if (run) {
+      const targets = groupRunTargets();
+      run.disabled = !targets.length || state.runningGroup;
+    }
+    syncGroupRunBtn();
   }
   function syncGroupRunBtn() {
     const btn = $("btnGroupRun");
@@ -1800,7 +1818,13 @@
     setMulti(ids);
     renderCards(); drawWires(); persist();
     syncGroupRunBtn();
-    setMsg("已成组 · " + name + "（" + ids.length + "）", "ok");
+    syncSelBar();
+    const shotN = ids.map(nodeById).filter((n) => n && n.kind === "shot").length;
+    if (shotN < 2) {
+      setMsg("已成组 · " + name + "（" + ids.length + "）· 整组执行需要组内至少 2 个分镜", "warn");
+    } else {
+      setMsg("已成组 · " + name + "（" + ids.length + "）· 可用顶栏「▶ 整组」逐步跑", "ok");
+    }
   }
   function ungroupSelection() {
     pruneGroups();
@@ -1817,11 +1841,16 @@
     });
     renderCards(); drawWires(); persist();
     syncGroupRunBtn();
+    syncSelBar();
     setMsg(removed ? ("已解组 · " + removed) : "选中项不在任何组内", removed ? "ok" : "warn");
   }
   if ($("btnGroup")) $("btnGroup").onclick = createGroupFromSelection;
   if ($("btnUngroup")) $("btnUngroup").onclick = ungroupSelection;
   if ($("btnGroupRun")) $("btnGroupRun").onclick = () => { runGroupSequential(); };
+  if ($("selGroup")) $("selGroup").onclick = createGroupFromSelection;
+  if ($("selUngroup")) $("selUngroup").onclick = ungroupSelection;
+  if ($("selGroupRun")) $("selGroupRun").onclick = () => { runGroupSequential(); };
+  syncSelBar();
 
   $("btnAdd").onclick = () => {
     const n = shots().length;

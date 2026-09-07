@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0802-group</title>
+<title>画布 · Night Lab · v0805-group-entry</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -227,6 +227,20 @@
     letter-spacing:.02em}
   .tool.lbl{width:auto;min-width:40px;padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.02em}
   .tool:disabled{opacity:.35;cursor:not-allowed}
+  .tools-sep{height:1px;margin:2px 6px;background:rgba(255,255,255,.12)}
+  .tools-hint{font-size:9px;color:#7a7a84;text-align:center;letter-spacing:.04em;padding:0 2px}
+  .selbar{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:20;
+    display:none;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;
+    background:#16161acc;border:1px solid rgba(94,224,197,.45);backdrop-filter:blur(10px);
+    box-shadow:0 12px 32px rgba(0,0,0,.45);color:#e8e8ec;font-size:12px}
+  .selbar.on{display:flex}
+  .selbar .n{color:#7ecfbf;font-weight:600}
+  .selbar button{height:32px;padding:0 12px;border-radius:10px;border:1px solid #3a3a44;
+    background:#1e1e24;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+  .selbar button:hover{border-color:#5ee0c5}
+  .selbar button:disabled{opacity:.35;cursor:not-allowed}
+  .selbar button.primary{background:rgba(94,224,197,.16);border-color:rgba(94,224,197,.55);color:#b8f5e6}
+
 </style>
 </head>
 <body>
@@ -242,18 +256,26 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0802-group</span>
+      <span class="stamp">v0805-group-entry</span>
     </div>
   </header>
   <div class="stage">
-    <div class="tools">
+    <div class="tools" aria-label="画布工具">
       <button class="tool" id="btnAdd" title="添加分镜">+</button>
       <button class="tool" id="btnAuto" title="自动布局">▦</button>
       <button class="tool" id="btnFit" title="适配">◎</button>
       <button class="tool" id="btnImport" title="导入分镜素材">⇪</button>
-      <button class="tool lbl" id="btnGroup" title="成组">成组</button>
+      <div class="tools-sep" aria-hidden="true"></div>
+      <div class="tools-hint">GROUP</div>
+      <button class="tool lbl" id="btnGroup" title="成组 · Shift多选后点">成组</button>
       <button class="tool lbl" id="btnUngroup" title="解组">解组</button>
-      <button class="tool lbl" id="btnGroupRun" title="整组执行" disabled>▶ 整组</button>
+      <button class="tool lbl" id="btnGroupRun" title="整组执行（逐步）" disabled>▶ 整组</button>
+    </div>
+    <div class="selbar" id="selBar" role="toolbar" aria-label="多选操作">
+      <span>已选 <span class="n" id="selCount">0</span> 项</span>
+      <button type="button" class="primary" id="selGroup">成组</button>
+      <button type="button" id="selUngroup">解组</button>
+      <button type="button" id="selGroupRun" disabled>▶ 整组</button>
     </div>
     <aside class="rail" id="assetRail" aria-label="资产索引"></aside>
     <div class="atbox" id="atbox"></div>
