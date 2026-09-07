@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0817c-no-at-in-prompt</title>
+<title>画布 · Night Lab · v0818-sticky-composer-bar</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -86,7 +86,9 @@
   .dock.collapsed{max-height:none;overflow:visible}
   .dock.collapsed .dock-body{display:none}
   .dock.expanded{max-height:40vh}
-  .dock.expanded .dock-body{display:block;overflow:auto;padding:10px 14px 12px;min-height:0}
+  .dock.expanded .dock-body{display:flex;flex-direction:column;overflow:hidden;padding:10px 14px 12px;min-height:0;flex:1}
+  .dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+  .dock-foot{flex:0 0 auto;position:sticky;bottom:0;background:#16161af2;padding-top:2px;z-index:1}
   .dock-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
     border-bottom:1px solid transparent;cursor:default}
   .dock.expanded .dock-hd{border-bottom-color:#2a2a32}
@@ -311,7 +313,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0817c-no-at-in-prompt</span>
+      <span class="stamp">v0818-sticky-composer-bar</span>
     </div>
   </header>
   <div class="stage">
@@ -366,6 +368,7 @@
         <button type="button" class="dock-btn" id="dockClose" title="关闭 Composer">×</button>
       </div>
       <div class="dock-body" id="dockBody">
+      <div class="dock-scroll" id="dockScroll">
       <div class="modes">
         <button type="button" id="modeText" class="stub" data-mode="text">文本生成</button>
         <button type="button" id="modeImg" data-mode="image">图片生成</button>
@@ -379,7 +382,8 @@
         <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产（连线到当前分镜，不写入 @filename）">画布引用</button>
       </div>
       <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
-
+      </div>
+      <div class="dock-foot" id="dockFoot">
       <div class="lora-block" id="loraBlock" data-sb-lora="1">
         <div class="lora-hd">
           <span class="lbl" id="loraQLbl">LoRA</span>
@@ -416,6 +420,7 @@
         <button class="send" id="send" title="生成">↑</button>
       </div>
       <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；「画布引用」只连线，不写 @filename；手动 @ 可选。</div>
+      </div>
       </div>
     </aside>
   </div>

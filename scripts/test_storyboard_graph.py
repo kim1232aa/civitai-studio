@@ -255,12 +255,13 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0817c" in js, "STORE must bump to v0817c")
+    assert_true("nl-storyboard-v0818" in js, "STORE must bump to v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS must keep v0817c for migrate")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS must keep v0817b for migrate")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "stamp must be v0817c-no-at-in-prompt")
+    assert_true("v0818-sticky-composer-bar" in html, "stamp must be v0818-sticky-composer-bar")
 
 
 def test_empty_boot_no_robot_demo():
@@ -284,16 +285,18 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
-    assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp")
+    assert_true("nl-storyboard-v0818" in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
 
 
 def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
-    assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp v0818-sticky-composer-bar")
+    assert_true("nl-storyboard-v0818" in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS prepend v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -345,11 +348,12 @@ def test_v0815_gen_hardgate():
 
 
 def test_v0816_sb_lora():
-    """LoRA UI + packing still green under v0817c stamp."""
+    """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
-    assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp v0818-sticky-composer-bar")
+    assert_true('const STORE = "nl-storyboard-v0818"' in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
@@ -407,8 +411,9 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "stamp v0817c-no-at-in-prompt")
-    assert_true("nl-storyboard-v0817c" in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "stamp v0818-sticky-composer-bar")
+    assert_true("nl-storyboard-v0818" in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
@@ -448,11 +453,12 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
 
 
 def test_v0817_no_at_filename():
-    """v0817 lineage: link/mention must not append @sourceTitle; kept under v0817c stamp."""
+    """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp v0817c-no-at-in-prompt")
-    assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp v0818-sticky-composer-bar")
+    assert_true('const STORE = "nl-storyboard-v0818"' in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
@@ -566,11 +572,12 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0817c-no-at-in-prompt: unmention/link helpers still present."""
+    """v0817b lineage under v0818-sticky-composer-bar: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0818"' in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("function tagsForAsset" in js, "tagsForAsset")
@@ -587,8 +594,9 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0817c-no-at-in-prompt" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0817c"' in js, "STORE v0817c")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0818"' in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS has v0816b")
@@ -654,6 +662,42 @@ def test_v0817c_no_at_in_prompt():
 
 
 
+
+def test_v0818_sticky_composer_bar():
+    """v0818: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0818-sticky-composer-bar" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0818"' in js, "STORE v0818")
+    assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
+    assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
+    assert_true('id="dockScroll"' in html and 'class="dock-scroll"' in html, "dock-scroll region")
+    assert_true('id="dockFoot"' in html and 'class="dock-foot"' in html, "dock-foot sticky footer")
+    # Structure: scroll contains prompt; foot contains lora + bar + msg
+    i_scroll = html.find('id="dockScroll"')
+    i_foot = html.find('id="dockFoot"')
+    i_prompt = html.find('id="prompt"')
+    i_lora = html.find('id="loraBlock"')
+    i_bar = html.find('class="bar"')
+    i_msg = html.find('id="msg"')
+    assert_true(i_scroll >= 0 and i_foot > i_scroll, "dock-scroll before dock-foot")
+    assert_true(i_scroll < i_prompt < i_foot, "prompt inside dock-scroll (before foot)")
+    assert_true(i_foot < i_lora < i_bar < i_msg, "loraBlock + bar + msg inside dock-foot")
+    # CSS: expanded body is flex column; scroll overflows; foot sticky/flex-none
+    assert_true(".dock.expanded .dock-body{display:flex;flex-direction:column" in html
+                or "display:flex;flex-direction:column;overflow:hidden" in html,
+                "expanded dock-body is flex column")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}" in html, "dock-scroll scrolls")
+    assert_true(".dock-foot{" in html and "flex:0 0 auto" in html, "dock-foot flex-none")
+    assert_true("position:sticky;bottom:0" in html, "dock-foot sticky bottom")
+    # Untouched behaviors
+    assert_true("stages[0].payload" not in js, "gate untouched")
+    assert_true("function attachExtraImages" in js, "images packing kept")
+    assert_true("function packLorasForPayload" in js, "LoRA packing kept")
+    assert_true("mentionTags" not in js, "no-@-in-prompt lineage kept")
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -676,6 +720,7 @@ def main():
         test_v0817_no_at_filename,
         test_v0817b_unmention_at_tag,
         test_v0817c_no_at_in_prompt,
+        test_v0818_sticky_composer_bar,
     ]
     failed = 0
     for fn in tests:
