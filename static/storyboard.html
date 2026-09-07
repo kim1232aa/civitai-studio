@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0815c-ref-cap</title>
+<title>画布 · Night Lab · v0816-sb-lora</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -161,6 +161,31 @@
   .atbox img{width:28px;height:28px;object-fit:cover;border-radius:6px}
 
 
+
+  .lora-block{margin:10px 0 0;padding:10px;border:1px solid #2a2a30;border-radius:12px;background:#121216}
+  .lora-block.hidden{display:none}
+  .lora-hd{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+  .lora-hd .lbl{font-size:12px;color:#9a9aa3;flex:1}
+  .lora-hint{font-size:11px;color:var(--buzz);margin:0 0 8px;display:none}
+  .lora-hint.show{display:block}
+  .lora-row{display:flex;gap:6px;align-items:center}
+  .lora-row input{flex:1;min-width:0;background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;color:#e8e8ec;font-size:12px}
+  .lora-row button{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;padding:6px 12px;font-size:12px;flex-shrink:0}
+  .lora-row button:hover{border-color:#4a4a54;color:#fff}
+  .lora-hits{margin-top:6px;max-height:120px;overflow:auto;font-size:12px;color:#9a9aa3}
+  .lora-hits div{padding:6px 8px;border-radius:8px;cursor:pointer;color:#ddd}
+  .lora-hits div:hover{background:#222}
+  .lora{background:#1a1a1f;border:1px solid #2e2e36;border-radius:10px;padding:8px 10px;margin-top:8px}
+  .lora .top{display:flex;gap:8px;align-items:center}
+  .lora-info{flex:1;min-width:0}
+  .lora-name{font-size:12px;font-weight:500;color:#e8e8ec}
+  .lora-air{font-size:11px;color:#8b8b94;margin:2px 0 0;word-break:break-all}
+  .lora-status{font-size:11px;color:var(--buzz);margin:2px 0 0}
+  .lora-status.bad{color:var(--coral)}
+  .lora-str{width:64px;flex-shrink:0;background:#121214;border:1px solid #2e2e36;border-radius:8px;padding:4px 6px;color:#e8e8ec;font-size:12px}
+  .lora-del{padding:4px 8px;background:#121214;color:#8b8b94;border:1px solid #2e2e36;border-radius:8px;font-size:12px;flex-shrink:0}
+  .lora-del:hover{color:var(--coral);border-color:var(--coral)}
+
   .composer-acts{display:flex;gap:6px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
   .act-btn{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;
     padding:6px 12px;font-size:12px;height:30px;line-height:1}
@@ -286,7 +311,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0815c-ref-cap</span>
+      <span class="stamp">v0816-sb-lora</span>
     </div>
   </header>
   <div class="stage">
@@ -354,6 +379,20 @@
         <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产并 @ 提到提示词">画布引用</button>
       </div>
       <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
+
+      <div class="lora-block" id="loraBlock" data-sb-lora="1">
+        <div class="lora-hd">
+          <span class="lbl" id="loraQLbl">LoRA</span>
+        </div>
+        <div class="lora-hint" id="loraHint"></div>
+        <div class="lora-row">
+          <input id="loraQ" placeholder="名字 / URL / version id / AIR" autocomplete="off" />
+          <button type="button" id="searchLora">搜索</button>
+        </div>
+        <div class="lora-hits" id="loraHits"></div>
+        <div id="loras"></div>
+      </div>
+
       <div class="bar">
         <select id="backend">
           <option value="fal">fal</option>

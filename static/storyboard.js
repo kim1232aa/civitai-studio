@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0815c";
-  const STORE_OLDS = ["nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0816";
+  const STORE_OLDS = ["nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -65,6 +65,7 @@
     groupRunAbort: false,
     dockMode: "expanded",
     lastComposerShot: null,
+    loras: [],
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -260,6 +261,7 @@
         duration: $("duration") && $("duration").value,
         aspect: $("aspect") && $("aspect").value,
         res: $("res") && $("res").value,
+        loras: Array.isArray(state.loras) ? state.loras : [],
       }));
     } catch (_) {}
   }
@@ -290,6 +292,7 @@
       if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
       if (p.res && $("res")) $("res").value = p.res;
       state._pendingService = p.service || "";
+      state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
       if (isClassicRobotDemo(state.nodes)) {
         // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
         state.nodes = [];
@@ -1685,6 +1688,306 @@
   }
 
 
+
+  // --- v0816-sb-lora: Composer LoRA search/select + payload.loras ---
+  function currentBackend() {
+    return ($("backend") && $("backend").value) || "fal";
+  }
+  function isModelscopeBe() {
+    const b = currentBackend();
+    return b === "modelscope-ai" || b === "modelscope-cn";
+  }
+  function isNanogptBe() {
+    return currentBackend() === "nano-gpt";
+  }
+  function clampLoraScale(v, fallback) {
+    const n = parseFloat(v);
+    const x = Number.isFinite(n) ? n : (fallback == null ? 0.8 : fallback);
+    return Math.max(0, Math.min(4, x));
+  }
+  function isHttpUrl(s) { return /^https?:\/\//i.test(String(s || "")); }
+  function isHfRepo(s) { return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(s || "").trim()); }
+  function looksAir(s) {
+    const t = String(s || "");
+    return /^urn:air:/i.test(t) || /:lora:/i.test(t);
+  }
+  function loraDownloadUrl(v) {
+    if (!v) return "";
+    if (v.path && !looksAir(v.path)) return v.path;
+    if (v.downloadUrl && !looksAir(v.downloadUrl)) return v.downloadUrl;
+    if (v.url && !looksAir(v.url) && isHttpUrl(v.url)) return v.url;
+    const files = v.files || [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f && f.downloadUrl && !looksAir(f.downloadUrl)) return f.downloadUrl;
+    }
+    if (v.id && /^\d+$/.test(String(v.id))) return "https://civitai.com/api/download/models/" + v.id;
+    if (v.versionId && /^\d+$/.test(String(v.versionId))) return "https://civitai.com/api/download/models/" + v.versionId;
+    return "";
+  }
+  function loraVersionId(l) {
+    if (!l) return "";
+    if (l.versionId) return String(l.versionId);
+    if (l.modelVersionId) return String(l.modelVersionId);
+    const air = String(l.air || "");
+    const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
+    return m ? m[1] : "";
+  }
+  function loraHasDirectPath(l) {
+    if (!l) return false;
+    if (l.path && !looksAir(l.path)) return true;
+    if (l.downloadUrl && !looksAir(l.downloadUrl)) return true;
+    if (l.versionId && /^\d+$/.test(String(l.versionId))) return true;
+    return false;
+  }
+  function normalizeLora(v) {
+    v = v || {};
+    const air = v.air || "";
+    const path = (v.path && !looksAir(v.path) ? v.path : "") || loraDownloadUrl(v) || "";
+    const name = (typeof v.model === "string" && v.model) || v.name || "LoRA";
+    const strength = clampLoraScale(v.strength != null ? v.strength : v.scale, 0.8);
+    return {
+      air: air,
+      path: path,
+      downloadUrl: v.downloadUrl || path,
+      versionId: v.versionId || loraVersionId(v) || (v.id && /^\d+$/.test(String(v.id)) ? String(v.id) : ""),
+      strength: strength,
+      scale: strength,
+      name: name,
+      status: v.status || "",
+    };
+  }
+  function showLoraBlock() {
+    const be = currentBackend();
+    if (Array.isArray(state.loras) && state.loras.length) return true;
+    // Prefer show for fal / civitai / nano; modelscope+hf show with hint.
+    if (be === "fal" || be === "civitai" || be === "nano-gpt") return true;
+    if (isModelscopeBe() || be === "huggingface") return true;
+    return false;
+  }
+  function syncLoraPlaceholders() {
+    const be = currentBackend();
+    const q = $("loraQ");
+    const lbl = $("loraQLbl");
+    const hint = $("loraHint");
+    if (be === "fal" || isNanogptBe() || be === "huggingface") {
+      if (q) q.placeholder = "URL、HF owner/name、名字或 version id";
+      if (lbl) lbl.textContent = "LoRA · 搜索名字 / URL / HF / version id";
+    } else if (isModelscopeBe()) {
+      if (q) q.placeholder = "魔搭 owner/repo，例如 Qwen/Qwen-Image";
+      if (lbl) lbl.textContent = "LoRA · 魔搭 Hub owner/repo";
+    } else {
+      if (q) q.placeholder = "名字 / version id / AIR";
+      if (lbl) lbl.textContent = "LoRA · 搜索名字 / version id / AIR";
+    }
+    if (hint) {
+      if (isModelscopeBe()) {
+        hint.textContent = "魔搭需要 Hub owner/repo；Civitai 下载链不能用（不会做 remap）";
+        hint.classList.add("show");
+      } else if (be === "huggingface") {
+        hint.textContent = "HF 路由会带上 loras[]；上游是否加载取决于映射端点";
+        hint.classList.add("show");
+      } else {
+        hint.textContent = "";
+        hint.classList.remove("show");
+      }
+    }
+  }
+  function renderLoras() {
+    const box = $("loras");
+    if (!box) return;
+    const be = currentBackend();
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    box.innerHTML = list.map(function (l, i) {
+      const sub = l.path || l.downloadUrl || l.air || "";
+      const needUrl = (be === "fal" || isNanogptBe()) && !loraHasDirectPath(l);
+      const st = needUrl ? (l.status || "无直链") : (l.status || "");
+      const stCls = needUrl || st === "无直链" ? "lora-status bad" : "lora-status";
+      return '<div class="lora' + (needUrl ? " need-url" : "") + '" data-lora-i="' + i + '"><div class="top">' +
+        '<div class="lora-info"><div class="lora-name">' + esc(l.name || "LoRA") + '</div>' +
+        '<div class="lora-air">' + esc(sub) + '</div>' +
+        (st ? '<div class="' + stCls + '">' + esc(st) + '</div>' : '') +
+        '</div>' +
+        '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
+          clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8) +
+          '" data-lora-str="' + i + '" title="strength">' +
+        '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
+        '</div></div>';
+    }).join("");
+  }
+  function syncLoraUi() {
+    const block = $("loraBlock");
+    if (!block) return;
+    const show = showLoraBlock();
+    block.classList.toggle("hidden", !show);
+    syncLoraPlaceholders();
+    renderLoras();
+  }
+  function addLora(v) {
+    const row = normalizeLora(v);
+    if (!row.air && !row.path && !row.versionId) return;
+    const be = currentBackend();
+    if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
+    if (!Array.isArray(state.loras)) state.loras = [];
+    state.loras.push(row);
+    renderLoras();
+    if ($("loraHits")) $("loraHits").innerHTML = "";
+    persist();
+    if ((be === "fal" || isNanogptBe()) && row.air && !row.path) resolveLorasForBackend();
+  }
+  async function resolveOneLora(i) {
+    const l = state.loras[i];
+    if (!l || l.path) return;
+    const vid = loraVersionId(l);
+    if (!vid) { l.status = "无直链"; return; }
+    try {
+      const r = await fetch("/api/model-version/" + encodeURIComponent(vid));
+      const v = await r.json();
+      const url = loraDownloadUrl(v);
+      if (url) {
+        l.path = url;
+        l.downloadUrl = url;
+        if (!l.name || l.name === "LoRA") l.name = v.model || v.name || l.name;
+        l.status = "";
+      } else {
+        l.status = "无直链";
+      }
+    } catch (_) {
+      l.status = "无直链";
+    }
+  }
+  async function resolveLorasForBackend() {
+    const be = currentBackend();
+    if (be !== "fal" && !isNanogptBe()) { renderLoras(); return; }
+    for (let i = 0; i < state.loras.length; i++) await resolveOneLora(i);
+    renderLoras();
+    persist();
+  }
+  // Pack like index.html base.loras (~2231) + slimPayload (~2302): path/url/versionId/air/scale.
+  function packLorasForPayload() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    if (!list.length) return null;
+    return list.map(function (l) {
+      let path = l.path || l.downloadUrl || l.url || "";
+      const versionId = l.versionId || loraVersionId(l) || "";
+      if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
+        path = "https://civitai.com/api/download/models/" + versionId;
+      }
+      const scale = clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8);
+      const strength = clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8);
+      return {
+        air: l.air || "",
+        path: path,
+        url: path,
+        downloadUrl: l.downloadUrl || path,
+        versionId: versionId,
+        scale: scale,
+        strength: strength,
+        name: l.name || "LoRA",
+      };
+    });
+  }
+  async function searchLoras() {
+    const qEl = $("loraQ");
+    const hits = $("loraHits");
+    if (!qEl || !hits) return;
+    const q = qEl.value.trim();
+    if (!q) return;
+    const be = currentBackend();
+    hits.textContent = "搜…";
+    if ((be === "fal" || be === "huggingface" || isModelscopeBe() || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
+      addLora({ path: q, name: q, strength: 0.8 });
+      hits.textContent = "";
+      return;
+    }
+    if (be === "civitai" && /^\d+$/.test(q)) {
+      try {
+        const r = await fetch("/api/model-version/" + encodeURIComponent(q));
+        const v = await r.json();
+        if (v && !v.error) addLora(v);
+        else hits.textContent = "没找到这个 version";
+      } catch (_) { hits.textContent = "没找到这个 version"; }
+      return;
+    }
+    if (q.startsWith("urn:air:") || q.includes(":lora:")) {
+      addLora({ air: q, name: q.split(":").pop(), strength: 0.8 });
+      hits.textContent = "";
+      return;
+    }
+    try {
+      const r = await fetch("/api/search?type=LORA&q=" + encodeURIComponent(q) + "&backend=" + encodeURIComponent(be));
+      const j = await r.json();
+      const rows = j.items || [];
+      if (!rows.length) { hits.textContent = (j.note || "没有结果"); return; }
+      hits.innerHTML = rows.map(function (it) {
+        const v = (it.versions || [])[0] || {};
+        const path = it.path || "";
+        const extra = v.baseModel || v.name || path || "";
+        return '<div data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") + '" data-name="' + esc(it.name || "") + '"><b>' +
+          esc(it.name) + '</b>' + (extra ? (" · " + esc(extra)) : "") + "</div>";
+      }).join("");
+      Array.prototype.forEach.call(hits.children, function (el) {
+        el.onclick = async function () {
+          const path = el.getAttribute("data-path");
+          const name = el.getAttribute("data-name") || "";
+          const vid = el.getAttribute("data-vid");
+          if (path && (isHttpUrl(path) || isHfRepo(path))) {
+            addLora({ path: path, name: name || path, strength: 0.8 });
+            return;
+          }
+          if (be === "civitai" && vid) {
+            try {
+              const rr = await fetch("/api/model-version/" + encodeURIComponent(vid));
+              addLora(await rr.json());
+            } catch (_) {}
+            return;
+          }
+          if (vid && /^\d+$/.test(String(vid))) {
+            addLora({
+              path: "https://civitai.com/api/download/models/" + vid,
+              versionId: String(vid),
+              name: name || ("LoRA " + vid),
+              strength: 0.8,
+            });
+            return;
+          }
+          if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8 });
+        };
+      });
+    } catch (_) {
+      hits.textContent = "搜索失败";
+    }
+  }
+  function bindLoraUi() {
+    if ($("searchLora")) $("searchLora").onclick = function () { searchLoras(); };
+    if ($("loraQ")) {
+      $("loraQ").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); searchLoras(); }
+      });
+    }
+    if ($("loras")) {
+      $("loras").addEventListener("click", function (e) {
+        const del = e.target.closest("[data-lora-del]");
+        if (!del) return;
+        const i = +del.getAttribute("data-lora-del");
+        if (!Number.isFinite(i)) return;
+        state.loras.splice(i, 1);
+        renderLoras();
+        persist();
+      });
+      $("loras").addEventListener("change", function (e) {
+        const inp = e.target.closest("[data-lora-str]");
+        if (!inp) return;
+        const i = +inp.getAttribute("data-lora-str");
+        if (!Number.isFinite(i) || !state.loras[i]) return;
+        const s = clampLoraScale(inp.value, 0.8);
+        state.loras[i].strength = s;
+        state.loras[i].scale = s;
+        persist();
+      });
+    }
+  }
+
   function catalogItemForService() {
     const sid = $("service") && $("service").value;
     if (!sid) return null;
@@ -1960,6 +2263,11 @@
       return { status: "blocked", stageOp: stageOp };
     }
     attachExtraImages(payload, shot);
+    // v0816-sb-lora: attach selected LoRAs (index.html base.loras shape)
+    {
+      const packedLoras = packLorasForPayload();
+      if (packedLoras && packedLoras.length) payload.loras = packedLoras;
+    }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     setShotBusy(shot, true);

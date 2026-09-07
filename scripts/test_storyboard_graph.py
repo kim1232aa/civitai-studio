@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0815c" in js, "STORE must bump to v0815c")
-    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS must keep v0815b for migrate")
+    assert_true("nl-storyboard-v0816" in js, "STORE must bump to v0816")
+    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS must keep v0815c for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815c-ref-cap" in html, "stamp must be v0815c-ref-cap")
+    assert_true("v0816-sb-lora" in html, "stamp must be v0816-sb-lora")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,17 +282,17 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0815c-ref-cap" in html, "html stamp")
-    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
+    assert_true("v0816-sb-lora" in html, "html stamp")
+    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
 
 
 def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815c-ref-cap" in html, "html stamp v0815c-ref-cap")
-    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
-    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS prepend v0815b")
+    assert_true("v0816-sb-lora" in html, "html stamp v0816-sb-lora")
+    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
+    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS prepend v0815c")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
@@ -337,13 +337,64 @@ def test_v0815_gen_hardgate():
     assert_true("payload.image_url = sliced[0]" in body, "modelscope sets image_url alongside images[]")
 
 
+
+def test_v0816_sb_lora():
+    """v0816-sb-lora: Composer LoRA UI + payload.loras packing; stamp/STORE."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0816-sb-lora" in html, "html stamp v0816-sb-lora")
+    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
+    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS has v0815c")
+    # UI markers in Composer dock
+    assert_true('id="loraBlock"' in html, "loraBlock in storyboard.html")
+    assert_true('data-sb-lora="1"' in html or "data-sb-lora" in html, "sb-lora marker")
+    assert_true('id="loraQ"' in html, "loraQ search input")
+    assert_true('id="searchLora"' in html, "searchLora button")
+    assert_true('id="loraHits"' in html, "loraHits results")
+    assert_true('id="loras"' in html, "loras selected list")
+    # JS state + helpers
+    assert_true("loras: []" in js or "state.loras" in js, "state.loras")
+    assert_true("function packLorasForPayload" in js, "packLorasForPayload")
+    assert_true("function searchLoras" in js, "searchLoras")
+    assert_true("function renderLoras" in js, "renderLoras")
+    assert_true("function showLoraBlock" in js, "showLoraBlock")
+    assert_true("function syncLoraUi" in js, "syncLoraUi")
+    assert_true("function normalizeLora" in js, "normalizeLora")
+    assert_true("/api/search?type=LORA" in js, "search via /api/search type=LORA")
+    # Pack into generate payload after attachExtraImages
+    k = js.find("async function runShotStep")
+    m = js.find("async function runSelected", k)
+    if m < 0:
+        m = js.find("function runSelected", k)
+    run = js[k:m if m > 0 else k + 9000]
+    assert_true("attachExtraImages(payload, shot)" in run, "attach before loras")
+    assert_true("packLorasForPayload()" in run, "pack loras in runShotStep")
+    assert_true("payload.loras = packedLoras" in run, "sets payload.loras")
+    assert_true(run.find("attachExtraImages(payload, shot)") < run.find("packLorasForPayload()"),
+                "loras packed after attachExtraImages")
+    # Shape fields matching index base.loras
+    pack_i = js.find("function packLorasForPayload")
+    pack_j = js.find("async function searchLoras", pack_i)
+    pack = js[pack_i:pack_j if pack_j > 0 else pack_i + 2000]
+    for field in ("path:", "url:", "versionId:", "air:", "scale:", "strength:", "downloadUrl:"):
+        assert_true(field in pack, "pack field " + field)
+    # modelscope hint, no invent remap
+    assert_true("owner/repo" in js or "Hub owner/repo" in html or "魔搭" in js, "modelscope hub hint")
+    assert_true("remap" in js.lower() or "不会做 remap" in js or "Civitai→Hub" not in js,
+                "no invent Civitai→Hub remap")
+    # gate untouched
+    assert_true("stages[0].payload" not in js, "no stages[0] fake-run")
+    assert_true("function nextRunnableStage" in js, "nextRunnableStage kept")
+    assert_true("function invalidateStageProgress" in js, "invalidateStageProgress kept")
+
+
 def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815c-ref-cap" in html, "stamp v0815c-ref-cap")
-    assert_true("nl-storyboard-v0815c" in js, "STORE v0815c")
-    assert_true("nl-storyboard-v0815b" in js, "STORE_OLDS has v0815b")
+    assert_true("v0816-sb-lora" in html, "stamp v0816-sb-lora")
+    assert_true("nl-storyboard-v0816" in js, "STORE v0816")
+    assert_true("nl-storyboard-v0815c" in js, "STORE_OLDS has v0815c")
     assert_true("MULTI_REF_FIELDS" in js, "multi field list")
     assert_true("SINGULAR_FIRST_FIELDS" in js, "singular FIRST list")
     assert_true("function catalogImageFields" in js, "catalogImageFields helper")
@@ -396,6 +447,7 @@ def main():
         test_empty_boot_no_robot_demo,
         test_v0815_gen_hardgate,
         test_v0815c_ref_cap_single_slot_and_overcap_block,
+        test_v0816_sb_lora,
     ]
     failed = 0
     for fn in tests:
