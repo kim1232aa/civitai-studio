@@ -1064,8 +1064,13 @@ def test_v0821b_i2v_detect():
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
                 "FAL_I2V_DEFAULT unchanged")
     assert_true("function catalogItemSupportsI2v" in js, "predicate present")
-    assert_true("Do NOT treat category=video alone as i2v" in js,
+    assert_true("NEVER: category=video" in js or "never category=video alone" in js.lower() or
+                "Do NOT treat category=video alone as i2v" in js or
+                "prefer catalog supportsI2v" in js,
                 "no category=video-alone true")
+    assert_true("supportsI2v" in js[js.find("function catalogItemSupportsI2v"):
+                                    js.find("function catalogItemSupportsImage")],
+                "predicate reads supportsI2v flag")
     assert_true('id === "fal-ai/minimax/video-01"' in js, "exact video-01 reject")
     # filter + hard-block still wired to predicate
     assert_true("filterCatalogForMode" in js and "catalogItemSupportsI2v" in js, "filter uses predicate")
@@ -1091,12 +1096,17 @@ def test_v0821b_i2v_detect():
 %s
 const cases = [
   [{ id: "fal-ai/minimax/video-01", category: "video" }, false],
+  [{ id: "fal-ai/minimax/video-01", category: "video", falCategory: "text-to-video", needsFirstFrame: false, supportsI2v: false, imageFields: [] }, false],
   [{ id: "fal-ai/minimax/video-01/image-to-video", category: "video" }, true],
+  [{ id: "fal-ai/minimax/video-01/image-to-video", category: "video", needsFirstFrame: true, supportsI2v: true, imageFields: ["image_url"] }, true],
   [{ id: "fal-ai/foo/text-to-video", category: "video" }, false],
   [{ id: "other/model/start-end", category: "video" }, true],
   [{ id: "x/i2v/bar", category: "video" }, true],
-  [{ id: "pure/t2v/clip", category: "video" }, false],
+  [{ id: "pure/video/clip", category: "video" }, false],
   [{ id: "vendor/vid", category: "video", needsFirstFrame: true }, true],
+  [{ id: "vendor/flag", category: "video", supportsI2v: true }, true],
+  [{ id: "vendor/flag-cap", category: "video", capabilities: { supportsI2v: true } }, true],
+  [{ id: "vendor/no", category: "video", supportsI2v: false, needsFirstFrame: false }, false],
   [{ id: "vendor/vid2", category: "video", imageFields: ["image_url"] }, true],
   [{ id: "vendor/vid3", category: "video", capabilities: { imageFields: ["start_image_url"] } }, true],
   [{ id: "fal-ai/flux/schnell", category: "image" }, false],
@@ -1123,6 +1133,38 @@ console.log(JSON.stringify({ out, filtered }));
     assert_true("fal-ai/minimax/video-01" not in data["filtered"], "filter excludes pure t2v video-01")
     assert_true("fal-ai/minimax/video-01/image-to-video" in data["filtered"], "filter keeps i2v")
     assert_true("fal-ai/flux/schnell" not in data["filtered"], "filter excludes image t2i")
+
+    # Catalog overlay from providers.fal must mark pure t2v vs real i2v; JS must agree.
+    from providers.fal import overlay_image_fields
+    t2v = overlay_image_fields({
+        "id": "fal-ai/minimax/video-01",
+        "category": "video",
+        "falCategory": "text-to-video",
+        "imageFields": [],
+    })
+    i2v = overlay_image_fields({
+        "id": "fal-ai/minimax/video-01/image-to-video",
+        "category": "video",
+        "falCategory": "image-to-video",
+        "imageFields": ["image_url"],
+    })
+    assert_true(t2v.get("supportsI2v") is False and t2v.get("needsFirstFrame") is False, t2v)
+    assert_true(i2v.get("supportsI2v") is True and i2v.get("needsFirstFrame") is True, i2v)
+    # Re-run predicate on overlay rows via node
+    ov_harness = """
+%s
+%s
+%s
+const rows = %s;
+const out = rows.map((it) => ({ id: it.id, got: catalogItemSupportsI2v(it) }));
+console.log(JSON.stringify(out));
+""" % (sf_line, cif_src, fn_src, json.dumps([t2v, i2v]))
+    ov = subprocess.run(["node", "-e", ov_harness], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(ov.returncode == 0, "overlay node harness: %s%s" % (ov.stdout, ov.stderr))
+    ov_out = json.loads(ov.stdout.strip().splitlines()[-1])
+    by_id = {r["id"]: r["got"] for r in ov_out}
+    assert_true(by_id.get("fal-ai/minimax/video-01") is False, by_id)
+    assert_true(by_id.get("fal-ai/minimax/video-01/image-to-video") is True, by_id)
 
 
 

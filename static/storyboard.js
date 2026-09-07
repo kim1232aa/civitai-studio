@@ -2265,30 +2265,42 @@
     return null;
   }
 
-  // v0821b: catalog row supports i2v first-frame (not pure t2v / t2i).
-  // Pure t2v (e.g. fal-ai/minimax/video-01) must be false — category=video alone is NOT enough.
+  // v0821b: prefer catalog supportsI2v / needsFirstFrame; never category=video alone.
+  // Pure t2v (fal-ai/minimax/video-01, falCategory=text-to-video, empty imageFields) → false.
   function catalogItemSupportsI2v(it) {
     if (!it) return false;
     const id = String(it.id || it.name || "").toLowerCase();
-    const cat = String(it.category || it.falCategory || it.kind || "").toLowerCase();
+    const cat = String(it.category || it.kind || "").toLowerCase();
+    const fcat = String(it.falCategory || "").toLowerCase();
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
     const fields = catalogImageFields(it);
     const hasFirst = fields.some(function (f) {
-      return SINGULAR_FIRST_FIELDS.indexOf(f) >= 0 || f === "image_urls" || f === "images" ||
-             f === "start_image" || f === "first_frame";
+      const n = String(f || "").toLowerCase();
+      return SINGULAR_FIRST_FIELDS.indexOf(n) >= 0 || n === "image_urls" || n === "images" ||
+             n === "start_image" || n === "first_frame";
     });
-    // Explicit pure t2v — never treat as i2v (plain video-01 drops the frame).
-    if (id === "fal-ai/minimax/video-01") return false;
+    // Exact/plain MiniMax t2v — never i2v (no /image-to-video suffix).
+    if (id === "fal-ai/minimax/video-01" || /\/video-01$/.test(id)) return false;
     if (id.indexOf("text-to-video") >= 0 || id.indexOf("/t2v") >= 0) return false;
-    // Id ends with bare /video-01 (no /image-to-video etc. suffix path)
-    if (/\/video-01$/.test(id)) return false;
-    if (it.needsFirstFrame) return true;
+    if (fcat.indexOf("text-to-video") >= 0 && id.indexOf("image-to-video") < 0) return false;
+
+    // 1) Prefer explicit catalog flags from Fal overlay (supportsI2v / needsFirstFrame).
+    const flag = (it.supportsI2v !== undefined) ? it.supportsI2v
+      : (caps.supportsI2v !== undefined) ? caps.supportsI2v
+      : undefined;
+    if (flag === true || it.needsFirstFrame === true) return true;
+    if (flag === false) return false;
+
+    // 2) Id path markers for real i2v endpoints.
     if (id.indexOf("image-to-video") >= 0 || id.indexOf("start-end") >= 0 ||
         id.indexOf("reference-to-video") >= 0 || id.indexOf("first-last") >= 0 ||
         id.indexOf("/i2v") >= 0) return true;
-    // Catalog declares first-frame / start_image / image_url input for a video endpoint
-    if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || id.indexOf("video") >= 0 ||
-        it.kind === "video")) return true;
-    // Do NOT treat category=video alone as i2v — that wrongly includes pure t2v.
+
+    // 3) Catalog imageFields declare first-frame / start_image / image_url for video.
+    if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || fcat.indexOf("video") >= 0 ||
+        it.kind === "video" || id.indexOf("video") >= 0)) return true;
+
+    // NEVER: category=video && !text-to-video substring — that let video-01 through.
     return false;
   }
   function catalogItemSupportsImage(it) {
