@@ -172,7 +172,20 @@ def test_ui_blocks_stages0_fake_run():
     assert_true('execute === "staged"' in js or "execute === 'staged'" in js, "missing staged execute gate")
     assert_true("multiStep" in js, "missing multiStep gate")
     assert_true("假跑" in js, "missing fake-run user message")
-    assert_true("const payload = compiled.payload;" in js or "const payload = compiled.payload" in js, "must use compiled.payload only")
+    assert_true("payload = compiled.payload" in js, "must use compiled.payload only")
+    assert_true("stages[0].payload" not in js, "no stages[0] fallback")
+
+
+
+def test_ui_clears_stage_urls_on_disconnect():
+    """storyboard must clear stageUrls on unlink/disconnect (align LiteGraph invalidate)."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    assert_true("function invalidateStageProgress" in js, "missing invalidateStageProgress")
+    assert_true("shot.stageUrls = {}" in js, "must zero stageUrls")
+    assert_true("invalidateStageProgress(shot)" in js, "unlink/link must call invalidate")
+    assert_true("disconnectEdgeAt" in js and "invalidateStageProgress" in js, "disconnect path")
+    # unlink body must invoke invalidate when edge existed
+    assert_true("if (had) invalidateStageProgress(shot)" in js, "unlink must clear when edge removed")
 
 
 def main():
@@ -188,6 +201,7 @@ def main():
         test_first_frame_from_promoted_asset,
         test_rail_history_not_in_compile,
         test_ui_blocks_stages0_fake_run,
+        test_ui_clears_stage_urls_on_disconnect,
     ]
     failed = 0
     for fn in tests:

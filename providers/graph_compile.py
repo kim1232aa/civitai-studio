@@ -528,14 +528,14 @@ def reject_staged_generate(payload: Any) -> dict | None:
         return None
     if payload.get("execute") == "staged" or payload.get("multiStep") is True:
         return {
-            "error": "多步链（execute=staged / multiStep）禁止一次提交假跑通；请按 stages 顺序物化上游后再生成下游（step runner 尚未接入）",
+            "error": "多步链（execute=staged / multiStep）禁止一次提交假跑通；请按 stages 顺序物化上游后再生成下游（用画布「运行下一步」，禁止一次假跑通）",
             "blocked": True,
             "execute": "staged",
             "multiStep": True,
         }
     if payload_has_stage_out(payload):
         return {
-            "error": "payload 含未物化的 __stageOut__ 占位，禁止假跑通；请先跑上游 stage（step runner 尚未接入）",
+            "error": "payload 含未物化的 __stageOut__ 占位，禁止假跑通；请先跑上游 stage（用画布「运行下一步」物化 __stageOut__）",
             "blocked": True,
             "stageOut": True,
         }

@@ -531,20 +531,30 @@
       if ($("prompt") && state.selected === shot.id) $("prompt").value = shot.prompt;
     }
   }
+
+  function invalidateStageProgress(shot, reason) {
+    if (!shot || shot.kind !== "shot") return;
+    shot.stageUrls = {};
+    if (reason) setMsg(reason, "warn");
+  }
+
   function linkAssetToShot(asset, shot) {
     if (!asset || !shot || shot.kind !== "shot" || asset.id === shot.id) return;
     if (asset.kind === "shot" && !isImageSource(asset)) return;
     if (!state.edges.some((e) => e.from === asset.id && e.to === shot.id)) {
       state.edges.push({ from: asset.id, to: shot.id });
+      invalidateStageProgress(shot);
     }
     mention(asset, shot);
     if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
   }
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
+    const had = state.edges.some((e) => e.from === asset.id && e.to === shot.id);
     state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
     unmention(asset, shot);
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
+    if (had) invalidateStageProgress(shot);
   }
   function toggleAssetOnShot(asset, shot) {
     if (!asset || !shot || shot.kind !== "shot") return;
@@ -870,11 +880,15 @@
     const src = nodeById(e.from);
     const dst = nodeById(e.to);
     if (src && dst) unlinkAssetFromShot(src, dst);
-    else state.edges.splice(index, 1);
+    else {
+      state.edges.splice(index, 1);
+      if (dst) invalidateStageProgress(dst);
+      if (src) invalidateStageProgress(src);
+    }
     drawWires();
     renderDock();
     persist();
-    setMsg("已断开连线", "ok");
+    setMsg("已断开连线 · 多步成片进度已清空，请重新校验", "warn");
   }
 
   wires.addEventListener("click", (e) => {
@@ -1301,11 +1315,6 @@
       }
     } else {
       // single-step only — never stage-zero payload fallback
-      const payload = compiled.payload;
-      if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
-      // assign outer for shared /api/generate path below
-    }
-    if (!staged) {
       payload = compiled.payload;
       if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
     }
@@ -1332,6 +1341,7 @@
         shot.stageUrls[String(stage.id)] = url;
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
         if (nxt) {
+          persist();
           setMsg("完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
         } else {
           shot.url = url;
