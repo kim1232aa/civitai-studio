@@ -21,7 +21,7 @@ function mkProject(name, id) {
     id: id + "-canvas", name: "主画布", nodes: [], edges: [], assetIds: [],
     viewport: { x: 0, y: 0, zoom: 1 }, createdAt: now, updatedAt: now,
   };
-  return { id, name, createdAt: now, updatedAt: now, activeCanvasId: canvas.id, canvases: [canvas], assets: [] };
+  return { id, name, createdAt: now, updatedAt: now, activeCanvasId: canvas.id, canvases: [canvas], assets: [], script: { script: "", scenes: "", characters: "", shots: "" }, editor: { content: "" } };
 }
 
 function FakeServer(projects) {
@@ -74,13 +74,15 @@ FakeServer.prototype.handle = async function (url, options) {
   }
   if (method === "PUT" && rest[1] === "state") {
     const project = find(rest[0]);
-    // 与真实 server.py 同口径：PUT = 整状态替换，三件套缺一不可。
-    const required = ["assets", "canvases", "activeCanvasId"];
+    // 与真实 server.py 同口径：PUT = 整状态替换，五件套缺一不可。
+    const required = ["assets", "canvases", "activeCanvasId", "script", "editor"];
     const missing = required.filter((key) => !(key in body));
     if (missing.length) return respond({ error: "missing " + missing.join(",") }, 400);
     project.assets = body.assets;
     project.canvases = body.canvases;
     project.activeCanvasId = body.activeCanvasId;
+    project.script = body.script;
+    project.editor = body.editor;
     return respond({ project: JSON.parse(JSON.stringify(project)) });
   }
   if (method === "PATCH" && rest.length === 1) {
@@ -113,6 +115,15 @@ FakeServer.prototype.handle = async function (url, options) {
   if (!manager.activeProject || manager.activeProject.name !== "镜头A") throw new Error("load() did not select first project");
   if (manager.projects.length !== 2) throw new Error("project list not hydrated");
 
+  manager.workspace = "story";
+  const storyHTML = manager.renderWorkspace(manager.activeProject, manager.activeProject.canvases, manager.activeProject.assets, manager.activeCanvasId);
+  manager.workspace = "editor";
+  const editorHTML = manager.renderWorkspace(manager.activeProject, manager.activeProject.canvases, manager.activeProject.assets, manager.activeCanvasId);
+  if (storyHTML === editorHTML || !storyHTML.includes("data-workspace-field=\"scenes\"") || !editorHTML.includes("cm-editor-workspace")) {
+    throw new Error("story/editor workspace HTML collapsed into one view");
+  }
+  manager.workspace = "canvas";
+
   const created = await manager.createProject("新项目C");
   console.log("createProject empty start:", created.canvases[0].nodes.length === 0 && created.canvases[0].assetIds.length === 0);
   if (created.canvases[0].nodes.length !== 0 || created.canvases[0].assetIds.length !== 0) throw new Error("new project seeded");
@@ -142,6 +153,46 @@ FakeServer.prototype.handle = async function (url, options) {
   if (canvas.nodes.length !== 0 || canvas.assetIds.length !== 0) throw new Error("new canvas seeded");
 
   await manager.selectProject(created.id);
+  await manager.saveState({
+    script: { script: "雨夜", scenes: "旧城区", characters: "林默", shots: "远景" },
+    editor: { content: "剪辑稿" },
+  });
+  if (manager.activeProject.script.scenes !== "旧城区" || manager.activeProject.editor.content !== "剪辑稿") {
+    throw new Error("workspace state did not persist");
+  }
+
+  const fields = new Map([
+    ["script", "更新剧本"],
+    ["scenes", "更新场景"],
+    ["characters", "更新角色"],
+    ["shots", "更新分镜"],
+    ["editor", "更新剪辑稿"],
+  ]);
+  const fakeRoot = {
+    dataset: {},
+    innerHTML: "",
+    querySelector(selector) {
+      const match = selector.match(/data-workspace-field="([^"]+)"/);
+      const field = match && match[1];
+      return field && fields.has(field) ? { value: fields.get(field) } : null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    dispatchEvent() {},
+  };
+  manager.root = fakeRoot;
+  manager.workspace = "story";
+  await manager.saveWorkspace();
+  if (manager.activeProject.script.shots !== "更新分镜" || manager.activeProject.editor.content !== "剪辑稿") {
+    throw new Error("story save did not persist or clobbered editor");
+  }
+  fields.set("editor", "更新剪辑稿");
+  manager.workspace = "editor";
+  await manager.saveWorkspace();
+  if (manager.activeProject.editor.content !== "更新剪辑稿" || manager.activeProject.script.scenes !== "更新场景") {
+    throw new Error("editor save did not persist or clobbered story");
+  }
+  console.log("saveWorkspace round-trips story/editor without clobbering:", true);
   await manager.unbindAsset(asset.id);
   const afterUnbind = manager.activeProject.canvases.find((c) => c.id === manager.activeCanvasId);
   console.log("unbind removes from canvas:", !afterUnbind.assetIds.includes(asset.id));

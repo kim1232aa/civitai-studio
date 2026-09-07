@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from canvas_store import CanvasStore  # noqa: E402
 import server  # noqa: E402
+from canvas_store import CanvasStore  # noqa: E402
 
 
 def request(base: str, method: str, path: str, body=None):
@@ -151,11 +151,20 @@ def test_store_updates_empty_canvas_and_asset_binding():
                         "assetIds": [asset["id"]],
                     }
                 ],
+                "script": {
+                    "script": "一场雨夜追逐",
+                    "scenes": "旧城区",
+                    "characters": "林默",
+                    "shots": "远景→近景",
+                },
+                "editor": {"content": "可编辑稿件"},
             },
         )
         assert state["assets"] == [asset]
         assert state["canvases"][0]["assetIds"] == [asset["id"]]
         assert state["canvases"][0]["nodes"][0]["assetId"] == asset["id"]
+        assert state["script"]["scenes"] == "旧城区"
+        assert state["editor"]["content"] == "可编辑稿件"
         assert CanvasStore(path).get(project["id"]) == state
 
 
@@ -197,7 +206,6 @@ def test_http_persists_canvas_state_and_assets():
                 f"/api/canvas-projects/{project_id}/state",
                 {
                     "assets": [asset],
-                    "activeCanvasId": canvas_id,
                     "canvases": [
                         {
                             **project["canvases"][0],
@@ -205,6 +213,9 @@ def test_http_persists_canvas_state_and_assets():
                             "assetIds": [asset["id"]],
                         }
                     ],
+                    "activeCanvasId": canvas_id,
+                    "script": {"script": "", "scenes": "", "characters": "", "shots": ""},
+                    "editor": {"content": ""},
                 },
             )
             assert status == 200
@@ -249,12 +260,13 @@ def test_http_put_replaces_whole_state_patch_merges():
                 "sourceUrl": "https://civitai.red/user/AIImageStudio/images/141669901",
             }
 
-            # PUT = 整状态替换：完整三件套写入
+            # PUT = 整状态替换：完整五件套写入
             status, payload = request(
                 base,
                 "PUT",
                 f"/api/canvas-projects/{project_id}/state",
-                {"assets": [asset], "canvases": [project["canvases"][0]], "activeCanvasId": canvas_id},
+                {"assets": [asset], "canvases": [project["canvases"][0]], "activeCanvasId": canvas_id,
+                 "script": {"script": "", "scenes": "", "characters": "", "shots": ""}, "editor": {"content": ""}},
             )
             assert status == 200
             assert payload["project"]["assets"] == [asset]
@@ -290,7 +302,8 @@ def test_http_put_replaces_whole_state_patch_merges():
                 base,
                 "PUT",
                 f"/api/canvas-projects/{project_id}/state",
-                {"assets": [], "canvases": [canvas_two], "activeCanvasId": canvas_two["id"]},
+                {"assets": [], "canvases": [canvas_two], "activeCanvasId": canvas_two["id"],
+                 "script": {"script": "", "scenes": "", "characters": "", "shots": ""}, "editor": {"content": ""}},
             )
             assert status == 200
             assert payload["project"]["assets"] == []

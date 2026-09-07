@@ -195,7 +195,7 @@
     }
 
     async saveState(state) {
-      // PUT = 整状态替换：服务端要求 body 正好是 assets/canvases/activeCanvasId 三件套。
+      // PUT = 整状态替换：服务端要求 body 正好是项目五件套。
       // 局部入参在此补全为当前项目快照，禁止向服务端发半截状态。
       const project = this.requireProject();
       const partial = state || {};
@@ -203,6 +203,8 @@
         assets: clone(Array.isArray(partial.assets) ? partial.assets : project.assets || []),
         canvases: clone(Array.isArray(partial.canvases) ? partial.canvases : project.canvases || []),
         activeCanvasId: partial.activeCanvasId || project.activeCanvasId || "",
+        script: clone(partial.script || project.script || { script: "", scenes: "", characters: "", shots: "" }),
+        editor: clone(partial.editor || project.editor || { content: "" }),
       };
       const body = await this.request(projectPath(this.apiRoot, project.id, "state"), {
         method: "PUT",
@@ -283,7 +285,7 @@
       const value = ["story", "canvas", "editor"].includes(workspace) ? workspace : "canvas";
       this.workspace = value;
       this.writeStorage(ACTIVE_WORKSPACE_KEY, value);
-      this.renderWorkspaceTabs();
+      this.render();
       this.emitChange();
     }
 
@@ -329,18 +331,59 @@
       });
     }
 
-    render() {
-      if (!this.root) return;
-      const project = this.activeProject;
-      const canvases = project && Array.isArray(project.canvases) ? project.canvases : [];
-      const assets = project && Array.isArray(project.assets) ? project.assets : [];
-      const currentCanvasId = this.activeCanvasId || (project && project.activeCanvasId) || "";
-      const projectOptions = this.projects
-        .map((item) => `<option value="${escapeHtml(item.id)}"${project && item.id === project.id ? " selected" : ""}>${escapeHtml(item.name)}</option>`)
-        .join("");
+    async saveWorkspace() {
+      const project = this.requireProject();
+      const read = (field) => {
+        const input = this.root && this.root.querySelector(`[data-workspace-field="${field}"]`);
+        return input ? input.value : "";
+      };
+      const script = clone(project.script || { script: "", scenes: "", characters: "", shots: "" });
+      const editor = clone(project.editor || { content: "" });
+      if (this.workspace === "story") {
+        ["script", "scenes", "characters", "shots"].forEach((field) => {
+          script[field] = read(field);
+        });
+      } else if (this.workspace === "editor") {
+        editor.content = read("editor");
+      } else {
+        throw new Error("当前工作区不支持保存");
+      }
+      const body = await this.request(projectPath(this.apiRoot, project.id, "state"), {
+        method: "PUT",
+        body: JSON.stringify({
+          assets: clone(project.assets || []),
+          canvases: clone(project.canvases || []),
+          activeCanvasId: this.activeCanvasId || project.activeCanvasId || "",
+          script,
+          editor,
+        }),
+      });
+      await this.acceptProject(body && body.project);
+      return this.activeProject;
+    }
+
+    renderWorkspace(project, canvases, assets, currentCanvasId) {
+      if (this.workspace === "story") {
+        const script = (project && project.script) || {};
+        return `<section class="cm-workspace cm-story-workspace">
+          <div class="cm-workspace-head"><div><h2>剧本策划</h2><p class="cm-note">${project ? "" : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存剧本</button></div>
+          <div class="cm-story-grid">
+            <label><span>剧本</span><textarea data-workspace-field="script" placeholder="暂无剧本内容">${escapeHtml(script.script || "")}</textarea></label>
+            <label><span>场景</span><textarea data-workspace-field="scenes" placeholder="暂无场景内容">${escapeHtml(script.scenes || "")}</textarea></label>
+            <label><span>角色</span><textarea data-workspace-field="characters" placeholder="暂无角色内容">${escapeHtml(script.characters || "")}</textarea></label>
+            <label><span>分镜</span><textarea data-workspace-field="shots" placeholder="暂无分镜内容">${escapeHtml(script.shots || "")}</textarea></label>
+          </div>
+        </section>`;
+      }
+      if (this.workspace === "editor") {
+        const content = project && project.editor && project.editor.content || "";
+        return `<section class="cm-workspace cm-editor-workspace">
+          <div class="cm-workspace-head"><div><h2>编辑器</h2><p class="cm-note">${project ? "" : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存内容</button></div>
+          <textarea class="cm-editor" data-workspace-field="editor" placeholder="暂无编辑内容">${escapeHtml(content)}</textarea>
+        </section>`;
+      }
       const canvasRows = canvases.length
-        ? canvases.map((canvas) => `
-          <li class="cm-row${canvas.id === currentCanvasId ? " on" : ""}">
+        ? canvases.map((canvas) => `<li class="cm-row${canvas.id === currentCanvasId ? " on" : ""}">
             <button type="button" data-action="select-canvas" data-id="${escapeHtml(canvas.id)}">${escapeHtml(canvas.name)}</button>
             <button type="button" class="cm-icon" data-action="rename-canvas" data-id="${escapeHtml(canvas.id)}" aria-label="重命名画布">⋯</button>
           </li>`).join("")
@@ -357,7 +400,22 @@
             </li>`;
           }).join("")
         : `<li class="cm-empty">暂无资产</li>`;
-      const status = this.loading ? "加载中…" : this.error ? escapeHtml(this.error) : "";
+      return `<div class="cm-columns">
+          <section><h3>画布</h3><button type="button" class="cm-add" data-action="create-canvas"${project ? "" : " disabled"}>+ 新建画布</button><ul>${canvasRows}</ul></section>
+          <section><h3>资产 <small>当前项目</small></h3><ul>${assetRows}</ul><p class="cm-note">资产必须先由真实导入或生成结果提供。</p></section>
+        </div>`;
+    }
+
+    render() {
+      if (!this.root) return;
+      const project = this.activeProject;
+      const canvases = project && Array.isArray(project.canvases) ? project.canvases : [];
+      const assets = project && Array.isArray(project.assets) ? project.assets : [];
+      const currentCanvasId = this.activeCanvasId || (project && project.activeCanvasId) || "";
+      const projectOptions = this.projects
+        .map((item) => `<option value="${escapeHtml(item.id)}"${project && item.id === project.id ? " selected" : ""}>${escapeHtml(item.name)}</option>`)
+        .join("");
+      const status = this.loading ? "加载中…" : (this.error ? escapeHtml(this.error) : "");
       const title = global.document && global.document.getElementById("projTitle");
       if (title) title.textContent = project ? project.name : "未命名项目";
       this.root.innerHTML = `
@@ -377,10 +435,7 @@
           <button type="button" data-action="delete-project"${project ? "" : " disabled"}>删除</button>
         </div>
         <div class="cm-status" role="status">${status}</div>
-        <div class="cm-columns">
-          <section><h3>画布</h3><button type="button" class="cm-add" data-action="create-canvas"${project ? "" : " disabled"}>+ 新建画布</button><ul>${canvasRows}</ul></section>
-          <section><h3>资产 <small>当前项目</small></h3><ul>${assetRows}</ul><p class="cm-note">资产必须先由真实导入或生成结果提供。</p></section>
-        </div>`;
+        ${this.renderWorkspace(project, canvases, assets, currentCanvasId)}`;
       this.bindEvents();
       this.renderWorkspaceTabs();
     }
@@ -403,6 +458,7 @@
             if (global.confirm("确认删除当前项目？")) return this.deleteProject();
             return;
           }
+          if (action === "save-workspace") return this.saveWorkspace();
           if (action === "create-canvas") return this.createCanvas(global.prompt("画布名称（可留空）") || undefined);
           if (action === "select-canvas") return this.setActiveCanvas(target.dataset.id);
           if (action === "rename-canvas") return this.renameCanvas(target.dataset.id, global.prompt("新画布名称") || "");

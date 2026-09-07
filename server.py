@@ -499,11 +499,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "缺少项目 id"})
             project_id = parts[0]
             if replace:
-                # PUT = 整状态替换：body 必须正好是 assets/canvases/activeCanvasId 三件套，
-                # 缺字段/多字段/非 /state 一律 400，不许像 PATCH 那样静默合并。
+                # PUT = 整状态替换：body 必须正好是五件套，缺字段或多字段都拒绝。
                 if not (len(parts) == 2 and parts[1] == "state"):
                     return self._json(400, {"error": "PUT 只支持整状态替换，必须指向 /state"})
-                required = {"assets", "canvases", "activeCanvasId"}
+                required = {"assets", "canvases", "activeCanvasId", "script", "editor"}
                 missing = sorted(required - set(payload))
                 extra = sorted(set(payload) - required)
                 if missing:
@@ -514,7 +513,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"project": project})
             if len(parts) == 1:
                 state = payload.get("state")
-                state_fields = {"assets", "canvases", "activeCanvasId"}
+                state_fields = {"assets", "canvases", "activeCanvasId", "script", "editor"}
                 if isinstance(state, dict):
                     update = state
                 elif any(key in payload for key in state_fields):

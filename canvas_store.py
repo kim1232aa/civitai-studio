@@ -7,6 +7,7 @@ bindings without coupling storage to request handling.
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import os
@@ -17,12 +18,44 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 SCHEMA_VERSION = 1
 DEFAULT_PROJECT_NAME = "未命名项目"
 DEFAULT_CANVAS_NAME = "主画布"
 MAX_PROJECT_NAME = 120
+SCRIPT_FIELDS = ("script", "scenes", "characters", "shots")
 
+
+def _empty_script() -> dict[str, str]:
+    return dict.fromkeys(SCRIPT_FIELDS, "")
+
+
+def _empty_editor() -> dict[str, str]:
+    return {"content": ""}
+
+
+def _normalize_script(value: Any) -> dict[str, str]:
+    if value is None:
+        return _empty_script()
+    if not isinstance(value, dict):
+        raise CanvasValidationError("项目 script 必须是对象")
+    result: dict[str, str] = {}
+    for field in SCRIPT_FIELDS:
+        field_value = value.get(field, "")
+        if not isinstance(field_value, str):
+            raise CanvasValidationError(f"项目 script.{field} 必须是文本")
+        result[field] = field_value
+    return result
+
+
+def _normalize_editor(value: Any) -> dict[str, str]:
+    if value is None:
+        return _empty_editor()
+    if not isinstance(value, dict):
+        raise CanvasValidationError("项目 editor 必须是对象")
+    content = value.get("content", "")
+    if not isinstance(content, str):
+        raise CanvasValidationError("项目 editor.content 必须是文本")
+    return {"content": content}
 
 class CanvasStoreError(Exception):
     """Base class for expected storage errors."""
@@ -129,6 +162,8 @@ def _new_project(name: str) -> dict[str, Any]:
         "activeCanvasId": canvas["id"],
         "canvases": [canvas],
         "assets": [],
+        "script": _empty_script(),
+        "editor": _empty_editor(),
     }
 
 
@@ -221,6 +256,10 @@ class CanvasStore:
             document.get("projects"), list
         ):
             raise CanvasStoreError("项目存储格式无效")
+        for project in document["projects"]:
+            if isinstance(project, dict):
+                project["script"] = _normalize_script(project.get("script"))
+                project["editor"] = _normalize_editor(project.get("editor"))
         return document
 
     def _write(self, document: dict[str, Any]) -> None:
@@ -236,10 +275,8 @@ class CanvasStore:
                 os.fsync(handle.fileno())
             os.replace(tmp_name, self.path)
         except Exception:
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_name)
-            except OSError:
-                pass
             raise
 
     @staticmethod
@@ -315,6 +352,10 @@ class CanvasStore:
                 if not isinstance(active_id, str) or not active_id:
                     raise CanvasValidationError("activeCanvasId 必须是非空 id")
                 updated["activeCanvasId"] = active_id
+            if "script" in state:
+                updated["script"] = _normalize_script(state["script"])
+            if "editor" in state:
+                updated["editor"] = _normalize_editor(state["editor"])
             if updated.get("activeCanvasId") not in {
                 canvas.get("id") for canvas in updated.get("canvases") or []
             }:
