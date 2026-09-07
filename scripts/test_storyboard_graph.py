@@ -163,6 +163,18 @@ def test_rail_history_not_in_compile():
     assert_true(r.get("ok") is True, r)
     assert_true("sourceImage" not in (r.get("payload") or {}), r)
 
+
+def test_ui_blocks_stages0_fake_run():
+    """storyboard.js must not POST stages[0] as a one-shot for multi-step compiles."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    assert_true("stages[0].payload" not in js, "stages[0].payload fallback still present")
+    assert_true("compiled.stages && compiled.stages[0]" not in js, "stages[0] OR-fallback still present")
+    assert_true('execute === "staged"' in js or "execute === 'staged'" in js, "missing staged execute gate")
+    assert_true("multiStep" in js, "missing multiStep gate")
+    assert_true("假跑" in js, "missing fake-run user message")
+    assert_true("const payload = compiled.payload;" in js or "const payload = compiled.payload" in js, "must use compiled.payload only")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -175,6 +187,7 @@ def main():
         test_shot_result_as_image_node,
         test_first_frame_from_promoted_asset,
         test_rail_history_not_in_compile,
+        test_ui_blocks_stages0_fake_run,
     ]
     failed = 0
     for fn in tests:

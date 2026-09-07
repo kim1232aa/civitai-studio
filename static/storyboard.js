@@ -1020,7 +1020,15 @@
       setMsg(String(e), "bad"); $("send").disabled = false; return;
     }
     if (!compiled.ok) { setMsg(compiled.error || "校验未通过", "bad"); $("send").disabled = false; return; }
-    const payload = compiled.payload || (compiled.stages && compiled.stages[0] && compiled.stages[0].payload);
+    // Never one-shot a multi-step plan via stages[0] or sink payload.
+    var staged = !!(compiled.multiStep || compiled.execute === "staged" ||
+      (Array.isArray(compiled.stages) && compiled.stages.length > 1));
+    if (staged) {
+      setMsg((compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通（step runner 未接入）", "warn");
+      $("send").disabled = false;
+      return;
+    }
+    const payload = compiled.payload;
     if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
     setMsg("正在请求云 API…");
     try {
