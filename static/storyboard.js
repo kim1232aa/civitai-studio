@@ -257,6 +257,9 @@
         }),
       );
     } catch (_) {}
+    try {
+      document.dispatchEvent(new CustomEvent("storyboard:graph-change"));
+    } catch (_) {}
   }
   function restore() {
     try {
@@ -7090,6 +7093,71 @@
       );
     }
     return _cardHTML(n);
+  };
+
+  function cloneGraphJson(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function defaultViewport() {
+    return { x: 0, y: 0, zoom: 1 };
+  }
+  function viewportFromCam(cam) {
+    const src = cam && typeof cam === "object" ? cam : {};
+    const zoomRaw = src.zoom != null ? src.zoom : src.s;
+    const x = Number(src.x);
+    const y = Number(src.y);
+    const zoom = Number(zoomRaw);
+    return {
+      x: Number.isFinite(x) ? x : 0,
+      y: Number.isFinite(y) ? y : 0,
+      zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1,
+    };
+  }
+  function camFromViewport(viewport) {
+    const vp = viewportFromCam(viewport);
+    return { x: vp.x, y: vp.y, s: vp.zoom };
+  }
+  function normalizeGraphPayload(payload) {
+    const src = payload && typeof payload === "object" ? payload : {};
+    return {
+      nodes: Array.isArray(src.nodes) ? cloneGraphJson(src.nodes) : [],
+      edges: Array.isArray(src.edges) ? cloneGraphJson(src.edges) : [],
+      viewport: src.viewport == null ? defaultViewport() : viewportFromCam(src.viewport),
+    };
+  }
+  function getStoryboardGraph() {
+    return {
+      nodes: cloneGraphJson(state.nodes || []),
+      edges: cloneGraphJson(state.edges || []),
+      viewport: viewportFromCam(state.cam),
+    };
+  }
+  function applyStoryboardGraph(payload) {
+    const next = normalizeGraphPayload(payload);
+    state.selected = null;
+    state.selectedEdge = null;
+    sekoSelKey = "";
+    state.nodes = next.nodes;
+    state.edges = next.edges;
+    state.cam = camFromViewport(next.viewport);
+    applyCam();
+    renderCards();
+    drawWires();
+    renderDock();
+    persist();
+    return getStoryboardGraph();
+  }
+  function clearStoryboardGraph() {
+    return applyStoryboardGraph({
+      nodes: [],
+      edges: [],
+      viewport: defaultViewport(),
+    });
+  }
+  window.storyboardGraph = {
+    get: getStoryboardGraph,
+    set: applyStoryboardGraph,
+    clear: clearStoryboardGraph,
   };
 
   bindCamOnce();
