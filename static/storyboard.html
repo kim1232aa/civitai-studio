@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0806-group-chrome</title>
+<title>画布 · Night Lab · v0807-composer-dock</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -78,11 +78,28 @@
     border:1px solid #2c2c34;background:#121216ee;backdrop-filter:blur(8px);overflow:hidden;cursor:crosshair;
     box-shadow:0 8px 24px rgba(0,0,0,.35)}
   .minimap canvas{display:block;width:100%;height:100%}
-  .dock{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(860px,calc(100vw - 80px));
-    z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:20px;padding:12px 14px 12px;
-    box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(18px);display:none}
-  .dock.show{display:block}
-  .dock.near{transform:none}
+  .dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(860px,calc(100% - 48px));
+    z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;padding:0;
+    box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(18px);display:none;
+    flex-direction:column;max-height:40vh;overflow:hidden}
+  .dock.show{display:flex}
+  .dock.collapsed{max-height:none;overflow:visible}
+  .dock.collapsed .dock-body{display:none}
+  .dock.expanded{max-height:40vh}
+  .dock.expanded .dock-body{display:block;overflow:auto;padding:10px 14px 12px;min-height:0}
+  .dock-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
+    border-bottom:1px solid transparent;cursor:default}
+  .dock.expanded .dock-hd{border-bottom-color:#2a2a32}
+  .dock.collapsed .dock-hd{border-bottom-color:transparent;cursor:pointer}
+  .dock-hd .dock-title{font-size:12px;font-weight:600;color:#e8e8ec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}
+  .dock-hd .dock-hint{font-size:11px;color:#7a7a84}
+  .dock-hd .grow{flex:1;min-width:8px}
+  .dock-btn{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:8px;
+    height:28px;min-width:28px;padding:0 8px;font-size:12px;line-height:1;flex-shrink:0}
+  .dock-btn:hover{border-color:#4a4a54;color:#fff}
+  .dock-btn.primary{border-color:rgba(94,224,197,.45);color:#b8f5e6;background:rgba(94,224,197,.10)}
+  .dock.collapsed .collapse-only,
+  .dock.expanded .expand-only{display:none}
   .modes{display:flex;gap:4px;margin-bottom:10px;background:#121216;border:1px solid #2a2a32;border-radius:999px;padding:3px;width:fit-content;max-width:100%;flex-wrap:wrap}
   .modes button{border:0;background:transparent;color:#8b8b94;border-radius:999px;padding:6px 12px;font-size:12px}
   .modes button.on{color:#fff;background:#26262e;box-shadow:inset 0 0 0 1px #3a3a44}
@@ -95,7 +112,7 @@
   .frame-slot{display:flex;align-items:center;gap:8px;flex:1 0 100%;margin:0 0 2px;color:#9a9aa3;font-size:12px}
   .frame-slot img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #2e2e36}
   .frame-slot.missing{color:#e85d4c}
-  .prompt{width:100%;min-height:92px;max-height:160px;resize:vertical;background:#121214;border:1px solid #2a2a30;
+  .prompt{width:100%;min-height:72px;max-height:120px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
   .mention{color:var(--teal)}
@@ -260,7 +277,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0806-group-chrome</span>
+      <span class="stamp">v0807-composer-dock</span>
     </div>
   </header>
   <div class="stage">
@@ -303,7 +320,16 @@
       </div>
     </div>
     <div class="picker" id="picker"></div>
-    <aside class="dock" id="dock">
+    <aside class="dock" id="dock" aria-label="Composer">
+      <div class="dock-hd" id="dockHd">
+        <button type="button" class="dock-btn primary expand-only" id="dockExpand" title="展开 Composer">▴ 展开</button>
+        <span class="dock-title" id="dockTitle">Composer</span>
+        <span class="dock-hint expand-only" id="dockHint">点击展开编辑提示词</span>
+        <span class="grow"></span>
+        <button type="button" class="dock-btn collapse-only" id="dockCollapse" title="折叠为底栏">▾ 折叠</button>
+        <button type="button" class="dock-btn" id="dockClose" title="关闭 Composer">×</button>
+      </div>
+      <div class="dock-body" id="dockBody">
       <div class="modes">
         <button type="button" id="modeText" class="stub" data-mode="text">文本生成</button>
         <button type="button" id="modeImg" data-mode="image">图片生成</button>
@@ -340,6 +366,7 @@
         <button class="send" id="send" title="生成">↑</button>
       </div>
       <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；@ 或「画布引用」连接资产。</div>
+      </div>
     </aside>
   </div>
 </div>

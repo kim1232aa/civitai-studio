@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0806";
-  const STORE_OLDS = ["nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0807";
+  const STORE_OLDS = ["nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -61,6 +61,7 @@
     skillCat: "官方精选",
     runningGroup: false,
     groupRunAbort: false,
+    dockMode: "collapsed",
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -529,41 +530,31 @@
     persist();
   }
 
+  function setDockMode(mode) {
+    if (mode !== "collapsed" && mode !== "expanded" && mode !== "closed") mode = "collapsed";
+    state.dockMode = mode;
+    renderDock();
+  }
+
   function positionDock() {
-    if (!dock || !dock.classList.contains("show")) return;
-    const n = nodeById(state.selected);
-    if (!n || n.kind !== "shot") {
-      dock.classList.remove("near");
-      dock.style.left = "";
-      dock.style.top = "";
-      dock.style.bottom = "";
-      dock.style.transform = "";
-      return;
-    }
+    if (!dock) return;
     const stage = dock.parentElement;
     if (!stage) return;
     const sr = stage.getBoundingClientRect();
-    const vr = vp.getBoundingClientRect();
-    const b = box(n);
-    const sx = vr.left + state.cam.x + (n.x + b.w / 2) * state.cam.s;
-    const syBottom = vr.top + state.cam.y + (n.y + b.h) * state.cam.s;
-    const syTop = vr.top + state.cam.y + n.y * state.cam.s;
-    const dockW = Math.min(860, Math.max(320, sr.width - 80));
+    const dockW = Math.min(860, Math.max(280, sr.width - 48));
     dock.style.width = dockW + "px";
-    const dw = dock.offsetWidth || dockW;
-    const dh = dock.offsetHeight || 260;
-    let left = sx - sr.left - dw / 2;
-    left = Math.max(16, Math.min(left, sr.width - dw - 16));
-    let top = syBottom - sr.top + 14;
-    if (top + dh > sr.height - 12) {
-      top = syTop - sr.top - dh - 28;
-    }
-    if (top < 56) top = Math.max(56, sr.height - dh - 16);
-    dock.classList.add("near");
-    dock.style.left = left + "px";
-    dock.style.top = top + "px";
-    dock.style.bottom = "auto";
-    dock.style.transform = "none";
+    dock.style.left = "50%";
+    dock.style.top = "auto";
+    dock.style.bottom = "14px";
+    dock.style.transform = "translateX(-50%)";
+    dock.classList.remove("near");
+    const visible = dock.classList.contains("show");
+    const dh = visible ? (dock.offsetHeight || (state.dockMode === "expanded" ? 220 : 44)) : 0;
+    const lift = Math.max(210, dh + 28) + "px";
+    ["skillbox", "atbox", "picker"].forEach((id) => {
+      const el = $(id);
+      if (el) el.style.bottom = lift;
+    });
   }
 
   function renderRail() {
@@ -607,14 +598,37 @@
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
       dock.classList.remove("near");
+      dock.classList.remove("collapsed");
+      dock.classList.remove("expanded");
       hideSkillbox();
       hideAtbox();
       const picker = $("picker");
       if (picker) picker.classList.remove("show");
       renderRail();
+      requestAnimationFrame(positionDock);
       return;
     }
+    if (state.dockMode === "closed") {
+      dock.classList.remove("show");
+      dock.classList.remove("collapsed");
+      dock.classList.remove("expanded");
+      dock.classList.remove("near");
+      hideSkillbox();
+      hideAtbox();
+      const picker = $("picker");
+      if (picker) picker.classList.remove("show");
+      renderRail();
+      requestAnimationFrame(positionDock);
+      return;
+    }
+    const expanded = state.dockMode === "expanded";
     dock.classList.add("show");
+    dock.classList.toggle("collapsed", !expanded);
+    dock.classList.toggle("expanded", expanded);
+    dock.classList.remove("near");
+    if ($("dockTitle")) {
+      $("dockTitle").textContent = (n.title || "分镜") + (expanded ? " · Composer" : " · Composer（已折叠）");
+    }
     $("prompt").value = n.prompt || "";
     ["text", "image", "video", "audio"].forEach((m) => {
       const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
@@ -667,6 +681,11 @@
     } else {
       state.selected = id;
       setMulti(id ? [id] : []);
+    }
+    const n = nodeById(id);
+    if (n && n.kind === "shot") {
+      if (state.dockMode === "closed") state.dockMode = "collapsed";
+      if (opts.expand) state.dockMode = "expanded";
     }
     renderCards();
     drawWires();
@@ -1482,18 +1501,59 @@
       if (skill) applySkill(skill);
     });
   }
+  if ($("dockExpand")) {
+    $("dockExpand").onclick = (e) => {
+      e.stopPropagation();
+      setDockMode("expanded");
+      requestAnimationFrame(() => { if ($("prompt")) $("prompt").focus(); });
+    };
+  }
+  if ($("dockCollapse")) {
+    $("dockCollapse").onclick = (e) => {
+      e.stopPropagation();
+      hideSkillbox();
+      hideAtbox();
+      setDockMode("collapsed");
+    };
+  }
+  if ($("dockClose")) {
+    $("dockClose").onclick = (e) => {
+      e.stopPropagation();
+      hideSkillbox();
+      hideAtbox();
+      const picker = $("picker");
+      if (picker) picker.classList.remove("show");
+      setDockMode("closed");
+    };
+  }
+  if ($("dockHd")) {
+    $("dockHd").addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      if (state.dockMode === "collapsed") {
+        setDockMode("expanded");
+        requestAnimationFrame(() => { if ($("prompt")) $("prompt").focus(); });
+      }
+    });
+  }
   if ($("btnSkill")) {
     $("btnSkill").onclick = () => {
+      if (state.dockMode !== "expanded") setDockMode("expanded");
       const box = $("skillbox");
       if (box && box.classList.contains("show")) hideSkillbox();
       else showSkillbox("", { filter: false });
     };
   }
   if ($("btnAttach")) {
-    $("btnAttach").onclick = () => openImportModal();
+    $("btnAttach").onclick = () => {
+      if (state.dockMode !== "expanded") setDockMode("expanded");
+      openImportModal();
+    };
   }
   if ($("btnCanvasRef")) {
-    $("btnCanvasRef").onclick = () => openCanvasPicker(true);
+    $("btnCanvasRef").onclick = () => {
+      if (state.dockMode !== "expanded") setDockMode("expanded");
+      openCanvasPicker(true);
+    };
   }
 
   $("prompt").addEventListener("input", () => {
