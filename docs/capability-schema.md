@@ -90,3 +90,16 @@
 - 不嵌 ComfyDeploy / 本地 `/prompt`
 - 不把 Comfy 类名（CheckpointLoader 等）画成节点骗自己
 - 能力表未落地前不上自由连线
+
+
+## 多参考图槽（v0815 硬闸）
+
+| 字段 | 含义 |
+|---|---|
+| `maxRefs` | 入站参考/源图最多几张（UI 露槽 + `payload.images` 截断） |
+| `maxImages` | 与 `maxRefs` 同义别名（旧 UI `maxRefCount` 读这个） |
+| `refImagesField` | 出站字段名：`images` / `image_urls` / `input_references` / `image_url` |
+
+Provider 默认：Civitai/Fal/HF=9；Nano=5（`input_references`）；魔搭=1（单 `image_url`）。
+Catalog 只能**收紧**数字，不能抬高。Fal 端点若 schema 仅单图，应用 override 把 `maxRefs` 降到 1。
+UI：`images = refs.slice(0, caps.maxRefs || caps.maxImages)`；无字段勿默认偷成 1。

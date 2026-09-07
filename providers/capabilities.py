@@ -47,6 +47,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "sourceImage",
         "videoDuration": True,
         "videoAspect": True,
+        "maxRefs": 9,
+        "maxImages": 9,
+        "refImagesField": "images",
     },
     "fal": {
         "lora": "path",
@@ -65,6 +68,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "fal_endpoint",
         "videoDuration": True,
         "videoAspect": True,
+        "maxRefs": 9,
+        "maxImages": 9,
+        "refImagesField": "image_urls",
     },
     "huggingface": {
         "lora": "path",
@@ -83,6 +89,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "none",
         "videoDuration": False,
         "videoAspect": False,
+        "maxRefs": 9,
+        "maxImages": 9,
+        "refImagesField": "image_urls",
     },
     "modelscope-ai": {
         "lora": "hub_repo",
@@ -101,6 +110,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
+        "maxRefs": 1,
+        "maxImages": 1,
+        "refImagesField": "image_url",
     },
     "modelscope-cn": {
         "lora": "hub_repo",
@@ -119,6 +131,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
+        "maxRefs": 1,
+        "maxImages": 1,
+        "refImagesField": "image_url",
     },
     "nano-gpt": {
         "lora": "path",
@@ -137,6 +152,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": "string_seconds",
         "videoAspect": True,
+        "maxRefs": 5,
+        "maxImages": 5,
+        "refImagesField": "input_references",
     },
 }
 
@@ -157,6 +175,9 @@ REQUIRED_KEYS = (
     "i2v",
     "videoDuration",
     "videoAspect",
+    "maxRefs",
+    "maxImages",
+    "refImagesField",
 )
 
 
@@ -181,6 +202,9 @@ def get_provider_capabilities(provider_id: str) -> dict[str, Any]:
             "i2v": "none",
             "videoDuration": False,
             "videoAspect": False,
+            "maxRefs": 0,
+            "maxImages": 0,
+            "refImagesField": None,
         }
     return deepcopy(base)
 
@@ -282,6 +306,31 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
             out["videoAspect"] = False
         else:
             out["videoAspect"] = bool(o["videoAspect"])
+
+    # --- maxRefs / maxImages: smaller = stricter; cannot raise above provider ---
+    for mk in ("maxRefs", "maxImages"):
+        if mk in o:
+            try:
+                c = int(o[mk])
+            except (TypeError, ValueError):
+                continue
+            p = out.get(mk, 0)
+            try:
+                p = int(p)
+            except (TypeError, ValueError):
+                p = 0
+            if p <= 0:
+                # provider unknown/zero: allow catalog to set finite (still not invent unlimited)
+                if c > 0:
+                    out[mk] = c
+            elif 0 < c <= p:
+                out[mk] = c
+            # else reject raise
+
+    if "refImagesField" in o and o["refImagesField"]:
+        # catalog may specialize field name when provider already accepts refs
+        if int(out.get("maxRefs") or 0) > 0:
+            out["refImagesField"] = o["refImagesField"]
 
     for k in (
         "resolutionTokens",
