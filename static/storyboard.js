@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0808";
-  const STORE_OLDS = ["nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0809";
+  const STORE_OLDS = ["nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -542,8 +542,22 @@
     const stage = dock.parentElement;
     if (!stage) return;
     const sr = stage.getBoundingClientRect();
-    // Keep left ~200px clear for minimap + zoom; center when room allows.
-    const clearL = 200;
+    // Leave minimap + zoom clear by real geometry (not z-index alone).
+    // minimap: left 14 / w 160 → right ~174; zoom: left 188 / ~270 wide → right ~458.
+    const gap = 12;
+    let clearL = 14;
+    const mm = $("minimap");
+    const zoomEl = stage.querySelector(".zoom");
+    if (mm) {
+      const r = mm.getBoundingClientRect();
+      if (r.width > 0) clearL = Math.max(clearL, r.right - sr.left + gap);
+    }
+    if (zoomEl) {
+      const r = zoomEl.getBoundingClientRect();
+      if (r.width > 0) clearL = Math.max(clearL, r.right - sr.left + gap);
+    }
+    // Fallback before layout: zoom right edge ~458 + gap
+    if (clearL < 100) clearL = 470;
     const clearR = 24;
     let dockW = Math.min(720, Math.max(280, sr.width - clearL - clearR));
     let left = (sr.width - dockW) / 2;
@@ -1264,20 +1278,19 @@
       vp.setPointerCapture(e.pointerId);
       return;
     }
-    // empty canvas click clears multi; collapse expanded Composer (pan still starts)
+    // empty canvas: clear multi + start pan; collapse Composer only on true click (not drag)
     if (!e.shiftKey) {
       setMulti(state.selected ? [state.selected] : []);
       syncGroupRunBtn();
       renderCards();
     }
-    if (state.dockMode === "expanded") {
-      hideSkillbox();
-      hideAtbox();
-      const picker = $("picker");
-      if (picker) picker.classList.remove("show");
-      setDockMode("collapsed");
-    }
-    state.pan = { x: e.clientX - state.cam.x, y: e.clientY - state.cam.y };
+    state.pan = {
+      x: e.clientX - state.cam.x,
+      y: e.clientY - state.cam.y,
+      sx: e.clientX,
+      sy: e.clientY,
+      collapse: state.dockMode === "expanded",
+    };
     vp.classList.add("grabbing");
     vp.setPointerCapture(e.pointerId);
   });
@@ -1319,6 +1332,18 @@
       state.link = null;
       state.snapTarget = null;
       drawWires(); persist();
+    }
+    if (state.pan && state.pan.collapse) {
+      const dx = e.clientX - state.pan.sx;
+      const dy = e.clientY - state.pan.sy;
+      // true click = pointerdown→up with movement ≤5px (not a pan/drag)
+      if (Math.hypot(dx, dy) <= 5) {
+        hideSkillbox();
+        hideAtbox();
+        const picker = $("picker");
+        if (picker) picker.classList.remove("show");
+        setDockMode("collapsed");
+      }
     }
     if (state.drag) { persist(); positionDock(); }
     state.drag = null; state.pan = null;
