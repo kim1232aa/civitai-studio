@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0817b";
-  const STORE_OLDS = ["nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0817c";
+  const STORE_OLDS = ["nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -111,16 +111,25 @@
     if (!/[\u4e00-\u9fff]/.test(s) && /^[a-z0-9]+(?:[_-][a-z0-9]+){2,}_?\d*$/i.test(s) && s.length >= 20) return true;
     return false;
   }
+  /** Next free @图片N from max persisted mentionTags (insert-time only). */
+  function nextPictureTag(shot) {
+    let maxN = 0;
+    const mt = (shot && shot.mentionTags) || {};
+    Object.keys(mt).forEach((id) => {
+      const m = /^@图片(\d+)$/.exec(String(mt[id] || ""));
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+    });
+    return "@图片" + (maxN + 1);
+  }
   /** Manual @ / atbox only: human title or @图片N — never raw file-hash titles. */
   function mentionDisplayTag(asset, shot) {
-    const linked = connectedAssets(shot.id);
-    let idx = linked.findIndex((a) => a.id === asset.id);
-    if (idx < 0) idx = linked.length;
     const title = sourceTitle(asset);
     if (title && !isRawFileTitle(title)) return "@" + title;
-    return "@图片" + (idx + 1);
+    if (shot && shot.mentionTags && shot.mentionTags[asset.id]) return shot.mentionTags[asset.id];
+    // Assign next free @图片N at insert time only (do not use for unlink/removal).
+    return nextPictureTag(shot);
   }
-  /** All @ aliases insertMention may have written for this asset (while still linked). */
+  /** Aliases to strip on unmention: persisted insert tag + legacy @sourceTitle. Never recompute @图片N. */
   function tagsForAsset(asset, shot) {
     const tags = [];
     const title = sourceTitle(asset);
@@ -128,8 +137,10 @@
       const legacy = "@" + title;
       if (tags.indexOf(legacy) < 0) tags.push(legacy);
     }
-    const display = mentionDisplayTag(asset, shot);
-    if (display && tags.indexOf(display) < 0) tags.push(display);
+    if (shot && shot.mentionTags && shot.mentionTags[asset.id]) {
+      const persisted = shot.mentionTags[asset.id];
+      if (persisted && tags.indexOf(persisted) < 0) tags.push(persisted);
+    }
     return tags;
   }
   function mediaBadge(n) {
@@ -792,14 +803,13 @@
     return null;
   }
 
-  // v0817b-unmention-at-tag: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
+  // v0817c-persist-at-tag: linking / 画布引用 / chips must NOT dump @sourceTitle into prompt.
   // Real images travel edges → attachExtraImages → payload.images[]. Prompt stays human text.
-  // insertMention may write mentionDisplayTag (@图片N / human); unmention strips tagsForAsset aliases.
+  // insertMention persists tag on shot.mentionTags[assetId]; unmention strips that record (never recompute @图片N).
   function mention(asset, shot) {
     return;
   }
-  // Strip every tag insertMention / legacy mention could have left for this asset.
-  // Caller must invoke while edge is still present so @图片N index matches insert time.
+  // Strip persisted insertMention tag + legacy @+title alias for this assetId; clear mentionTags record.
   function unmention(asset, shot) {
     if (!shot || !asset) return;
     const tags = tagsForAsset(asset, shot);
@@ -811,6 +821,10 @@
         text = text.split(tag).join("");
         changed = true;
       }
+    }
+    if (shot.mentionTags && shot.mentionTags[asset.id] != null) {
+      delete shot.mentionTags[asset.id];
+      changed = true;
     }
     if (changed) {
       shot.prompt = text.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
@@ -838,7 +852,7 @@
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
     const had = state.edges.some((e) => e.from === asset.id && e.to === shot.id);
-    // unmention BEFORE edge removal so tagsForAsset/@图片N matches insertMention index
+    // unmention strips persisted shot.mentionTags[assetId] (order vs edge removal no longer index-sensitive)
     unmention(asset, shot);
     state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
@@ -923,10 +937,12 @@
   function insertMention(asset) {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
-    // Edge first (mention is no-op); then display tag from tagsForAsset/mentionDisplayTag.
+    // Edge first (mention is no-op); assign display tag at insert time and persist on shot.mentionTags.
     linkAssetToShot(asset, shot);
     const ta = $("prompt");
-    const tag = mentionDisplayTag(asset, shot); // same as tagsForAsset display; unmention strips all aliases
+    const tag = mentionDisplayTag(asset, shot);
+    if (!shot.mentionTags) shot.mentionTags = {};
+    shot.mentionTags[asset.id] = tag; // persist so unlink never recomputes @图片N from linked order
     if (ta) {
       const v = ta.value || "";
       const caret = ta.selectionStart || v.length;
@@ -1732,7 +1748,7 @@
 
 
 
-  // --- v0817b-unmention-at-tag (+ v0817 no-at-filename + v0816b LoRA bind) ---
+  // --- v0817c-persist-at-tag (+ v0817b unmention + v0817 no-at-filename + v0816b LoRA bind) ---
   function currentBackend() {
     return ($("backend") && $("backend").value) || "fal";
   }
