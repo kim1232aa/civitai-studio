@@ -1,7 +1,8 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0791";
-  const STORE_OLD = "nl-storyboard-v0790";
+  const STORE = "nl-storyboard-v0793";
+  const STORE_OLDS = ["nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
   const wires = $("wires");
@@ -9,7 +10,7 @@
   const DEMO = "/out/fal_fal-ai_flux_schnell_01a05be2-19bd-75e1-8053-0a6f8de59915_0.jpg";
 
   const state = {
-    cam: { x: 90, y: 36, s: 0.3 },
+    cam: { x: 90, y: 36, s: 0.5 },
     nodes: [],
     edges: [],
     selected: null,
@@ -22,6 +23,7 @@
     history: [],
     railTab: "assets",
     atFilter: "",
+    snapTarget: null,
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -56,6 +58,12 @@
     if (n.kind === "shot") return (n.title || "分镜") + "成片";
     return n.title || "资产";
   }
+  function mediaBadge(n) {
+    if (!n || !n.url) return "";
+    if (isVideoUrl(n.url)) return '<span class="badge vid">视频</span>';
+    return '<span class="badge">图片</span>';
+  }
+  function isStubMode() { return state.mode === "text" || state.mode === "audio"; }
 
   function loadDemo() {
     const list = [
@@ -105,12 +113,20 @@
   }
   function restore() {
     try {
-      const p = JSON.parse(sessionStorage.getItem(STORE) || sessionStorage.getItem(STORE_OLD) || "null");
+      let raw = sessionStorage.getItem(STORE);
+      if (!raw) {
+        for (let i = 0; i < STORE_OLDS.length; i++) {
+          raw = sessionStorage.getItem(STORE_OLDS[i]);
+          if (raw) break;
+        }
+      }
+      const p = JSON.parse(raw || "null");
       if (!p || !p.nodes || !p.nodes.length) return false;
       state.cam = p.cam || state.cam;
+      if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
       state.nodes = p.nodes;
       state.edges = p.edges || [];
-      state.mode = p.mode || "image";
+      state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
       state.railTab = p.railTab || "assets";
       if (p.backend && $("backend")) $("backend").value = p.backend;
       if (p.duration && $("duration")) $("duration").value = p.duration;
@@ -124,6 +140,8 @@
   function applyCam() {
     world.style.transform = "translate(" + state.cam.x + "px," + state.cam.y + "px) scale(" + state.cam.s + ")";
     $("zPct").textContent = Math.round(state.cam.s * 100) + "%";
+    drawMinimap();
+    positionDock();
   }
   function panTo(n) {
     if (!n) return;
@@ -142,26 +160,80 @@
     const y = n.y + b.h / 2;
     return side === "out" ? { x: n.x + b.w, y: y } : { x: n.x, y: y };
   }
+
+  function canLink(src, dst) {
+    if (!src || !dst || src.id === dst.id) return false;
+    if (dst.kind !== "shot") return false;
+    if (src.kind === "shot" && !isImageSource(src)) return false;
+    return true;
+  }
+
+  function nearestCompatiblePort(wx, wy, fromId, fromSide) {
+    const from = nodeById(fromId);
+    if (!from) return null;
+    let best = null;
+    let bestD = SNAP_PX;
+    state.nodes.forEach((n) => {
+      if (n.id === fromId) return;
+      let side = null;
+      let src = null;
+      let dst = null;
+      if (fromSide === "out") {
+        if (n.kind !== "shot") return;
+        side = "in";
+        src = from;
+        dst = n;
+      } else {
+        side = "out";
+        src = n;
+        dst = from;
+      }
+      if (!canLink(src, dst)) return;
+      const p = portPos(n, side);
+      const d = Math.hypot(p.x - wx, p.y - wy);
+      if (d <= bestD) {
+        bestD = d;
+        best = { id: n.id, side: side, x: p.x, y: p.y, dist: d };
+      }
+    });
+    return best;
+  }
+
   function drawWires() {
     const parts = ["<defs></defs>"];
-    state.edges.forEach((e) => {
+    state.edges.forEach((e, i) => {
       const a = nodeById(e.from), b = nodeById(e.to);
       if (!a || !b) return;
       const p1 = portPos(a, "out"), p2 = portPos(b, "in");
-      parts.push('<path d="' + bezier(p1.x, p1.y, p2.x, p2.y) + '" />');
+      parts.push('<path class="edge" data-ei="' + i + '" d="' + bezier(p1.x, p1.y, p2.x, p2.y) + '" />');
     });
     if (state.link && state.link.x2 != null) {
-      parts.push('<path d="' + bezier(state.link.x1, state.link.y1, state.link.x2, state.link.y2) + '" style="opacity:1;stroke:#fff" />');
+      const snap = state.snapTarget;
+      const cls = snap ? "snap" : "live";
+      const x2 = snap ? snap.x : state.link.x2;
+      const y2 = snap ? snap.y : state.link.y2;
+      parts.push('<path class="' + cls + '" d="' + bezier(state.link.x1, state.link.y1, x2, y2) + '" />');
     }
     wires.innerHTML = parts.join("");
     const maxX = Math.max(2400, ...state.nodes.map((n) => n.x + box(n).w + 400));
     const maxY = Math.max(2400, ...state.nodes.map((n) => n.y + box(n).h + 400));
     wires.setAttribute("width", String(maxX));
     wires.setAttribute("height", String(maxY));
+    updatePortHot();
+  }
+
+  function updatePortHot() {
+    world.querySelectorAll(".port.snap-hot").forEach((el) => el.classList.remove("snap-hot"));
+    if (!state.snapTarget) return;
+    const card = world.querySelector('.card[data-id="' + state.snapTarget.id + '"]');
+    if (!card) return;
+    const port = card.querySelector('.port[data-side="' + state.snapTarget.side + '"]');
+    if (port) port.classList.add("snap-hot");
   }
 
   function cardHTML(n) {
     const sel = state.selected === n.id ? " sel" : "";
+    const badge = mediaBadge(n);
     if (n.kind === "shot") {
       const media = n.url
         ? (isVideoUrl(n.url)
@@ -170,20 +242,134 @@
         : '<div class="face"><div style="font-size:22px">▢</div><div class="hint">点击查看或编辑提示词</div></div>';
       return '<div class="card shot' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + '</div>' +
+        badge +
         '<div class="face">' + media + '</div>' +
-        '<button class="port in" data-side="in" type="button">+</button>' +
-        '<button class="port out" data-side="out" type="button">+</button></div>';
+        '<button class="port in" data-side="in" type="button" aria-label="输入"></button>' +
+        '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
     }
     const thumb = n.url
       ? '<img class="thumb" src="' + esc(n.url) + '" alt="">'
       : '<div class="ph">▣</div>';
     return '<div class="card asset' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
-      thumb + '<div class="name">' + esc(n.title) + '</div>' +
-      '<button class="port out" data-side="out" type="button">+</button></div>';
+      badge + thumb + '<div class="name">' + esc(n.title) + '</div>' +
+      '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
   }
   function renderCards() {
     world.querySelectorAll(".card").forEach((el) => el.remove());
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
+    drawMinimap();
+  }
+
+  function worldBounds() {
+    if (!state.nodes.length) return { minX: 0, minY: 0, maxX: 1600, maxY: 1000 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    state.nodes.forEach((n) => {
+      const b = box(n);
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + b.w);
+      maxY = Math.max(maxY, n.y + b.h);
+    });
+    const pad = 120;
+    return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+  }
+
+  function drawMinimap() {
+    const cv = $("minimapCv");
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#121216";
+    ctx.fillRect(0, 0, W, H);
+    const b = worldBounds();
+    const bw = Math.max(1, b.maxX - b.minX);
+    const bh = Math.max(1, b.maxY - b.minY);
+    const scale = Math.min(W / bw, H / bh);
+    const ox = (W - bw * scale) / 2;
+    const oy = (H - bh * scale) / 2;
+    state._mmap = { b: b, scale: scale, ox: ox, oy: oy, W: W, H: H };
+    state.nodes.forEach((n) => {
+      const nb = box(n);
+      const x = ox + (n.x - b.minX) * scale;
+      const y = oy + (n.y - b.minY) * scale;
+      const w = Math.max(2, nb.w * scale);
+      const h = Math.max(2, nb.h * scale);
+      ctx.fillStyle = n.kind === "shot" ? "#3a3a48" : "#2a3a36";
+      ctx.fillRect(x, y, w, h);
+      if (state.selected === n.id) {
+        ctx.strokeStyle = n.kind === "shot" ? "#fff" : "#5ee0c5";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+      }
+    });
+    const r = vp.getBoundingClientRect();
+    const wx0 = -state.cam.x / state.cam.s;
+    const wy0 = -state.cam.y / state.cam.s;
+    const ww = r.width / state.cam.s;
+    const wh = r.height / state.cam.s;
+    const fx = ox + (wx0 - b.minX) * scale;
+    const fy = oy + (wy0 - b.minY) * scale;
+    const fw = ww * scale;
+    const fh = wh * scale;
+    ctx.strokeStyle = "rgba(94,224,197,.85)";
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(fx, fy, fw, fh);
+    ctx.fillStyle = "rgba(94,224,197,.08)";
+    ctx.fillRect(fx, fy, fw, fh);
+  }
+
+  function panFromMinimap(cx, cy) {
+    const mm = $("minimap");
+    const meta = state._mmap;
+    if (!mm || !meta) return;
+    const r = mm.getBoundingClientRect();
+    const mx = ((cx - r.left) / r.width) * meta.W;
+    const my = ((cy - r.top) / r.height) * meta.H;
+    const wx = meta.b.minX + (mx - meta.ox) / meta.scale;
+    const wy = meta.b.minY + (my - meta.oy) / meta.scale;
+    const vr = vp.getBoundingClientRect();
+    state.cam.x = vr.width / 2 - wx * state.cam.s;
+    state.cam.y = vr.height / 2 - wy * state.cam.s;
+    applyCam();
+    persist();
+  }
+
+  function positionDock() {
+    if (!dock || !dock.classList.contains("show")) return;
+    const n = nodeById(state.selected);
+    if (!n || n.kind !== "shot") {
+      dock.classList.remove("near");
+      dock.style.left = "";
+      dock.style.top = "";
+      dock.style.bottom = "";
+      dock.style.transform = "";
+      return;
+    }
+    const stage = dock.parentElement;
+    if (!stage) return;
+    const sr = stage.getBoundingClientRect();
+    const vr = vp.getBoundingClientRect();
+    const b = box(n);
+    const sx = vr.left + state.cam.x + (n.x + b.w / 2) * state.cam.s;
+    const syBottom = vr.top + state.cam.y + (n.y + b.h) * state.cam.s;
+    const syTop = vr.top + state.cam.y + n.y * state.cam.s;
+    const dockW = Math.min(860, Math.max(320, sr.width - 80));
+    dock.style.width = dockW + "px";
+    const dw = dock.offsetWidth || dockW;
+    const dh = dock.offsetHeight || 260;
+    let left = sx - sr.left - dw / 2;
+    left = Math.max(16, Math.min(left, sr.width - dw - 16));
+    let top = syBottom - sr.top + 14;
+    if (top + dh > sr.height - 12) {
+      top = syTop - sr.top - dh - 28;
+    }
+    if (top < 56) top = Math.max(56, sr.height - dh - 16);
+    dock.classList.add("near");
+    dock.style.left = left + "px";
+    dock.style.top = top + "px";
+    dock.style.bottom = "auto";
+    dock.style.transform = "none";
   }
 
   function renderRail() {
@@ -193,8 +379,8 @@
     const canPin = shot && shot.kind === "shot";
     const tabAssets = state.railTab !== "history";
     const tabs = '<div class="rail-tabs">' +
-      '<button type="button" data-tab="assets"' + (tabAssets ? ' class="on"' : "") + ">资产</button>' +
-      '<button type="button" data-tab="history"' + (!tabAssets ? ' class="on"' : "") + ">历史</button></div>';
+      '<button type="button" data-tab="assets"' + (tabAssets ? ' class="on"' : "") + ">资产</button>" +
+      '<button type="button" data-tab="history"' + (!tabAssets ? ' class="on"' : "") + ">历史</button></div>";
     let body;
     if (tabAssets) {
       const list = assets();
@@ -226,18 +412,27 @@
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
+      dock.classList.remove("near");
       renderRail();
       return;
     }
     dock.classList.add("show");
     $("prompt").value = n.prompt || "";
-    $("modeVid").classList.toggle("on", state.mode === "video");
-    $("modeImg").classList.toggle("on", state.mode === "image");
+    ["text", "image", "video", "audio"].forEach((m) => {
+      const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
+      if (el) el.classList.toggle("on", state.mode === m);
+    });
     const list = assets();
     const linked = connectedAssets(n.id);
     const frame = frameAsset(n);
     const needFrame = state.mode === "video" && !frame;
-    if ($("send")) $("send").disabled = needFrame;
+    const stub = isStubMode();
+    if ($("send")) $("send").disabled = needFrame || stub;
+    if (stub) {
+      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
+    } else if (needFrame) {
+      setMsg("视频需要先连一张首帧图", "warn");
+    }
     let frameHtml = "";
     if (state.mode === "video") {
       if (frame) {
@@ -263,6 +458,7 @@
           (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
       }).join("");
     renderRail();
+    requestAnimationFrame(positionDock);
   }
 
   function selectNode(id) {
@@ -456,14 +652,52 @@
     g.classList.add("show");
   }
 
+  function disconnectEdgeAt(index) {
+    const e = state.edges[index];
+    if (!e) return;
+    const src = nodeById(e.from);
+    const dst = nodeById(e.to);
+    if (src && dst) unlinkAssetFromShot(src, dst);
+    else state.edges.splice(index, 1);
+    drawWires();
+    renderDock();
+    persist();
+    setMsg("已断开连线", "ok");
+  }
+
+  wires.addEventListener("click", (e) => {
+    const path = e.target.closest("path.edge");
+    if (!path) return;
+    e.stopPropagation();
+    const ei = Number(path.getAttribute("data-ei"));
+    if (!Number.isFinite(ei)) return;
+    disconnectEdgeAt(ei);
+  });
+
+  if ($("minimap")) {
+    $("minimap").addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      panFromMinimap(e.clientX, e.clientY);
+      const move = (ev) => panFromMinimap(ev.clientX, ev.clientY);
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  }
+
   vp.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost")) return;
+    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost,.minimap")) return;
+    if (e.target.closest("path.edge")) return;
     const port = e.target.closest(".port");
     const card = e.target.closest(".card");
     if (port && card) {
       const n = nodeById(card.dataset.id);
       const p = portPos(n, port.dataset.side === "in" ? "in" : "out");
       state.link = { from: n.id, side: port.dataset.side, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+      state.snapTarget = null;
       vp.setPointerCapture(e.pointerId);
       return;
     }
@@ -482,13 +716,17 @@
   vp.addEventListener("pointermove", (e) => {
     if (state.link) {
       const w = clientToWorld(e.clientX, e.clientY);
-      state.link.x2 = w.x; state.link.y2 = w.y; drawWires(); return;
+      state.snapTarget = nearestCompatiblePort(w.x, w.y, state.link.from, state.link.side);
+      state.link.x2 = w.x;
+      state.link.y2 = w.y;
+      drawWires();
+      return;
     }
     if (state.drag) {
       const w = clientToWorld(e.clientX, e.clientY);
       const n = nodeById(state.drag.id);
       n.x = w.x - state.drag.dx; n.y = w.y - state.drag.dy;
-      renderCards(); drawWires(); return;
+      renderCards(); drawWires(); positionDock(); return;
     }
     if (state.pan) {
       state.cam.x = e.clientX - state.pan.x;
@@ -499,20 +737,22 @@
   vp.addEventListener("pointerup", (e) => {
     if (state.link) {
       const w = clientToWorld(e.clientX, e.clientY);
-      const target = hitNode(w.x, w.y);
+      const snap = state.snapTarget || nearestCompatiblePort(w.x, w.y, state.link.from, state.link.side);
+      let target = snap ? nodeById(snap.id) : hitNode(w.x, w.y);
       if (target && target.id !== state.link.from) {
         const a = nodeById(state.link.from);
         const dst = target.kind === "shot" ? target : (a.kind === "shot" ? a : null);
         const src = dst === target ? a : target;
-        if (src && dst && dst.kind === "shot" && src.id !== dst.id && (src.kind !== "shot" || isImageSource(src))) {
+        if (src && dst && canLink(src, dst)) {
           linkAssetToShot(src, dst);
           selectNode(dst.id);
         }
       }
       state.link = null;
+      state.snapTarget = null;
       drawWires(); persist();
     }
-    if (state.drag) persist();
+    if (state.drag) { persist(); positionDock(); }
     state.drag = null; state.pan = null;
     vp.classList.remove("grabbing");
   });
@@ -706,8 +946,16 @@
       showAtbox(before.slice(at + 1));
     } else hideAtbox();
   });
-  $("modeImg").onclick = () => { state.mode = "image"; renderDock(); persist(); };
-  $("modeVid").onclick = () => { state.mode = "video"; renderDock(); persist(); };
+
+  function setMode(mode) {
+    state.mode = mode;
+    renderDock();
+    persist();
+  }
+  if ($("modeText")) $("modeText").onclick = () => setMode("text");
+  if ($("modeImg")) $("modeImg").onclick = () => setMode("image");
+  if ($("modeVid")) $("modeVid").onclick = () => setMode("video");
+  if ($("modeAud")) $("modeAud").onclick = () => setMode("audio");
   ["backend", "service", "duration", "aspect", "res"].forEach((id) => {
     if ($(id)) $(id).addEventListener("change", persist);
   });
@@ -752,6 +1000,10 @@
   async function generate() {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
+    if (isStubMode()) {
+      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
+      return;
+    }
     if (state.mode === "video" && !frameAsset(shot)) {
       setMsg("视频需要先连一张首帧图，不能偷配方台", "bad"); return;
     }
@@ -818,7 +1070,7 @@
     renderCards(); drawWires(); persist();
   };
   $("btnFit").onclick = () => {
-    state.cam = { x: 90, y: 36, s: 0.3 }; applyCam(); persist();
+    state.cam = { x: 90, y: 36, s: 0.5 }; applyCam(); persist();
   };
   $("zIn").onclick = () => { state.cam.s = Math.min(1.5, state.cam.s * 1.12); applyCam(); persist(); };
   $("zOut").onclick = () => { state.cam.s = Math.max(0.16, state.cam.s * 0.9); applyCam(); persist(); };
@@ -853,6 +1105,8 @@
     } catch (_) {}
   }
   $("backend").onchange = loadCatalog;
+
+  window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
   applyCam();

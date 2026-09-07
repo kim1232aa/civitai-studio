@@ -4,12 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0792-route</title>
+<title>画布 · Night Lab · v0793-seko-ui</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
     --text:#ececec; --muted:#8b8b94; --teal:#5ee0c5; --coral:#e85d4c;
     --ok:#3dd68c; --buzz:#f0c36a; --card:#16161a;
+    --wire:#e8e8f0; --port:#a8a8b4;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
@@ -41,35 +42,51 @@
   .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
   .grid{position:absolute;inset:-4000px;background-image:radial-gradient(circle, #2a2a32 1px, transparent 1.2px);
     background-size:28px 28px;pointer-events:none;opacity:.55}
-  svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
-  svg.wires path{fill:none;stroke:#cfcfd6;stroke-width:1.4;opacity:.55}
-  .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28)}
-  .asset{width:132px;border-radius:10px;overflow:hidden}
-  .asset .thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%}
-  .asset .ph{height:176px;display:grid;place-items:center;color:#5a5a64;font-size:22px;background:#141418}
-  .asset .name{padding:7px 8px;font-size:11px;color:#d0d0d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .shot{width:640px;height:360px;border-radius:16px;background:#121214}
+  svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:2}
+  svg.wires path.edge{fill:none;stroke:var(--wire);stroke-width:2.2;opacity:.88;pointer-events:stroke;cursor:pointer}
+  svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:2.6}
+  svg.wires path.live{fill:none;stroke:#fff;stroke-width:2.2;opacity:.95;pointer-events:none}
+  svg.wires path.snap{fill:none;stroke:var(--teal);stroke-width:2.4;opacity:1;pointer-events:none}
+  .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28);z-index:3}
+  .asset{width:132px;border-radius:10px;overflow:visible}
+  .asset .thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%;border-radius:10px 10px 0 0}
+  .asset .ph{height:176px;display:grid;place-items:center;color:#5a5a64;font-size:22px;background:#141418;border-radius:10px 10px 0 0}
+  .asset .name{padding:7px 8px;font-size:11px;color:#d0d0d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    background:var(--card);border-radius:0 0 10px 10px;border:1px solid #2a2a30;border-top:0;margin-top:-1px}
+  .shot{width:640px;height:360px;border-radius:16px;background:#121214;overflow:visible}
   .shot .label{position:absolute;top:-22px;left:0;font-size:11px;color:#9a9aa3;display:flex;align-items:center;gap:5px}
-  .shot .face{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6a6a74;gap:8px}
+  .shot .face{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6a6a74;gap:8px;
+    border-radius:15px;overflow:hidden}
   .shot .face img,.shot .face video{width:100%;height:100%;object-fit:cover;border-radius:15px}
   .shot .hint{font-size:11px}
   .shot.sel{border-color:#fff;box-shadow:0 0 0 1px #fff, 0 16px 40px rgba(0,0,0,.4)}
   .asset.sel{border-color:#5ee0c5}
-  .port{position:absolute;width:18px;height:18px;border-radius:50%;border:1px solid #4a4a52;
-    background:#1a1a1e;color:#bbb;font-size:12px;display:grid;place-items:center;z-index:3}
-  .asset .port.out{right:-9px;top:50%;transform:translateY(-50%)}
-  .shot .port.in{left:-9px;top:50%;transform:translateY(-50%)}
-  .shot .port.out{right:-9px;top:50%;transform:translateY(-50%)}
-  .zoom{position:absolute;left:14px;bottom:18px;z-index:12;display:flex;align-items:center;gap:8px;
+  .badge{position:absolute;top:8px;left:8px;z-index:4;font-size:10px;line-height:1;padding:4px 7px;border-radius:6px;
+    background:rgba(12,12,16,.78);border:1px solid rgba(255,255,255,.12);color:#e8e8ec;backdrop-filter:blur(6px);pointer-events:none}
+  .badge.vid{border-color:rgba(94,224,197,.35);color:#b8f5e6}
+  .port{position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid var(--port);
+    background:transparent;padding:0;z-index:5;box-shadow:0 0 0 3px rgba(11,11,13,.55)}
+  .port::before{content:"";position:absolute;inset:-12px;border-radius:50%}
+  .port:hover,.port.snap-hot{border-color:var(--teal);box-shadow:0 0 0 3px rgba(94,224,197,.25),0 0 12px rgba(94,224,197,.35)}
+  .asset .port.out{right:-8px;top:50%;transform:translateY(-50%)}
+  .shot .port.in{left:-8px;top:50%;transform:translateY(-50%)}
+  .shot .port.out{right:-8px;top:50%;transform:translateY(-50%)}
+  .zoom{position:absolute;left:188px;bottom:18px;z-index:12;display:flex;align-items:center;gap:8px;
     background:#141416;border:1px solid var(--line);border-radius:12px;padding:4px 8px;color:var(--muted)}
   .zoom button{background:transparent;border:0;color:#ddd;width:24px;height:24px}
-  .dock{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(820px,calc(100vw - 80px));
-    z-index:16;background:#16161aee;border:1px solid #2c2c34;border-radius:18px;padding:12px 14px 12px;
-    box-shadow:0 20px 60px rgba(0,0,0,.45);backdrop-filter:blur(16px);display:none}
+  .minimap{position:absolute;left:14px;bottom:18px;z-index:12;width:160px;height:100px;border-radius:10px;
+    border:1px solid #2c2c34;background:#121216ee;backdrop-filter:blur(8px);overflow:hidden;cursor:crosshair;
+    box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .minimap canvas{display:block;width:100%;height:100%}
+  .dock{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(860px,calc(100vw - 80px));
+    z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:20px;padding:12px 14px 12px;
+    box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(18px);display:none}
   .dock.show{display:block}
-  .modes{display:flex;gap:8px;margin-bottom:10px}
-  .modes button{border:1px solid #2e2e36;background:#1a1a1f;color:#aaa;border-radius:999px;padding:6px 12px;font-size:12px}
-  .modes button.on{color:#fff;border-color:#4a4a54;background:#222228}
+  .dock.near{transform:none}
+  .modes{display:flex;gap:4px;margin-bottom:10px;background:#121216;border:1px solid #2a2a32;border-radius:999px;padding:3px;width:fit-content;max-width:100%;flex-wrap:wrap}
+  .modes button{border:0;background:transparent;color:#8b8b94;border-radius:999px;padding:6px 12px;font-size:12px}
+  .modes button.on{color:#fff;background:#26262e;box-shadow:inset 0 0 0 1px #3a3a44}
+  .modes button.stub{opacity:.7}
   .refs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .chip-btn,.chip{width:44px;height:44px;border-radius:10px;border:1px solid #2e2e36;background:#1a1a1f;
     display:grid;place-items:center;color:#9a9aa3;font-size:10px;overflow:hidden}
@@ -82,9 +99,9 @@
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
   .mention{color:var(--teal)}
-  .bar{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .bar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
   .bar select{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;min-width:0}
-  .bar .grow{flex:1}
+  .bar .grow{flex:1;min-width:8px}
   .send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px;flex-shrink:0}
   .send:disabled{opacity:.4}
   .msg{margin-top:8px;font-size:12px;color:var(--muted);min-height:1.2em}
@@ -140,7 +157,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0792-route</span>
+      <span class="stamp">v0793-seko-ui</span>
     </div>
   </header>
   <div class="stage">
@@ -157,16 +174,19 @@
         <svg class="wires" id="wires"></svg>
       </div>
     </div>
+    <div class="minimap" id="minimap" title="小地图 · 点击平移"><canvas id="minimapCv" width="160" height="100"></canvas></div>
     <div class="zoom">
       <button type="button" id="zOut">−</button>
-      <span id="zPct">30%</span>
+      <span id="zPct">50%</span>
       <button type="button" id="zIn">+</button>
     </div>
     <div class="picker" id="picker"></div>
     <aside class="dock" id="dock">
       <div class="modes">
-        <button type="button" id="modeImg">图片生成</button>
-        <button type="button" id="modeVid">视频生成</button>
+        <button type="button" id="modeText" class="stub" data-mode="text">文本生成</button>
+        <button type="button" id="modeImg" data-mode="image">图片生成</button>
+        <button type="button" id="modeVid" data-mode="video">视频生成</button>
+        <button type="button" id="modeAud" class="stub" data-mode="audio">音频生成</button>
       </div>
       <div class="refs" id="refs"></div>
       <textarea class="prompt" id="prompt" placeholder="点击查看或编辑提示词"></textarea>
