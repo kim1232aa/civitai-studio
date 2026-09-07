@@ -231,6 +231,78 @@ def test_http_persists_canvas_state_and_assets():
             thread.join(timeout=5)
 
 
+def test_http_put_get_round_trips_multiple_canvas_graphs():
+    with TemporaryDirectory(dir=ROOT / ".test-tmp") as tmp:
+        server.canvas_store = CanvasStore(Path(tmp) / "projects.json")
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+        try:
+            status, payload = request(
+                base, "POST", "/api/canvas-projects", {"name": "多画布图数据"}
+            )
+            assert status == 201
+            project = payload["project"]
+            project_id = project["id"]
+            template = project["canvases"][0]
+
+            graph_a = {
+                "nodes": [
+                    {"id": "text-a", "kind": "text", "x": -120, "y": 40, "text": "镜头 A"},
+                    {"id": "shot-a", "kind": "shot", "x": 320, "y": 40, "prompt": "雨夜追逐"},
+                ],
+                "edges": [
+                    {"from": "text-a", "fromPort": "text", "to": "shot-a", "toPort": "prompt"}
+                ],
+                "viewport": {"x": -240, "y": 36, "zoom": 0.72},
+            }
+            graph_b = {
+                "nodes": [
+                    {"id": "asset-b", "kind": "image", "x": 80, "y": -60, "url": "/out/b.jpg"},
+                    {"id": "shot-b", "kind": "shot", "x": 520, "y": -60, "prompt": "白昼远景"},
+                ],
+                "edges": [
+                    {"from": "asset-b", "fromPort": "image", "to": "shot-b", "toPort": "image"}
+                ],
+                "viewport": {"x": 128, "y": -88, "zoom": 1.35},
+            }
+            canvas_a = {**template, "id": "canvas-graph-a", "name": "图 A", **graph_a}
+            canvas_b = {**template, "id": "canvas-graph-b", "name": "图 B", **graph_b}
+            state = {
+                "assets": [],
+                "canvases": [canvas_a, canvas_b],
+                "activeCanvasId": canvas_b["id"],
+                "script": {"script": "", "scenes": "", "characters": "", "shots": ""},
+                "editor": {"content": ""},
+            }
+
+            status, payload = request(
+                base, "PUT", f"/api/canvas-projects/{project_id}/state", state
+            )
+            assert status == 200
+
+            status, payload = request(
+                base, "GET", f"/api/canvas-projects/{project_id}"
+            )
+            assert status == 200
+            stored = payload["project"]
+            assert stored["activeCanvasId"] == canvas_b["id"]
+            canvases = {canvas["id"]: canvas for canvas in stored["canvases"]}
+            assert set(canvases) == {"canvas-graph-a", "canvas-graph-b"}
+            for expected in (canvas_a, canvas_b):
+                actual = canvases[expected["id"]]
+                assert actual["nodes"] == expected["nodes"]
+                assert actual["edges"] == expected["edges"]
+                assert actual["viewport"] == expected["viewport"]
+            assert canvases["canvas-graph-a"]["nodes"] != canvases["canvas-graph-b"]["nodes"]
+            assert canvases["canvas-graph-a"]["edges"] != canvases["canvas-graph-b"]["edges"]
+            assert canvases["canvas-graph-a"]["viewport"] != canvases["canvas-graph-b"]["viewport"]
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+
 def test_http_put_replaces_whole_state_patch_merges():
     with TemporaryDirectory(dir=ROOT / ".test-tmp") as tmp:
         server.canvas_store = CanvasStore(Path(tmp) / "projects.json")
@@ -353,6 +425,7 @@ if __name__ == "__main__":
         test_store_new_canvas_is_empty,
         test_http_crud_list_create_duplicate_rename_delete,
         test_http_persists_canvas_state_and_assets,
+        test_http_put_get_round_trips_multiple_canvas_graphs,
         test_http_put_replaces_whole_state_patch_merges,
         test_http_rejects_invalid_project_operations,
     ]
