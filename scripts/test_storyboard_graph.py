@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0814" in js, "STORE must bump to v0814")
-    assert_true("nl-storyboard-v0813" in js, "STORE_OLDS must keep v0813 for migrate")
+    assert_true("nl-storyboard-v0815" in js, "STORE must bump to v0815")
+    assert_true("nl-storyboard-v0814" in js, "STORE_OLDS must keep v0814 for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0814-empty-boot" in html, "stamp must be v0814-empty-boot")
+    assert_true("v0815-gen-hardgate" in html, "stamp must be v0815-gen-hardgate")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,8 +282,44 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0814-empty-boot" in html, "html stamp")
-    assert_true("nl-storyboard-v0814" in js, "STORE v0814")
+    assert_true("v0815-gen-hardgate" in html, "html stamp")
+    assert_true("nl-storyboard-v0815" in js, "STORE v0815")
+
+
+def test_v0815_gen_hardgate():
+    """v0815 hard gate: expanded dock, multi-ref pack via capabilities, aspectRatio, duration 5s."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0815-gen-hardgate" in html, "html stamp v0815-gen-hardgate")
+    assert_true("nl-storyboard-v0815" in js, "STORE v0815")
+    assert_true("nl-storyboard-v0814" in js, "STORE_OLDS prepend v0814")
+    assert_true('dockMode: "expanded"' in js, "dock default expanded")
+    assert_true("function attachExtraImages" in js, "attachExtraImages helper")
+    assert_true("function maxRefCount" in js, "maxRefCount helper")
+    assert_true("function resolveRefCaps" in js, "resolveRefCaps from capabilities")
+    assert_true("refImagesField" in js, "pack onto refImagesField")
+    assert_true("PROVIDER_REF_CAPS" in js, "provider ref defaults")
+    assert_true("input_references" in js, "nano default field")
+    assert_true("attachExtraImages(payload, shot)" in js, "attach before generate")
+    assert_true("aspectRatio" in js, "buildGraph aspectRatio from UI")
+    assert_true("catalogById" in js, "loadCatalog catalogById")
+    assert_true("maxImages" in js and "maxRefs" in js, "catalog maxImages/maxRefs")
+    assert_true("capabilities" in js, "read item.capabilities")
+    # duration default 5s selected in HTML
+    assert_true('<option selected>5s</option>' in html or '<option selected="">5s</option>' in html, "duration default 5s")
+    # Composer chip / selectNode expand
+    assert_true('setDockMode("expanded")' in js, "chip/select opens expanded")
+    # still must not touch gates
+    assert_true("stages[0].payload" not in js, "still no stages[0] fake-run")
+    assert_true("function invalidateStageProgress" in js, "invalidateStageProgress kept")
+    assert_true("function nextRunnableStage" in js, "nextRunnableStage kept")
+    assert_true("shot.stageUrls = {}" in js, "stageUrls clear kept")
+    # i2v still requires firstFrame / frameAsset
+    assert_true("function frameAsset" in js, "frameAsset kept")
+    assert_true("视频需要先连一张首帧图" in js, "i2v firstFrame gate kept")
+    # Do not infer always-1 from field name alone
+    assert_true('Do NOT infer "always 1" from field name alone' in js or "Do NOT infer" in js, "no always-1 from field name")
+
 
 def main():
     tests = [
@@ -301,6 +337,7 @@ def main():
         test_ui_clears_stage_urls_on_disconnect,
         test_selbar_scoped_layout_skips_exclusive_outside_asset,
         test_empty_boot_no_robot_demo,
+        test_v0815_gen_hardgate,
     ]
     failed = 0
     for fn in tests:

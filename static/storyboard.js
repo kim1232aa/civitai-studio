@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0814";
-  const STORE_OLDS = ["nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0815";
+  const STORE_OLDS = ["nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -51,6 +51,7 @@
     railDrag: null,
     mode: "image",
     catalog: [],
+    catalogById: {},
     history: [],
     railTab: "assets",
     atFilter: "",
@@ -62,7 +63,7 @@
     skillCat: "官方精选",
     runningGroup: false,
     groupRunAbort: false,
-    dockMode: "collapsed",
+    dockMode: "expanded",
     lastComposerShot: null,
   };
 
@@ -124,7 +125,7 @@
     }
     if (state.mode === "video") {
       const d = $("duration") && $("duration").value;
-      return d || "12s";
+      return d || "5s";
     }
     return "";
   }
@@ -406,7 +407,8 @@
             : '<img src="' + esc(n.url) + '" alt="">')
         : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
-      return '<div class="card shot' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+      const busy = n._busy ? " busy" : "";
+      return '<div class="card shot' + sel + multi + busy + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -699,11 +701,15 @@
     const promoteBtn = n.url && !isVideoUrl(n.url)
       ? '<button class="chip-btn" type="button" data-act="promote" title="收进资产库">入库</button>'
       : "";
+    const refCap = maxRefCount(catalogItemForService());
+    const refHint = linked.length > refCap
+      ? '<span class="chip-btn" title="参考图上限">最多 ' + refCap + ' 张参考</span>'
+      : (linked.length ? '<span class="chip-btn" title="参考图上限">参考 ' + linked.length + '/' + refCap + '</span>' : "");
     $("refs").innerHTML = frameHtml +
       '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
       '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-      promoteBtn +
-      linked.concat(list.filter((a) => !linked.includes(a))).slice(0, 8).map((a) => {
+      promoteBtn + refHint +
+      linked.concat(list.filter((a) => !linked.includes(a))).slice(0, refCap).map((a) => {
         const on = linked.some((x) => x.id === a.id) ? " on" : "";
         return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
           (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
@@ -725,8 +731,9 @@
     const n = nodeById(id);
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
-      if (state.dockMode === "closed" && !opts.keepClosed) state.dockMode = "collapsed";
-      if (opts.expand) state.dockMode = "expanded";
+      // Hard gate: selecting a shot opens Composer expanded (prompt+send visible).
+      if (!opts.keepClosed) state.dockMode = "expanded";
+      else if (opts.expand) state.dockMode = "expanded";
     }
     renderCards();
     drawWires();
@@ -1596,7 +1603,7 @@
       const shot = nodeById(id);
       if (!shot || shot.kind !== "shot") return;
       if (state.selected !== shot.id) selectNode(shot.id, { keepClosed: true });
-      setDockMode("collapsed");
+      setDockMode("expanded");
     };
   }
   if ($("dockHd")) {
@@ -1677,6 +1684,84 @@
     $("msg").className = "msg" + (cls ? " " + cls : "");
   }
 
+
+  function catalogItemForService() {
+    const sid = $("service") && $("service").value;
+    if (!sid) return null;
+    if (state.catalogById && state.catalogById[sid]) return state.catalogById[sid];
+    const list = state.catalog || [];
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      if ((it.id || it.name) === sid) return it;
+    }
+    return null;
+  }
+
+  // Provider defaults (capabilities): catalog may only tighten, never raise.
+  // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope=1+image_url.
+  const PROVIDER_REF_CAPS = {
+    civitai: { maxRefs: 9, refImagesField: "images" },
+    fal: { maxRefs: 9, refImagesField: "image_urls" },
+    huggingface: { maxRefs: 9, refImagesField: "image_urls" },
+    "nano-gpt": { maxRefs: 5, refImagesField: "input_references" },
+    "modelscope-ai": { maxRefs: 1, refImagesField: "image_url" },
+    "modelscope-cn": { maxRefs: 1, refImagesField: "image_url" },
+  };
+
+  function providerRefDefaults() {
+    const backend = ($("backend") && $("backend").value) || "fal";
+    return PROVIDER_REF_CAPS[backend] || { maxRefs: 9, refImagesField: "images" };
+  }
+
+  // Resolve caps from catalog item.capabilities (or top-level), clamped to provider default.
+  function resolveRefCaps(it) {
+    const prov = providerRefDefaults();
+    const caps = (it && it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const raw = caps.maxRefs || caps.maxImages || (it && (it.maxRefs || it.maxImages));
+    let max = Number(raw);
+    if (!(max > 0 && max < 99)) max = Number(prov.maxRefs) || 9;
+    const ceil = Number(prov.maxRefs) || 9;
+    if (max > ceil) max = ceil; // catalog may only tighten
+    if (!(max > 0)) max = 1; // slice(0, caps.maxRefs||caps.maxImages||1)
+    const field = (caps.refImagesField || (it && it.refImagesField) || prov.refImagesField || "images");
+    return { maxRefs: max, refImagesField: String(field) };
+  }
+
+  function maxRefCount(it) {
+    return resolveRefCaps(it).maxRefs;
+  }
+
+  // After compile: pack [primary, ...other linked] onto capabilities.refImagesField,
+  // capped by maxRefs||maxImages. Keep ONE compile image wire (firstFrame/sourceImage).
+  function attachExtraImages(payload, shot) {
+    if (!payload || !shot) return payload;
+    const linked = connectedAssets(shot.id);
+    const primaryNode = frameAsset(shot);
+    const primary = payload.firstFrame || payload.sourceImage || (primaryNode && primaryNode.url) || "";
+    const urls = [];
+    if (primary) urls.push(primary);
+    linked.forEach((a) => {
+      if (a && a.url && urls.indexOf(a.url) < 0) urls.push(a.url);
+    });
+    if (!urls.length) return payload;
+    const resolved = resolveRefCaps(catalogItemForService());
+    const cap = resolved.maxRefs;
+    const field = resolved.refImagesField || "images";
+    const sliced = urls.slice(0, cap);
+    // Do NOT infer "always 1" from field name alone — honor cap.
+    // Singular string only when cap produced a single URL on image_url.
+    if (field === "image_url" && sliced.length === 1) payload[field] = sliced[0];
+    else payload[field] = sliced;
+    return payload;
+  }
+
+  function setShotBusy(shot, on) {
+    if (!shot) return;
+    shot._busy = !!on;
+    const card = world.querySelector('.card[data-id="' + shot.id + '"]');
+    if (card) card.classList.toggle("busy", !!on);
+  }
+
   function buildGraph(shot) {
     const frame = frameAsset(shot);
     const linked = connectedAssets(shot.id);
@@ -1694,6 +1779,7 @@
         serviceId: $("service").value || (op === "i2v" ? "fal-ai/minimax/video-01" : "fal-ai/flux/schnell"),
         resolution: res,
         duration: parseInt($("duration").value, 10) || 5,
+        aspectRatio: ($("aspect") && $("aspect").value) || "16:9",
       },
     });
     const ref = (op === "i2v") ? frame : linked[0];
@@ -1815,8 +1901,10 @@
       }
     }
     const stageOp = stage ? stage.op : "";
+    attachExtraImages(payload, shot);
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
+    setShotBusy(shot, true);
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1828,6 +1916,7 @@
       if (jobId && !pickUrl(j)) {
         for (let i = 0; i < 40; i++) {
           if (state.groupRunAbort) {
+            setShotBusy(shot, false);
             if (!opts.keepSend) $("send").disabled = false;
             return { status: "aborted", stageOp: stageOp };
           }
@@ -1839,6 +1928,7 @@
         }
       }
       if (state.groupRunAbort) {
+        setShotBusy(shot, false);
         if (!opts.keepSend) $("send").disabled = false;
         return { status: "aborted", stageOp: stageOp };
       }
@@ -1863,17 +1953,20 @@
         renderCards(); drawWires(); persist();
         setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库"), "ok");
       } else {
+        setShotBusy(shot, false);
         setMsg(prefix + "云端已返回，没有可预览地址", "warn");
         if (!opts.keepSend) $("send").disabled = false;
         renderDock();
         return { status: "blocked", stageOp: stageOp };
       }
     } catch (e) {
+      setShotBusy(shot, false);
       setMsg(prefix + String(e), "bad");
       if (!opts.keepSend) $("send").disabled = false;
       renderDock();
       return { status: "error", stageOp: stageOp };
     }
+    setShotBusy(shot, false);
     if (!opts.keepSend) $("send").disabled = false;
     renderDock();
     return { status: "done", stageOp: stageOp };
@@ -2255,15 +2348,25 @@
 
   async function loadCatalog() {
     $("service").innerHTML = '<option value="">默认模型</option>';
+    state.catalogById = state.catalogById || {};
     try {
       const r = await fetch("/api/catalog?backend=" + encodeURIComponent($("backend").value));
       const j = await r.json();
-      (j.items || j.models || []).slice(0, 60).forEach((it) => {
+      const items = (j.items || j.models || []).slice(0, 60);
+      state.catalog = items;
+      // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
+      const byId = {};
+      items.forEach((it) => {
         const id = it.id || it.name || "";
+        if (id) {
+          byId[id] = it;
+          // keep maxImages / maxRefs / imageFields on the catalog row when present
+        }
         const o = document.createElement("option");
         o.value = id; o.textContent = it.name || id;
         $("service").appendChild(o);
       });
+      state.catalogById = byId;
       if (state._pendingService) {
         $("service").value = state._pendingService;
         state._pendingService = "";

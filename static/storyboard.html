@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0814-empty-boot</title>
+<title>画布 · Night Lab · v0815-gen-hardgate</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -235,6 +235,7 @@
   .import-ft .primary:disabled{opacity:.4;cursor:not-allowed}
 
   .card.multi{border-color:#5ee0c5;box-shadow:0 0 0 2px rgba(94,224,197,.55),0 16px 40px rgba(0,0,0,.35)}
+  .card.busy{outline:1px dashed rgba(94,224,197,.75);opacity:.88}
   .card.shot.multi.sel{border-color:#fff;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(94,224,197,.45),0 16px 40px rgba(0,0,0,.4)}
   .group-bound{position:absolute;z-index:2;pointer-events:auto;cursor:pointer;
     border:2px dashed #5ee0c5;border-radius:22px;background:rgba(94,224,197,.10);
@@ -285,7 +286,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0814-empty-boot</span>
+      <span class="stamp">v0815-gen-hardgate</span>
     </div>
   </header>
   <div class="stage">
@@ -364,7 +365,7 @@
         </select>
         <select id="service"></select>
         <select id="duration">
-          <option>5s</option><option selected>12s</option><option>16s</option>
+          <option selected>5s</option><option>12s</option><option>16s</option>
         </select>
         <select id="aspect">
           <option>16:9</option><option>9:16</option><option>1:1</option><option>21:9</option>
