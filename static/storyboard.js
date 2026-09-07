@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0812";
-  const STORE_OLDS = ["nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0813";
+  const STORE_OLDS = ["nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -2051,22 +2051,11 @@
       return;
     }
     let shotList = shots().filter((n) => !scopeIds || scopeIds.indexOf(n.id) >= 0);
-    const scopedAssets = assets().filter((n) => {
-      if (!scopeIds) return false; // full-canvas path handles orphans separately
-      if (scopeIds.indexOf(n.id) >= 0) return true;
-      // Clearly attached: edges only into scoped shots (not shared with outside)
-      const tos = state.edges.filter((e) => e.from === n.id).map((e) => e.to);
-      if (!tos.length) return false;
-      const scopedShotTos = tos.filter((to) => {
-        const t = nodeById(to);
-        return t && t.kind === "shot" && scopeIds.indexOf(to) >= 0;
-      });
-      if (!scopedShotTos.length) return false;
-      return tos.every((to) => scopeIds.indexOf(to) >= 0);
-    });
-    // Full-canvas: all assets eligible for orphan packing later; linked placed with shots
+    // Scoped (selBar / group): ONLY nodes in scopeIds move. Never yank exclusive
+    // linked assets that sit outside the selection — UI contract: unselected stay put.
+    // Full-canvas (#btnAuto, scopeIds=null): all assets still follow shots as before.
     const assetList = scopeIds
-      ? scopedAssets
+      ? assets().filter((n) => scopeIds.indexOf(n.id) >= 0)
       : assets().slice();
     if (scopeIds && scopeIds.length) {
       const order = {};
@@ -2158,7 +2147,7 @@
       const linked = connectedNodes(shot.id);
       linked.forEach((a, j) => {
         if (!a || a.kind === "shot") return;
-        // Scoped: only move in-scope / exclusively-attached assets (P1: no yank shared/outside)
+        // Scoped: only move assets whose id is in scopeIds (no exclusive-link expansion)
         if (scopeIds && !assetAllowed[a.id]) return;
         if (placed[a.id]) return;
         a.x = shot.x - 180;

@@ -188,6 +188,78 @@ def test_ui_clears_stage_urls_on_disconnect():
     assert_true("if (had) invalidateStageProgress(shot)" in js, "unlink must clear when edge removed")
 
 
+def _scoped_layout_move_ids(scope_ids, nodes, edges):
+    """Mirror autoLayout scoped path: only nodes in scopeIds get x,y updates.
+
+    Linked assets outside scope (even exclusive) must NOT move.
+    Full-canvas (scope_ids is None) is out of scope for this helper.
+    """
+    assert scope_ids is not None
+    shots = [n for n in nodes if n["kind"] == "shot" and n["id"] in scope_ids]
+    assets = [n for n in nodes if n["kind"] == "asset"]
+    asset_list = [a for a in assets if a["id"] in scope_ids]
+    moved = {n["id"] for n in shots}
+    asset_allowed = {a["id"] for a in asset_list}
+    # linked placement only for allowed assets
+    for shot in shots:
+        linked = [e["from"] for e in edges if e["to"] == shot["id"]]
+        for aid in linked:
+            if aid not in asset_allowed:
+                continue
+            moved.add(aid)
+    for a in asset_list:
+        moved.add(a["id"])
+    return moved
+
+
+def test_selbar_scoped_layout_skips_exclusive_outside_asset():
+    """P0 UI Fail: multi two shots → selBar ▦ must not move unselected exclusive asset.
+
+    「大白-居家装」exclusively edged into a scoped shot but not in multi → x,y stay put.
+    """
+    nodes = [
+        {"id": "s1", "kind": "shot", "x": 560, "y": 80},
+        {"id": "s2", "kind": "shot", "x": 1280, "y": 80},
+        {"id": "a-dabai", "kind": "asset", "title": "大白-居家装", "x": 100, "y": 400},
+        {"id": "a-other", "kind": "asset", "title": "其他", "x": 50, "y": 50},
+    ]
+    edges = [
+        {"from": "a-dabai", "to": "s1"},  # exclusive link into scoped shot
+        {"from": "a-other", "to": "s2"},
+        {"from": "a-other", "to": "s1"},  # shared — also outside scope
+    ]
+    scope = ["s1", "s2"]  # multi-select two shots only
+    before = {n["id"]: (n["x"], n["y"]) for n in nodes}
+    moved = _scoped_layout_move_ids(scope, nodes, edges)
+    assert_true(moved == {"s1", "s2"}, f"expected only scoped shots, got {moved}")
+    # simulate: only update moved nodes (as autoLayout does)
+    for n in nodes:
+        if n["id"] in moved:
+            n["x"] += 10
+            n["y"] += 10
+    assert_true(nodes[2]["x"] == before["a-dabai"][0] and nodes[2]["y"] == before["a-dabai"][1],
+                "exclusive unselected asset must keep x,y")
+    assert_true(nodes[3]["x"] == before["a-other"][0] and nodes[3]["y"] == before["a-other"][1],
+                "shared outside asset must keep x,y")
+    assert_true(nodes[0]["x"] != before["s1"][0], "scoped shots still rearrange")
+
+    # Group path: memberIds only — same rule
+    group_scope = ["s1", "s2"]  # group.memberIds; asset not a member
+    moved_g = _scoped_layout_move_ids(group_scope, nodes, edges)
+    assert_true("a-dabai" not in moved_g, "group layout must not pull exclusive outside asset")
+
+    # Static guard: exclusive-link expansion removed from storyboard.js
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    assert_true("Clearly attached: edges only into scoped shots" not in js,
+                "exclusive-link expansion comment still present")
+    assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
+                "exclusive-link tos.every expansion still present")
+    assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
+    assert_true("nl-storyboard-v0813" in js, "STORE must bump to v0813")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0813-selbar-layout" in html, "stamp must be v0813-selbar-layout")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -202,6 +274,7 @@ def main():
         test_rail_history_not_in_compile,
         test_ui_blocks_stages0_fake_run,
         test_ui_clears_stage_urls_on_disconnect,
+        test_selbar_scoped_layout_skips_exclusive_outside_asset,
     ]
     failed = 0
     for fn in tests:
