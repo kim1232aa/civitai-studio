@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0793";
-  const STORE_OLDS = ["nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0796";
+  const STORE_OLDS = ["nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -24,6 +24,10 @@
     railTab: "assets",
     atFilter: "",
     snapTarget: null,
+    importTab: "project",
+    importFilter: "all",
+    importSelected: {},
+    importLibrary: [],
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -62,6 +66,31 @@
     if (!n || !n.url) return "";
     if (isVideoUrl(n.url)) return '<span class="badge vid">视频</span>';
     return '<span class="badge">图片</span>';
+  }
+
+  function mediaKindOf(url, kindHint) {
+    if (kindHint === "video" || kindHint === "image" || kindHint === "audio") return kindHint;
+    const u = url || "";
+    if (isVideoUrl(u)) return "video";
+    if (/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return "audio";
+    return "image";
+  }
+  function kindBadgeLabel(kind) {
+    if (kind === "video") return "视频";
+    if (kind === "audio") return "音频";
+    return "图片";
+  }
+  function shotDurationLabel(n) {
+    if (!n || n.kind !== "shot") return "";
+    if (n.duration != null && n.duration !== "") {
+      const raw = String(n.duration);
+      return /s$/i.test(raw) ? raw : raw + "s";
+    }
+    if (state.mode === "video") {
+      const d = $("duration") && $("duration").value;
+      return d || "12s";
+    }
+    return "";
   }
   function isStubMode() { return state.mode === "text" || state.mode === "audio"; }
 
@@ -139,9 +168,10 @@
 
   function applyCam() {
     world.style.transform = "translate(" + state.cam.x + "px," + state.cam.y + "px) scale(" + state.cam.s + ")";
-    $("zPct").textContent = Math.round(state.cam.s * 100) + "%";
+    if ($("zPct")) $("zPct").textContent = Math.round(state.cam.s * 100) + "%";
     drawMinimap();
     positionDock();
+    if (typeof syncZoomPresets === "function") syncZoomPresets();
   }
   function panTo(n) {
     if (!n) return;
@@ -240,8 +270,9 @@
             ? '<video src="' + esc(n.url) + '" muted></video>'
             : '<img src="' + esc(n.url) + '" alt="">')
         : '<div class="face"><div style="font-size:22px">▢</div><div class="hint">点击查看或编辑提示词</div></div>';
+      const dur = shotDurationLabel(n);
       return '<div class="card shot' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
-        '<div class="label">▢ ' + esc(n.title) + '</div>' +
+        '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
         '<button class="port in" data-side="in" type="button" aria-label="输入"></button>' +
@@ -639,6 +670,187 @@
     return URL.createObjectURL(f);
   }
 
+
+  function importKey(it) {
+    return String((it && (it.key || it.url || it.id)) || "");
+  }
+  function collectImportLibrary() {
+    const seen = {};
+    const out = [];
+    function push(it) {
+      if (!it || !it.url) return;
+      const key = importKey(it);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      out.push({
+        key: key,
+        url: it.url,
+        title: it.title || "素材",
+        kind: mediaKindOf(it.url, it.kind),
+        nodeId: it.nodeId || "",
+        source: it.source || "project",
+      });
+    }
+    assets().forEach((a) => push({
+      url: a.url, title: sourceTitle(a), kind: mediaKindOf(a.url), nodeId: a.id, source: "canvas", key: "node:" + a.id,
+    }));
+    state.history.forEach((h, i) => push({
+      url: h.url, title: h.title || "历史成片", kind: mediaKindOf(h.url, h.kind), source: "history", key: "hist:" + (h.url || i),
+    }));
+    (state.importLibrary || []).forEach((it) => push(Object.assign({ source: "outs" }, it)));
+    return out;
+  }
+  function filteredImportItems() {
+    const tab = state.importTab || "project";
+    let list = collectImportLibrary();
+    if (tab === "story" || tab === "avatar") return [];
+    if (tab === "canvas") list = list.filter((it) => it.source === "canvas" || it.nodeId);
+    const f = state.importFilter || "all";
+    if (f !== "all") list = list.filter((it) => it.kind === f);
+    return list;
+  }
+  function renderImportModal() {
+    const body = $("importBody");
+    const modal = $("importModal");
+    if (!body || !modal || !modal.classList.contains("show")) return;
+    document.querySelectorAll("#importTabs [data-itab]").forEach((btn) => {
+      btn.classList.toggle("on", btn.dataset.itab === state.importTab);
+    });
+    document.querySelectorAll(".import-filters [data-ifilter]").forEach((btn) => {
+      btn.classList.toggle("on", btn.dataset.ifilter === state.importFilter);
+    });
+    const tab = state.importTab || "project";
+    if (tab === "story" || tab === "avatar") {
+      body.innerHTML = '<div class="import-empty">' +
+        (tab === "story" ? "故事素材库尚未接入" : "数字人素材库尚未接入") +
+        "<br><span style='color:#555'>本版不做 SenseTime / 云端拉取</span></div>";
+      const all = $("importSelectAll");
+      if (all) { all.checked = false; all.disabled = true; }
+      updateImportConfirm();
+      return;
+    }
+    const list = filteredImportItems();
+    if (!list.length) {
+      body.innerHTML = '<div class="import-empty">暂无素材 · 可用「本地上传」加入</div>';
+    } else {
+      body.innerHTML = '<div class="import-grid">' + list.map((it) => {
+        const on = !!state.importSelected[it.key];
+        const badge = kindBadgeLabel(it.kind);
+        const media = it.kind === "video"
+          ? '<video src="' + esc(it.url) + '" muted></video>'
+          : (it.kind === "audio"
+            ? '<div class="ph">♪</div>'
+            : '<img src="' + esc(it.url) + '" alt="">');
+        return '<button type="button" class="import-card' + (on ? " on" : "") + '" data-ikey="' + esc(it.key) + '" title="' + esc(it.title) + '">' +
+          '<span class="ibadge">' + esc(badge) + "</span>" +
+          '<span class="icheck"></span>' + media + "</button>";
+      }).join("") + "</div>";
+    }
+    const visibleKeys = list.map((it) => it.key);
+    const allOn = visibleKeys.length > 0 && visibleKeys.every((k) => state.importSelected[k]);
+    const all = $("importSelectAll");
+    if (all) { all.disabled = !visibleKeys.length; all.checked = allOn; }
+    updateImportConfirm();
+  }
+  function updateImportConfirm() {
+    const n = Object.keys(state.importSelected).length;
+    const btn = $("importConfirm");
+    if (!btn) return;
+    btn.textContent = "确认导入(" + n + ")";
+    btn.disabled = n === 0;
+  }
+  function openImportModal() {
+    const modal = $("importModal");
+    if (!modal) return;
+    state.importSelected = {};
+    state.importTab = "project";
+    state.importFilter = "all";
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    hideAtbox();
+    const picker = $("picker");
+    if (picker) picker.classList.remove("show");
+    renderImportModal();
+    refreshImportLibrary().then(() => renderImportModal());
+  }
+  function closeImportModal() {
+    const modal = $("importModal");
+    if (!modal) return;
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    state.importSelected = {};
+  }
+  async function refreshImportLibrary() {
+    try {
+      const r = await fetch("/api/outs");
+      const j = await r.json();
+      state.importLibrary = (j.items || []).slice(0, 60).map((it) => ({
+        key: "out:" + (it.url || it.file),
+        url: it.url || it.path,
+        title: String(it.file || it.name || "素材").replace(/\.[^.]+$/, ""),
+        kind: it.kind || mediaKindOf(it.url),
+        source: "outs",
+      })).filter((it) => it.url);
+    } catch (_) {
+      /* keep prior library; assets+history still available */
+    }
+  }
+  function confirmImportSelection() {
+    const keys = Object.keys(state.importSelected);
+    if (!keys.length) return;
+    const lib = collectImportLibrary();
+    const byKey = {};
+    lib.forEach((it) => { byKey[it.key] = it; });
+    const shot = nodeById(state.selected);
+    let placed = 0;
+    let baseY = 24 + assets().length * 40;
+    keys.forEach((k, i) => {
+      const it = byKey[k] || state.importSelected[k];
+      if (!it || !it.url) return;
+      if (it.nodeId && nodeById(it.nodeId)) {
+        const existing = nodeById(it.nodeId);
+        if (shot && shot.kind === "shot") linkAssetToShot(existing, shot);
+        placed++;
+        return;
+      }
+      const node = spawnHistoryAt({ url: it.url, title: it.title || "导入素材" }, 220 + (i % 3) * 24, baseY + i * 40);
+      if (node) {
+        placed++;
+        if (shot && shot.kind === "shot") linkAssetToShot(node, shot);
+      }
+    });
+    closeImportModal();
+    renderCards(); drawWires(); renderDock(); persist();
+    setMsg(placed ? ("已导入 " + placed + " 个素材到画布") : "没有可导入的素材", placed ? "ok" : "warn");
+  }
+  function setZoomScale(s) {
+    const next = Math.min(1.5, Math.max(0.16, s));
+    const r = vp.getBoundingClientRect();
+    const cx = r.width / 2, cy = r.height / 2;
+    const w0 = clientToWorld(r.left + cx, r.top + cy);
+    state.cam.s = next;
+    state.cam.x = cx - w0.x * next;
+    state.cam.y = cy - w0.y * next;
+    applyCam(); persist();
+    syncZoomPresets();
+  }
+  function fitCam() {
+    state.cam = { x: 90, y: 36, s: 0.5 };
+    applyCam(); persist();
+    syncZoomPresets();
+  }
+  function syncZoomPresets() {
+    const box = $("zPresets");
+    if (!box) return;
+    const s = state.cam.s;
+    box.querySelectorAll("button[data-z]").forEach((btn) => {
+      const v = btn.dataset.z;
+      if (v === "fit") { btn.classList.remove("on"); return; }
+      const num = Number(v);
+      btn.classList.toggle("on", Math.abs(s - num) < 0.02);
+    });
+  }
+
   function hideGhost() {
     const g = $("ghost");
     if (g) { g.classList.remove("show"); g.innerHTML = ""; }
@@ -689,7 +901,7 @@
   }
 
   vp.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost,.minimap")) return;
+    if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,header,.ghost,.minimap,.import-backdrop")) return;
     if (e.target.closest("path.edge")) return;
     const port = e.target.closest(".port");
     const card = e.target.closest(".card");
@@ -787,7 +999,7 @@
     const act = e.target.closest("[data-act]");
     if (!act) return;
     if (act.dataset.act === "upload") $("file").click();
-    if (act.dataset.act === "pick") togglePicker();
+    if (act.dataset.act === "pick") openImportModal();
     if (act.dataset.act === "promote") {
       const shot = nodeById(state.selected);
       if (shot && shot.url) {
@@ -866,7 +1078,7 @@
       const tab = e.target.closest("[data-tab]");
       if (tab) { state.railTab = tab.dataset.tab; renderRail(); persist(); return; }
       const up = e.target.closest("[data-act]");
-      if (up && up.dataset.act === "upload") { $("file").click(); return; }
+      if (up && up.dataset.act === "upload") { openImportModal(); return; }
       const pin = e.target.closest("[data-pin]");
       if (pin) {
         const asset = nodeById(pin.dataset.pin);
@@ -904,6 +1116,9 @@
     renderCards(); drawWires(); renderDock(); persist();
     if (url.indexOf("/out/") === 0) setMsg("已上传到资产库", "ok");
     $("file").value = "";
+    if ($("importModal") && $("importModal").classList.contains("show")) {
+      refreshImportLibrary().then(() => renderImportModal());
+    }
   });
 
   function togglePicker() {
@@ -949,6 +1164,8 @@
 
   function setMode(mode) {
     state.mode = mode;
+    renderCards();
+    drawWires();
     renderDock();
     persist();
   }
@@ -957,7 +1174,12 @@
   if ($("modeVid")) $("modeVid").onclick = () => setMode("video");
   if ($("modeAud")) $("modeAud").onclick = () => setMode("audio");
   ["backend", "service", "duration", "aspect", "res"].forEach((id) => {
-    if ($(id)) $(id).addEventListener("change", persist);
+    if ($(id)) $(id).addEventListener("change", () => {
+      persist();
+      if (id === "duration" && state.mode === "video") {
+        renderCards(); drawWires(); positionDock();
+      }
+    });
   });
 
   function setMsg(t, cls) {
@@ -1077,11 +1299,73 @@
     shots().forEach((n, i) => { n.x = 560 + (i % 2) * 720; n.y = 80 + Math.floor(i / 2) * 430; });
     renderCards(); drawWires(); persist();
   };
-  $("btnFit").onclick = () => {
-    state.cam = { x: 90, y: 36, s: 0.5 }; applyCam(); persist();
-  };
-  $("zIn").onclick = () => { state.cam.s = Math.min(1.5, state.cam.s * 1.12); applyCam(); persist(); };
-  $("zOut").onclick = () => { state.cam.s = Math.max(0.16, state.cam.s * 0.9); applyCam(); persist(); };
+  $("btnFit").onclick = () => { fitCam(); };
+  $("zIn").onclick = () => { setZoomScale(state.cam.s * 1.12); };
+  $("zOut").onclick = () => { setZoomScale(state.cam.s * 0.9); };
+  if ($("zPresets")) {
+    $("zPresets").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-z]");
+      if (!btn) return;
+      if (btn.dataset.z === "fit") fitCam();
+      else setZoomScale(Number(btn.dataset.z));
+    });
+  }
+  if ($("btnImport")) $("btnImport").onclick = () => openImportModal();
+
+  function bindImportModal() {
+    const modal = $("importModal");
+    if (!modal) return;
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeImportModal();
+    });
+    if ($("importClose")) $("importClose").onclick = closeImportModal;
+    if ($("importCancel")) $("importCancel").onclick = closeImportModal;
+    if ($("importConfirm")) $("importConfirm").onclick = confirmImportSelection;
+    if ($("importLocalBtn")) $("importLocalBtn").onclick = () => $("file").click();
+    if ($("importTabs")) {
+      $("importTabs").addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-itab]");
+        if (!btn) return;
+        state.importTab = btn.dataset.itab;
+        renderImportModal();
+      });
+    }
+    const filters = document.querySelector(".import-filters");
+    if (filters) {
+      filters.addEventListener("click", (e) => {
+        const pill = e.target.closest("[data-ifilter]");
+        if (!pill) return;
+        state.importFilter = pill.dataset.ifilter;
+        renderImportModal();
+      });
+    }
+    if ($("importSelectAll")) {
+      $("importSelectAll").addEventListener("change", () => {
+        const list = filteredImportItems();
+        const on = $("importSelectAll").checked;
+        if (on) list.forEach((it) => { state.importSelected[it.key] = it; });
+        else list.forEach((it) => { delete state.importSelected[it.key]; });
+        renderImportModal();
+      });
+    }
+    if ($("importBody")) {
+      $("importBody").addEventListener("click", (e) => {
+        const card = e.target.closest("[data-ikey]");
+        if (!card) return;
+        const key = card.dataset.ikey;
+        const list = filteredImportItems();
+        const it = list.find((x) => x.key === key);
+        if (!it) return;
+        if (state.importSelected[key]) delete state.importSelected[key];
+        else state.importSelected[key] = it;
+        renderImportModal();
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modal.classList.contains("show")) closeImportModal();
+    });
+  }
+  bindImportModal();
 
   async function loadCatalog() {
     $("service").innerHTML = '<option value="">默认模型</option>';
@@ -1118,6 +1402,7 @@
 
   if (!restore()) loadDemo();
   applyCam();
+  syncZoomPresets();
   renderCards();
   drawWires();
   loadCatalog();
