@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0798";
-  const STORE_OLDS = ["nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0802";
+  const STORE_OLDS = ["nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -42,6 +42,8 @@
     nodes: [],
     edges: [],
     selected: null,
+    multi: [],
+    groups: [],
     drag: null,
     pan: null,
     link: null,
@@ -57,6 +59,8 @@
     importSelected: {},
     importLibrary: [],
     skillCat: "官方精选",
+    runningGroup: false,
+    groupRunAbort: false,
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -123,6 +127,75 @@
   }
   function isStubMode() { return state.mode === "text" || state.mode === "audio"; }
 
+  function isMulti(id) { return state.multi.indexOf(id) >= 0; }
+  function setMulti(ids) {
+    const seen = {};
+    state.multi = (ids || []).filter((id) => {
+      if (!id || seen[id] || !nodeById(id)) return false;
+      seen[id] = true;
+      return true;
+    });
+  }
+  function toggleMulti(id) {
+    if (!id || !nodeById(id)) return;
+    if (isMulti(id)) state.multi = state.multi.filter((x) => x !== id);
+    else state.multi = state.multi.concat([id]);
+  }
+  function pruneGroups() {
+    const alive = {};
+    state.nodes.forEach((n) => { alive[n.id] = true; });
+    state.groups = (state.groups || []).map((g) => ({
+      id: g.id,
+      name: g.name || "组",
+      memberIds: (g.memberIds || []).filter((id) => alive[id]),
+    })).filter((g) => g.memberIds.length >= 2);
+  }
+  function groupOf(id) {
+    return (state.groups || []).find((g) => (g.memberIds || []).indexOf(id) >= 0) || null;
+  }
+  function findActiveGroup() {
+    pruneGroups();
+    const multiShots = state.multi.map(nodeById).filter((n) => n && n.kind === "shot").map((n) => n.id);
+    if (multiShots.length) {
+      const exact = state.groups.find((g) => {
+        const m = g.memberIds || [];
+        if (m.length !== multiShots.length) return false;
+        return multiShots.every((id) => m.indexOf(id) >= 0);
+      });
+      if (exact) return exact;
+      const cover = state.groups.find((g) => multiShots.every((id) => (g.memberIds || []).indexOf(id) >= 0));
+      if (cover) return cover;
+    }
+    if (state.selected) return groupOf(state.selected);
+    return null;
+  }
+  function groupRunTargets() {
+    const g = findActiveGroup();
+    if (g) {
+      return (g.memberIds || []).map(nodeById).filter((n) => n && n.kind === "shot");
+    }
+    const multiShots = state.multi.map(nodeById).filter((n) => n && n.kind === "shot");
+    if (multiShots.length) return multiShots;
+    return [];
+  }
+  function syncGroupRunBtn() {
+    const btn = $("btnGroupRun");
+    if (!btn) return;
+    const targets = groupRunTargets();
+    btn.disabled = !targets.length || state.runningGroup;
+  }
+  function selectGroupMembers(g) {
+    if (!g) return;
+    const ids = (g.memberIds || []).filter((id) => nodeById(id));
+    setMulti(ids);
+    const firstShot = ids.map(nodeById).find((n) => n && n.kind === "shot");
+    state.selected = firstShot ? firstShot.id : (ids[0] || null);
+    renderCards();
+    drawWires();
+    renderDock();
+    syncGroupRunBtn();
+  }
+
   function loadDemo() {
     const list = [
       { id: "a-bot", kind: "character", title: "家用机器人", x: 48, y: 24, url: DEMO },
@@ -161,6 +234,7 @@
       sessionStorage.setItem(STORE, JSON.stringify({
         cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
         railTab: state.railTab,
+        groups: state.groups || [],
         backend: $("backend") && $("backend").value,
         service: $("service") && $("service").value,
         duration: $("duration") && $("duration").value,
@@ -186,6 +260,11 @@
       state.edges = p.edges || [];
       state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
       state.railTab = p.railTab || "assets";
+      state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
+        id: g.id || uid("grp"),
+        name: g.name || "组",
+        memberIds: Array.isArray(g.memberIds) ? g.memberIds.slice() : [],
+      })).filter((g) => g.memberIds.length) : [];
       if (p.backend && $("backend")) $("backend").value = p.backend;
       if (p.duration && $("duration")) $("duration").value = p.duration;
       if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
@@ -292,6 +371,7 @@
 
   function cardHTML(n) {
     const sel = state.selected === n.id ? " sel" : "";
+    const multi = isMulti(n.id) ? " multi" : "";
     const badge = mediaBadge(n);
     if (n.kind === "shot") {
       const media = n.url
@@ -300,7 +380,7 @@
             : '<img src="' + esc(n.url) + '" alt="">')
         : '<div class="face"><div style="font-size:22px">▢</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
-      return '<div class="card shot' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+      return '<div class="card shot' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -310,14 +390,40 @@
     const thumb = n.url
       ? '<img class="thumb" src="' + esc(n.url) + '" alt="">'
       : '<div class="ph">▣</div>';
-    return '<div class="card asset' + sel + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+    return '<div class="card asset' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
       badge + thumb + '<div class="name">' + esc(n.title) + '</div>' +
       '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
   }
+  function renderGroupBounds() {
+    world.querySelectorAll(".group-bound").forEach((el) => el.remove());
+    pruneGroups();
+    (state.groups || []).forEach((g) => {
+      const members = (g.memberIds || []).map(nodeById).filter(Boolean);
+      if (members.length < 2) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      members.forEach((n) => {
+        const b = box(n);
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + b.w);
+        maxY = Math.max(maxY, n.y + b.h);
+      });
+      const pad = 28;
+      const left = minX - pad;
+      const top = minY - pad - 8;
+      const w = maxX - minX + pad * 2;
+      const h = maxY - minY + pad * 2 + 8;
+      world.insertAdjacentHTML("beforeend",
+        '<div class="group-bound" data-gid="' + esc(g.id) + '" style="left:' + left + 'px;top:' + top +
+        'px;width:' + w + 'px;height:' + h + 'px"><span class="gname">' + esc(g.name || "组") + '</span></div>');
+    });
+  }
   function renderCards() {
-    world.querySelectorAll(".card").forEach((el) => el.remove());
+    world.querySelectorAll(".card,.group-bound").forEach((el) => el.remove());
+    renderGroupBounds();
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
     drawMinimap();
+    syncGroupRunBtn();
   }
 
   function worldBounds() {
@@ -525,11 +631,19 @@
     requestAnimationFrame(positionDock);
   }
 
-  function selectNode(id) {
-    state.selected = id;
+  function selectNode(id, opts) {
+    opts = opts || {};
+    if (opts.shift && id) {
+      toggleMulti(id);
+      state.selected = id;
+    } else {
+      state.selected = id;
+      setMulti(id ? [id] : []);
+    }
     renderCards();
     drawWires();
     renderDock();
+    syncGroupRunBtn();
   }
   function clientToWorld(cx, cy) {
     const r = vp.getBoundingClientRect();
@@ -568,6 +682,7 @@
   function invalidateStageProgress(shot, reason) {
     if (!shot || shot.kind !== "shot") return;
     shot.stageUrls = {};
+    if (state.runningGroup) state.groupRunAbort = true;
     if (reason) setMsg(reason, "warn");
   }
 
@@ -1043,6 +1158,15 @@
   vp.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop")) return;
     if (e.target.closest("path.edge")) return;
+    const gchrome = e.target.closest(".group-bound");
+    if (gchrome && !e.target.closest(".card")) {
+      const g = (state.groups || []).find((x) => x.id === gchrome.dataset.gid);
+      if (g) {
+        selectGroupMembers(g);
+        e.preventDefault();
+        return;
+      }
+    }
     const port = e.target.closest(".port");
     const card = e.target.closest(".card");
     if (port && card) {
@@ -1055,11 +1179,21 @@
     }
     if (card) {
       const n = nodeById(card.dataset.id);
-      selectNode(n.id);
+      selectNode(n.id, { shift: !!(e.shiftKey) });
+      if (e.shiftKey) {
+        // multi-toggle only — skip drag start to avoid accidental moves
+        return;
+      }
       const w = clientToWorld(e.clientX, e.clientY);
       state.drag = { id: n.id, dx: w.x - n.x, dy: w.y - n.y };
       vp.setPointerCapture(e.pointerId);
       return;
+    }
+    // empty canvas click clears multi
+    if (!e.shiftKey) {
+      setMulti(state.selected ? [state.selected] : []);
+      syncGroupRunBtn();
+      renderCards();
     }
     state.pan = { x: e.clientX - state.cam.x, y: e.clientY - state.cam.y };
     vp.classList.add("grabbing");
@@ -1451,18 +1585,25 @@
     return null;
   }
 
-  async function generate() {
-    const shot = nodeById(state.selected);
-    if (!shot || shot.kind !== "shot") return;
+  // Per-shot step runner — same path as Composer send (compile → nextRunnableStage → fillStageRefs → /api/generate).
+  // Never one-shot a multi-step graph. Returns { status, stageOp } where status is:
+  // done | more | blocked | error | aborted
+  async function runShotStep(shotId, opts) {
+    opts = opts || {};
+    const shot = nodeById(shotId);
+    if (!shot || shot.kind !== "shot") return { status: "blocked" };
+    if (state.groupRunAbort) return { status: "aborted" };
+    const prefix = opts.progressPrefix ? (opts.progressPrefix + " · ") : "";
     if (isStubMode()) {
-      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
-      return;
+      setMsg(prefix + (state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
+      return { status: "blocked" };
     }
     if (state.mode === "video" && !frameAsset(shot)) {
-      setMsg("视频需要先连一张首帧图，不能偷配方台", "bad"); return;
+      setMsg(prefix + "视频需要先连一张首帧图，不能偷配方台", "bad");
+      return { status: "blocked" };
     }
-    $("send").disabled = true;
-    setMsg("校验连线…");
+    if (!opts.keepSend) $("send").disabled = true;
+    setMsg(prefix + "校验连线…");
     let compiled;
     try {
       const r = await fetch("/api/graph/compile", {
@@ -1471,9 +1612,19 @@
       });
       compiled = await r.json();
     } catch (e) {
-      setMsg(String(e), "bad"); $("send").disabled = false; return;
+      setMsg(prefix + String(e), "bad");
+      if (!opts.keepSend) $("send").disabled = false;
+      return { status: "error" };
     }
-    if (!compiled.ok) { setMsg(compiled.error || "校验未通过", "bad"); $("send").disabled = false; return; }
+    if (state.groupRunAbort) {
+      if (!opts.keepSend) $("send").disabled = false;
+      return { status: "aborted" };
+    }
+    if (!compiled.ok) {
+      setMsg(prefix + (compiled.error || "校验未通过"), "bad");
+      if (!opts.keepSend) $("send").disabled = false;
+      return { status: "blocked" };
+    }
     // Never one-shot a multi-step plan via stage-zero payload or whole compile body.
     var staged = !!(compiled.multiStep || compiled.execute === "staged" ||
       (Array.isArray(compiled.stages) && compiled.stages.length > 1));
@@ -1483,22 +1634,28 @@
       if (!shot.stageUrls) shot.stageUrls = {};
       stage = nextRunnableStage(compiled, shot.stageUrls);
       if (!stage || !stage.payload) {
-        setMsg((compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "warn");
-        $("send").disabled = false;
-        return;
+        setMsg(prefix + (compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "warn");
+        if (!opts.keepSend) $("send").disabled = false;
+        return { status: "blocked", stageOp: stage && stage.op };
       }
       payload = fillStageRefs(stage.payload, shot.stageUrls);
       if (hasUnresolvedStageOut(payload)) {
-        setMsg("上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "bad");
-        $("send").disabled = false;
-        return;
+        setMsg(prefix + "上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "bad");
+        if (!opts.keepSend) $("send").disabled = false;
+        return { status: "blocked", stageOp: stage.op };
       }
     } else {
       // single-step only — never stage-zero payload fallback
       payload = compiled.payload;
-      if (!payload) { setMsg("没有 payload", "bad"); $("send").disabled = false; return; }
+      if (!payload) {
+        setMsg(prefix + "没有 payload", "bad");
+        if (!opts.keepSend) $("send").disabled = false;
+        return { status: "blocked" };
+      }
     }
-    setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
+    const stageOp = stage ? stage.op : "";
+    if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
+    else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1509,12 +1666,20 @@
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
         for (let i = 0; i < 40; i++) {
+          if (state.groupRunAbort) {
+            if (!opts.keepSend) $("send").disabled = false;
+            return { status: "aborted", stageOp: stageOp };
+          }
           await new Promise((res) => setTimeout(res, 2500));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
           if (st.error || st.status === "failed") throw new Error(st.error || "任务失败");
           if (pickUrl(st) || st.status === "done" || st.status === "succeeded" || st.status === "completed") { j = st; break; }
-          setMsg("云端进行中 " + (i + 1) + "/40");
+          setMsg(prefix + "云端进行中 " + (i + 1) + "/40");
         }
+      }
+      if (state.groupRunAbort) {
+        if (!opts.keepSend) $("send").disabled = false;
+        return { status: "aborted", stageOp: stageOp };
       }
       const url = pickUrl(j);
       if (url && stage) {
@@ -1522,24 +1687,141 @@
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
         if (nxt) {
           persist();
-          setMsg("完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
-        } else {
-          shot.url = url;
-          if (!isVideoUrl(url)) promoteResult(shot, url);
-          renderCards(); drawWires(); persist();
-          setMsg(isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库", "ok");
+          setMsg(prefix + "完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片（禁止一次假跑通）", "warn");
+          if (!opts.keepSend) $("send").disabled = false;
+          renderDock();
+          return { status: "more", stageOp: stage.op };
         }
+        shot.url = url;
+        if (!isVideoUrl(url)) promoteResult(shot, url);
+        renderCards(); drawWires(); persist();
+        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库"), "ok");
       } else if (url) {
         shot.url = url;
         if (!isVideoUrl(url)) promoteResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库", "ok");
-      } else setMsg("云端已返回，没有可预览地址", "warn");
-    } catch (e) { setMsg(String(e), "bad"); }
-    $("send").disabled = false;
+        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库"), "ok");
+      } else {
+        setMsg(prefix + "云端已返回，没有可预览地址", "warn");
+        if (!opts.keepSend) $("send").disabled = false;
+        renderDock();
+        return { status: "blocked", stageOp: stageOp };
+      }
+    } catch (e) {
+      setMsg(prefix + String(e), "bad");
+      if (!opts.keepSend) $("send").disabled = false;
+      renderDock();
+      return { status: "error", stageOp: stageOp };
+    }
+    if (!opts.keepSend) $("send").disabled = false;
     renderDock();
+    return { status: "done", stageOp: stageOp };
+  }
+
+  async function generate() {
+    await runShotStep(state.selected, {});
   }
   $("send").onclick = generate;
+
+  async function runShotUntilDone(shotId, progressPrefix) {
+    // Loop nextRunnableStage for one shot via the same step runner — do not skip gates.
+    let guard = 0;
+    while (guard++ < 24) {
+      if (state.groupRunAbort) return { status: "aborted" };
+      const r = await runShotStep(shotId, { progressPrefix: progressPrefix, keepSend: true });
+      if (r.status === "more") continue;
+      return r;
+    }
+    return { status: "blocked" };
+  }
+
+  async function runGroupSequential() {
+    const targets = groupRunTargets();
+    if (!targets.length || state.runningGroup) return;
+    state.runningGroup = true;
+    state.groupRunAbort = false;
+    $("send").disabled = true;
+    syncGroupRunBtn();
+    const total = targets.length;
+    let stopped = false;
+    for (let i = 0; i < targets.length; i++) {
+      if (state.groupRunAbort) {
+        setMsg("整组已中止 · 拓扑变更清空了 stageUrls", "warn");
+        stopped = true;
+        break;
+      }
+      const shot = targets[i];
+      state.selected = shot.id;
+      setMulti(targets.map((t) => t.id));
+      renderCards();
+      drawWires();
+      renderDock();
+      const prefix = "整组 " + (i + 1) + "/" + total + " · " + (shot.title || "镜头");
+      setMsg(prefix + " · 准备…");
+      const r = await runShotUntilDone(shot.id, prefix);
+      if (state.groupRunAbort || r.status === "aborted") {
+        setMsg("整组已中止 · 拓扑变更清空了 stageUrls", "warn");
+        stopped = true;
+        break;
+      }
+      if (r.status === "blocked" || r.status === "error") {
+        setMsg(prefix + " · 已停在此镜" + (r.stageOp ? (" · " + r.stageOp) : ""), r.status === "error" ? "bad" : "warn");
+        stopped = true;
+        break;
+      }
+    }
+    if (!stopped && !state.groupRunAbort) {
+      setMsg("整组完成 · " + total + " 镜", "ok");
+    }
+    state.runningGroup = false;
+    $("send").disabled = false;
+    syncGroupRunBtn();
+    renderDock();
+  }
+
+  function createGroupFromSelection() {
+    pruneGroups();
+    let ids = state.multi.slice();
+    if (ids.length < 2 && state.selected) ids = [state.selected].concat(ids.filter((x) => x !== state.selected));
+    ids = ids.filter((id) => nodeById(id));
+    // prefer shots; allow mixed but need >=2
+    if (ids.length < 2) {
+      setMsg("成组需要至少 2 个已选卡片（Shift+点击多选）", "warn");
+      return;
+    }
+    // remove overlapping memberships from other groups
+    state.groups.forEach((g) => {
+      g.memberIds = (g.memberIds || []).filter((id) => ids.indexOf(id) < 0);
+    });
+    pruneGroups();
+    const name = "组" + (state.groups.length + 1);
+    const g = { id: uid("grp"), name: name, memberIds: ids.slice() };
+    state.groups.push(g);
+    setMulti(ids);
+    renderCards(); drawWires(); persist();
+    syncGroupRunBtn();
+    setMsg("已成组 · " + name + "（" + ids.length + "）", "ok");
+  }
+  function ungroupSelection() {
+    pruneGroups();
+    const ids = state.multi.length ? state.multi.slice() : (state.selected ? [state.selected] : []);
+    if (!ids.length) {
+      setMsg("先选择组内卡片再解组", "warn");
+      return;
+    }
+    let removed = 0;
+    state.groups = state.groups.filter((g) => {
+      const hit = (g.memberIds || []).some((id) => ids.indexOf(id) >= 0);
+      if (hit) { removed++; return false; }
+      return true;
+    });
+    renderCards(); drawWires(); persist();
+    syncGroupRunBtn();
+    setMsg(removed ? ("已解组 · " + removed) : "选中项不在任何组内", removed ? "ok" : "warn");
+  }
+  if ($("btnGroup")) $("btnGroup").onclick = createGroupFromSelection;
+  if ($("btnUngroup")) $("btnUngroup").onclick = ungroupSelection;
+  if ($("btnGroupRun")) $("btnGroupRun").onclick = () => { runGroupSequential(); };
 
   $("btnAdd").onclick = () => {
     const n = shots().length;
@@ -1552,11 +1834,48 @@
     });
     selectNode(id); persist();
   };
-  $("btnAuto").onclick = () => {
-    assets().forEach((n, i) => { n.x = 220; n.y = 24 + i * 236; });
-    shots().forEach((n, i) => { n.x = 560 + (i % 2) * 720; n.y = 80 + Math.floor(i / 2) * 430; });
+  function autoLayout() {
+    const g = findActiveGroup();
+    const scopeIds = g ? (g.memberIds || []).slice() : null;
+    const shotList = shots().filter((n) => !scopeIds || scopeIds.indexOf(n.id) >= 0);
+    const assetList = assets().filter((n) => {
+      if (!scopeIds) return true;
+      return state.edges.some((e) => e.from === n.id && scopeIds.indexOf(e.to) >= 0);
+    });
+    const startX = scopeIds ? (shotList[0] ? shotList[0].x : 560) : 560;
+    const startY = scopeIds ? (shotList[0] ? Math.min.apply(null, shotList.map((s) => s.y)) : 80) : 80;
+    const gapX = 720;
+    shotList.forEach((n, i) => {
+      n.x = startX + i * gapX;
+      n.y = startY;
+    });
+    const placed = {};
+    shotList.forEach((shot) => {
+      const linked = connectedNodes(shot.id);
+      linked.forEach((a, j) => {
+        if (!a || a.kind === "shot") return;
+        if (scopeIds && scopeIds.indexOf(a.id) < 0 && assetList.indexOf(a) < 0) {
+          // still place assets linked into scoped shots
+        }
+        if (placed[a.id]) return;
+        a.x = shot.x - 180;
+        a.y = shot.y + j * 220;
+        placed[a.id] = true;
+      });
+    });
+    if (!scopeIds) {
+      let orphan = 0;
+      assets().forEach((a) => {
+        if (placed[a.id]) return;
+        a.x = 48;
+        a.y = 24 + orphan * 236;
+        orphan++;
+        placed[a.id] = true;
+      });
+    }
     renderCards(); drawWires(); persist();
-  };
+  }
+  $("btnAuto").onclick = () => { autoLayout(); };
   $("btnFit").onclick = () => { fitCam(); };
   $("zIn").onclick = () => { setZoomScale(state.cam.s * 1.12); };
   $("zOut").onclick = () => { setZoomScale(state.cam.s * 0.9); };
