@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0811";
-  const STORE_OLDS = ["nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0812";
+  const STORE_OLDS = ["nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -2000,7 +2000,7 @@
   if ($("selGroup")) $("selGroup").onclick = createGroupFromSelection;
   if ($("selUngroup")) $("selUngroup").onclick = ungroupSelection;
   if ($("selGroupRun")) $("selGroupRun").onclick = () => { runGroupSequential(); };
-  if ($("selAuto")) $("selAuto").onclick = () => { autoLayout(); };
+  if ($("selAuto")) $("selAuto").onclick = () => { autoLayout({ fromSelBar: true }); };
   syncSelBar();
 
   $("btnAdd").onclick = () => {
@@ -2014,19 +2014,61 @@
     });
     selectNode(id); persist();
   };
-  function autoLayout() {
-    const g = findActiveGroup();
-    const multiShotIds = (state.multi || []).map(nodeById).filter((n) => n && n.kind === "shot").map((n) => n.id);
-    // Scope: active group members > multi-select shots (>=2) > full canvas
-    let scopeIds = null;
-    if (g) {
-      scopeIds = (g.memberIds || []).slice();
-    } else if (multiShotIds.length >= 2) {
-      scopeIds = multiShotIds.slice();
+  function resolveLayoutScope(fromSelBar) {
+    pruneGroups();
+    const multiIds = (state.multi || []).filter((id) => !!nodeById(id));
+    // P0: multi≥2 (shots and/or assets) → exact selection. Never expand to covering group.
+    if (multiIds.length >= 2) return multiIds.slice();
+    // Exact group match on multi shots (length may be 0–1 here already handled above for ≥2)
+    const multiShotIds = multiIds.map(nodeById).filter((n) => n && n.kind === "shot").map((n) => n.id);
+    if (multiShotIds.length) {
+      const exact = (state.groups || []).find((g) => {
+        const m = g.memberIds || [];
+        if (m.length !== multiShotIds.length) return false;
+        return multiShotIds.every((id) => m.indexOf(id) >= 0);
+      });
+      if (exact) return (exact.memberIds || []).slice();
+      // P1: do NOT cover-expand a multi subset to a larger group
+    }
+    // Group chrome / single select inside a group (selBar shows via !!g)
+    if (state.selected) {
+      const g = groupOf(state.selected);
+      if (g && multiIds.length <= 1) return (g.memberIds || []).slice();
+    }
+    // selBar must never wash the full canvas
+    if (fromSelBar) {
+      if (multiIds.length) return multiIds.slice();
+      if (state.selected) return [state.selected];
+    }
+    return null;
+  }
+  function autoLayout(opts) {
+    opts = opts || {};
+    const fromSelBar = !!opts.fromSelBar;
+    const scopeIds = resolveLayoutScope(fromSelBar);
+    if (fromSelBar && !scopeIds) {
+      setMsg("先多选卡片或选中组再布局", "warn");
+      return;
     }
     let shotList = shots().filter((n) => !scopeIds || scopeIds.indexOf(n.id) >= 0);
+    const scopedAssets = assets().filter((n) => {
+      if (!scopeIds) return false; // full-canvas path handles orphans separately
+      if (scopeIds.indexOf(n.id) >= 0) return true;
+      // Clearly attached: edges only into scoped shots (not shared with outside)
+      const tos = state.edges.filter((e) => e.from === n.id).map((e) => e.to);
+      if (!tos.length) return false;
+      const scopedShotTos = tos.filter((to) => {
+        const t = nodeById(to);
+        return t && t.kind === "shot" && scopeIds.indexOf(to) >= 0;
+      });
+      if (!scopedShotTos.length) return false;
+      return tos.every((to) => scopeIds.indexOf(to) >= 0);
+    });
+    // Full-canvas: all assets eligible for orphan packing later; linked placed with shots
+    const assetList = scopeIds
+      ? scopedAssets
+      : assets().slice();
     if (scopeIds && scopeIds.length) {
-      // Prefer selection/group order so rearrange is stable & predictable
       const order = {};
       scopeIds.forEach((id, i) => { order[id] = i; });
       shotList = shotList.slice().sort((a, b) => {
@@ -2040,15 +2082,41 @@
     } else {
       shotList = shotList.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
     }
-    const assetList = assets().filter((n) => {
-      if (!scopeIds) return true;
-      return state.edges.some((e) => e.from === n.id && scopeIds.indexOf(e.to) >= 0);
-    });
+    // P1: group / selection with 0 shots — warn or layout scoped assets
+    if (!shotList.length) {
+      if (scopeIds) {
+        const onlyAssets = assetList.slice().sort((a, b) => {
+          const oa = scopeIds.indexOf(a.id);
+          const ob = scopeIds.indexOf(b.id);
+          if (oa < 0 && ob < 0) return (a.x - b.x) || (a.y - b.y);
+          if (oa < 0) return 1;
+          if (ob < 0) return -1;
+          return oa - ob;
+        });
+        if (!onlyAssets.length) {
+          setMsg("选区没有可布局的分镜或资产", "warn");
+          return;
+        }
+        const ax = Math.min.apply(null, onlyAssets.map((a) => a.x));
+        const ay = Math.min.apply(null, onlyAssets.map((a) => a.y));
+        onlyAssets.forEach((a, i) => {
+          a.x = ax;
+          a.y = ay + i * 236;
+        });
+        setMsg("选区无分镜 · 已排布 " + onlyAssets.length + " 个资产", "warn");
+        renderCards(); drawWires(); persist();
+        syncSelBar();
+        return;
+      }
+      // full canvas, no shots — nothing to do
+      setMsg("画布上没有分镜可布局", "warn");
+      return;
+    }
     const startX = scopeIds
-      ? (shotList.length ? Math.min.apply(null, shotList.map((s) => s.x)) : 560)
+      ? Math.min.apply(null, shotList.map((s) => s.x))
       : 560;
     const startY = scopeIds
-      ? (shotList.length ? Math.min.apply(null, shotList.map((s) => s.y)) : 80)
+      ? Math.min.apply(null, shotList.map((s) => s.y))
       : 80;
     const gapX = 720;
     const gapY = 430;
@@ -2084,20 +2152,37 @@
       n.y = plan[i].y;
     });
     const placed = {};
+    const assetAllowed = {};
+    assetList.forEach((a) => { assetAllowed[a.id] = true; });
     shotList.forEach((shot) => {
       const linked = connectedNodes(shot.id);
       linked.forEach((a, j) => {
         if (!a || a.kind === "shot") return;
-        if (scopeIds && scopeIds.indexOf(a.id) < 0 && assetList.indexOf(a) < 0) {
-          // still place assets linked into scoped shots
-        }
+        // Scoped: only move in-scope / exclusively-attached assets (P1: no yank shared/outside)
+        if (scopeIds && !assetAllowed[a.id]) return;
         if (placed[a.id]) return;
         a.x = shot.x - 180;
         a.y = shot.y + j * 220;
         placed[a.id] = true;
       });
     });
-    if (!scopeIds) {
+    // Place scoped assets not yet placed (e.g. selected but unlinked)
+    if (scopeIds) {
+      let orphan = 0;
+      const baseY = shotList.length
+        ? Math.min.apply(null, shotList.map((s) => s.y))
+        : 80;
+      const baseX = shotList.length
+        ? Math.min.apply(null, shotList.map((s) => s.x)) - 180
+        : 48;
+      assetList.forEach((a) => {
+        if (placed[a.id]) return;
+        a.x = baseX;
+        a.y = baseY + orphan * 236;
+        orphan++;
+        placed[a.id] = true;
+      });
+    } else {
       let orphan = 0;
       assets().forEach((a) => {
         if (placed[a.id]) return;
