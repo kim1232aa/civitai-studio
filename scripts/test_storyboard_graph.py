@@ -255,10 +255,10 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0815" in js, "STORE must bump to v0815")
-    assert_true("nl-storyboard-v0814" in js, "STORE_OLDS must keep v0814 for migrate")
+    assert_true("nl-storyboard-v0815b" in js, "STORE must bump to v0815b")
+    assert_true("nl-storyboard-v0815" in js, "STORE_OLDS must keep v0815 for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815-gen-hardgate" in html, "stamp must be v0815-gen-hardgate")
+    assert_true("v0815b-ref-images" in html, "stamp must be v0815b-ref-images")
 
 
 def test_empty_boot_no_robot_demo():
@@ -282,25 +282,39 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0815-gen-hardgate" in html, "html stamp")
-    assert_true("nl-storyboard-v0815" in js, "STORE v0815")
+    assert_true("v0815b-ref-images" in html, "html stamp")
+    assert_true("nl-storyboard-v0815b" in js, "STORE v0815b")
 
 
 def test_v0815_gen_hardgate():
-    """v0815 hard gate: expanded dock, multi-ref pack via capabilities, aspectRatio, duration 5s."""
+    """v0815b: multi-ref always packs payload.images[]; caps still from capabilities."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0815-gen-hardgate" in html, "html stamp v0815-gen-hardgate")
-    assert_true("nl-storyboard-v0815" in js, "STORE v0815")
-    assert_true("nl-storyboard-v0814" in js, "STORE_OLDS prepend v0814")
+    assert_true("v0815b-ref-images" in html, "html stamp v0815b-ref-images")
+    assert_true("nl-storyboard-v0815b" in js, "STORE v0815b")
+    assert_true("nl-storyboard-v0815" in js, "STORE_OLDS prepend v0815")
     assert_true('dockMode: "expanded"' in js, "dock default expanded")
     assert_true("function attachExtraImages" in js, "attachExtraImages helper")
     assert_true("function maxRefCount" in js, "maxRefCount helper")
     assert_true("function resolveRefCaps" in js, "resolveRefCaps from capabilities")
-    assert_true("refImagesField" in js, "pack onto refImagesField")
+    assert_true("refImagesField" in js, "caps still expose refImagesField")
     assert_true("PROVIDER_REF_CAPS" in js, "provider ref defaults")
     assert_true("input_references" in js, "nano default field")
     assert_true("attachExtraImages(payload, shot)" in js, "attach before generate")
+    # Packing target is always studio-inbound images[] (not sole-write image_urls).
+    assert_true("payload.images = sliced" in js, "attachExtraImages always writes images[]")
+    assert_true("studio-inbound images[]" in js or "ALWAYS" in js, "comment: always images inbound")
+    # Extract attachExtraImages body: must not sole-assign only to refImagesField
+    i = js.find("function attachExtraImages")
+    assert_true(i >= 0, "attachExtraImages loc")
+    j = js.find("function setShotBusy", i)
+    body = js[i:j]
+    assert_true("payload.images = sliced" in body, "images=sliced inside attachExtraImages")
+    assert_true('payload[field] = sliced' in body or "payload[field] = sliced" in body,
+                "optional mirror to refImagesField still allowed")
+    # Must not be the ONLY write path that skips images when field is image_urls
+    assert_true("never sole-write" in body or "not the sole bag" in body or "payload.images = sliced" in body,
+                "must not sole-write provider-native field")
     assert_true("aspectRatio" in js, "buildGraph aspectRatio from UI")
     assert_true("catalogById" in js, "loadCatalog catalogById")
     assert_true("maxImages" in js and "maxRefs" in js, "catalog maxImages/maxRefs")
@@ -319,6 +333,9 @@ def test_v0815_gen_hardgate():
     assert_true("视频需要先连一张首帧图" in js, "i2v firstFrame gate kept")
     # Do not infer always-1 from field name alone
     assert_true('Do NOT infer "always 1" from field name alone' in js or "Do NOT infer" in js, "no always-1 from field name")
+    # modelscope: BOTH images=[url] and image_url
+    assert_true("payload.image_url = sliced[0]" in body, "modelscope sets image_url alongside images[]")
+
 
 
 def main():

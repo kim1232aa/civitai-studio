@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0815";
-  const STORE_OLDS = ["nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0815b";
+  const STORE_OLDS = ["nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -1731,8 +1731,11 @@
     return resolveRefCaps(it).maxRefs;
   }
 
-  // After compile: pack [primary, ...other linked] onto capabilities.refImagesField,
-  // capped by maxRefs||maxImages. Keep ONE compile image wire (firstFrame/sourceImage).
+  // After compile: pack [primary, ...other linked] onto studio-inbound images[]
+  // ALWAYS (capped by maxRefs||maxImages). Keep ONE compile image wire
+  // (firstFrame/sourceImage). Optionally mirror onto capabilities.refImagesField
+  // for backends that only look there — never sole-write image_urls /
+  // input_references / image_url as the only multi-ref bag.
   function attachExtraImages(payload, shot) {
     if (!payload || !shot) return payload;
     const linked = connectedAssets(shot.id);
@@ -1749,9 +1752,22 @@
     const field = resolved.refImagesField || "images";
     const sliced = urls.slice(0, cap);
     // Do NOT infer "always 1" from field name alone — honor cap.
-    // Singular string only when cap produced a single URL on image_url.
-    if (field === "image_url" && sliced.length === 1) payload[field] = sliced[0];
-    else payload[field] = sliced;
+    // Studio inbound: always images[] so collectors see multi-ref (N>0).
+    payload.images = sliced;
+    // Keep/ensure primary wires when present.
+    if (primary) {
+      if (!payload.firstFrame) payload.firstFrame = primary;
+      if (!payload.sourceImage) payload.sourceImage = primary;
+    }
+    // Optional mirror onto provider-native field (not the sole bag).
+    if (field && field !== "images") {
+      if (field === "image_url") {
+        // modelscope singular: BOTH images=[url] and image_url=url
+        payload.image_url = sliced[0];
+      } else {
+        payload[field] = sliced;
+      }
+    }
     return payload;
   }
 
