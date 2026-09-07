@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-<title>节点画布 · Night Lab · LiteGraph · v0800-lg-label</title>
+<title>节点画布 · Night Lab · LiteGraph · v0801-lg-label</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/css/litegraph.css" />
 <link rel="stylesheet" href="/static/litegraph.css" />
 <style>
@@ -66,7 +66,7 @@
       <a class="on" href="/litegraph" aria-current="page">LiteGraph</a>
     </nav>
     <span class="muted">LiteGraph · 双击搜节点 · 端口拖线 · 执行走云 API</span>
-    <span class="stamp">v0800-lg-label</span>
+    <span class="stamp">v0801-lg-label</span>
   </header>
   <div class="wrap">
     <aside class="rail">
@@ -147,9 +147,9 @@
       this.serialize_widgets = true;
       Object.keys(this.properties).forEach((k) => {
         const v = this.properties[k];
-        // Long serviceId/url on-card text widgets get clipped by LiteGraph chrome —
-        // keep full value in properties; edit in left inspector only.
-        if (k === "serviceId" || k === "url" || k === "previewUrl") return;
+        // Long fields stay in left inspector — on-card widgets used to clip serviceId
+        // under resolution / bottom edge. Card only keeps short numeric controls.
+        if (k === "serviceId" || k === "url" || k === "previewUrl" || k === "resolution") return;
         const kind = typeof v === "number" ? "number" : "text";
         this.addWidget(kind, k, v, (nv) => {
           this.properties[k] = nv;
@@ -160,26 +160,54 @@
       this.color = def.color;
       this.bgcolor = "#161922";
       this.boxcolor = def.color;
-      this.size = this.size || [220, 80];
-      if ((def.props && def.props.serviceId) || def.type === "cloud/i2v" || def.type === "cloud/t2i" || def.type === "cloud/i2i") {
-        this.size = [248, Math.max(96, (this.size && this.size[1]) || 96)];
-      }
+      const needsBand = !!(def.props && (def.props.serviceId || def.props.url)) ||
+        def.type === "cloud/i2v" || def.type === "cloud/t2i" || def.type === "cloud/i2i" || def.type === "cloud/image";
+      // Reserve a summary band under the title (above widgets) so labels are never cropped.
+      this._summaryBand = needsBand ? 36 : 0;
+      this.size = [needsBand ? 260 : 220, 72 + this._summaryBand + (this.widgets ? this.widgets.length * 20 : 0)];
     }
     Node.title = def.title;
     Node.desc = def.title + " · 云能力";
     Node.prototype.onExecute = function () {};
-    Node.prototype.onDrawForeground = function (ctx) {
+    Node.prototype.computeSize = function () {
+      const band = this._summaryBand || 0;
+      const wh = (this.widgets && this.widgets.length) ? this.widgets.length * 20 : 0;
+      const w = band ? 260 : 200;
+      return [w, Math.max(60, 30 + band + wh + 16)];
+    };
+    // Draw under title, ABOVE widgets — not on the bottom edge.
+    Node.prototype.onDrawBackground = function (ctx) {
       if (!this.properties) return;
       const sid = this.properties.serviceId || this.properties.url;
-      if (!sid) return;
-      const raw = String(sid);
-      const label = raw.length > 28 ? raw.slice(0, 12) + "…" + raw.slice(-12) : raw;
+      const res = this.properties.resolution;
+      if (!sid && !res) return;
+      const band = this._summaryBand || 0;
+      if (!band) return;
+      const titleH = (typeof LiteGraph !== "undefined" && LiteGraph.NODE_TITLE_HEIGHT) ? LiteGraph.NODE_TITLE_HEIGHT : 30;
+      const maxW = (this.size && this.size[0] ? this.size[0] : 260) - 20;
+      function ellipsize(ctx, text, max) {
+        text = String(text || "");
+        if (ctx.measureText(text).width <= max) return text;
+        while (text.length > 4 && ctx.measureText(text + "…").width > max) text = text.slice(0, -1);
+        return text + "…";
+      }
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, this.size[0], this.size[1]);
+      ctx.clip();
       ctx.font = "11px ui-monospace, Menlo, monospace";
-      ctx.fillStyle = "#8b93a7";
       ctx.textAlign = "left";
-      const y = (this.size && this.size[1] ? this.size[1] : 80) - 10;
-      ctx.fillText(label, 10, y);
+      ctx.textBaseline = "top";
+      let y = 6;
+      if (sid) {
+        ctx.fillStyle = "#c8cdd8";
+        ctx.fillText(ellipsize(ctx, sid, maxW), 10, y);
+        y += 14;
+      }
+      if (res) {
+        ctx.fillStyle = "#8b93a7";
+        ctx.fillText(ellipsize(ctx, "res " + res, maxW), 10, y);
+      }
       ctx.restore();
     };
     LiteGraph.registerNodeType(def.type, Node);
