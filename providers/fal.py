@@ -178,6 +178,7 @@ def overlay_image_fields(item: dict) -> dict:
     )
     has_first = any(f in FIRST_IMAGE_FIELDS for f in fields)
     has_many = "image_urls" in fields
+    has_last = any(f in LAST_IMAGE_FIELDS for f in fields)
     if is_video:
         out["needsSource"] = False
         out["needsFirstFrame"] = bool(
@@ -188,6 +189,22 @@ def overlay_image_fields(item: dict) -> dict:
     elif has_first:
         out["needsSource"] = True
         out["needsFirstFrame"] = False
+    # P0: single-image endpoints must not advertise maxRefs=9
+    if has_many:
+        out["maxRefs"] = int(out.get("maxRefs") or 9)
+        out["maxImages"] = int(out.get("maxImages") or out["maxRefs"])
+        out["refImagesField"] = "image_urls"
+    else:
+        # image_url / start_image_url / first_frame_url only — one primary (last is separate port)
+        out["maxRefs"] = 1
+        out["maxImages"] = 1
+        out["refImagesField"] = "image_url" if (has_first or fields) else out.get("refImagesField") or "image_url"
+    # expose under capabilities for storyboard resolveRefCaps
+    caps = dict(out.get("capabilities") or {})
+    caps["maxRefs"] = out["maxRefs"]
+    caps["maxImages"] = out["maxImages"]
+    caps["refImagesField"] = out.get("refImagesField") or caps.get("refImagesField")
+    out["capabilities"] = caps
     if fal_supports_lora(out):
         out["supportsLora"] = True
     return out

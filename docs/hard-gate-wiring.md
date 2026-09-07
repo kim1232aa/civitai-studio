@@ -24,3 +24,6 @@
 ## 入站字段对齐
 画布可能写 `image_urls` / `input_references`（不是只有 `images`）。
 `collect_ref_images` 对四键做并集；`/api/generate` 调 `normalize_payload_refs` 镜像到 `images`，原字段保留。
+
+## Fal 单图端点
+`imageFields` 仅有 `image_url`/`start_image_url` 等、无 `image_urls` 时，`overlay_image_fields` 强制 `maxRefs=1`（禁止挂 9 假装能吃满）。有 `image_urls` 才用 9。

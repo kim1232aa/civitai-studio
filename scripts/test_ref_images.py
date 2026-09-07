@@ -62,6 +62,14 @@ def main():
         }
     )
     assert fin.get("image_urls") and len(fin["image_urls"]) == 3, fin
+    
+    # fal single maxRefs
+    from providers.fal import overlay_image_fields
+    single = overlay_image_fields({"id": "fal-ai/flux/dev/image-to-image", "name": "x"})
+    assert single["maxRefs"] == 1 and single["capabilities"]["maxRefs"] == 1, single
+    multi = overlay_image_fields({"id": "fal-ai/flux-2-pro/edit", "imageFields": ["image_urls"]})
+    assert multi["maxRefs"] == 9, multi
+    assert max_refs("fal", gc("fal"), item=single) == 1
     print("PASS ref_images")
     return 0
 

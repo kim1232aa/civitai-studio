@@ -71,6 +71,13 @@ def max_refs(
     prov_default = PROVIDER_MAX_REFS.get((backend or "").strip(), 9)
     if default is not None:
         prov_default = int(default)
+    # Fal (and friends): single image_url schema cannot take N refs
+    if isinstance(item, dict):
+        fields = item.get("imageFields") or []
+        if fields and "image_urls" not in fields and "input_references" not in fields:
+            # only singular official slots → ceiling 1
+            prov_default = min(prov_default, 1)
+            candidates = [min(c, 1) for c in candidates] or [1]
     if not candidates:
         return prov_default
     return min(min(candidates), prov_default)
