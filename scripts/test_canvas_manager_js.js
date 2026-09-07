@@ -255,6 +255,70 @@ FakeServer.prototype.handle = async function (url, options) {
   if (canvasMount.workspace !== "canvas" || canvasMount.shown) throw new Error("canvas workspace must not force the panel open");
   if (bogusMount.workspace !== "canvas" || bogusMount.shown) throw new Error("bogus stored workspace was not rejected");
 
+  // 未保存草稿：render() 重建 innerHTML 会抹掉用户打到一半的字。
+  // 现网实测过的翻车链路——填四栏 → 中途重渲染 → 点保存 → 存进去的是空串，
+  // 已保存内容被清掉。保存必须能从草稿回落，render 必须回填草稿。
+  const draftProject = await manager.createProject("草稿项目");
+  manager.workspace = "story";
+  let domAlive = true;
+  const draftFields = new Map();
+  const draftRoot = {
+    dataset: {},
+    innerHTML: "",
+    statusText: "",
+    querySelector(selector) {
+      if (selector === ".cm-status") return draftRoot.statusNode;
+      if (!domAlive) return null;
+      const match = selector.match(/data-workspace-field="([^"]+)"/);
+      const field = match && match[1];
+      return field && draftFields.has(field) ? { value: draftFields.get(field) } : null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    dispatchEvent() {},
+  };
+  draftRoot.statusNode = { textContent: "" };
+  manager.root = draftRoot;
+  manager.clearDraft();
+  manager.savedAt = "";
+
+  ["script", "scenes", "characters", "shots"].forEach((field) => {
+    draftFields.set(field, "草稿-" + field);
+    manager.noteDraft(field, "草稿-" + field);
+  });
+  const draftStatus = manager.statusText();
+  console.log("unsaved input surfaces in status:", draftStatus, "| live status node:", draftRoot.statusNode.textContent);
+  if (draftStatus !== "有未保存修改") throw new Error("unsaved draft not reported in status");
+  if (draftRoot.statusNode.textContent !== "有未保存修改") throw new Error("status node not refreshed while typing");
+
+  // 草稿必须回填进重新渲染出来的 HTML，否则一次 render 就把用户输入吃掉。
+  const refilled = manager.renderWorkspace(manager.activeProject, manager.activeProject.canvases, manager.activeProject.assets, manager.activeCanvasId);
+  console.log("render refills draft:", refilled.includes("草稿-scenes") && refilled.includes("草稿-shots"));
+  if (!refilled.includes("草稿-scenes") || !refilled.includes("草稿-shots")) throw new Error("render dropped the unsaved draft");
+
+  // DOM 已被重渲染掉（querySelector 返回 null）时保存仍须落草稿值，不得存空串。
+  domAlive = false;
+  await manager.saveWorkspace();
+  console.log("save falls back to draft when DOM is gone:", JSON.stringify(manager.activeProject.script));
+  if (manager.activeProject.script.scenes !== "草稿-scenes" || manager.activeProject.script.shots !== "草稿-shots") {
+    throw new Error("save wrote empty strings after the DOM was re-rendered");
+  }
+  if (manager.hasDraft()) throw new Error("draft not cleared after a successful save");
+  if (!/^已保存 · \d{2}:\d{2}:\d{2}$/.test(manager.statusText())) throw new Error("saved status missing timestamp: " + manager.statusText());
+  console.log("saved status:", manager.statusText());
+
+  // 草稿按「项目 + 工作区」归属：切走之后不得把上一个项目的字带过去。
+  manager.noteDraft("script", "只属于草稿项目");
+  manager.workspace = "editor";
+  if (manager.hasDraft() || manager.draftValue("script", "回落值") !== "回落值") throw new Error("draft leaked across workspaces");
+  manager.workspace = "story";
+  await manager.selectProject("project-a", false);
+  if (manager.hasDraft() || manager.draftValue("script", "回落值") !== "回落值") throw new Error("draft leaked across projects");
+  console.log("draft scoped to project+workspace:", true);
+  await manager.deleteProject(draftProject.id);
+  manager.root = null;
+  manager.clearDraft();
+
   const source = SCRIPT + JSON.stringify(server.projects);
   if (/机器人|扫地|demo-|DEMO_BOT|light-preset|CHAR_LIB|loadDemo/i.test(source)) throw new Error("seed/robot content found");
   console.log("no robot/demo/seed content");

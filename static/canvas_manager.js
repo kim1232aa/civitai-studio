@@ -46,6 +46,10 @@
       this.workspace = "canvas";
       this.loading = false;
       this.error = "";
+      // 未保存草稿：任何一次 render() 都会重建 innerHTML，用户打到一半的字会被抹掉。
+      // 草稿按「项目 + 工作区」归属，切项目或切工作区自动失效，不会串到别的项目上。
+      this.draft = { scope: "", fields: {} };
+      this.savedAt = "";
       this.onChange = typeof config.onChange === "function" ? config.onChange : null;
     }
 
@@ -266,6 +270,47 @@
       await this.refreshProject();
     }
 
+    draftScope() {
+      return `${(this.activeProject && this.activeProject.id) || ""}|${this.workspace}`;
+    }
+
+    noteDraft(field, value) {
+      const scope = this.draftScope();
+      if (this.draft.scope !== scope) this.draft = { scope, fields: {} };
+      this.draft.fields[field] = String(value == null ? "" : value);
+      this.savedAt = "";
+      this.renderStatus();
+    }
+
+    draftValue(field, fallback) {
+      if (this.draft.scope !== this.draftScope()) return fallback;
+      return Object.prototype.hasOwnProperty.call(this.draft.fields, field) ? this.draft.fields[field] : fallback;
+    }
+
+    hasDraft() {
+      if (this.draft.scope !== this.draftScope()) return false;
+      return Object.keys(this.draft.fields).length > 0;
+    }
+
+    clearDraft() {
+      this.draft = { scope: "", fields: {} };
+    }
+
+    statusText() {
+      if (this.loading) return "加载中…";
+      if (this.error) return this.error;
+      if (this.hasDraft()) return "有未保存修改";
+      if (this.savedAt) return `已保存 · ${this.savedAt}`;
+      return "";
+    }
+
+    // 输入过程中只刷状态文字，不重建 innerHTML —— 否则每敲一个字都会丢焦点。
+    renderStatus() {
+      if (!this.root || typeof this.root.querySelector !== "function") return;
+      const node = this.root.querySelector(".cm-status");
+      if (node) node.textContent = this.statusText();
+    }
+
     requireProject() {
       if (!this.activeProject || !this.activeProject.id) throw new Error("请先选择项目");
       return this.activeProject;
@@ -342,18 +387,23 @@
 
     async saveWorkspace() {
       const project = this.requireProject();
-      const read = (field) => {
-        const input = this.root && this.root.querySelector(`[data-workspace-field="${field}"]`);
-        return input ? input.value : "";
+      // DOM 优先；DOM 已被重渲染掉时回落到草稿，再回落到项目现值。
+      // 三级回落缺一不可：只读 DOM 会把重渲染后的空框存成空串，把已保存内容清掉。
+      const read = (field, current) => {
+        const input = this.root && typeof this.root.querySelector === "function"
+          ? this.root.querySelector(`[data-workspace-field="${field}"]`)
+          : null;
+        if (input) return input.value;
+        return this.draftValue(field, current == null ? "" : current);
       };
       const script = clone(project.script || { script: "", scenes: "", characters: "", shots: "" });
       const editor = clone(project.editor || { content: "" });
       if (this.workspace === "story") {
         ["script", "scenes", "characters", "shots"].forEach((field) => {
-          script[field] = read(field);
+          script[field] = read(field, script[field]);
         });
       } else if (this.workspace === "editor") {
-        editor.content = read("editor");
+        editor.content = read("editor", editor.content);
       } else {
         throw new Error("当前工作区不支持保存");
       }
@@ -367,6 +417,8 @@
           editor,
         }),
       });
+      this.clearDraft();
+      this.savedAt = new Date().toTimeString().slice(0, 8);
       await this.acceptProject(body && body.project);
       return this.activeProject;
     }
@@ -377,10 +429,10 @@
         return `<section class="cm-workspace cm-story-workspace">
           <div class="cm-workspace-head"><div><h2>剧本策划</h2><p class="cm-note" data-active-project="${project ? escapeHtml(project.id) : ""}">${project ? `当前项目：${escapeHtml(projectLabel(project))}` : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存剧本</button></div>
           <div class="cm-story-grid">
-            <label><span>剧本</span><textarea data-workspace-field="script" placeholder="暂无剧本内容">${escapeHtml(script.script || "")}</textarea></label>
-            <label><span>场景</span><textarea data-workspace-field="scenes" placeholder="暂无场景内容">${escapeHtml(script.scenes || "")}</textarea></label>
-            <label><span>角色</span><textarea data-workspace-field="characters" placeholder="暂无角色内容">${escapeHtml(script.characters || "")}</textarea></label>
-            <label><span>分镜</span><textarea data-workspace-field="shots" placeholder="暂无分镜内容">${escapeHtml(script.shots || "")}</textarea></label>
+            <label><span>剧本</span><textarea data-workspace-field="script" placeholder="暂无剧本内容">${escapeHtml(this.draftValue("script", script.script || ""))}</textarea></label>
+            <label><span>场景</span><textarea data-workspace-field="scenes" placeholder="暂无场景内容">${escapeHtml(this.draftValue("scenes", script.scenes || ""))}</textarea></label>
+            <label><span>角色</span><textarea data-workspace-field="characters" placeholder="暂无角色内容">${escapeHtml(this.draftValue("characters", script.characters || ""))}</textarea></label>
+            <label><span>分镜</span><textarea data-workspace-field="shots" placeholder="暂无分镜内容">${escapeHtml(this.draftValue("shots", script.shots || ""))}</textarea></label>
           </div>
         </section>`;
       }
@@ -388,7 +440,7 @@
         const content = project && project.editor && project.editor.content || "";
         return `<section class="cm-workspace cm-editor-workspace">
           <div class="cm-workspace-head"><div><h2>编辑器</h2><p class="cm-note" data-active-project="${project ? escapeHtml(project.id) : ""}">${project ? `当前项目：${escapeHtml(projectLabel(project))}` : "暂无项目"}</p></div><button type="button" class="cm-save" data-action="save-workspace"${project ? "" : " disabled"}>保存内容</button></div>
-          <textarea class="cm-editor" data-workspace-field="editor" placeholder="暂无编辑内容">${escapeHtml(content)}</textarea>
+          <textarea class="cm-editor" data-workspace-field="editor" placeholder="暂无编辑内容">${escapeHtml(this.draftValue("editor", content))}</textarea>
         </section>`;
       }
       const canvasRows = canvases.length
@@ -424,7 +476,7 @@
       const projectOptions = this.projects
         .map((item) => `<option value="${escapeHtml(item.id)}"${project && item.id === project.id ? " selected" : ""}>${escapeHtml(item.name)}</option>`)
         .join("");
-      const status = this.loading ? "加载中…" : (this.error ? escapeHtml(this.error) : "");
+      const status = escapeHtml(this.statusText());
       const title = global.document && global.document.getElementById("projTitle");
       if (title) title.textContent = project ? projectLabel(project) : "未选择项目";
       this.root.innerHTML = `
@@ -481,6 +533,11 @@
           this.error = error.message || "操作失败";
           this.render();
         }
+      });
+      this.root.addEventListener("input", (event) => {
+        const field = event.target && event.target.dataset && event.target.dataset.workspaceField;
+        if (!field) return;
+        this.noteDraft(field, event.target.value);
       });
       this.root.addEventListener("change", (event) => {
         const target = event.target.closest('[data-action="select-project"]');
