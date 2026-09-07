@@ -1410,6 +1410,19 @@
         if (!toolUi.prevBackend) toolUi.prevBackend = $("backend").value;
         $("backend").value = "nano-gpt";
       }
+      const current = nodeById(state.selected);
+      if (!current || (current.kind !== "shot" && current.kind !== "text")) {
+        const id = uid("text");
+        state.nodes.push({
+          id: id,
+          kind: "text",
+          title: "文本生成",
+          x: 220,
+          y: 24,
+          text: "",
+        });
+        selectNode(id);
+      }
       resetScopedMsg();
       renderDock();
       loadCatalog();
@@ -1966,7 +1979,7 @@
       {
         id: "p-" + shot.id,
         op: "prompt",
-        params: { text: normalizePrompt(shot) },
+        params: { text: shot.kind === "text" ? shot.text || "" : normalizePrompt(shot) },
       },
     ];
     const edges = [
@@ -1977,12 +1990,15 @@
         toPort: "prompt",
       },
     ];
-    linked.forEach((a) =>
-      nodes.push({ id: a.id, op: "image", params: { url: a.url } }),
-    );
     let op = "t2i";
-    if (state.mode === "video") op = "i2v";
-    else if (state.mode !== "text" && linked[0]) op = "i2i";
+    if (state.mode === "text") op = "text";
+    else if (state.mode === "video") op = "i2v";
+    else if (linked[0]) op = "i2i";
+    if (op !== "text") {
+      linked.forEach((a) =>
+        nodes.push({ id: a.id, op: "image", params: { url: a.url } }),
+      );
+    }
     const aspect = $("aspect").value || "16:9";
     const selectedResolution = $("res").value || "";
     const selectedModel = selectedCatalogItem();
@@ -1999,20 +2015,24 @@
             ? "720x1280"
             : "1280x720";
     const backend = ($("backend") && $("backend").value) || "";
+    const generatorParams =
+      op === "text"
+        ? { serviceId: $("service").value }
+        : Object.assign(
+            {
+              serviceId: $("service").value,
+              resolution: res,
+              duration: parseInt($("duration").value, 10) || 5,
+            },
+            samplerGraphParams(op, backend),
+            samplingGraphParams(op, shot),
+          );
     nodes.push({
       id: shot.id,
       op: op,
-      params: Object.assign(
-        {
-          serviceId: $("service").value,
-          resolution: res,
-          duration: parseInt($("duration").value, 10) || 5,
-        },
-        samplerGraphParams(op, backend),
-        samplingGraphParams(op, shot),
-      ),
+      params: generatorParams,
     });
-    const seedRaw = seedFieldRaw(shot);
+    const seedRaw = op === "text" ? "" : seedFieldRaw(shot);
     if (/^-?\d+$/.test(seedRaw)) {
       nodes.push({
         id: "sd-" + shot.id,
@@ -2026,7 +2046,7 @@
         toPort: "seed",
       });
     }
-    const loraRows = loraEnabled(shot) ? loraPayloadRows() : [];
+    const loraRows = op === "text" ? [] : loraEnabled(shot) ? loraPayloadRows() : [];
     if (loraRows.length) {
       nodes.push({
         id: "lr-" + shot.id,
@@ -2041,7 +2061,7 @@
       });
     }
     const ref = op === "i2v" ? frame : linked[0];
-    if (ref && op !== "t2i")
+    if (ref && op !== "t2i" && op !== "text")
       edges.push({
         from: ref.id,
         fromPort: "image",
@@ -2066,8 +2086,113 @@
     );
   }
 
+  function pickText(data) {
+    if (!data) return "";
+    const value = data.text || data.content || data.story || data.message;
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) {
+      return value
+        .map((part) =>
+          part && typeof part === "object" ? part.text || "" : String(part || ""),
+        )
+        .join("")
+        .trim();
+    }
+    return "";
+  }
+
+  async function generateText(node) {
+    if (!node || (node.kind !== "text" && node.kind !== "shot")) {
+      const id = uid("text");
+      node = {
+        id: id,
+        kind: "text",
+        title: "文本生成",
+        x: 220,
+        y: 24,
+        text: ($("prompt") && $("prompt").value) || "",
+      };
+      state.nodes.push(node);
+      selectNode(id);
+    }
+    const dockTa = $("prompt");
+    if (dockTa) syncPrompt(node, dockTa.value, dockTa);
+    if (!$("service") || !$("service").value) {
+      setMsg("没有选中真实文本模型，不会用默认假值生成", "bad");
+      return;
+    }
+    const prompt = String(promptOf(node) || "").trim();
+    if (!prompt) {
+      setMsg("文本生成需要先填写提示词", "warn");
+      return;
+    }
+    const send = $("send");
+    if (send) send.disabled = true;
+    setMsg("校验文本生成连线…");
+    try {
+      const compiledResponse = await fetch("/api/graph/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildGraph(node)),
+      });
+      const compiled = await compiledResponse.json();
+      if (!compiledResponse.ok || !compiled.ok) {
+        throw new Error(compiled.error || "文本生成校验未通过");
+      }
+      const payload =
+        compiled.payload ||
+        (compiled.stages && compiled.stages[0] && compiled.stages[0].payload);
+      if (!payload || payload.kind !== "text") {
+        throw new Error("文本生成没有编译出文本 payload");
+      }
+      setMsg("正在请求 NanoGPT 文本接口…");
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result.error) {
+        throw new Error(result.error || "HTTP " + response.status);
+      }
+      const text = pickText(result);
+      if (!text) throw new Error("NanoGPT 文本接口没有返回内容");
+      let output = node.kind === "text" ? nodeById(node.textOutputId) : null;
+      if (!output || output.kind !== "text") {
+        output = {
+          id: uid("text"),
+          kind: "text",
+          title: "文本生成结果",
+          x: node.x + 360,
+          y: node.y,
+          text: "",
+          sourcePromptId: node.id,
+        };
+        state.nodes.push(output);
+        state.edges.push({ from: node.id, to: output.id });
+        if (node.kind === "text") node.textOutputId = output.id;
+      }
+      output.text = text;
+      renderCards();
+      drawWires();
+      selectNode(output.id);
+      persist();
+      setMsg("文本生成完成，结果已落到新的文本节点", "ok");
+    } catch (e) {
+      setMsg(String(e && e.message ? e.message : e), "bad");
+    } finally {
+      if (send) send.disabled = false;
+      renderDock();
+    }
+  }
+
   async function generate() {
-    const shot = nodeById(state.selected);
+    const selected = nodeById(state.selected);
+    if (state.mode === "text") {
+      await generateText(selected);
+      return;
+    }
+    const shot = selected;
     if (!shot || shot.kind !== "shot") return;
     if (state.mode === "video" && !frameAsset(shot)) {
       setMsg("视频需要先连一张首帧图，不能偷配方台", "bad");
@@ -2239,7 +2364,8 @@
   }
   $("send").onclick = () => {
     const n = nodeById(state.selected);
-    if (n && n.kind === "text") generateFromText(n);
+    if (state.mode === "text") generateText(n);
+    else if (n && n.kind === "text") generateFromText(n);
     else generate();
   };
 
@@ -3338,6 +3464,7 @@
   const NINE_SHEET_GAP = 8;
   const PH_DEFAULT = "点击查看或编辑提示词";
   const PH_STORY = "输入你的故事、场景或角色设定";
+  const PH_TEXT = "输入要生成的文本，或镜头旁白";
   const PH_NINE = "请输入九宫格生成提示词...";
   const PH_IMAGE = "描述你想要生成的图片，或输入 @ 引用角色";
   const PH_VIDEO = "结合图片，描述你想生成的角色动作和画面动态";
@@ -5571,11 +5698,10 @@
         ta.placeholder = PH_NINE;
         if (ta !== document.activeElement) ta.value = toolUi.nineText || "";
       } else if (state.mode === "text") {
-        ta.placeholder = PH_STORY;
+        ta.placeholder = PH_TEXT;
         if (ta !== document.activeElement) {
           const n = nodeById(state.selected);
-          ta.value =
-            n && n.kind === "text" ? n.text || "" : toolUi.storyText || "";
+          ta.value = promptOf(n);
         }
       } else if (state.mode === "image") {
         ta.placeholder = PH_IMAGE;

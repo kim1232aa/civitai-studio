@@ -43,6 +43,7 @@ PORT_TYPES = {
     "negative": "prompt",
     "loras": "loras",
     "video": "video",
+    "text": "text",
 }
 
 OP_SPEC = {
@@ -59,6 +60,8 @@ OP_SPEC = {
     "i2v": {"ins": ["prompt", "image", "seed", "negative", "loras"], "outs": ["video"], "required": ["image"]},
     # text→video; prompt required; no image port — a wired frame is i2v, never a silent rewrite
     "t2v": {"ins": ["prompt", "seed", "negative", "loras"], "outs": ["video"], "required": ["prompt"]},
+    # text generation: chat-capable providers return text, not media
+    "text": {"ins": ["prompt"], "outs": ["text"], "required": ["prompt"]},
     "lora_apply": {"ins": ["image"], "outs": ["loras", "image"], "required": []},
     # image→image, no prompt required (超清/放大)
     "upscale": {"ins": ["prompt", "image"], "outs": ["image"], "required": ["image"]},
@@ -332,6 +335,27 @@ def compile_graph(graph: dict | None) -> dict:
                     blocked=True,
                     nodeId=nid,
                 )
+            continue
+
+        if op == "text":
+            if not caps.get("chat"):
+                return _err(f"后端 {backend} 不支持文本生成", blocked=True, nodeId=nid)
+            payload = {
+                "backend": backend,
+                "serviceId": params.get("serviceId") or g.get("serviceId"),
+                "kind": "text",
+                "recipe": "text",
+                "prompt": inputs.get("prompt"),
+            }
+            if not payload["serviceId"]:
+                return _err(f"节点 {nid} 缺少 serviceId", nodeId=nid)
+            if caps.get("promptMax") and isinstance(payload.get("prompt"), str):
+                mx = int(caps["promptMax"])
+                if len(payload["prompt"]) > mx:
+                    return _err(f"提示词超过 promptMax={mx}", blocked=True, nodeId=nid)
+            values[(nid, "text")] = payload["prompt"]
+            stages.append({"id": nid, "op": op, "payload": deepcopy(payload), "produces": "text"})
+            candidate_sinks.append((nid, payload))
             continue
 
         if op in ("t2i", "i2i"):
@@ -727,7 +751,7 @@ def compile_graph(graph: dict | None) -> dict:
         return _err(f"未实现 op: {op}", nodeId=nid)
 
     if not candidate_sinks:
-        return _err("图中没有可生成的 t2i/i2i/i2v/t2v 汇点")
+        return _err("图中没有可生成的 t2i/i2i/i2v/t2v/text 汇点")
     if len(candidate_sinks) > 1:
         ids = [s[0] for s in candidate_sinks]
         return _err(

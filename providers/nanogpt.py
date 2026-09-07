@@ -1084,6 +1084,12 @@ class NanoGptProvider(Provider):
         if sid.startswith(("nano-gpt/", "nanogpt/", "nano/")):
             return True
         ids = {x.get("id") for x in fetch_catalog()}
+        if sid in ids:
+            return True
+        try:
+            ids |= {x.get("id") for x in fetch_text_catalog()}
+        except CatalogFetchError:
+            pass
         return sid in ids
 
     def owns_job(self, job_id: str) -> bool:
@@ -1114,9 +1120,10 @@ class NanoGptProvider(Provider):
         if too:
             return 400, {**base, **too}
         cat = (spec.get("category") or p.get("kind") or p.get("recipe") or "image").lower()
+        kind = str(p.get("kind") or p.get("recipe") or "").lower()
         task = spec.get("task") or ""
         is_video = cat == "video" or "video" in task
-        is_text = cat in ("text", "chat")
+        is_text = kind in ("text", "chat") or cat in ("text", "chat")
         if not is_text and not (p.get("prompt") or "").strip():
             errors.append({"code": "missing_prompt", "message": "prompt 是空的，NanoGPT 会直接打回"})
         media = _source_images(p)
@@ -1190,10 +1197,84 @@ class NanoGptProvider(Provider):
         if not mid:
             return 400, {"error": "缺少 NanoGPT 模型 id"}
         spec = find_spec(mid)
-        cat = (spec.get("category") or payload.get("kind") or payload.get("recipe") or "image").lower()
+        kind = str((payload or {}).get("kind") or (payload or {}).get("recipe") or "").lower()
+        cat = (spec.get("category") or kind or "image").lower()
+        if kind in ("text", "chat") or cat in ("text", "chat"):
+            return self._generate_text(payload, spec, mid)
         if cat == "video" or (spec.get("task") or "").find("video") >= 0:
             return self._generate_video(payload, spec, mid)
         return self._generate_image(payload, spec, mid)
+
+    def _generate_text(self, payload, spec, mid):
+        too = prompt_length_error((payload or {}).get("prompt"))
+        if too:
+            return 400, too
+        prompt = str((payload or {}).get("prompt") or "").strip()
+        if not prompt:
+            return 400, {"error": "文本生成需要提示词", "serviceId": mid, "code": "missing_prompt"}
+        model = str(mid or "").strip()
+        if model.startswith("chat/"):
+            model = model[len("chat/"):]
+        if not model:
+            return 400, {"error": "缺少 NanoGPT 模型 id", "code": "missing_service"}
+        body = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        temperature = (payload or {}).get("temperature")
+        if temperature not in (None, ""):
+            try:
+                body["temperature"] = float(temperature)
+            except (TypeError, ValueError):
+                return 400, {"error": "temperature 必须是数字", "serviceId": mid, "code": "invalid_temperature"}
+        code, data = json_call(
+            CHAT_COMPLETIONS,
+            method="POST",
+            headers=_auth(),
+            body=body,
+            timeout=90,
+        )
+        if code >= 400 or not isinstance(data, dict):
+            return (
+                code if code >= 400 else 502,
+                {
+                    "error": extract_error(data, f"NanoGPT chat HTTP {code}"),
+                    "code": "text_generation_failed",
+                    "backend": self.id,
+                    "model": mid,
+                },
+            )
+        choices = data.get("choices") or []
+        content = ""
+        if choices and isinstance(choices[0], dict):
+            message = choices[0].get("message") or {}
+            content = message.get("content") or choices[0].get("text") or ""
+        if isinstance(content, list):
+            content = "".join(
+                str(part.get("text") or "") if isinstance(part, dict) else str(part)
+                for part in content
+            )
+        content = str(content).strip()
+        if not content:
+            return 502, {
+                "error": "NanoGPT 文本接口未返回内容",
+                "code": "empty_text_generation",
+                "backend": self.id,
+                "model": mid,
+            }
+        jid = f"nano-gpt|text|{uuid.uuid4().hex[:12]}"
+        return 200, {
+            "ok": True,
+            "id": jid,
+            "status": "succeeded",
+            "backend": self.id,
+            "endpoint": mid,
+            "model": mid,
+            "text": content,
+            "content": content,
+            "submittedInput": body,
+            "cost": data.get("cost"),
+        }
 
     def _generate_image(self, payload, spec, mid):
         too = prompt_length_error((payload or {}).get("prompt"))
