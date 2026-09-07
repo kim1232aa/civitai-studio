@@ -35,6 +35,33 @@ def main():
         assert len(fin["image_urls"]) >= 2, fin
     elif "image_url" in fin:
         assert fin["image_url"]
+    # Canvas packs field names — must not require payload.images
+    only_urls = payload_ref_images(
+        {"image_urls": ["https://ex/a.png", "https://ex/b.png", "https://ex/c.png"]},
+        backend="fal",
+        caps=gc("fal"),
+    )
+    assert only_urls == ["https://ex/a.png", "https://ex/b.png", "https://ex/c.png"], only_urls
+    only_refs = payload_ref_images(
+        {"input_references": ["https://ex/1.png", "https://ex/2.png"]},
+        backend="nano-gpt",
+        caps=gc("nano-gpt"),
+    )
+    assert only_refs == ["https://ex/1.png", "https://ex/2.png"], only_refs
+    from providers.ref_images import normalize_payload_refs
+    raw = {"image_urls": ["https://ex/a.png", "https://ex/b.png"]}
+    normalize_payload_refs(raw)
+    assert raw["images"] == ["https://ex/a.png", "https://ex/b.png"]
+    assert raw["image_urls"] == ["https://ex/a.png", "https://ex/b.png"]  # keep canvas field
+    # image_urls-only fal edit endpoint
+    fin = fal_mod.build_fal_input(
+        {
+            "serviceId": "fal-ai/flux-2-pro/edit",
+            "prompt": "x",
+            "image_urls": ["https://ex/a.png", "https://ex/b.png", "https://ex/c.png"],
+        }
+    )
+    assert fin.get("image_urls") and len(fin["image_urls"]) == 3, fin
     print("PASS ref_images")
     return 0
 

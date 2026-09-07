@@ -1,11 +1,16 @@
 """Shared outbound reference-image collection + clamp.
 
-Studio inbound: sourceImage / firstFrame / images[] / referenceImages[].
-Providers map to official fields (Fal image_urls, Nano input_references,
-Civitai images, ModelScope image_url).
+Studio / storyboard inbound (any of these — union, not only images):
+  - firstFrame / sourceImage / startImage / image_url / imageUrl / …
+  - images[] / referenceImages[]
+  - image_urls[]   (Fal canvas pack)
+  - input_references[]  (Nano canvas pack)
 
-maxRefs / maxImages come from provider capabilities (civitai 开发) or catalog
-item; never invent higher than the provider default below.
+Providers map to official outbound fields (Fal image_urls, Nano
+input_references, Civitai images, ModelScope image_url).
+
+maxRefs / maxImages come from provider capabilities or catalog item;
+never invent higher than the provider default below.
 """
 from __future__ import annotations
 
@@ -134,6 +139,25 @@ def clamp_ref_images(
     imgs = [x for x in (images or []) if x]
     n = max_refs(backend=backend, caps=caps, item=item, payload=payload, default=default)
     return imgs[:n]
+
+
+def normalize_payload_refs(payload: dict | None) -> dict:
+    """Mirror canvas field names onto payload.images for legacy readers.
+
+    Storyboard packs refs onto capabilities.refImagesField (often
+    image_urls / input_references). Call this at /api/generate so any
+    leftover images-only path still sees the full list. Idempotent.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    refs = collect_ref_images(payload, include_primary=True)
+    if not refs:
+        return payload
+    existing = payload.get("images")
+    if not isinstance(existing, list) or len(existing) < len(refs):
+        payload["images"] = list(refs)
+    # Keep canvas fields intact; do not delete image_urls / input_references.
+    return payload
 
 
 def payload_ref_images(

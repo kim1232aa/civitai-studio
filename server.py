@@ -977,6 +977,9 @@ class Handler(BaseHTTPRequestHandler):
                 blocked = reject_staged_generate(payload)
                 if blocked:
                     return self._json(400, blocked)
+            # Canvas may pack image_urls / input_references; mirror to images.
+            from providers.ref_images import normalize_payload_refs
+            normalize_payload_refs(payload)
             prov = providers.resolve_from_payload(payload)
             if path == "/api/whatif":
                 code, data = prov.whatif(payload)

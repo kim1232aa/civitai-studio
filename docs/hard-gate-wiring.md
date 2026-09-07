@@ -20,3 +20,7 @@
 | huggingface | 9 | image_urls |
 | nano-gpt | 5 | input_references |
 | modelscope-* | 1 | image_url |
+
+## 入站字段对齐
+画布可能写  / （不是只有 ）。
+ 四键并集； 调  镜像到 ，原字段保留。
