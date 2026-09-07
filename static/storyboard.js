@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821f";
-  const STORE_OLDS = ["nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821g";
+  const STORE_OLDS = ["nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821g: always 首帧已就绪; bind send click+pointerdown; larger hit/z-index; missing-frame bad
   // v0821f: send ↑ no-op — clear stale needFrame warn; never silent-return; disabled gray
   // v0821e: POST /api/upload-out → /out (no blob soft-fallback)
   // v0821d: new-shot / loadDemo prompt stays empty (no 【镜头 shell)
@@ -762,17 +763,15 @@
     const frame = frameAsset(n);
     const needFrame = state.mode === "video" && !frame;
     const stub = isStubMode();
-    if ($("send")) $("send").disabled = !!(needFrame || stub);
+    syncSendGate(needFrame, stub);
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
-      setMsg("缺首帧 · 视频需要先连一张首帧图", "warn");
+      // v0821g: missing-frame is hard stop (red), not yellow warn
+      setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
     } else if (state.mode === "video" && frame) {
-      // v0821f: clear stale needFrame warn when thumb is hung (was CLICK_NOOP confusion)
-      const cur = ($("msg") && $("msg").textContent) || "";
-      if (/缺首帧|视频需要先连一张首帧图|本版未接/.test(cur)) {
-        setMsg("首帧已就绪 · 可生成");
-      }
+      // v0821g: always show ready when video+frame (v0821f only cleared stale 缺首帧 regex → tip skipped)
+      setMsg("首帧已就绪 · 可生成");
     }
     let frameHtml = "";
     if (state.mode === "video") {
@@ -2777,8 +2776,50 @@
     return { status: "done", stageOp: stageOp };
   }
 
+  function syncSendGate(needFrame, stub) {
+    const btn = $("send");
+    if (!btn) return;
+    const blocked = !!(needFrame || stub);
+    btn.disabled = blocked;
+    let reason = "enabled";
+    if (stub) reason = "stub-mode";
+    else if (needFrame) reason = "need-frame";
+    else if (state.runningGroup) reason = "group-running";
+    btn.title = blocked ? ("不可生成 · " + reason) : "生成 · enabled";
+    btn.setAttribute("data-testid", "composer-send");
+    btn.setAttribute("data-enabled", blocked ? "0" : "1");
+    btn.setAttribute("data-reason", reason);
+  }
+
+  function fireSend(e) {
+    const btn = $("send");
+    if (!btn) return;
+    // disabled buttons normally swallow events; still guard
+    if (btn.disabled) return;
+    if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
+    const now = Date.now();
+    if (fireSend._at && (now - fireSend._at) < 450) return;
+    fireSend._at = now;
+    if (e) {
+      try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+    }
+    generate();
+  }
+
+  function bindSendButton() {
+    const btn = $("send");
+    if (!btn || btn.dataset.nlSendBound === "1") return;
+    btn.dataset.nlSendBound = "1";
+    btn.type = "button";
+    btn.setAttribute("data-testid", "composer-send");
+    btn.onclick = null;
+    // capture click + pointerdown fallback (index #go lesson: elevate hit; avoid silent noop)
+    btn.addEventListener("click", fireSend, true);
+    btn.addEventListener("pointerdown", fireSend);
+  }
+
   async function generate() {
-    // v0821f: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
+    // v0821f/g: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
     setMsg("校验连线…");
     if ($("send")) $("send").disabled = true;
     try {
@@ -2786,15 +2827,22 @@
     } finally {
       // renderDock / runShotStep re-enable; belt-and-suspenders if early-return skipped that
       const n = nodeById(state.selected);
-      const blocked = !n || n.kind !== "shot" || isStubMode() ||
+      const needFrame = !n || n.kind !== "shot" ? false :
         (state.mode === "video" && !frameAsset(n));
-      if ($("send") && !state.runningGroup) $("send").disabled = !!blocked;
+      const stub = !n || n.kind !== "shot" || isStubMode();
+      if ($("send") && !state.runningGroup) {
+        if (!n || n.kind !== "shot") {
+          $("send").disabled = true;
+          $("send").title = "不可生成 · no-shot";
+          $("send").setAttribute("data-enabled", "0");
+          $("send").setAttribute("data-reason", "no-shot");
+        } else {
+          syncSendGate(needFrame, isStubMode());
+        }
+      }
     }
   }
-  if ($("send")) {
-    $("send").type = "button";
-    $("send").onclick = generate;
-  }
+  bindSendButton();
 
   async function runShotUntilDone(shotId, progressPrefix) {
     // Loop nextRunnableStage for one shot via the same step runner — do not skip gates.
