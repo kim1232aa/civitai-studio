@@ -1,7 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821m";
-  const STORE_OLDS = ["nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821m2";
+  const STORE_OLDS = ["nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
   // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
@@ -2634,12 +2634,17 @@
     if (fromList) return fromList;
     if (data.video) return data.video.url || (typeof data.video === "string" ? data.video : "");
     if (data.image) return data.image.url || (typeof data.image === "string" ? data.image : "");
+    // v0821m: bare video_url / image_url (some fal/provider shapes)
+    if (typeof data.video_url === "string" && data.video_url) return data.video_url;
+    if (typeof data.image_url === "string" && data.image_url) return data.image_url;
     const res = data.result;
     if (res && typeof res === "object") {
       if (res.video) return res.video.url || (typeof res.video === "string" ? res.video : "");
       if (res.image) return res.image.url || (typeof res.image === "string" ? res.image : "");
       const nested = first(res.videos) || first(res.images);
       if (nested) return nested;
+      if (typeof res.video_url === "string" && res.video_url) return res.video_url;
+      if (typeof res.image_url === "string" && res.image_url) return res.image_url;
       if (typeof res.url === "string") return res.url;
     }
     if (typeof data.url === "string") return data.url;
@@ -2881,7 +2886,15 @@
         setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
       } else {
         setShotBusy(shot, false);
-        setMsg(prefix + "云端已返回，没有可预览地址", "warn");
+        // v0821m: poll budget exhausted while Fal still IN_PROGRESS ≠ 「已返回无媒体」
+        const stillGoing = !!(j && (
+          j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status
+        ));
+        if (stillGoing) {
+          setMsg(prefix + "等待超时，云端任务仍在进行中（视频约需数分钟，可稍后用任务 id 再查）", "warn");
+        } else {
+          setMsg(prefix + "云端已返回，没有可预览地址", "warn");
+        }
         if (!opts.keepSend) markSendBusy(false);
         renderDock();
         return { status: "blocked", stageOp: stageOp };
@@ -2958,8 +2971,7 @@
     const btn = $("send");
     if (!btn) return;
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
-    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
-  // v0821l: same DOM event handled once (#send + #dockFoot both wired)
+    // v0821l: same DOM event handled once (#send + #dockFoot both wired)
     if (e) {
       if (e._nlSendHandled) return;
       e._nlSendHandled = true;
@@ -2981,8 +2993,7 @@
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
     }
-    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
-  // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
+    // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       setMsg("请先选中分镜再生成", "bad");
@@ -3001,8 +3012,7 @@
       setMsg("此模型需要提示词", "bad");
       return;
     }
-    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
-  // v0821l: only ack when proceeding to generate()
+    // v0821l: only ack when proceeding to generate()
     setMsg("已点生成");
     generate();
   }
@@ -3025,8 +3035,7 @@
       const onFoot = function (ev) {
         const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
         if (!t) return;
-        // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
-  // v0821l: skip if #send already marked this event
+        // v0821l: skip if #send already marked this event
         if (ev._nlSendHandled) return;
         fireSend(ev);
       };
