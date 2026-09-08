@@ -2769,8 +2769,11 @@
           await new Promise((res) => setTimeout(res, 2500));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
           if (st.error || st.status === "failed") throw new Error(st.error || "任务失败");
-          if (pickUrl(st) || st.status === "done" || st.status === "succeeded" || st.status === "completed") { j = st; break; }
-          setMsg(prefix + "云端进行中 " + (i + 1) + "/40");
+          // v0821i: never break on succeeded alone — wait for saved[]/video.url (pickUrl) or keep polling.
+          j = st;
+          if (pickUrl(st)) break;
+          const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
+          setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
         }
       }
       if (state.groupRunAbort) {

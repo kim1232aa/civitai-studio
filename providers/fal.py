@@ -713,20 +713,21 @@ def submit(payload: dict):
         data["id"] = jid
         data["backend"] = "fal"
         data["endpoint"] = eid
-        data["submittedInput"] = inp
+        # v0821i P1: persist what Fal actually received (post-materialize), not pre-/out snapshot
+        data["submittedInput"] = outbound
         if rid:
             _remember_job(rid, {
                 "endpoint": eid,
                 "status_url": data.get("status_url"),
                 "response_url": data.get("response_url"),
                 "cancel_url": data.get("cancel_url"),
-                "submittedInput": inp,
+                "submittedInput": outbound,
                 "prompt": payload.get("prompt"),
             })
             remember_studio_job(jid, {
                 "backend": "fal",
                 "serviceId": eid,
-                "submittedInput": inp,
+                "submittedInput": outbound,
                 "prompt": payload.get("prompt"),
                 "negativePrompt": payload.get("negativePrompt"),
                 "seed": payload.get("seed"),

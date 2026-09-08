@@ -1516,6 +1516,11 @@ def test_v0821i_i2v_writeback():
     assert_true('playsinline preload="metadata"' in js, "shot/asset video preload")
     assert_true("<video src=" in js and "muted playsinline" in js, "video tag on cards")
 
+    # poll must not break on succeeded without pickUrl
+    assert_true("never break on succeeded alone" in js or "成片落盘中" in js, "poll waits for saved after succeeded")
+    assert_true('if (pickUrl(st)) break;' in js, "poll breaks only when pickUrl hits")
+    assert_true('pickUrl(st) || st.status === "done"' not in js and "pickUrl(st) || st.status === 'done'" not in js, "old succeeded-or-pickUrl break removed")
+
     # loadOuts keeps videos
     lo = js[js.find("async function loadOuts"):js.find("$(\"backend\").onchange")]
     assert_true('it.kind === "image" || (it.url && !isVideoUrl(it.url))' not in lo, "must not filter videos out")
