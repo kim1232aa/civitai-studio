@@ -715,6 +715,20 @@ def submit(payload: dict):
         outbound = materialize_fal_media(inp)
     except ValueError as e:
         return 400, {"error": str(e), "backend": "fal", "endpoint": eid, "submittedInput": inp}
+    # v0821k: optional provider reject when catalog requires prompt and outbound is empty
+    # (client gates first; this stops silent Fal 422 Field required for API callers)
+    spec = find_model(eid) or {}
+    prompt_key = spec.get("promptField") or "prompt"
+    req = list(spec.get("required") or [])
+    if prompt_key in req or "prompt" in req:
+        pv = outbound.get(prompt_key) if isinstance(outbound, dict) else None
+        if pv is None or (isinstance(pv, str) and not pv.strip()):
+            return 400, {
+                "error": "此模型需要提示词",
+                "backend": "fal",
+                "endpoint": eid,
+                "submittedInput": outbound,
+            }
     code, data = fal_call(f"{QUEUE}/{eid}", method="POST", body=outbound)
     if isinstance(data, dict):
         rid = data.get("request_id") or data.get("requestId")

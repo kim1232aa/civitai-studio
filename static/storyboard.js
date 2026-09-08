@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821j";
-  const STORE_OLDS = ["nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821k";
+  const STORE_OLDS = ["nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821k: fal i2v empty-prompt hard gate; sticky 已点生成 · …; surface job.error; no wipe bad
   // v0821j: renderDock must not wipe msg while busy; fireSend entry 已点生成; dockFoot+Ctrl/Cmd+Enter
   // v0821i: i2v writeback — shot.url video preview; promote/history keep mp4; pickUrl prefer /out saved
   // v0821h: send gate via aria-disabled (not disabled=true) so click always fires setMsg
@@ -786,8 +787,13 @@
       setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
     } else if (state.mode === "video" && frame) {
       // v0821j: do NOT reset to 首帧已就绪 while generate/busy/group in-flight (wipes 校验连线/已点生成)
+      // v0821k: also keep bad/warn (Fal job.error / 此模型需要提示词) — empty card must not be silent
       if (!fireSend._busy && !state.runningGroup) {
-        setMsg("首帧已就绪 · 可生成");
+        const msgEl = $("msg");
+        const cls = (msgEl && msgEl.className) || "";
+        if (!/\bbad\b|\bwarn\b/.test(cls)) {
+          setMsg("首帧已就绪 · 可生成");
+        }
       }
     }
     let frameHtml = "";
@@ -1854,7 +1860,59 @@
     $("msg").className = "msg" + (cls ? " " + cls : "");
   }
 
+  // v0821k: sticky click-ack — successors keep「已点生成」visible (never wipe bare)
+  function setAckMsg(rest, cls) {
+    const body = String(rest == null ? "" : rest).replace(/^已点生成(\s*·\s*)?/, "");
+    setMsg(body ? ("已点生成 · " + body) : "已点生成", cls);
+  }
 
+  function formatErr(e) {
+    if (e == null || e === "") return "未知错误";
+    if (typeof e === "string") return e;
+    if (e instanceof Error) return e.message || String(e);
+    if (typeof e === "object") {
+      if (e.error != null && e.error !== e) return formatErr(e.error);
+      if (e.message != null) return String(e.message);
+      if (e.detail != null) {
+        if (typeof e.detail === "string") return e.detail;
+        try { return JSON.stringify(e.detail); } catch (_) {}
+      }
+      try { return JSON.stringify(e); } catch (_) { return String(e); }
+    }
+    return String(e);
+  }
+
+  function readComposerPrompt() {
+    const n = nodeById(state.selected);
+    const ta = $("prompt");
+    if (ta && n && n.kind === "shot" && state.selected === n.id) {
+      n.prompt = ta.value;
+      return String(ta.value || "").trim();
+    }
+    return String((n && n.prompt) || "").trim();
+  }
+
+  function catalogRequiresPrompt(it) {
+    if (!it) return false;
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const req = [].concat(it.required || caps.required || []);
+    const pf = String(it.promptField || caps.promptField || "prompt");
+    return req.map(String).some(function (r) {
+      return r === "prompt" || r === pf || r.indexOf("prompt") >= 0;
+    });
+  }
+
+  // v0821k: hard client gate — fal video / minimax i2v / catalog-required prompt; no silent soft-fill
+  function needsPromptBeforeGenerate() {
+    const empty = !readComposerPrompt();
+    if (!empty) return false;
+    if (state.mode === "video" && currentBackend() === "fal") return true;
+    const it = catalogItemForService();
+    if (catalogRequiresPrompt(it)) return true;
+    const sid = (($("service") && $("service").value) || "").toLowerCase();
+    if (currentBackend() === "fal" && (sid.indexOf("image-to-video") >= 0 || sid.indexOf("minimax") >= 0)) return true;
+    return false;
+  }
 
   // --- v0817c-no-at-in-prompt (+ no @ from atbox; legacy unmention cleanup; v0816b LoRA) ---
   function currentBackend() {
@@ -2657,6 +2715,11 @@
         return { status: "blocked" };
       }
     }
+    // v0821k: before POST — fal i2v / catalog-required prompt; hard red, no soft-fill
+    if (needsPromptBeforeGenerate()) {
+      setMsg(prefix + "此模型需要提示词", "bad");
+      return { status: "blocked" };
+    }
     // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
     if (currentBackend() === "civitai") {
       const civSid = ($("service") && $("service").value) || "";
@@ -2666,8 +2729,9 @@
       }
     }
     if (!opts.keepSend) markSendBusy(true);
-    // v0821i: generate() already set 校验连线 for click feedback — avoid double flash under 正在请求
+    // v0821k/i: sticky ack — keep 已点生成 in successor (group uses progressPrefix)
     if (prefix) setMsg(prefix + "校验连线…");
+    else setAckMsg("校验连线…");
     let compiled;
     try {
       const r = await fetch("/api/graph/compile", {
@@ -2752,7 +2816,7 @@
       }
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
-    else setMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
+    else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     setShotBusy(shot, true);
     try {
       const r = await fetch("/api/generate", {
@@ -2760,7 +2824,7 @@
         body: JSON.stringify(payload),
       });
       let j = await r.json();
-      if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
+      if (!r.ok || j.error) throw new Error(formatErr(j.error || j.message || j.detail || ("HTTP " + r.status)));
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
         for (let i = 0; i < 40; i++) {
@@ -2771,12 +2835,16 @@
           }
           await new Promise((res) => setTimeout(res, 2500));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
-          if (st.error || st.status === "failed") throw new Error(st.error || "任务失败");
+          if (st.error || st.status === "failed") {
+            const detail = formatErr(st.error || (st.wait && st.wait.log) || st.message || "任务失败");
+            throw new Error(detail);
+          }
           // v0821i: never break on succeeded alone — wait for saved[]/video.url (pickUrl) or keep polling.
           j = st;
           if (pickUrl(st)) break;
           const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
-          setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
+          if (prefix) setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
+          else setAckMsg((doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
         }
       }
       if (state.groupRunAbort) {
@@ -2814,7 +2882,8 @@
       }
     } catch (e) {
       setShotBusy(shot, false);
-      setMsg(prefix + String(e), "bad");
+      // v0821k: surface Fal/job.error onto Composer (renderDock must not wipe bad)
+      setMsg(prefix + formatErr(e), "bad");
       if (!opts.keepSend) markSendBusy(false);
       renderDock();
       return { status: "error", stageOp: stageOp };
@@ -2888,14 +2957,14 @@
     // in-flight / group: clicks still fire → show 进行中… (not silent)
     if (fireSend._busy || state.runningGroup || btn.getAttribute("data-reason") === "busy") {
       if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
-      setMsg("进行中…", "warn");
+      setAckMsg("进行中…", "warn");
       return;
     }
     const now = Date.now();
     // v0821j: debounce must NOT silent-return — keep 已点生成 or show 进行中 if busy raced in
     if (fireSend._at && (now - fireSend._at) < 450) {
       if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
-      if (fireSend._busy || state.runningGroup) setMsg("进行中…", "warn");
+      if (fireSend._busy || state.runningGroup) setAckMsg("进行中…", "warn");
       return;
     }
     fireSend._at = now;
@@ -2913,6 +2982,11 @@
     }
     if (state.mode === "video" && !frameAsset(n)) {
       setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+      return;
+    }
+    // v0821k: prefer client gate in fireSend (video+fal / catalog-required) — abort before generate
+    if (needsPromptBeforeGenerate()) {
+      setMsg("此模型需要提示词", "bad");
       return;
     }
     generate();
@@ -2960,8 +3034,12 @@
   }
 
   async function generate() {
-    // v0821f/g/h/j: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
-    setMsg("校验连线…");
+    // v0821k: sticky 已点生成 · 校验连线… (never wipe click ack without successor)
+    if (needsPromptBeforeGenerate()) {
+      setMsg("此模型需要提示词", "bad");
+      return;
+    }
+    setAckMsg("校验连线…");
     markSendBusy(true);
     try {
       await runShotStep(state.selected, {});
