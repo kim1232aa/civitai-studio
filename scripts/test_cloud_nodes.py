@@ -127,6 +127,22 @@ def test_i2v_empty_prompt_allowed():
     assert_true("缺少文本" not in (r.get("error") or ""), r)
 
 
+
+
+def test_fal_keeps_empty_prompt_key():
+    """v0821k: Fal i2v must send prompt even when empty — omit → 422 Field required (01a07e75)."""
+    from providers.fal import build_fal_input
+    inp = build_fal_input({
+        "serviceId": "fal-ai/minimax/video-01/image-to-video",
+        "prompt": "",
+        "sourceImage": "/out/x.jpg",
+        "firstFrame": "/out/x.jpg",
+        "image_url": "/out/x.jpg",
+    })
+    assert_true("prompt" in inp, inp)
+    assert_true(inp.get("prompt") == "", inp)
+    assert_true(bool(inp.get("image_url") or inp.get("start_image_url")), inp)
+
 def main():
     tests = [
         test_missing_image_blocked,
@@ -136,6 +152,7 @@ def main():
         test_seed_bypass_blocked,
         test_unknown_op,
         test_i2v_empty_prompt_allowed,
+        test_fal_keeps_empty_prompt_key,
     ]
     failed = 0
     for fn in tests:

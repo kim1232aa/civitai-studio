@@ -576,7 +576,16 @@ def build_fal_input(payload: dict) -> dict:
         except (TypeError, ValueError):
             pass
     apply_fal_loras(inp, payload, spec, eid)
-    return {k: v for k, v in inp.items() if v not in (None, "", [])}
+    # Keep empty-string prompt: Fal minimax i2v 422s with "body.prompt: Field required"
+    # if the key is omitted (v0821k / job 01a07e75). Other empty strings still drop.
+    out = {}
+    for k, v in inp.items():
+        if v is None or v == []:
+            continue
+        if v == "" and k not in ("prompt", "negative_prompt"):
+            continue
+        out[k] = v
+    return out
 
 
 # rid -> {endpoint, status_url, response_url}. Submit response is source of truth:
