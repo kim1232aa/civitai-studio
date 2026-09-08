@@ -50,7 +50,8 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 | | |
 | --- | --- |
-| 官方 | 字符串 `"owner/repo"` 或多条 `{repo: weight}`（权重归一） |
+| 出站（实测） | `loras: [{ "model": "owner/repo", "weight": 0.8 }, …]`；见 [`../modelscope-hub-lora.md`](../modelscope-hub-lora.md) |
+| 勿发 | 字符串 `"owner/repo"` 或 `{repo: weight}`（会 500 Model does not exist） |
 | http / Civitai 链 | **`continue` 跳过** |
 | 有 loras 入站但全跳过 | 响应 `warning: 魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用`（UI 可能不展示） |
 | AIR `urn:` | 跳过 |

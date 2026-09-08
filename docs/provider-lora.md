@@ -84,13 +84,17 @@
 
 官方 AIGC 字段：`model` `prompt` `negative_prompt` `size` `seed` `steps` `guidance` `image_url` `loras`。
 
-`loras` 只要 Hub `owner/repo`：
+`loras` 只要 Hub `owner/repo`，出站用数组对象（单条也如此；2026-09-08 实测）：
 
 ```json
-{ "model": "Tongyi-MAI/Z-Image-Turbo", "prompt": "…", "loras": "Qwen/some-lora" }
+{
+  "model": "Tongyi-MAI/Z-Image-Turbo",
+  "prompt": "…",
+  "loras": [{ "model": "DiffSynth-Studio/Z-Image-Turbo-DistillPatch", "weight": 0.8 }]
+}
 ```
 
-或多条 `{ "owner/repo": 0.8, "other/repo": 0.2 }`（权重会归一）。
+页面挂载步骤见 [`modelscope-hub-lora.md`](modelscope-hub-lora.md)。旧文档里的字符串 / `{repo:w}` 形状会 500，不要再发。
 
 Civitai `https://…` 路径：**跳过**，不提交，响应带
 
