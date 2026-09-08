@@ -14,7 +14,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from typing import Any
 
-from .capabilities import get_provider_capabilities
+from .capabilities import PROVIDER_CAPS, get_provider_capabilities
 
 PORT_TYPES = {
     "prompt": "prompt",
@@ -87,6 +87,76 @@ def _merge_loras(*bags: Any) -> list:
                 if x:
                     out.append(deepcopy(x))
     return out
+
+
+def _validate_loras(raw: Any, backend: str) -> tuple[list | None, str | None]:
+    """Reject shapes that the selected adapter would silently discard."""
+    items = [raw] if isinstance(raw, dict) else raw
+    if not isinstance(items, list) or not items:
+        return None, "LoRA 必须是非空数组（每项为对象）"
+    out = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            return None, f"LoRA 第 {i + 1} 项必须是对象"
+        identity = (
+            item.get("air")
+            or item.get("model")
+            or item.get("path")
+            or item.get("url")
+            or item.get("downloadUrl")
+            or item.get("name")
+            or item.get("versionId")
+        )
+        if identity in (None, ""):
+            return None, f"LoRA 第 {i + 1} 项缺少 air/model/path/name/versionId"
+        for key in ("scale", "strength"):
+            if item.get(key) not in (None, ""):
+                try:
+                    float(item[key])
+                except (TypeError, ValueError):
+                    return None, f"LoRA 第 {i + 1} 项 {key} 不是数字"
+        if backend in ("modelscope-ai", "modelscope-cn"):
+            repo = str(item.get("model") or item.get("path") or item.get("name") or "").strip()
+            if repo.count("/") != 1 or repo.startswith(("http://", "https://")):
+                return None, f"魔搭 LoRA 第 {i + 1} 项必须是 Hub owner/repo"
+        elif backend in ("fal", "huggingface", "nano-gpt"):
+            path = str(
+                item.get("path")
+                or item.get("url")
+                or item.get("downloadUrl")
+                or item.get("versionId")
+                or ""
+            ).strip()
+            if not path:
+                return None, f"{backend} LoRA 第 {i + 1} 项必须有下载路径或 versionId"
+        out.append(deepcopy(item))
+    return out, None
+
+
+def _unsupported_params(params: dict, caps: dict, op: str, node_id: str) -> dict | None:
+    if "sampler" in params and not caps.get("sampler"):
+        return _err(
+            f"节点 {node_id}({op}) 的 sampler 不在当前 provider 能力内，禁止静默丢弃或改发",
+            blocked=True,
+            nodeId=node_id,
+            parameter="sampler",
+        )
+    if op == "i2v":
+        if "duration" in params and not caps.get("videoDuration"):
+            return _err(
+                f"节点 {node_id}(i2v) 的 duration 不在当前模型/provider 能力内",
+                blocked=True,
+                nodeId=node_id,
+                parameter="duration",
+            )
+        if "aspectRatio" in params and not caps.get("videoAspect"):
+            return _err(
+                f"节点 {node_id}(i2v) 的 aspectRatio 不在当前模型/provider 能力内",
+                blocked=True,
+                nodeId=node_id,
+                parameter="aspectRatio",
+            )
+    return None
 
 
 
@@ -172,6 +242,8 @@ def compile_graph(graph: dict | None) -> dict:
     backend = (g.get("backend") or "").strip()
     if not backend:
         return _err("缺少 backend")
+    if backend not in PROVIDER_CAPS:
+        return _err(f"未知 provider: {backend}", blocked=True, provider=backend)
     caps = get_provider_capabilities(backend)
     nodes = g.get("nodes") or []
     edges = g.get("edges") or []
@@ -226,6 +298,9 @@ def compile_graph(graph: dict | None) -> dict:
         n = by_id[nid]
         op = n["op"]
         params = n.get("params") if isinstance(n.get("params"), dict) else {}
+        param_error = _unsupported_params(params, caps, op, nid)
+        if param_error:
+            return param_error
         inputs: dict[str, Any] = {}
         seen_ports: set[str] = set()
         for e in incoming.get(nid, []):
@@ -275,7 +350,14 @@ def compile_graph(graph: dict | None) -> dict:
                 return _err(f"lora_apply {nid} 缺少 params.loras", nodeId=nid)
             if caps.get("lora") == "none":
                 return _err(f"后端 {backend} 不支持 LoRA", blocked=True)
-            loras = deepcopy(params["loras"])
+            loras, lora_error = _validate_loras(params["loras"], backend)
+            if lora_error:
+                return _err(
+                    f"节点 {nid} LoRA 无效：{lora_error}",
+                    blocked=True,
+                    nodeId=nid,
+                    parameter="loras",
+                )
             values[(nid, "loras")] = loras
             if "image" in inputs:
                 img, prior = _unwrap_image(inputs["image"])
