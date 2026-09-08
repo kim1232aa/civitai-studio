@@ -468,6 +468,12 @@ class ModelScopeProvider(Provider):
                 body["size"] = f"{int(payload['width'])}x{int(payload['height'])}"
             except (TypeError, ValueError):
                 pass
+        if "size" not in body:
+            res = payload.get("resolution") or payload.get("size")
+            if isinstance(res, str):
+                m = re.match(r"^(\d+)\s*[x×*]\s*(\d+)$", res.strip(), re.I)
+                if m:
+                    body["size"] = f"{int(m.group(1))}x{int(m.group(2))}"
         ms_loras = _modelscope_loras(payload)
         lora_skip = None
         if ms_loras is not None:

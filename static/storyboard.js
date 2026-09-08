@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o5";
-  const STORE_OLDS = ["nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o6";
+  const STORE_OLDS = ["nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o6: Magao ② mount Tongyi-MAI/Z-Image-Turbo + Hub LoRA; skip Civitai http; no AI↔CN drift
   // v0821o5: HF Z-Image turbo pins fal-ai; skip wavespeed; fal-ai error is final
   // v0821o4: HF ② mount Tongyi-MAI/Z-Image-Turbo + http LoRA; never fal /lora sibling
   // v0821o3: Fal import without loras[] clears stale chips (was wantCivitai-only)
@@ -31,6 +32,8 @@
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
   const HF_LORA_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo";
+  const MS_LORA_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo";
+  const MS_LORA_FIXTURE_REPO = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
   const SNAP_PX = 36;
@@ -2068,7 +2071,8 @@
     box.innerHTML = list.map(function (l, i) {
       const sub = loraChipSubtitle(l);
       const tip = String(l.air || sub || "");
-      const needUrl = (be === "fal" || be === "huggingface" || isNanogptBe()) && !loraHasDirectPath(l);
+      const needUrl = ((be === "fal" || be === "huggingface" || isNanogptBe()) && !loraHasDirectPath(l))
+        || ((be === "modelscope-ai" || be === "modelscope-cn") && !isHfRepo(String(l.path || "").trim()));
       const st = needUrl ? (l.status || "无直链") : (l.status || "");
       const stCls = needUrl || st === "无直链" ? "lora-status bad" : "lora-status";
       return '<div class="lora' + (needUrl ? " need-url" : "") + '" data-lora-i="' + i + '"><div class="top">' +
@@ -2280,6 +2284,12 @@
         const p = String(row.path || "").trim();
         return !!(p && isHttpUrl(p) && !looksAir(p));
       }
+      // v0821o6: Magao outbound is Hub owner/repo only — skip Civitai http / 3231694 / AIR
+      if (be === "modelscope-ai" || be === "modelscope-cn") {
+        const p = String(row.path || "").trim();
+        if (isHttpUrl(p) || looksAir(p) || p.indexOf("3231694") >= 0) return false;
+        return isHfRepo(p);
+      }
       return true;
     });
     return mapped.length ? mapped : null;
@@ -2294,6 +2304,9 @@
   }
   function outboundLoraBlockMsg() {
     const be = currentBackend();
+    if (be === "modelscope-ai" || be === "modelscope-cn") {
+      return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
+    }
     if (be === "fal" || be === "huggingface") return "LoRA 缺 http path，无法出站";
     return "LoRA 缺 air，无法出站";
   }
@@ -2305,7 +2318,12 @@
     if (!q) return;
     const be = currentBackend();
     hits.textContent = "搜…";
-    if ((be === "fal" || be === "huggingface" || isModelscopeBe() || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
+    if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
+      addLora({ path: q, name: q, strength: 0.8 });
+      hits.textContent = "";
+      return;
+    }
+    if ((be === "fal" || be === "huggingface" || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
       addLora({ path: q, name: q, strength: 0.8 });
       hits.textContent = "";
       return;
@@ -2619,6 +2637,9 @@
     if (!serviceId && be === "huggingface") {
       // v0821o4: HF empty → Hub turbo; never fal-ai/.../turbo/lora sibling
       serviceId = HF_LORA_PREF_SERVICE;
+    } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
+      // v0821o6: Magao empty → Hub turbo; never fal sibling / 默认模型
+      serviceId = MS_LORA_PREF_SERVICE;
     } else if (!serviceId && be !== "civitai") {
       // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
       // v0821o2: LoRAs present → pin turbo/lora (never empty→flux/schnell→flux-lora sibling)
@@ -2627,6 +2648,9 @@
     }
     if (be === "huggingface") {
       serviceId = pinHfLoraServiceId(serviceId);
+    }
+    if (be === "modelscope-ai" || be === "modelscope-cn") {
+      serviceId = pinMsLoraServiceId(serviceId);
     }
     if (be === "fal" && op !== "i2v") {
       serviceId = pinFalLoraServiceId(serviceId);
@@ -2644,6 +2668,13 @@
       genParams.resolution = res;
       genParams.duration = parseInt(($("duration") && $("duration").value) || "5", 10) || 5;
       genParams.aspectRatio = aspect;
+      if (be === "modelscope-ai" || be === "modelscope-cn") {
+        const m = String(res || "").match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
+        if (m) {
+          genParams.width = parseInt(m[1], 10);
+          genParams.height = parseInt(m[2], 10);
+        }
+      }
     }
     nodes.push({
       id: shot.id, op: op,
@@ -2884,6 +2915,11 @@
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureHfLoraServiceSelected();
+        } else if (currentBackend() === "modelscope-ai" || currentBackend() === "modelscope-cn") {
+          const pinned = pinMsLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          payload.serviceId = pinned;
+          payload.endpoint = pinned;
+          ensureMsLoraServiceSelected();
         }
       }
     }
@@ -3553,6 +3589,61 @@
     state._pinHfLoraService = HF_LORA_PREF_SERVICE;
   }
 
+  function pinMsLoraServiceId(sid) {
+    const s = String(sid || "").trim();
+    // Empty / Fal sibling / Civitai image/… → Hub turbo. Never rewrite Hub → fal-ai/.../lora.
+    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return MS_LORA_PREF_SERVICE;
+    return s;
+  }
+  function ensureMsLoraServiceSelected() {
+    const be = ($("backend") && $("backend").value) || "";
+    if (be !== "modelscope-ai" && be !== "modelscope-cn") return;
+    const sel = $("service");
+    if (!sel) return;
+    const want = pinMsLoraServiceId(sel.value || state._pinMsLoraService || "");
+    ensureSelectOpt(sel, want);
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) {
+        const t = sel.options[i].textContent || "";
+        if (!t || t === want || t === "默认模型" || t.indexOf(want) < 0) {
+          sel.options[i].textContent = "Z-Image Turbo · " + want;
+        }
+        break;
+      }
+    }
+    sel.value = want;
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) {
+      state.catalogById[want] = { id: want, name: "Z-Image Turbo", category: "image" };
+    }
+  }
+  function msLoraFixtureImport() {
+    const cur = ($("backend") && $("backend").value) || "";
+    const be = (cur === "modelscope-cn") ? "modelscope-cn" : "modelscope-ai";
+    return {
+      backend: be,
+      serviceId: "Tongyi-MAI/Z-Image-Turbo",
+      serviceName: "Z-Image Turbo",
+      kind: "image",
+      prompt: "portrait, soft light, detailed face, cinematic",
+      loras: [{
+        path: "DiffSynth-Studio/Z-Image-Turbo-DistillPatch",
+        downloadUrl: "DiffSynth-Studio/Z-Image-Turbo-DistillPatch",
+        url: "DiffSynth-Studio/Z-Image-Turbo-DistillPatch",
+        scale: 0.8,
+        strength: 0.8,
+        name: "Z-Image Turbo DistillPatch Hub LoRA",
+      }],
+    };
+  }
+  async function mountMsLoraFixture() {
+    closeImportModal();
+    await applyImport(msLoraFixtureImport());
+    ensureMsLoraServiceSelected();
+    state._pendingService = MS_LORA_PREF_SERVICE;
+    state._pinMsLoraService = MS_LORA_PREF_SERVICE;
+  }
+
   // v0821o2: when LoRAs ship, keep z-image/turbo/lora — never empty→flux/schnell→sibling flux-lora
   function falHasLoras() {
     return Array.isArray(state.loras) && state.loras.length > 0;
@@ -3648,11 +3739,14 @@
     const civitaiSid = looksCivitaiServiceId(j.serviceId);
     const falSid = looksFalServiceId(j.serviceId);
     const hfSid = looksHfServiceId(j.serviceId);
-    // Explicit backend wins; HF must not fall through to Fal sibling / Civitai image/…
-    const wantHf = (j.backend === "huggingface" || j.backend === "hf")
-      || (hfSid && j.backend !== "fal" && j.backend !== "civitai");
-    const wantCivitai = !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
-    const wantFal = !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
+    const msBe = String(j.backend || "").trim();
+    const wantMs = j.backend === "modelscope-ai" || j.backend === "modelscope-cn"
+      || msBe === "modelscope" || msBe === "ms" || msBe === "魔搭" || msBe === "魔搭ai" || msBe === "魔搭cn";
+    // Explicit backend wins; Magao Hub ids must not steal HF; HF must not fall through to Fal.
+    const wantHf = !wantMs && ((j.backend === "huggingface" || j.backend === "hf")
+      || (hfSid && j.backend !== "fal" && j.backend !== "civitai"));
+    const wantCivitai = !wantMs && !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
+    const wantFal = !wantMs && !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
     const shot = ensureActiveShotForImport();
     let hardErr = "";
 
@@ -3744,6 +3838,40 @@
         state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
       }
       ensureHfLoraServiceSelected();
+    } else if (wantMs) {
+      // AI and CN are separate products — never cross (token/base).
+      if (msBe === "modelscope-cn" || msBe === "魔搭cn") {
+        if ($("backend")) $("backend").value = "modelscope-cn";
+      } else {
+        if ($("backend")) $("backend").value = "modelscope-ai";
+      }
+      syncParamSurface();
+      let sid = String(j.serviceId || "").trim() || MS_LORA_PREF_SERVICE;
+      if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
+        hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 Tongyi-MAI/Z-Image-Turbo）";
+        sid = MS_LORA_PREF_SERVICE;
+      }
+      state._pendingService = sid;
+      state._pinMsLoraService = sid;
+      await loadCatalog();
+      ensureSelectOpt($("service"), sid);
+      if ($("service")) {
+        for (let oi = 0; oi < $("service").options.length; oi++) {
+          if ($("service").options[oi].value === sid) {
+            $("service").options[oi].textContent = (j.serviceName || "Z-Image Turbo") + " · " + sid;
+            break;
+          }
+        }
+        $("service").value = sid;
+      }
+      if (!$("service") || $("service").value !== sid) {
+        hardErr = hardErr || ("无法挂载 魔搭 服务 " + sid);
+      }
+      if (!state.catalogById) state.catalogById = {};
+      if (!state.catalogById[sid]) {
+        state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+      }
+      ensureMsLoraServiceSelected();
     }
 
     // Prompt only — never inject @filename from import media (v0817c)
@@ -3863,6 +3991,9 @@
     if ($("btnHfLoraFix")) {
       $("btnHfLoraFix").onclick = function () { mountHfLoraFixture(); };
     }
+    if ($("btnMsLoraFix")) {
+      $("btnMsLoraFix").onclick = function () { mountMsLoraFixture(); };
+    }
     if ($("importUrl")) {
       $("importUrl").addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -3953,7 +4084,7 @@
         }
       }
       // v0821o2: when LoRAs / fixture pin — keep turbo/lora in the capped list (visible, not 默认模型)
-      const pinWant = state._pendingService || state._pinFalLoraService || state._pinHfLoraService || prevService || "";
+      const pinWant = state._pendingService || state._pinFalLoraService || state._pinHfLoraService || state._pinMsLoraService || prevService || "";
       const needLoraPin = (be === "fal" && state.mode !== "video" && (
         falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === "fal-ai/z-image/turbo"
       ));
@@ -3983,6 +4114,21 @@
         }
         items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; })).slice(0, CAP);
       }
+      const needMsPin = ((be === "modelscope-ai" || be === "modelscope-cn") && (
+        (Array.isArray(state.loras) && state.loras.length)
+        || pinWant === MS_LORA_PREF_SERVICE
+        || state._pinMsLoraService
+      ));
+      if (needMsPin) {
+        const pinId = state._pinMsLoraService || MS_LORA_PREF_SERVICE;
+        let pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+        if (!pinItem) {
+          pinItem = { id: pinId, name: "Z-Image Turbo", category: "image" };
+        } else {
+          pinItem = Object.assign({}, pinItem, { name: pinItem.name || "Z-Image Turbo" });
+        }
+        items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; })).slice(0, CAP);
+      }
       state.catalog = items;
       // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
       const byId = {};
@@ -3997,6 +4143,7 @@
         // Clear label for pinned turbo/lora (not bare id-only / not 默认模型)
         if (id === FAL_LORA_PREF_SERVICE) o.textContent = (it.name && it.name !== id ? it.name + " · " + id : "Z-Image Turbo LoRA · " + id);
         else if (id === HF_LORA_PREF_SERVICE) o.textContent = (it.name && it.name !== id ? it.name + " · " + id : id);
+        else if (id === MS_LORA_PREF_SERVICE) o.textContent = (it.name && it.name !== id ? it.name + " · " + id : "Z-Image Turbo · " + id);
         else o.textContent = it.name || id;
         $("service").appendChild(o);
       });
@@ -4009,6 +4156,9 @@
       } else if (state._pinHfLoraService && be === "huggingface") {
         ensureSelectOpt($("service"), state._pinHfLoraService);
         $("service").value = state._pinHfLoraService;
+      } else if (state._pinMsLoraService && (be === "modelscope-ai" || be === "modelscope-cn")) {
+        ensureSelectOpt($("service"), state._pinMsLoraService);
+        $("service").value = state._pinMsLoraService;
       } else if (state._pinFalLoraService && be === "fal") {
         ensureSelectOpt($("service"), state._pinFalLoraService);
         $("service").value = state._pinFalLoraService;
@@ -4018,6 +4168,7 @@
         $("service").value = prevService;
       }
       if (be === "huggingface") ensureHfLoraServiceSelected();
+      if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
       if (be === "fal" && falHasLoras()) ensureFalLoraServiceSelected();
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       syncParamSurface();
@@ -4058,6 +4209,7 @@
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
   let _wantHfLoraFixture = false;
+  let _wantMsLoraFixture = false;
   try {
     const q = String(location.search || "");
     const h = String(location.hash || "");
@@ -4066,6 +4218,9 @@
     }
     if (/[?&]fixture=hf-lora\b/.test(q) || h === "#hf-lora" || h === "#hf-lora-fixture") {
       _wantHfLoraFixture = true;
+    }
+    if (/[?&]fixture=ms-lora\b/.test(q) || h === "#ms-lora" || h === "#modelscope-lora") {
+      _wantMsLoraFixture = true;
     }
   } catch (_) {}
   applyCam();
@@ -4078,9 +4233,11 @@
   loadComfyDefaults().then(function () { return loadCatalog(); }).then(function () {
     if (_wantFalLoraFixture) return mountFalLoraFixture();
     if (_wantHfLoraFixture) return mountHfLoraFixture();
+    if (_wantMsLoraFixture) return mountMsLoraFixture();
   }).then(function () {
     if (_wantFalLoraFixture) ensureFalLoraServiceSelected();
     if (_wantHfLoraFixture) ensureHfLoraServiceSelected();
+    if (_wantMsLoraFixture) ensureMsLoraServiceSelected();
   });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
