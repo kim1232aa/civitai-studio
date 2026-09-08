@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "stamp must be v0821o3-fal-clear-loras")
+    assert_true("v0821o4-hf-turbo-lora" in html, "stamp must be v0821o4-hf-turbo-lora")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,7 +420,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "stamp v0821o3-fal-clear-loras")
+    assert_true("v0821o4-hf-turbo-lora" in html, "stamp v0821o4-hf-turbo-lora")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -586,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o3-fal-clear-loras: unmention/link helpers still present."""
+    """v0817b lineage under v0821o4-hf-turbo-lora: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,12 +606,12 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o3-fal-clear-loras: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o4-hf-turbo-lora: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821d")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
     assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
@@ -652,8 +652,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -726,8 +726,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -761,8 +761,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -787,8 +787,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -827,8 +827,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -886,8 +886,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -957,8 +957,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0820c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -1021,9 +1021,9 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821n4")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
@@ -1111,9 +1111,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1194,9 +1194,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp v0821o3-fal-clear-loras")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821b")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp v0821o4-hf-turbo-lora")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1316,9 +1316,9 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821c")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
@@ -1402,9 +1402,9 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821h")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1466,13 +1466,13 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o3-fal-clear-loras: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o4-hf-turbo-lora: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821h")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1524,13 +1524,13 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o3-fal-clear-loras: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o4-hf-turbo-lora: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821h")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1590,9 +1590,9 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821k")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
@@ -1694,10 +1694,10 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821j")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
     # renderDock busy guard
@@ -1814,10 +1814,10 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821k")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
     assert_true("function needsPromptBeforeGenerate" in js, "prompt gate helper")
@@ -2001,10 +2001,10 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821l")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
     fs = js[js.find("function fireSend"):js.find("function fireSend") + 3200]
@@ -2147,9 +2147,9 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821m2")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
     assert_true('"nl-storyboard-v0821l"' in js, "STORE_OLDS keeps v0821l")
     assert_true("? 180 : 40" in js or "pollMax = 180" in js, "video pollMax 180")
@@ -2165,9 +2165,9 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821n3")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
     assert_true("nl-storyboard-v0821m2" in js, "STORE_OLDS keeps v0821m2")
@@ -2234,9 +2234,9 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821n4")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
@@ -2346,23 +2346,23 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=v0821o3-fal-clear-loras"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('src="/static/storyboard.js?v=v0821o3-fal-clear-loras"' in html, "script ?v=")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE n5")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "script ?v=")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
         ".dock-foot{flex:0 0 auto;max-height:none;overflow:visible;position:static;" in html,
@@ -2385,11 +2385,11 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('src="/static/storyboard.js?v=v0821o3-fal-clear-loras"' in html, "script cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE v0821o")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "script cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
 
@@ -2554,11 +2554,11 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o3-fal-clear-loras"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE o3")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
 
@@ -2577,7 +2577,8 @@ def test_v0821o2_fal_turbo_pin():
 
     # loadCatalog must restore pin / prevService (not blank to 默认模型)
     li = js.find("async function loadCatalog")
-    lc = js[li:li + 4500]
+    lc_end = js.find("async function loadOuts", li)
+    lc = js[li:lc_end if lc_end > li else li + 8000]
     assert_true("prevService" in lc, "remembers #service before wipe")
     assert_true("_pinFalLoraService" in lc, "restores pin after fill")
     assert_true("FAL_LORA_PREF_SERVICE" in lc, "injects turbo/lora option")
@@ -2613,11 +2614,12 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o3-fal-clear-loras" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o3-fal-clear-loras</span>' in html, ".stamp")
-    assert_true("v0821o3-fal-clear-loras" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o3-fal-clear-loras"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o3"' in js, "STORE o3")
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE o4")
+    assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
 
     i = js.find("async function applyImport")
@@ -2744,6 +2746,205 @@ def test_v0821o3_fal_clear_loras():
                 "with loras: still pin turbo/lora off flux/schnell")
 
 
+def test_v0821o4_hf_turbo_lora():
+    """v0821o4 HF ②: mount Hub Tongyi-MAI/Z-Image-Turbo + http LoRA 3231694; never fal sibling."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
+
+    HUB = "Tongyi-MAI/Z-Image-Turbo"
+    PATH = "https://civitai.com/api/download/models/3231694"
+    FAL_SIB = "fal-ai/z-image/turbo/lora"
+
+    assert_true("v0821o4-hf-turbo-lora" in html, "html stamp")
+    assert_true('<span class="stamp">v0821o4-hf-turbo-lora</span>' in html, ".stamp")
+    assert_true("v0821o4-hf-turbo-lora" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
+    assert_true('src="/static/storyboard.js?v=v0821o4-hf-turbo-lora"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o4"' in js, "STORE o4")
+    assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
+
+    # Fixture import shape — Hub id, huggingface backend, http LoRA @ 0.8
+    assert_true("function hfLoraFixtureImport" in js, "hfLoraFixtureImport")
+    assert_true("function mountHfLoraFixture" in js or "async function mountHfLoraFixture" in js,
+                "mountHfLoraFixture")
+    fi = js.find("function hfLoraFixtureImport")
+    assert_true(fi >= 0, "hf fixture fn")
+    fj = js.find("async function mountHfLoraFixture", fi)
+    if fj < 0:
+        fj = js.find("function mountHfLoraFixture", fi)
+    fixture_block = js[fi:fj if fj > fi else fi + 1100]
+    assert_true('backend: "huggingface"' in fixture_block or "backend:'huggingface'" in fixture_block,
+                "fixture backend huggingface")
+    assert_true('serviceId: "Tongyi-MAI/Z-Image-Turbo"' in fixture_block
+                or "serviceId: HF_LORA_PREF_SERVICE" in fixture_block,
+                "fixture serviceId is Hub Tongyi-MAI/Z-Image-Turbo")
+    assert_true('serviceId: "fal-ai/z-image/turbo/lora"' not in fixture_block
+                and "serviceId: FAL_LORA_PREF_SERVICE" not in fixture_block,
+                "HF fixture must NOT rewrite to fal turbo/lora sibling")
+    assert_true(PATH in fixture_block, "fixture http path 3231694")
+    assert_true("scale: 0.8" in fixture_block or "scale:0.8" in fixture_block, "fixture scale 0.8")
+    assert_true("air:" not in fixture_block.split("loras:")[1][:400] or PATH in fixture_block,
+                "loras use http path (not AIR-only)")
+
+    assert_true('HF_LORA_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo"' in js
+                or 'HF_LORA_PREF_SERVICE="Tongyi-MAI/Z-Image-Turbo"' in js,
+                "HF_LORA_PREF_SERVICE pinned to Hub id")
+    assert_true("function pinHfLoraServiceId" in js, "pinHfLoraServiceId")
+    assert_true("function ensureHfLoraServiceSelected" in js, "ensureHfLoraServiceSelected")
+    assert_true("function looksHfServiceId" in js, "looksHfServiceId")
+    assert_true("_pinHfLoraService" in js, "sticky HF pin across catalog fill")
+    assert_true("_wantHfLoraFixture" in js, "CLI ?fixture=hf-lora mounts after catalog")
+    assert_true("fixture=hf-lora" in js, "CLI query fixture=hf-lora")
+    assert_true('id="btnHfLoraFix"' in html or "btnHfLoraFix" in js, "HF LoRA夹具 button")
+    # Dropdown / plain text before generate must show Hub id (not 默认模型, not fal sibling)
+    assert_true(HUB in js, "Hub id present in storyboard.js")
+    ei = js.find("function ensureHfLoraServiceSelected")
+    ens = js[ei:ei + 1600] if ei >= 0 else ""
+    assert_true(HUB in ens or "HF_LORA_PREF_SERVICE" in ens, "ensure writes Hub id into #service")
+    assert_true("默认模型" not in ens or "textContent" in ens, "ensure does not leave 默认模型")
+    assert_true(FAL_SIB not in ens, "ensure must not label fal sibling")
+
+    # applyImport: wantHf from j.backend; reject fal/civitai ids; pin Hub
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    block = js[i:j]
+    assert_true(i >= 0 and j > i, "applyImport block")
+    assert_true("/api/generate" not in block, "applyImport must not call /api/generate")
+    assert_true("wantHf" in block, "wantHf branch")
+    assert_true('j.backend === "huggingface"' in block or "j.backend === 'huggingface'" in block,
+                "wantHf from j.backend")
+    assert_true('value = "huggingface"' in block or '$("backend").value = "huggingface"' in block,
+                "forces backend huggingface")
+    assert_true("looksFalServiceId" in block and "looksCivitaiServiceId" in block,
+                "HF import detects fal/civitai drift")
+    assert_true("HF_LORA_PREF_SERVICE" in block, "HF import pins Hub pref")
+    # v0821o3 chip-clear still intact
+    lora_i = block.rfind("if (Array.isArray(j.loras))")
+    lora_j = block.find("syncLoraUi();", lora_i)
+    snip = block[lora_i:lora_j]
+    compact = " ".join(snip.split())
+    assert_true("else if (wantCivitai)" not in snip, "o3: chip-clear not wantCivitai-only")
+    assert_true("} else { state.loras = []" in compact or "} else {state.loras = []" in compact,
+                "o3: missing loras[] still clears")
+    assert_true("normalizeLora" in snip, "present loras still normalize")
+
+    # packLoras: huggingface requires http path (AIR-only would silent-drop in _fal_lora_path)
+    pack_i = js.find("function packLorasForPayload")
+    pack = js[pack_i:pack_i + 2400]
+    assert_true('be === "huggingface"' in pack or "be === 'huggingface'" in pack,
+                "huggingface path filter in pack")
+    assert_true("isHttpUrl" in pack, "http path check")
+    assert_true("looksAir" in pack, "rejects air-as-path")
+    assert_true("LoRA 缺 http path" in js, "hf/fal path red msg")
+
+    def looks_air(s):
+        t = str(s or "")
+        return t.lower().startswith("urn:air:") or ":lora:" in t.lower()
+
+    def is_http(s):
+        u = str(s or "").lower()
+        return u.startswith("http://") or u.startswith("https://")
+
+    def sim_pack(rows, be="huggingface"):
+        mapped = []
+        for l in rows:
+            path = l.get("path") or l.get("downloadUrl") or l.get("url") or ""
+            version_id = str(l.get("versionId") or "")
+            if (not path or looks_air(path)) and version_id.isdigit():
+                path = "https://civitai.com/api/download/models/" + version_id
+            scale = float(l.get("scale") if l.get("scale") is not None else l.get("strength", 0.8))
+            scale = max(0.0, min(4.0, scale))
+            row = {"air": l.get("air") or "", "path": path, "scale": scale}
+            if be in ("fal", "huggingface"):
+                p = str(row["path"] or "").strip()
+                if not (p and is_http(p) and not looks_air(p)):
+                    continue
+            mapped.append(row)
+        return mapped or None
+
+    air_only = [{"air": "urn:air:sdxl:lora:civitai:1", "strength": 0.8, "name": "AIR"}]
+    assert_true(sim_pack(air_only) is None, "AIR-only → hf pack null")
+    packed = sim_pack([{"path": PATH, "scale": 0.8, "name": "Asian Mix", "versionId": 3231694}])
+    assert_true(packed and packed[0]["path"] == PATH, "http path ships")
+    assert_true(float(packed[0]["scale"]) == 0.8, "scale 0.8")
+
+    # buildGraph: huggingface empty must pin Hub, never fal sibling / flux/schnell
+    bgi = js.find("function buildGraph")
+    bg = js[bgi:js.find("function pickUrl", bgi)]
+    assert_true("HF_LORA_PREF_SERVICE" in bg, "buildGraph pins HF Hub")
+    assert_true('be === "huggingface"' in bg or "be === 'huggingface'" in bg,
+                "HF empty-service gated to huggingface")
+    # Fal pin stays fal-only
+    assert_true('be === "fal"' in bg and "pinFalLoraServiceId" in bg, "fal pin still fal-only")
+
+    def sim_empty_service(be, has_loras=True, op="t2i"):
+        service_id = ""
+        if not service_id and be == "huggingface":
+            return HUB
+        if not service_id and be != "civitai":
+            if op != "i2v" and has_loras:
+                return FAL_SIB
+            return "fal-ai/flux/schnell" if op != "i2v" else "fal-ai/minimax/video-01/image-to-video"
+        return service_id
+
+    assert_true(sim_empty_service("huggingface") == HUB, "HF empty → Hub id")
+    assert_true(sim_empty_service("huggingface") != FAL_SIB, "HF empty must not fal sibling")
+    assert_true(sim_empty_service("fal") == FAL_SIB, "Fal empty+loras still turbo/lora")
+
+    def sim_pin_hf(sid):
+        s = str(sid or "").strip()
+        if (not s) or s.startswith("fal-ai/") or s.startswith("image/"):
+            return HUB
+        if s == HUB:
+            return s
+        return s
+
+    assert_true(sim_pin_hf("") == HUB, "empty → Hub")
+    assert_true(sim_pin_hf(FAL_SIB) == HUB, "fal sibling on HF backend → Hub (no keep sibling)")
+    assert_true(sim_pin_hf("image/comfy/krea2/turbo/createImage") == HUB, "civitai id on HF → Hub")
+    assert_true(sim_pin_hf(HUB) == HUB, "Hub stays Hub")
+    assert_true(sim_pin_hf("Qwen/Qwen-Image") == "Qwen/Qwen-Image", "other Hub id kept")
+
+    # runShotStep: HF outbound serviceId is Hub, not fal sibling
+    rsi = js.find("async function runShotStep")
+    run = js[rsi:rsi + 18000]
+    assert_true("pinHfLoraServiceId" in run or "HF_LORA_PREF_SERVICE" in run,
+                "runShotStep pins HF Hub outbound")
+    assert_true('be === "huggingface"' in run or "be === 'huggingface'" in run
+                or 'currentBackend() === "huggingface"' in run,
+                "HF outbound pin gated")
+    assert_true("chipsLackAirForOutbound" in run, "lora gate still before POST")
+    assert_true(run.find("chipsLackAirForOutbound") < run.find("/api/generate"),
+                "gate before POST")
+
+    # Provider: no /lora sibling rewrite; job hf|sync|; civitai+fal drift 400
+    from providers.huggingface import _maybe_lora_pid, _force_loras
+    assert_true(
+        _maybe_lora_pid("fal-ai/z-image/turbo", {"loras": [{"path": PATH}]}) == "fal-ai/z-image/turbo",
+        "Router has no sibling — keep mapped pid",
+    )
+    forced = {}
+    _force_loras(forced, {"loras": [{"path": PATH, "scale": 0.8}]})
+    assert_true(forced.get("loras") and forced["loras"][0]["path"] == PATH, "_force_loras http path")
+    assert_true(abs(float(forced["loras"][0]["scale"]) - 0.8) < 1e-6, "_force_loras scale 0.8")
+    assert_true('hf|sync|' in hf, "job shape hf|sync|")
+    assert_true("looks_like_civitai_service" in hf, "HF generate rejects Civitai serviceId")
+    assert_true('startswith(("fal-ai/"' in hf or 'startswith("fal-ai/")' in hf or "fal-ai/" in hf
+                and "不能发给 Hugging Face" in hf,
+                "HF generate rejects Fal serviceId")
+    assert_true("return pid" in hf or "return (pid" in hf, "_maybe_lora_pid does not rewrite")
+    assert_true("/lora" in hf and "sibling" in hf.lower() or "Router does not host" in hf,
+                "docs: no fal /lora sibling")
+
+    # loadCatalog keeps Hub option visible
+    lc = js.find("async function loadCatalog")
+    cat = js[lc:js.find("async function loadOuts", lc)]
+    assert_true("HF_LORA_PREF_SERVICE" in cat or HUB in cat, "catalog injects Hub pin")
+    assert_true("ensureHfLoraServiceSelected" in cat, "catalog re-pins HF #service")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -2781,6 +2982,7 @@ def main():
         test_v0821o_fal_lora_knife,
         test_v0821o2_fal_turbo_pin,
         test_v0821o3_fal_clear_loras,
+        test_v0821o4_hf_turbo_lora,
         test_v0821_hardgate_i2v_refs,
         test_v0821b_i2v_detect,
         test_v0821c_fal_i2v_preview,

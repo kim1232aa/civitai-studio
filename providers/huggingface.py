@@ -491,6 +491,8 @@ class HuggingFaceProvider(Provider):
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
             return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
+        if (sid or "").startswith(("fal-ai/", "fal.ai/")):
+            return 400, {"error": "当前选中的是 Fal 服务，不能发给 Hugging Face。请选 Tongyi-MAI/Z-Image-Turbo。"}
         mid = model_id(sid)
         if not mid:
             return 400, {"error": "缺少 Hugging Face 模型 id"}
