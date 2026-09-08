@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821i";
-  const STORE_OLDS = ["nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821j";
+  const STORE_OLDS = ["nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821j: renderDock must not wipe msg while busy; fireSend entry 已点生成; dockFoot+Ctrl/Cmd+Enter
   // v0821i: i2v writeback — shot.url video preview; promote/history keep mp4; pickUrl prefer /out saved
   // v0821h: send gate via aria-disabled (not disabled=true) so click always fires setMsg
   // v0821g: always 首帧已就绪; bind send click+pointerdown; larger hit/z-index; missing-frame bad
@@ -784,8 +785,10 @@
       // v0821g: missing-frame is hard stop (red), not yellow warn
       setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
     } else if (state.mode === "video" && frame) {
-      // v0821g: always show ready when video+frame (v0821f only cleared stale 缺首帧 regex → tip skipped)
-      setMsg("首帧已就绪 · 可生成");
+      // v0821j: do NOT reset to 首帧已就绪 while generate/busy/group in-flight (wipes 校验连线/已点生成)
+      if (!fireSend._busy && !state.runningGroup) {
+        setMsg("首帧已就绪 · 可生成");
+      }
     }
     let frameHtml = "";
     if (state.mode === "video") {
@@ -2880,6 +2883,8 @@
     const btn = $("send");
     if (!btn) return;
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
+    // v0821j: always acknowledge entry BEFORE gates (CLICK_NOOP killer — visible even if later blocked)
+    setMsg("已点生成");
     // in-flight / group: clicks still fire → show 进行中… (not silent)
     if (fireSend._busy || state.runningGroup || btn.getAttribute("data-reason") === "busy") {
       if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
@@ -2887,7 +2892,12 @@
       return;
     }
     const now = Date.now();
-    if (fireSend._at && (now - fireSend._at) < 450) return;
+    // v0821j: debounce must NOT silent-return — keep 已点生成 or show 进行中 if busy raced in
+    if (fireSend._at && (now - fireSend._at) < 450) {
+      if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
+      if (fireSend._busy || state.runningGroup) setMsg("进行中…", "warn");
+      return;
+    }
     fireSend._at = now;
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
@@ -2919,10 +2929,38 @@
     // capture click + pointerdown fallback (index #go lesson: elevate hit; avoid silent noop)
     btn.addEventListener("click", fireSend, true);
     btn.addEventListener("pointerdown", fireSend);
+    // v0821j: event delegation on #dockFoot for [data-testid=composer-send] (undeniable hit)
+    const foot = $("dockFoot");
+    if (foot && foot.dataset.nlSendDelegate !== "1") {
+      foot.dataset.nlSendDelegate = "1";
+      const onFoot = function (ev) {
+        const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
+        if (!t) return;
+        fireSend(ev);
+      };
+      foot.addEventListener("click", onFoot, true);
+      foot.addEventListener("pointerdown", onFoot, true);
+    }
+  }
+
+  function bindComposerSendKeys() {
+    if (bindComposerSendKeys._done) return;
+    bindComposerSendKeys._done = true;
+    // v0821j: Ctrl/Cmd+Enter in Composer → generate (undeniable when click miss-hits)
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey)) return;
+      const dockEl = $("dock");
+      if (!dockEl || !dockEl.classList.contains("show")) return;
+      const ae = document.activeElement;
+      const inComposer = !!(ae && dockEl.contains(ae));
+      if (!inComposer) return;
+      try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+      fireSend(e);
+    }, true);
   }
 
   async function generate() {
-    // v0821f/g/h: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
+    // v0821f/g/h/j: immediate click feedback (even before gates); never leave ↑ as CLICK_NOOP
     setMsg("校验连线…");
     markSendBusy(true);
     try {
@@ -2932,6 +2970,7 @@
     }
   }
   bindSendButton();
+  bindComposerSendKeys();
 
   async function runShotUntilDone(shotId, progressPrefix) {
     // Loop nextRunnableStage for one shot via the same step runner — do not skip gates.
