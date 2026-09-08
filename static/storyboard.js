@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821n";
-  const STORE_OLDS = ["nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821n2";
+  const STORE_OLDS = ["nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821n2: LoRA chips without air → red block (no silent omit loras[]); some-with-air still filter
   // v0821n: krea2 import hardgate — packLoras skip no-air; attach negativePrompt; empty #service red
   // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
   // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
@@ -2257,6 +2258,13 @@
     });
     return mapped.length ? mapped : null;
   }
+  // v0821n2: UI chips present but pack empty (all lack air on civitai) → must not POST without loras[]
+  function chipsLackAirForOutbound() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    if (!list.length) return false;
+    const packed = packLorasForPayload();
+    return !packed || !packed.length;
+  }
   async function searchLoras() {
     const qEl = $("loraQ");
     const hits = $("loraHits");
@@ -2742,6 +2750,11 @@
         return { status: "blocked" };
       }
     }
+    // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
+    if (chipsLackAirForOutbound()) {
+      setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+      return { status: "blocked" };
+    }
     if (!opts.keepSend) markSendBusy(true);
     // v0821k/i: sticky ack — keep 已点生成 in successor (group uses progressPrefix)
     if (prefix) setMsg(prefix + "校验连线…");
@@ -2806,8 +2819,15 @@
     }
     attachExtraImages(payload, shot);
     // v0816-sb-lora: attach selected LoRAs (index.html base.loras shape)
+    // v0821n2: chips without air already gated above; some-with-air still ship filtered rows
     {
       const packedLoras = packLorasForPayload();
+      const list = Array.isArray(state.loras) ? state.loras : [];
+      if (list.length && (!packedLoras || !packedLoras.length)) {
+        setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+        if (!opts.keepSend) markSendBusy(false);
+        return { status: "blocked", stageOp: stageOp };
+      }
       if (packedLoras && packedLoras.length) payload.loras = packedLoras;
     }
     // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
@@ -3021,6 +3041,11 @@
     // v0821k: prefer client gate in fireSend (video+fal / catalog-required) — abort before generate
     if (needsPromptBeforeGenerate()) {
       setMsg("此模型需要提示词", "bad");
+      return;
+    }
+    // v0821n2: LoRA chips without air → red before 已点生成 / generate
+    if (chipsLackAirForOutbound()) {
+      setMsg("LoRA 缺 air，无法出站", "bad");
       return;
     }
     // v0821l: only ack when proceeding to generate()
