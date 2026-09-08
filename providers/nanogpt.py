@@ -190,6 +190,9 @@ def pick_resolution(spec, w=None, h=None, preferred=None):
         hit = low.get(norm(pref))
         if hit:
             return hit
+        # A user/model-selected token is a contract, not a hint. Do not
+        # silently replace it with an aspect/area-nearest catalog value.
+        return None
     try:
         wi = int(w) if w not in (None, "") else 0
         hi = int(h) if h not in (None, "") else 0
@@ -1076,6 +1079,12 @@ class NanoGptProvider(Provider):
         too = prompt_length_error((payload or {}).get("prompt"))
         if too:
             return 400, too
+        sp = (spec or {}).get("supported_parameters") or {}
+        if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
+            return 400, {
+                "error": "当前 NanoGPT 视频模型目录没有 resolutions，不能猜测或近似替换分辨率",
+                "serviceId": mid,
+            }
         # v0770: video path also runs resolve_nano_loras (same fail-closed rules).
         pl = dict(payload or {})
         raw_loras = pl.get("loras") or []
@@ -1095,6 +1104,11 @@ class NanoGptProvider(Provider):
             pl["loras"] = resolved
             lora_meta = list(resolved or [])
         body = _video_body(pl, spec)
+        if not body.get("resolution") and not body.get("size"):
+            return 400, {
+                "error": "无法从目录选中视频 resolution token，请在构图里选一个目录分辨率",
+                "serviceId": mid,
+            }
         persist_body = sanitize_submitted_for_persist(body, lora_meta)
         seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         code, data = json_call(GEN_VIDEO, method="POST", headers=_auth(), body=body, timeout=90)
