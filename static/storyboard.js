@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821k";
-  const STORE_OLDS = ["nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821l";
+  const STORE_OLDS = ["nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
   // v0821k: fal i2v empty-prompt hard gate; sticky 已点生成 · …; surface job.error; no wipe bad
   // v0821j: renderDock must not wipe msg while busy; fireSend entry 已点生成; dockFoot+Ctrl/Cmd+Enter
   // v0821i: i2v writeback — shot.url video preview; promote/history keep mp4; pickUrl prefer /out saved
@@ -2952,8 +2953,11 @@
     const btn = $("send");
     if (!btn) return;
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
-    // v0821j: always acknowledge entry BEFORE gates (CLICK_NOOP killer — visible even if later blocked)
-    setMsg("已点生成");
+    // v0821l: same DOM event handled once (#send + #dockFoot both wired)
+    if (e) {
+      if (e._nlSendHandled) return;
+      e._nlSendHandled = true;
+    }
     // in-flight / group: clicks still fire → show 进行中… (not silent)
     if (fireSend._busy || state.runningGroup || btn.getAttribute("data-reason") === "busy") {
       if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
@@ -2961,7 +2965,7 @@
       return;
     }
     const now = Date.now();
-    // v0821j: debounce must NOT silent-return — keep 已点生成 or show 进行中 if busy raced in
+    // v0821j/l: debounce must NOT wipe a prior gate msg — only bump 进行中 if busy raced in
     if (fireSend._at && (now - fireSend._at) < 450) {
       if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} }
       if (fireSend._busy || state.runningGroup) setAckMsg("进行中…", "warn");
@@ -2971,6 +2975,7 @@
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
     }
+    // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       setMsg("请先选中分镜再生成", "bad");
@@ -2989,6 +2994,8 @@
       setMsg("此模型需要提示词", "bad");
       return;
     }
+    // v0821l: only ack when proceeding to generate()
+    setMsg("已点生成");
     generate();
   }
 
@@ -3010,6 +3017,8 @@
       const onFoot = function (ev) {
         const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
         if (!t) return;
+        // v0821l: skip if #send already marked this event
+        if (ev._nlSendHandled) return;
         fireSend(ev);
       };
       foot.addEventListener("click", onFoot, true);

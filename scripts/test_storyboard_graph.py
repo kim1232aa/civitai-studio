@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821k" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821l" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "stamp must be v0821k-i2v-prompt-req")
+    assert_true("v0821l-send-once" in html, "stamp must be v0821l-send-once")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true("nl-storyboard-v0821k" in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true("nl-storyboard-v0821l" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true("nl-storyboard-v0821k" in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true("nl-storyboard-v0821l" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "stamp v0821k-i2v-prompt-req")
-    assert_true("nl-storyboard-v0821k" in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "stamp v0821l-send-once")
+    assert_true("nl-storyboard-v0821l" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -586,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821k-i2v-prompt-req: unmention/link helpers still present."""
+    """v0817b lineage under v0821l-send-once: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,12 +606,12 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821k-i2v-prompt-req: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821l-send-once: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821d")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
     assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
@@ -652,8 +652,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -726,8 +726,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -761,8 +761,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -787,8 +787,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -827,8 +827,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -886,8 +886,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -957,8 +957,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0820c")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -1020,9 +1020,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1103,9 +1103,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp v0821k-i2v-prompt-req")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821b")
+    assert_true("v0821l-send-once" in html, "html stamp v0821l-send-once")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1225,9 +1225,9 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821c")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
@@ -1311,9 +1311,9 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821h")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1375,13 +1375,13 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821k-i2v-prompt-req: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821l-send-once: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true("v0821k-i2v-prompt-req" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821h")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true("v0821l-send-once" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1433,13 +1433,13 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821k-i2v-prompt-req: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821l-send-once: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true("v0821k-i2v-prompt-req" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821h")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true("v0821l-send-once" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1499,9 +1499,10 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821k")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821k")
+    assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -1600,10 +1601,10 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true("v0821k-i2v-prompt-req" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821j")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true("v0821l-send-once" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
     # renderDock busy guard
@@ -1617,18 +1618,20 @@ def test_v0821j_send_busy_msg():
     assert_true("fireSend._busy" in guard, "ready setMsg nested under busy guard")
     assert_true("\\bbad\\b" in dock or "bad" in dock[ready_i-200:ready_i+80], "v0821k keep bad/warn tip")
 
-    # fireSend entry ack + non-silent debounce
-    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2200]
-    assert_true('setMsg("已点生成")' in fs, "entry 已点生成 before gates")
+    # fireSend: once-per-event + gates before ack; non-silent debounce
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2800]
+    assert_true("_nlSendHandled" in fs, "same-event once flag")
+    assert_true('setMsg("已点生成")' in fs, "已点生成 ack present")
     entry_i = fs.find('setMsg("已点生成")')
-    busy_i = fs.find("进行中")
-    assert_true(0 <= entry_i < busy_i, "已点生成 before busy gate")
+    need_i = fs.find("此模型需要提示词")
+    gen_i = fs.rfind("generate()")
+    assert_true(need_i >= 0 and 0 <= entry_i and need_i < entry_i < gen_i,
+                "needsPrompt gate before 已点生成 before generate")
     assert_true("450" in fs, "debounce window kept")
-    # debounce path must mention 进行中 or keep 已点生成 — never bare return only
+    # debounce path must mention 进行中 — never wipe prior gate by re-acking
     deb = fs[fs.find("450"):fs.find("450") + 350]
     assert_true("return" in deb, "debounce returns")
-    assert_true("进行中" in deb or "已点生成" in fs[: fs.find("450") + 350],
-                "debounce not silent")
+    assert_true("进行中" in deb, "debounce busy path not silent")
 
     # dockFoot delegation + Ctrl/Cmd+Enter
     assert_true("function bindComposerSendKeys" in js, "bindComposerSendKeys")
@@ -1717,10 +1720,10 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821k-i2v-prompt-req" in html, "html stamp")
-    assert_true('<span class="stamp">v0821k-i2v-prompt-req</span>' in html, ".stamp")
-    assert_true("v0821k-i2v-prompt-req" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821k"' in js, "STORE v0821k")
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true("v0821l-send-once" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
     assert_true("function needsPromptBeforeGenerate" in js, "prompt gate helper")
@@ -1848,9 +1851,11 @@ fireSend._at = 0;
 fireSend({ type: "click", button: 0, preventDefault(){}, stopPropagation(){} });
 const texts = msgs.map(m => m.t);
 const last = texts[texts.length - 1] || "";
+const lastCls = (msgs[msgs.length - 1] || {}).cls || "";
 console.log(JSON.stringify({
-  ok: generateCalls === 0 && last.indexOf("此模型需要提示词") >= 0 && texts.some(t => t.indexOf("已点生成") >= 0),
-  texts, generateCalls, last
+  ok: generateCalls === 0 && last.indexOf("此模型需要提示词") >= 0 && lastCls === "bad"
+    && !texts.some(t => t === "已点生成" || t.indexOf("已点生成 ·") === 0),
+  texts, generateCalls, last, lastCls
 }));
 """
     node = subprocess.run(["node", "-e", harness], capture_output=True, text=True, cwd=str(ROOT))
@@ -1892,6 +1897,154 @@ console.log(JSON.stringify({
 
 
 
+
+def test_v0821l_send_once():
+    """v0821l: same-event once; gates before 已点生成; double pointerdown+click empty → red final; with prompt → ack+generate. No paid POST."""
+    import json
+    import subprocess
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    assert_true("v0821l-send-once" in html, "html stamp")
+    assert_true('<span class="stamp">v0821l-send-once</span>' in html, ".stamp")
+    assert_true("v0821l-send-once" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821l"' in js, "STORE v0821l")
+    assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
+
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 3200]
+    assert_true("_nlSendHandled" in fs, "once-per-event flag")
+    assert_true(fs.find("_nlSendHandled") < fs.find('setMsg("已点生成")'), "flag before ack")
+    assert_true(fs.find("此模型需要提示词") < fs.find('setMsg("已点生成")'), "prompt gate before ack")
+    assert_true(fs.find("缺首帧") < fs.find('setMsg("已点生成")'), "needFrame before ack")
+    assert_true(fs.find("本版未接") < fs.find('setMsg("已点生成")'), "stub before ack")
+    assert_true(fs.find('setMsg("已点生成")') < fs.rfind("generate()"), "ack then generate")
+
+    bb = js[js.find("function bindSendButton"):js.find("function bindSendButton") + 1800]
+    assert_true("ev._nlSendHandled" in bb or "_nlSendHandled" in bb, "foot skip if handled")
+
+    harness_base = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push({t:String(t), cls: cls||""}); }
+function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生成(\s*·\s*)?/, ""); setMsg(body ? ("已点生成 · " + body) : "已点生成", cls); }
+const state = { selected: "s1", mode: "video", runningGroup: false, catalogById: {
+  "fal-ai/minimax/video-01/image-to-video": { id: "fal-ai/minimax/video-01/image-to-video", required: ["prompt", "image_url"] }
+}, nodes: [
+  { id: "s1", kind: "shot", title: "分镜1", firstFrameId: "a1", prompt: PROMPT },
+  { id: "a1", kind: "asset", title: "img", url: "/out/a.jpg" },
+], edges: [{ from: "a1", to: "s1" }] };
+function nodeById(id){ return state.nodes.find(n => n.id === id); }
+function isVideoUrl(u){ return /\.(mp4|webm|mov)(\?|$)/i.test(String(u||"")); }
+function isImageSource(n){ return !!(n && n.url && !isVideoUrl(n.url)); }
+function connectedAssets(shotId){
+  return state.edges.filter(e => e.to === shotId).map(e => nodeById(e.from)).filter(isImageSource);
+}
+function frameAsset(shot){
+  const linked = connectedAssets(shot.id);
+  if (shot.firstFrameId) {
+    const hit = linked.find(a => a.id === shot.firstFrameId);
+    if (hit) return hit;
+    shot.firstFrameId = linked[0] ? linked[0].id : "";
+  }
+  return linked[0] || null;
+}
+function isStubMode(){ return false; }
+function currentBackend(){ return "fal"; }
+function catalogItemForService(){ return state.catalogById["fal-ai/minimax/video-01/image-to-video"]; }
+function catalogRequiresPrompt(it){
+  if (!it) return false;
+  const req = [].concat(it.required || []);
+  return req.map(String).some(r => r === "prompt" || r.indexOf("prompt") >= 0);
+}
+function readComposerPrompt(){
+  const n = nodeById(state.selected);
+  const ta = $("prompt");
+  if (ta && n) { n.prompt = ta.value; return String(ta.value||"").trim(); }
+  return String((n && n.prompt)||"").trim();
+}
+function needsPromptBeforeGenerate(){
+  const empty = !readComposerPrompt();
+  if (!empty) return false;
+  if (state.mode === "video" && currentBackend() === "fal") return true;
+  return catalogRequiresPrompt(catalogItemForService());
+}
+let generateCalls = 0;
+function generate(){ generateCalls++; setAckMsg("校验连线…"); fireSend._busy = true; }
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const promptEl = { value: PROMPT };
+function $(id){
+  if (id === "send") return btn;
+  if (id === "prompt") return promptEl;
+  if (id === "service") return { value: "fal-ai/minimax/video-01/image-to-video" };
+  if (id === "backend") return { value: "fal" };
+  return null;
+}
+"""
+
+    fs_src = js[js.find("function fireSend"):js.find("\n  function bindSendButton")]
+
+    # empty prompt double fire
+    harness_empty = (
+        "const PROMPT = \"\";\n"
+        + harness_base
+        + fs_src
+        + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+const ev1 = { type: "pointerdown", button: 0, preventDefault(){}, stopPropagation(){} };
+const ev2 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev1);
+fireSend(ev2);
+// same-event foot+btn
+const ev3 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev3);
+fireSend(ev3);
+const texts = msgs.map(m => m.t);
+const last = texts[texts.length - 1] || "";
+const lastCls = (msgs[msgs.length - 1] || {}).cls || "";
+console.log(JSON.stringify({
+  ok: generateCalls === 0 && last === "此模型需要提示词" && lastCls === "bad"
+    && !texts.some(t => t === "已点生成"),
+  texts, generateCalls, last, lastCls
+}));
+"""
+    )
+    node = subprocess.run(["node", "-e", harness_empty], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node.returncode == 0, "node empty double: %s%s" % (node.stdout, node.stderr))
+    row = json.loads(node.stdout.strip().splitlines()[-1])
+    assert_true(row["ok"], row)
+    assert_true(row["generateCalls"] == 0, row)
+
+    # with prompt → 已点生成 then generate path; double events → one generate
+    harness_ok = (
+        "const PROMPT = \"camera slowly pans\";\n"
+        + harness_base
+        + fs_src
+        + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+const ev1 = { type: "pointerdown", button: 0, preventDefault(){}, stopPropagation(){} };
+const ev2 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev1);
+fireSend(ev2);
+const texts = msgs.map(m => m.t);
+console.log(JSON.stringify({
+  ok: generateCalls === 1 && texts.some(t => t === "已点生成" || t.indexOf("已点生成 ·") === 0),
+  texts, generateCalls
+}));
+"""
+    )
+    node2 = subprocess.run(["node", "-e", harness_ok], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node2.returncode == 0, "node prompt double: %s%s" % (node2.stdout, node2.stderr))
+    row2 = json.loads(node2.stdout.strip().splitlines()[-1])
+    assert_true(row2["ok"], row2)
+    assert_true(row2["generateCalls"] == 1, row2)
+
+    assert_true('fetch("/api/generate"' in js, "generate path exists (tests do not POST paid)")
+
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -1930,6 +2083,7 @@ def main():
         test_v0821i_i2v_writeback,
         test_v0821j_send_busy_msg,
         test_v0821k_i2v_prompt_req,
+        test_v0821l_send_once,
     ]
     failed = 0
     for fn in tests:
