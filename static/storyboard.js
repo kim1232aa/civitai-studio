@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821l";
-  const STORE_OLDS = ["nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821m";
+  const STORE_OLDS = ["nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
   // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
   // v0821k: fal i2v empty-prompt hard gate; sticky 已点生成 · …; surface job.error; no wipe bad
   // v0821j: renderDock must not wipe msg while busy; fireSend entry 已点生成; dockFoot+Ctrl/Cmd+Enter
@@ -2828,13 +2829,16 @@
       if (!r.ok || j.error) throw new Error(formatErr(j.error || j.message || j.detail || ("HTTP " + r.status)));
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
-        for (let i = 0; i < 40; i++) {
+        // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
+        const pollMax = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 180 : 40;
+        const pollMs = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 3000 : 2500;
+        for (let i = 0; i < pollMax; i++) {
           if (state.groupRunAbort) {
             setShotBusy(shot, false);
             if (!opts.keepSend) markSendBusy(false);
             return { status: "aborted", stageOp: stageOp };
           }
-          await new Promise((res) => setTimeout(res, 2500));
+          await new Promise((res) => setTimeout(res, pollMs));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
           if (st.error || st.status === "failed") {
             const detail = formatErr(st.error || (st.wait && st.wait.log) || st.message || "任务失败");
@@ -2844,8 +2848,9 @@
           j = st;
           if (pickUrl(st)) break;
           const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
-          if (prefix) setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
-          else setAckMsg((doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/40");
+          const tick = (i + 1) + "/" + pollMax;
+          if (prefix) setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + tick);
+          else setAckMsg((doneish ? "成片落盘中 " : "云端进行中 ") + tick);
         }
       }
       if (state.groupRunAbort) {
@@ -2953,7 +2958,8 @@
     const btn = $("send");
     if (!btn) return;
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
-    // v0821l: same DOM event handled once (#send + #dockFoot both wired)
+    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
+  // v0821l: same DOM event handled once (#send + #dockFoot both wired)
     if (e) {
       if (e._nlSendHandled) return;
       e._nlSendHandled = true;
@@ -2975,7 +2981,8 @@
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
     }
-    // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
+    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
+  // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       setMsg("请先选中分镜再生成", "bad");
@@ -2994,7 +3001,8 @@
       setMsg("此模型需要提示词", "bad");
       return;
     }
-    // v0821l: only ack when proceeding to generate()
+    // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
+  // v0821l: only ack when proceeding to generate()
     setMsg("已点生成");
     generate();
   }
@@ -3017,7 +3025,8 @@
       const onFoot = function (ev) {
         const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
         if (!t) return;
-        // v0821l: skip if #send already marked this event
+        // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
+  // v0821l: skip if #send already marked this event
         if (ev._nlSendHandled) return;
         fireSend(ev);
       };
