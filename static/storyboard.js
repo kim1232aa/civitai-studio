@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821n2";
-  const STORE_OLDS = ["nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821n3";
+  const STORE_OLDS = ["nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821n3: import air — chip subtitle prefers air URN (was path||downloadUrl hiding it); applyImport keeps air
   // v0821n2: LoRA chips without air → red block (no silent omit loras[]); some-with-air still filter
   // v0821n: krea2 import hardgate — packLoras skip no-air; attach negativePrompt; empty #service red
   // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
@@ -2041,19 +2042,27 @@
       }
     }
   }
+  // v0821n3: prefer air URN in chip subtitle so civitai outbound id is visible (path hid it)
+  function loraChipSubtitle(l) {
+    l = l || {};
+    const air = String(l.air || "").trim();
+    if (air) return air;
+    return l.path || l.downloadUrl || l.url || "";
+  }
   function renderLoras() {
     const box = $("loras");
     if (!box) return;
     const be = currentBackend();
     const list = Array.isArray(state.loras) ? state.loras : [];
     box.innerHTML = list.map(function (l, i) {
-      const sub = l.path || l.downloadUrl || l.air || "";
+      const sub = loraChipSubtitle(l);
+      const tip = String(l.air || sub || "");
       const needUrl = (be === "fal" || isNanogptBe()) && !loraHasDirectPath(l);
       const st = needUrl ? (l.status || "无直链") : (l.status || "");
       const stCls = needUrl || st === "无直链" ? "lora-status bad" : "lora-status";
       return '<div class="lora' + (needUrl ? " need-url" : "") + '" data-lora-i="' + i + '"><div class="top">' +
         '<div class="lora-info"><div class="lora-name">' + esc(l.name || "LoRA") + '</div>' +
-        '<div class="lora-air">' + esc(sub) + '</div>' +
+        '<div class="lora-air" title="' + esc(tip) + '">' + esc(sub) + '</div>' +
         (st ? '<div class="' + stCls + '">' + esc(st) + '</div>' : '') +
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
@@ -3500,7 +3509,19 @@
     }
 
     if (Array.isArray(j.loras)) {
-      state.loras = j.loras.map(normalizeLora);
+      // v0821n3-import-air: copy air/name/strength/versionId/path onto chips (normalizeLora + reaffirm air)
+      state.loras = j.loras.map(function (row) {
+        const n = normalizeLora(row || {});
+        if (row && row.air) n.air = String(row.air).trim();
+        if (row && row.versionId != null && String(row.versionId).trim() !== "") {
+          n.versionId = String(row.versionId);
+        }
+        if (row && (row.path || row.downloadUrl) && !n.path) {
+          n.path = row.path || row.downloadUrl || n.path;
+          n.downloadUrl = row.downloadUrl || n.path;
+        }
+        return n;
+      });
     } else if (wantCivitai) {
       state.loras = [];
     }

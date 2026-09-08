@@ -2172,7 +2172,8 @@ function renderLoras() {
   const box = $('loras');
   if (!box) return;
   box.innerHTML = loras.map((l, i) => {
-    const sub = l.path || l.downloadUrl || l.air || '';
+    // v0821n3: prefer air URN over path/downloadUrl so chip shows outbound id
+    const sub = (l.air && String(l.air).trim()) ? String(l.air).trim() : (l.path || l.downloadUrl || '');
     const needUrl = (backend === 'fal' || isNanogpt()) && !loraHasDirectPath(l);
     const st = needUrl ? (l.status || '无直链') : (l.status || '');
     const stCls = needUrl || st === '无直链' ? 'lora-status bad' : 'lora-status';
