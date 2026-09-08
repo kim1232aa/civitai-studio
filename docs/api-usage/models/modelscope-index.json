@@ -1,0 +1,105 @@
+{
+  "source": "docs/ms-models.json (pinned) + Hub openapi live search",
+  "generatedAt": "2026-09-08",
+  "pinnedTotal": 7,
+  "items": [
+    {
+      "id": "Qwen/Qwen-Image",
+      "name": "Qwen Image",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "Qwen/Qwen-Image-Edit",
+      "name": "Qwen Image Edit",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "image-to-image",
+      "needsSource": true,
+      "tags": [
+        "i2i"
+      ]
+    },
+    {
+      "id": "MusePublic/Qwen-Image-Edit",
+      "name": "Qwen Image Edit (MusePublic)",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "image-to-image",
+      "needsSource": true,
+      "tags": [
+        "i2i"
+      ]
+    },
+    {
+      "id": "Tongyi-MAI/Z-Image-Turbo",
+      "name": "Z-Image Turbo",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "krea/Krea-2-Turbo",
+      "name": "Krea 2 Turbo",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i",
+        "krea2"
+      ]
+    },
+    {
+      "id": "krea/Krea-2-Raw",
+      "name": "Krea 2 Raw",
+      "category": "image",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i",
+        "krea2"
+      ]
+    },
+    {
+      "id": "krea/krea-realtime-video",
+      "name": "Krea Realtime Video",
+      "category": "video",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "text-to-video",
+      "tags": [
+        "t2v",
+        "krea"
+      ]
+    }
+  ],
+  "discovery": {
+    "hub": "https://www.modelscope.cn/openapi/v1/models",
+    "tasks": [
+      "text-to-image-synthesis",
+      "image-to-image",
+      "text-to-video-synthesis",
+      "image-to-video"
+    ],
+    "pageSize": 50,
+    "pages": 2,
+    "note": "task slug text-to-image-synthesis NOT text-to-image (0 results)",
+    "generateBases": {
+      "modelscope-ai": "https://api-inference.modelscope.ai/v1",
+      "modelscope-cn": "https://api-inference.modelscope.cn/v1"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "source": "live GET /api/v1/images/models + /api/v1/video-models (TTL 300s); no offline full dump in repo",
+  "generatedAt": "2026-09-08",
+  "pinnedTotal": 0,
+  "sampleModelsStudioUses": [
+    {
+      "id": "z-image-turbo-lora",
+      "kind": "image",
+      "supportsLora": true,
+      "notes": "实测 Civitai 下载链 LoRA"
+    },
+    {
+      "id": "wavespeed-ai/krea-v2/turbo-lora",
+      "kind": "image",
+      "supportsLora": true,
+      "notes": "实测 Civitai 下载链 LoRA"
+    },
+    {
+      "id": "z-image-turbo",
+      "kind": "image",
+      "supportsLora": false,
+      "notes": "普通 turbo；不保证吃 LoRA — 优先 *-lora"
+    }
+  ],
+  "discovery": {
+    "imageModels": "GET https://nano-gpt.com/api/v1/images/models",
+    "videoModels": "GET https://nano-gpt.com/api/v1/video-models",
+    "generateImage": [
+      "POST /api/v1/images",
+      "fallback POST /v1/images/generations"
+    ],
+    "generateVideo": "POST /api/generate-video",
+    "videoStatus": "GET /api/video/status?requestId=",
+    "docs": "https://docs.nano-gpt.com/introduction",
+    "catalogViaStudio": "GET /api/catalog?backend=nano-gpt"
+  },
+  "constraints": {
+    "promptMax": 1200,
+    "resolution": "catalog_token only (no free WxH outbound)",
+    "maxLoras": 3,
+    "loraFailClosed": true,
+    "maxRefs": 5,
+    "refImagesField": "input_references"
+  }
+}

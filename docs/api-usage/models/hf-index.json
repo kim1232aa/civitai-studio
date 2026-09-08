@@ -1,0 +1,121 @@
+{
+  "source": "docs/hf-models.json (pinned) + live Hub search via providers.huggingface.search_hf",
+  "generatedAt": "2026-09-08",
+  "pinnedTotal": 8,
+  "items": [
+    {
+      "id": "black-forest-labs/FLUX.1-schnell",
+      "name": "FLUX.1 schnell",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "black-forest-labs/FLUX.1-dev",
+      "name": "FLUX.1 dev",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "black-forest-labs/FLUX.1-Krea-dev",
+      "name": "FLUX.1 Krea",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "Qwen/Qwen-Image",
+      "name": "Qwen Image",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "Tongyi-MAI/Z-Image-Turbo",
+      "name": "Z-Image Turbo",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "stabilityai/stable-diffusion-xl-base-1.0",
+      "name": "SDXL Base 1.0",
+      "category": "image",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-image",
+      "tags": [
+        "t2i"
+      ]
+    },
+    {
+      "id": "tencent/HunyuanVideo",
+      "name": "HunyuanVideo",
+      "category": "video",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-video",
+      "tags": [
+        "t2v"
+      ]
+    },
+    {
+      "id": "Lightricks/LTX-Video-0.9.8-13B-distilled",
+      "name": "LTX Video distilled",
+      "category": "video",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "text-to-video",
+      "tags": [
+        "t2v"
+      ]
+    }
+  ],
+  "discovery": {
+    "hubModels": "GET https://huggingface.co/api/models?search=&limit=50",
+    "pipelines": [
+      "text-to-image",
+      "image-to-image",
+      "text-to-video",
+      "image-to-video"
+    ],
+    "loraSearch": "GET …/models?search=&filter=lora",
+    "inferenceMapping": "GET {HUB}/{mid}?expand[]=inferenceProviderMapping",
+    "router": "https://router.huggingface.co",
+    "providerPref": [
+      "fal-ai",
+      "nscale",
+      "wavespeed",
+      "together",
+      "hf-inference"
+    ],
+    "skip": [
+      "replicate"
+    ]
+  },
+  "notes": [
+    "loraConfidence=unverified — body may include loras[] on mapped fal endpoint; not an official /lora sibling",
+    "No full offline catalog; only pinned seed list in hf-models.json"
+  ]
+}
