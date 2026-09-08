@@ -2067,7 +2067,7 @@
     box.innerHTML = list.map(function (l, i) {
       const sub = loraChipSubtitle(l);
       const tip = String(l.air || sub || "");
-      const needUrl = (be === "fal" || isNanogptBe()) && !loraHasDirectPath(l);
+      const needUrl = (be === "fal" || be === "huggingface" || isNanogptBe()) && !loraHasDirectPath(l);
       const st = needUrl ? (l.status || "无直链") : (l.status || "");
       const stCls = needUrl || st === "无直链" ? "lora-status bad" : "lora-status";
       return '<div class="lora' + (needUrl ? " need-url" : "") + '" data-lora-i="' + i + '"><div class="top">' +
@@ -3720,29 +3720,29 @@
       // Forbid drift to Civitai image/… or fal-ai/… (Router has no /lora sibling)
       if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
         hardErr = "Hugging Face 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 Tongyi-MAI/Z-Image-Turbo）";
-      } else {
-        state._pendingService = sid;
-        state._pinHfLoraService = sid;
-        await loadCatalog();
-        ensureSelectOpt($("service"), sid);
-        if ($("service")) {
-          for (let oi = 0; oi < $("service").options.length; oi++) {
-            if ($("service").options[oi].value === sid) {
-              $("service").options[oi].textContent = (j.serviceName || "Z-Image Turbo") + " · " + sid;
-              break;
-            }
-          }
-          $("service").value = sid;
-        }
-        if (!$("service") || $("service").value !== sid) {
-          hardErr = "无法挂载 Hugging Face 服务 " + sid;
-        }
-        if (!state.catalogById) state.catalogById = {};
-        if (!state.catalogById[sid]) {
-          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
-        }
-        ensureHfLoraServiceSelected();
+        sid = HF_LORA_PREF_SERVICE;
       }
+      state._pendingService = sid;
+      state._pinHfLoraService = sid;
+      await loadCatalog();
+      ensureSelectOpt($("service"), sid);
+      if ($("service")) {
+        for (let oi = 0; oi < $("service").options.length; oi++) {
+          if ($("service").options[oi].value === sid) {
+            $("service").options[oi].textContent = (j.serviceName || "Z-Image Turbo") + " · " + sid;
+            break;
+          }
+        }
+        $("service").value = sid;
+      }
+      if (!$("service") || $("service").value !== sid) {
+        hardErr = hardErr || ("无法挂载 Hugging Face 服务 " + sid);
+      }
+      if (!state.catalogById) state.catalogById = {};
+      if (!state.catalogById[sid]) {
+        state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+      }
+      ensureHfLoraServiceSelected();
     }
 
     // Prompt only — never inject @filename from import media (v0817c)

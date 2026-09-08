@@ -2796,6 +2796,22 @@ def test_v0821o4_hf_turbo_lora():
     assert_true("_wantHfLoraFixture" in js, "CLI ?fixture=hf-lora mounts after catalog")
     assert_true("fixture=hf-lora" in js, "CLI query fixture=hf-lora")
     assert_true('id="btnHfLoraFix"' in html or "btnHfLoraFix" in js, "HF LoRA夹具 button")
+    assert_true("HF LoRA夹具" in html, "HF fixture button label")
+
+    def _btn_tag(doc, eid):
+        i = doc.find('id="' + eid + '"')
+        assert_true(i >= 0, eid + " in html")
+        start = doc.rfind("<button", 0, i)
+        end = doc.find(">", i)
+        assert_true(start >= 0 and end > start, eid + " button tag")
+        return doc[start:end + 1]
+
+    # .ghost is the drag-preview overlay (display:none; pointer-events:none) — 夹具 must stay clickable
+    hf_btn = _btn_tag(html, "btnHfLoraFix")
+    assert_true('class="ghost"' not in hf_btn, "HF LoRA夹具 must not use .ghost overlay")
+    fal_btn = _btn_tag(html, "btnFalLoraFix")
+    assert_true('class="ghost"' not in fal_btn, "Fal LoRA夹具 must not use .ghost overlay")
+
     # Dropdown / plain text before generate must show Hub id (not 默认模型, not fal sibling)
     assert_true(HUB in js, "Hub id present in storyboard.js")
     ei = js.find("function ensureHfLoraServiceSelected")
@@ -2820,6 +2836,9 @@ def test_v0821o4_hf_turbo_lora():
     assert_true("looksFalServiceId" in block and "looksCivitaiServiceId" in block,
                 "HF import detects fal/civitai drift")
     assert_true("HF_LORA_PREF_SERVICE" in block, "HF import pins Hub pref")
+    assert_true("Hugging Face 导入拒绝" in block, "HF import error copy for Fal/Civitai ids")
+    # Drift must still pin Hub into #service (generate-before must not keep fal sibling)
+    assert_true("sid = HF_LORA_PREF_SERVICE" in block, "Fal/Civitai sid rewritten to Hub, not skipped")
     # v0821o3 chip-clear still intact
     lora_i = block.rfind("if (Array.isArray(j.loras))")
     lora_j = block.find("syncLoraUi();", lora_i)
@@ -2838,6 +2857,10 @@ def test_v0821o4_hf_turbo_lora():
     assert_true("isHttpUrl" in pack, "http path check")
     assert_true("looksAir" in pack, "rejects air-as-path")
     assert_true("LoRA 缺 http path" in js, "hf/fal path red msg")
+    ri = js.find("function renderLoras")
+    rend = js[ri:ri + 1400] if ri >= 0 else ""
+    assert_true('be === "huggingface"' in rend or "be === 'huggingface'" in rend,
+                "HF LoRA chips flag missing http path (needUrl)")
 
     def looks_air(s):
         t = str(s or "")
