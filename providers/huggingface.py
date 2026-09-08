@@ -88,7 +88,28 @@ def _style_for(provider: str) -> str:
     return "openai"
 
 
-def _provider_candidates(mapping: dict, mid: str, spec: dict) -> list:
+def _is_zimage_turbo(mid: str, mapping=None) -> bool:
+    blob = (mid or "").lower()
+    if "z-image-turbo" in blob or "z_image_turbo" in blob:
+        return True
+    compact = "".join(ch for ch in blob if ch.isalnum())
+    if "zimageturbo" in compact:
+        return True
+    for info in (mapping or {}).values():
+        if not isinstance(info, dict):
+            continue
+        pid = str(info.get("providerId") or "").lower()
+        if "z-image/turbo" in pid or "z-image-turbo" in pid:
+            return True
+    return False
+
+
+def _has_loras(payload) -> bool:
+    loras = (payload or {}).get("loras")
+    return isinstance(loras, list) and len(loras) > 0
+
+
+def _provider_candidates(mapping: dict, mid: str, spec: dict, payload=None) -> list:
     live = []
     for name, info in (mapping or {}).items():
         if not isinstance(info, dict):
@@ -117,7 +138,22 @@ def _provider_candidates(mapping: dict, mid: str, spec: dict) -> list:
             ("nscale", mid, "openai"),
             ("hf-inference", mid, "bytes"),
         ]
-    return [(n, p, s) for n, p, s in ordered if not (s == "openai" and n in _SKIP_OPENAI)]
+    out = [(n, p, s) for n, p, s in ordered if not (s == "openai" and n in _SKIP_OPENAI)]
+    # v0821o5: Tongyi / any Z-Image turbo mapping with fal-ai — pin fal-ai; wavespeed
+    # does not support this model (and must not cover a fal-ai LoRA error).
+    if _is_zimage_turbo(mid, mapping):
+        has_fal = any(n == "fal-ai" for n, _, _ in out)
+        if has_fal or _has_loras(payload):
+            out = [(n, p, s) for n, p, s in out if n != "wavespeed"]
+        fal = [x for x in out if x[0] == "fal-ai"]
+        rest = [x for x in out if x[0] != "fal-ai"]
+        if fal:
+            out = fal + rest
+    return out
+
+
+def _fal_ai_error_is_final(provider: str, mid: str, mapping=None) -> bool:
+    return provider == "fal-ai" and _is_zimage_turbo(mid, mapping)
 
 
 def _auth_headers(key: str, extra=None):
@@ -498,7 +534,7 @@ class HuggingFaceProvider(Provider):
             return 400, {"error": "缺少 Hugging Face 模型 id"}
         spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
         mapping = inference_mapping(mid)
-        candidates = _provider_candidates(mapping, mid, spec)
+        candidates = _provider_candidates(mapping, mid, spec, payload)
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
         for provider, pid, style in candidates:
@@ -543,6 +579,9 @@ class HuggingFaceProvider(Provider):
                         if isinstance(data, dict):
                             data.setdefault("error", extract_error(data, f"HTTP {code}"))
                         last = (code, data)
+                        # v0821o5: do not continue to wavespeed and overwrite the fal-ai error
+                        if _fal_ai_error_is_final(provider, mid, mapping):
+                            return last
                         continue
                     saved = _save_json_images(data, jid, meta=meta)
                 else:
@@ -557,6 +596,8 @@ class HuggingFaceProvider(Provider):
                     saved = _save_json_images(data, jid, meta=meta)
             except Exception as e:
                 last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
+                if _fal_ai_error_is_final(provider, mid, mapping):
+                    return last
                 continue
             if saved:
                 out = {
@@ -576,6 +617,8 @@ class HuggingFaceProvider(Provider):
                     )
                 return 200, out
             last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
+            if _fal_ai_error_is_final(provider, mid, mapping):
+                return last
         return last
 
     def job_status(self, job_id: str):
