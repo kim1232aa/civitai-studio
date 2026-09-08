@@ -92,52 +92,67 @@ def _clamp_seed(raw):
 
 
 def _modelscope_loras(payload: dict):
-    """Official AIGC field: Hub `owner/repo` or `{repo: weight}`. Civitai http paths are skipped (+ warning)."""
+    """Official AIGC field: list of `{model, weight}` even for one. Skip Civitai http.
+
+    Live 2026-09-08: string `owner/repo` or `{repo: weight}` → 500 Model does not exist.
+    `[{model, weight}]` → HTTP 200 + task_id.
+    """
     raw = payload.get("loras") or []
-    if isinstance(raw, str) and raw.strip() and "/" in raw and not raw.startswith("http"):
-        return raw.strip()
-    if isinstance(raw, dict):
-        return raw
     pairs = {}
-    for it in raw if isinstance(raw, list) else []:
-        repo = ""
-        weight = 1.0
-        if isinstance(it, str):
-            repo = it.strip()
-        elif isinstance(it, dict):
+
+    def _add(repo, weight):
+        repo = (repo or "").strip()
+        if not repo or repo.lower().startswith("urn:"):
+            return
+        if repo.startswith("http"):
+            # AIGC wants Hub owner/repo; Civitai download URLs 500 with 空 modelName.
+            return
+        if repo.count("/") != 1:
+            return
+        try:
+            w = float(weight) if weight not in (None, "") else 1.0
+        except (TypeError, ValueError):
+            w = 1.0
+        pairs[repo] = max(0.0, w)
+
+    if isinstance(raw, str):
+        _add(raw, 1.0)
+    elif isinstance(raw, dict):
+        for k, v in raw.items():
+            _add(str(k), v)
+    elif isinstance(raw, list):
+        for it in raw:
+            if isinstance(it, str):
+                _add(it, 1.0)
+                continue
+            if not isinstance(it, dict):
+                continue
             path = (it.get("path") or it.get("url") or it.get("downloadUrl") or it.get("download_url") or "").strip()
+            model_id = (it.get("model") or "").strip()
             name = (it.get("name") or it.get("id") or "").strip()
-            if path.startswith("http"):
+            if (
+                model_id.count("/") == 1
+                and not model_id.startswith("http")
+                and not model_id.lower().startswith("urn:")
+            ):
+                repo = model_id
+            elif path.startswith("http"):
+                repo = path
+            elif path.count("/") == 1:
                 repo = path
             elif name.count("/") == 1 and not name.lower().startswith("urn:"):
                 repo = name
-            elif path.count("/") == 1:
-                repo = path
             else:
-                repo = path or name
-            try:
+                repo = model_id or path or name
+            raw_w = it.get("weight")
+            if raw_w is None:
                 raw_w = it.get("scale")
-                if raw_w is None:
-                    raw_w = it.get("strength")
-                weight = float(raw_w) if raw_w not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                weight = 1.0
-        else:
-            continue
-        if not repo or repo.lower().startswith("urn:"):
-            continue
-        if repo.startswith("http"):
-            # AIGC wants Hub owner/repo; Civitai download URLs 500 with 空 modelName.
-            continue
-        if repo.count("/") != 1:
-            continue
-        pairs[repo] = max(0.0, weight)
+            if raw_w is None:
+                raw_w = it.get("strength")
+            _add(repo, raw_w)
     if not pairs:
         return None
-    if len(pairs) == 1:
-        return next(iter(pairs.keys()))
-    total = sum(pairs.values()) or 1.0
-    return {k: (v / total) for k, v in pairs.items()}
+    return [{"model": k, "weight": v} for k, v in pairs.items()]
 
 
 HUB = "https://www.modelscope.cn/openapi/v1/models"

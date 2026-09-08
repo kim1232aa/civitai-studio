@@ -19,7 +19,7 @@
 7. 自己点 ↑。成功后看 sidecar / 出站：`loras` 必须还在，且是 Hub 形态。
 
 快捷夹具（开发硬闸）：「魔搭 LoRA夹具」或 `?fixture=ms-lora`  
-→ 钉 `Tongyi-MAI/Z-Image-Turbo` + `DiffSynth-Studio/Z-Image-Turbo-DistillPatch` @0.8。
+→ **强制** `backend=modelscope-ai`（不跟当前 CN 走）+ `Tongyi-MAI/Z-Image-Turbo` + `DiffSynth-Studio/Z-Image-Turbo-DistillPatch` @0.8。
 
 ## 出站字段（2026-09-08 实测）
 

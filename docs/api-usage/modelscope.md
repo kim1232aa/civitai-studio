@@ -118,6 +118,6 @@ Hub 列表（AI/CN **共用**搜目录，**不**共用生成 base）：
 
 - Hub OpenAPI：`https://www.modelscope.cn/openapi/v1/models`（filter.task 用 synthesis slug）。
 - 生成：`POST https://api-inference.modelscope.{ai|cn}/v1/images/generations`；官方键集合见上表（多余键 4xx 时 slim 重试）。
-- LoRA：字符串 `owner/repo` 或权重 dict（归一）；**不要**发 Civitai 下载链。
+- LoRA：出站 `[{ "model": "owner/repo", "weight": 0.8 }, …]`（单条也用数组对象）；字符串 / `{repo:w}` 会 500。**不要**发 Civitai 下载链。
 - 能力表：`lora=hub_repo`，`progress=status_only`，`cancel=False`，`maxRefs=1`，`refImagesField=image_url`。
 - 全量 Hub 不在本仓库落盘 → inventory 只保证钉选 + 发现端点诚实。
