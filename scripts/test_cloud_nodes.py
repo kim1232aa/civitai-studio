@@ -108,6 +108,25 @@ def test_unknown_op():
     assert_true("未知 op" in (r.get("error") or ""), r)
 
 
+def test_i2v_empty_prompt_allowed():
+    """v0821i: i2v prompt node may be empty string (optional)."""
+    r = g(
+        backend="fal",
+        nodes=[
+            {"id": "img", "op": "image", "params": {"url": "/out/x.jpg"}},
+            {"id": "p", "op": "prompt", "params": {"text": ""}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
+        ],
+        edges=[
+            {"from": "img", "fromPort": "image", "to": "v", "toPort": "image"},
+            {"from": "p", "fromPort": "prompt", "to": "v", "toPort": "prompt"},
+        ],
+    )
+    assert_true(r.get("ok") is True, r)
+    assert_true((r.get("payload") or {}).get("prompt") == "", r)
+    assert_true("缺少文本" not in (r.get("error") or ""), r)
+
+
 def main():
     tests = [
         test_missing_image_blocked,
@@ -116,6 +135,7 @@ def main():
         test_hf_i2v_blocked,
         test_seed_bypass_blocked,
         test_unknown_op,
+        test_i2v_empty_prompt_allowed,
     ]
     failed = 0
     for fn in tests:

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0821h-send-aria</title>
+<title>画布 · Night Lab · v0821i-i2v-writeback</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -49,7 +49,7 @@
   svg.wires path.snap{fill:none;stroke:var(--teal);stroke-width:2.4;opacity:1;pointer-events:none}
   .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28);z-index:3}
   .asset{width:132px;border-radius:10px;overflow:visible}
-  .asset .thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%;border-radius:10px 10px 0 0}
+  .asset .thumb,.asset video.thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%;border-radius:10px 10px 0 0}
   .asset .ph{height:176px;display:grid;place-items:center;color:#5a5a64;font-size:22px;background:#141418;border-radius:10px 10px 0 0}
   .asset .name{padding:7px 8px;font-size:11px;color:#d0d0d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     background:var(--card);border-radius:0 0 10px 10px;border:1px solid #2a2a30;border-top:0;margin-top:-1px}
@@ -151,7 +151,7 @@
   .rail-tabs button.on{color:#fff;border-color:#4a4a54;background:#1c1c22}
   .rail-item{display:flex;align-items:center;gap:6px;width:100%;border:1px solid #2a2a30;background:#141416;
     color:#ddd;border-radius:10px;padding:4px;text-align:left}
-  .rail-item img{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0}
+  .rail-item img,.rail-item video{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0}
   .rail-item.on{border-color:#5ee0c5}
   .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;flex:1}
   .rail-item.add{justify-content:center;color:#9a9aa3}
@@ -341,7 +341,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0821h-send-aria</span>
+      <span class="stamp">v0821i-i2v-writeback</span>
     </div>
   </header>
   <div class="stage">

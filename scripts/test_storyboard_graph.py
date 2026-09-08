@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821h" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821i" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "stamp must be v0821h-send-aria")
+    assert_true("v0821i-i2v-writeback" in html, "stamp must be v0821i-i2v-writeback")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true("nl-storyboard-v0821h" in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true("nl-storyboard-v0821i" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true("nl-storyboard-v0821h" in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true("nl-storyboard-v0821i" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "stamp v0821h-send-aria")
-    assert_true("nl-storyboard-v0821h" in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "stamp v0821i-i2v-writeback")
+    assert_true("nl-storyboard-v0821i" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -586,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821h-send-aria: unmention/link helpers still present."""
+    """v0817b lineage under v0821i-i2v-writeback: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,12 +606,13 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821h-send-aria: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821i-i2v-writeback: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821d")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821d")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
     assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
     assert_true('"nl-storyboard-v0821c"' in js, "STORE_OLDS keeps v0821c")
@@ -651,8 +652,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -725,8 +726,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -760,8 +761,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -786,8 +787,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -826,8 +827,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -885,8 +886,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -956,8 +957,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0820c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -1019,9 +1020,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1102,9 +1103,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp v0821h-send-aria")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821b")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp v0821i-i2v-writeback")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1224,9 +1225,9 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821c")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
@@ -1288,6 +1289,7 @@ def test_v0821c_fal_i2v_preview():
         ["node", "-e", fn + r"""
 const cases = [
   [{ saved: [{ url: "/out/a.mp4" }] }, "/out/a.mp4"],
+  [{ saved: [{ url: "/out/a.mp4" }], video: { url: "https://v3.fal.media/files/x.mp4" }, result: { video: { url: "https://cdn/v.mp4" } } }, "/out/a.mp4"],
   [{ video: { url: "https://v3.fal.media/files/x.mp4" } }, "https://v3.fal.media/files/x.mp4"],
   [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
   [{ result: { images: [{ url: "https://cdn/i.jpg" }] } }, "https://cdn/i.jpg"],
@@ -1309,9 +1311,10 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821h")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821h")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
@@ -1372,13 +1375,13 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821h-send-aria: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821i-i2v-writeback: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true("v0821h-send-aria" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821h")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true("v0821i-i2v-writeback" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1428,13 +1431,13 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821h-send-aria: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821i-i2v-writeback: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821h-send-aria" in html, "html stamp")
-    assert_true('<span class="stamp">v0821h-send-aria</span>' in html, ".stamp")
-    assert_true("v0821h-send-aria" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821h"' in js, "STORE v0821h")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true("v0821i-i2v-writeback" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1485,6 +1488,100 @@ def test_v0821h_send_aria():
 
 
 
+
+def test_v0821i_i2v_writeback():
+    """v0821i: video writeback to shot card + promote/history; empty i2v prompt allowed; pickUrl prefers /out."""
+    import json
+    import subprocess
+    from providers.graph_compile import compile_graph
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821i-i2v-writeback" in html, "html stamp")
+    assert_true('<span class="stamp">v0821i-i2v-writeback</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821i"' in js, "STORE v0821i")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
+
+    # promoteResult must accept videos
+    pr = js[js.find("function promoteResult"):js.find("function spawnHistoryAt")]
+    assert_true("isVideoUrl(url)) return null" not in pr, "promoteResult must not skip videos")
+    assert_true("v0821i" in pr or "promote images AND videos" in pr, "v0821i promote note")
+
+    # writeback helper
+    assert_true("function writebackResult" in js, "writebackResult helper")
+    assert_true("function pushHistoryItem" in js, "pushHistoryItem helper")
+    assert_true("writebackResult(shot, url)" in js, "success path calls writebackResult")
+
+    # card video preview
+    assert_true('playsinline preload="metadata"' in js, "shot/asset video preload")
+    assert_true("<video src=" in js and "muted playsinline" in js, "video tag on cards")
+
+    # loadOuts keeps videos
+    lo = js[js.find("async function loadOuts"):js.find("$(\"backend\").onchange")]
+    assert_true('it.kind === "image" || (it.url && !isVideoUrl(it.url))' not in lo, "must not filter videos out")
+    assert_true('k === "image" || k === "video"' in lo or "kind===video" in lo or 'k === "video"' in lo, "loadOuts keeps video")
+
+    # pickUrl prefers saved
+    i = js.find("function pickUrl")
+    block = js[i:js.find("function hasUnresolvedStageOut", i)]
+    assert_true("prefer local saved" in block or "v0821i" in block, "pickUrl v0821i note")
+    assert_true(block.find("first(data.saved)") < block.find("data.video") or "savedHit" in block, "saved before video")
+
+    # empty i2v prompt allowed at compile
+    r = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "/out/x.jpg"}},
+            {"id": "p-shot-1", "op": "prompt", "params": {"text": ""}},
+            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "shot-1", "toPort": "image"},
+            {"from": "p-shot-1", "fromPort": "prompt", "to": "shot-1", "toPort": "prompt"},
+        ],
+    })
+    assert_true(r.get("ok") is True, r)
+    assert_true("缺少文本" not in (r.get("error") or ""), r)
+    assert_true((r.get("payload") or {}).get("prompt") == "", r)
+
+    # negative still requires text
+    r2 = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "n", "op": "negative", "params": {"text": ""}},
+            {"id": "p", "op": "prompt", "params": {"text": "x"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "fal-ai/flux/schnell"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "n", "fromPort": "negative", "to": "g", "toPort": "negative"},
+        ],
+    })
+    assert_true(r2.get("ok") is False, r2)
+    assert_true("缺少文本" in (r2.get("error") or ""), r2)
+
+    # Node: pickUrl prefer saved; writebackResult shape via promote+history sim
+    end = js.find("function hasUnresolvedStageOut", i)
+    fn = js[i:end]
+    # extract promoteResult + helpers roughly via node harness
+    node = subprocess.run(
+        ["node", "-e", fn + r"""
+const cases = [
+  [{ saved: [{ url: "/out/fal_…01a07e47…_0.mp4" }], result: { video: { url: "https://cdn/v.mp4" } } }, "/out/fal_…01a07e47…_0.mp4"],
+  [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
+];
+const out = cases.map(([d, exp]) => ({ got: pickUrl(d), exp, ok: pickUrl(d) === exp }));
+console.log(JSON.stringify(out));
+"""],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node pickUrl: %s%s" % (node.stdout, node.stderr))
+    rows = json.loads(node.stdout.strip().splitlines()[-1])
+    for r in rows:
+        assert_true(r["ok"], r)
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -1520,6 +1617,7 @@ def main():
         test_v0821f_send_noop,
         test_v0821g_send_bind,
         test_v0821h_send_aria,
+        test_v0821i_i2v_writeback,
     ]
     failed = 0
     for fn in tests:

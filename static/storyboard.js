@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821h";
-  const STORE_OLDS = ["nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821i";
+  const STORE_OLDS = ["nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821i: i2v writeback — shot.url video preview; promote/history keep mp4; pickUrl prefer /out saved
   // v0821h: send gate via aria-disabled (not disabled=true) so click always fires setMsg
   // v0821g: always 首帧已就绪; bind send click+pointerdown; larger hit/z-index; missing-frame bad
   // v0821f: send ↑ no-op — clear stale needFrame warn; never silent-return; disabled gray
@@ -468,7 +469,7 @@
     if (n.kind === "shot") {
       const media = n.url
         ? (isVideoUrl(n.url)
-            ? '<video src="' + esc(n.url) + '" muted></video>'
+            ? '<video src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
             : '<img src="' + esc(n.url) + '" alt="">')
         : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
@@ -481,7 +482,9 @@
         '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
     }
     const thumb = n.url
-      ? '<img class="thumb" src="' + esc(n.url) + '" alt="">'
+      ? (isVideoUrl(n.url)
+          ? '<video class="thumb" src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
+          : '<img class="thumb" src="' + esc(n.url) + '" alt="">')
       : '<div class="ph">▣</div>';
     return '<div class="card asset' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
       badge + thumb + '<div class="name">' + esc(n.title) + '</div>' +
@@ -668,8 +671,13 @@
       body = '<div class="rail-h">画布资产 · 可拖出</div>' +
         list.map((a) => {
           const on = state.selected === a.id ? " on" : "";
+          const thumb = a.url
+            ? (isVideoUrl(a.url)
+                ? '<video src="' + esc(a.url) + '" muted playsinline preload="metadata"></video>'
+                : '<img src="' + esc(a.url) + '" alt="">')
+            : "";
           return '<div class="rail-item' + on + '" data-rail="' + esc(a.id) + '">' +
-            (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") +
+            thumb +
             "<span>" + esc(a.title) + "</span>" +
             (canPin ? '<button class="pin" type="button" data-pin="' + esc(a.id) + '" title="接到此镜">＋</button>' : "") +
             "</div>";
@@ -679,8 +687,13 @@
       const list = state.history;
       body = '<div class="rail-h">生成历史 · 拖到画布</div>' +
         (list.length ? list.map((it, i) => {
+          const thumb = it.url
+            ? (isVideoUrl(it.url)
+                ? '<video src="' + esc(it.url) + '" muted playsinline preload="metadata"></video>'
+                : '<img src="' + esc(it.url) + '" alt="">')
+            : "";
           return '<div class="rail-item" data-hist="' + i + '">' +
-            (it.url ? '<img src="' + esc(it.url) + '" alt="">' : "") +
+            thumb +
             "<span>" + esc(it.title) + "</span>" +
             (canPin ? '<button class="pin" type="button" data-hist-pin="' + i + '" title="接到此镜">＋</button>' : "") +
             "</div>";
@@ -786,7 +799,7 @@
         frameHtml = '<div class="frame-slot missing">缺首帧</div>';
       }
     }
-    const promoteBtn = n.url && !isVideoUrl(n.url)
+    const promoteBtn = n.url
       ? '<button class="chip-btn" type="button" data-act="promote" title="收进资产库">入库</button>'
       : "";
     const refCap = maxRefCount(catalogItemForService());
@@ -921,24 +934,27 @@
   }
 
   function promoteResult(shot, url) {
-    if (!shot || !url || isVideoUrl(url)) return null;
+    // v0821i: promote images AND videos into outs/assets (history/drag survive refresh)
+    if (!shot || !url) return null;
     const aid = "out-" + shot.id;
     let asset = nodeById(aid) || assets().find((a) => a.url === url);
     if (!asset) {
       asset = {
         id: aid,
         kind: "character",
-        title: (shot.title || "分镜") + "成片",
+        title: (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"),
         x: shot.x + 680,
         y: shot.y + 20,
         url: url,
         fromShot: shot.id,
+        mediaKind: mediaKindOf(url),
       };
       state.nodes.push(asset);
     } else {
       asset.url = url;
-      asset.title = (shot.title || "分镜") + "成片";
+      asset.title = (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片");
       asset.fromShot = shot.id;
+      asset.mediaKind = mediaKindOf(url);
     }
     return asset;
   }
@@ -2517,28 +2533,53 @@
     return { backend: $("backend").value, nodes: nodes, edges: edges };
   }
 
-  function pickUrl(data) {
-    // v0821c: fal video lands as result.video.url / video.url — not only images[]/saved[].
+  function pushHistoryItem(url, title) {
+    if (!url) return;
+    const item = {
+      url: url,
+      title: title || (isVideoUrl(url) ? "视频成片" : "历史成片"),
+      kind: mediaKindOf(url),
+    };
+    state.history = [item].concat((state.history || []).filter((h) => h && h.url !== url)).slice(0, 24);
+  }
+  function writebackResult(shot, url) {
+    // v0821i: persist shot.url (caller), promote to assets, push 生成历史 — images + videos
+    if (!shot || !url) return;
+    promoteResult(shot, url);
+    pushHistoryItem(url, (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
+    renderRail();
+  }
+
+    function pickUrl(data) {
+    // v0821i/v0821c: prefer local saved[] /out/*.mp4 over ephemeral CDN result.video.url.
     if (!data) return "";
-    if (typeof data.url === "string") return data.url;
     const first = (arr) => {
       if (!arr || !arr[0]) return "";
       const x = arr[0];
       if (typeof x === "string") return x;
       return (x && (x.url || x.path)) || "";
     };
-    const fromList = first(data.saved) || first(data.files) || first(data.urls) || first(data.images) || first(data.videos);
+    // 1) materialized /out (or any saved/files) — survives refresh
+    const savedHit = first(data.saved) || first(data.files);
+    if (savedHit) return savedHit;
+    if (data.result && typeof data.result === "object") {
+      const rs = first(data.result.saved) || first(data.result.files);
+      if (rs) return rs;
+    }
+    // 2) video / image bags (CDN ok as fallback)
+    const fromList = first(data.urls) || first(data.videos) || first(data.images);
     if (fromList) return fromList;
-    if (data.image) return data.image.url || (typeof data.image === "string" ? data.image : "");
     if (data.video) return data.video.url || (typeof data.video === "string" ? data.video : "");
+    if (data.image) return data.image.url || (typeof data.image === "string" ? data.image : "");
     const res = data.result;
     if (res && typeof res === "object") {
-      if (typeof res.url === "string") return res.url;
       if (res.video) return res.video.url || (typeof res.video === "string" ? res.video : "");
       if (res.image) return res.image.url || (typeof res.image === "string" ? res.image : "");
-      const nested = first(res.images) || first(res.videos) || first(res.saved) || first(res.files);
+      const nested = first(res.videos) || first(res.images);
       if (nested) return nested;
+      if (typeof res.url === "string") return res.url;
     }
+    if (typeof data.url === "string") return data.url;
     return "";
   }
 
@@ -2622,7 +2663,8 @@
       }
     }
     if (!opts.keepSend) markSendBusy(true);
-    setMsg(prefix + "校验连线…");
+    // v0821i: generate() already set 校验连线 for click feedback — avoid double flash under 正在请求
+    if (prefix) setMsg(prefix + "校验连线…");
     let compiled;
     try {
       const r = await fetch("/api/graph/compile", {
@@ -2749,14 +2791,14 @@
           return { status: "more", stageOp: stage.op };
         }
         shot.url = url;
-        if (!isVideoUrl(url)) promoteResult(shot, url);
+        writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库"), "ok");
+        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
       } else if (url) {
         shot.url = url;
-        if (!isVideoUrl(url)) promoteResult(shot, url);
+        writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成" : "此镜完成，成片已收进资产库"), "ok");
+        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
       } else {
         setShotBusy(shot, false);
         setMsg(prefix + "云端已返回，没有可预览地址", "warn");
@@ -3468,10 +3510,17 @@
     try {
       const r = await fetch("/api/outs");
       const j = await r.json();
-      const items = (j.items || []).filter((it) => it.kind === "image" || (it.url && !isVideoUrl(it.url)));
+      // v0821i: keep videos in 生成历史 (kind===video or .mp4) — do not filter them out
+      const items = (j.items || []).filter((it) => {
+        const u = it.url || it.path || "";
+        if (!u) return false;
+        const k = it.kind || mediaKindOf(u);
+        return k === "image" || k === "video";
+      });
       state.history = items.slice(0, 24).map((it) => ({
         url: it.url || it.path,
         title: String(it.file || it.name || "历史成片").replace(/\.[^.]+$/, ""),
+        kind: it.kind || mediaKindOf(it.url || it.path || ""),
       })).filter((it) => it.url);
       renderRail();
     } catch (_) {}
