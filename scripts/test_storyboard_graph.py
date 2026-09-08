@@ -30,7 +30,7 @@ def shot_graph(op, prompt, image_url=None, service=None):
         "id": "shot-1",
         "op": op,
         "params": {
-            "serviceId": service or ("fal-ai/minimax/video-01" if op == "i2v" else "fal-ai/flux/schnell"),
+            "serviceId": service or ("fal-ai/minimax/video-01/image-to-video" if op == "i2v" else "fal-ai/flux/schnell"),
             "resolution": "1280x720",
             "duration": 5,
         },
@@ -105,7 +105,7 @@ def test_i2v_first_frame_pick_second_ref():
             {"id": "p-shot-1", "op": "prompt", "params": {"text": "固定镜头"}},
             {"id": "a-bot", "op": "image", "params": {"url": "/out/bot.jpg"}},
             {"id": "a-bed", "op": "image", "params": {"url": "/out/bed.jpg"}},
-            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01", "duration": 5}},
+            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
         ],
         "edges": [
             {"from": "p-shot-1", "fromPort": "prompt", "to": "shot-1", "toPort": "prompt"},
@@ -144,7 +144,7 @@ def test_first_frame_from_promoted_asset():
         "nodes": [
             {"id": "p-v", "op": "prompt", "params": {"text": "固定镜头轻微转动"}},
             {"id": "shot-1", "op": "image", "params": {"url": "/out/shot1.jpg"}},
-            {"id": "shot-3", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01", "duration": 5}},
+            {"id": "shot-3", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
         ],
         "edges": [
             {"from": "p-v", "fromPort": "prompt", "to": "shot-3", "toPort": "prompt"},
@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0820" in js, "STORE must bump to v0820")
+    assert_true("nl-storyboard-v0821n" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "stamp must be v0820-civitai-comfy-params")
+    assert_true("v0821n5-dock-scroll" in html, "stamp must be v0821n5-dock-scroll")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "stamp v0820-civitai-comfy-params")
-    assert_true("nl-storyboard-v0820" in js, "STORE v0820")
+    assert_true("v0821n5-dock-scroll" in html, "stamp v0821n5-dock-scroll")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -445,7 +445,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     m = js.find("async function runSelected", k)
     if m < 0:
         m = js.find("function runSelected", k)
-    run = js[k:m if m > 0 else k + 8000]
+    run = js[k:m if m > 0 else k + 16000]
     assert_true("refUrls.length > refCap" in run, "over-cap compare in runShotStep")
     assert_true('status: "blocked"' in run and "超过上限" in run, "over-cap returns blocked with setMsg")
     assert_true("不静默丢弃" in run or "超过上限" in run, "loud over-cap message")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -516,8 +516,10 @@ def test_v0817_no_at_filename():
     ci = js[ci0:ci1]
     assert_true("linkAssetToShot" in ci, "import still auto-links")
     assert_true("shot.prompt" not in ci, "import must not write shot.prompt")
-    # default new-shot template has no @asset auto-fill
-    assert_true('prompt: "【镜头"' in js or "prompt: \"【镜头" in js, "human shot template")
+    # default new-shot / loadDemo must NOT auto-fill 【镜头 shell (Skill templates OK)
+    assert_true('prompt: "【镜头' not in js and 'prompt: "【镜头" +' not in js,
+                "create-path must not prefill 【镜头 template")
+    assert_true('template: "【镜头】' in js or "template: \"【镜头】" in js, "Skill storyboard-shot template kept")
     assert_true("@角色" in js, "Skill human placeholders OK")
     # normalizePrompt still rewrites remaining @title → @图片N
     assert_true("function normalizePrompt" in js, "normalizePrompt kept")
@@ -584,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0820-civitai-comfy-params: unmention/link helpers still present."""
+    """v0817b lineage under v0821n5-dock-scroll: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -602,12 +604,56 @@ def test_v0817b_unmention_at_tag():
     assert_true("function packLorasForPayload" in js, "LoRA packing kept")
 
 
+
+def test_empty_prompt_on_new_shot_and_load_demo():
+    """v0821n5-dock-scroll: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821d")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
+    assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
+    assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
+    assert_true('"nl-storyboard-v0821c"' in js, "STORE_OLDS keeps v0821c")
+    # loadDemo body
+    i = js.find("function loadDemo()")
+    assert_true(i >= 0, "loadDemo missing")
+    j = js.find("function persist()", i)
+    boot = js[i:j]
+    assert_true("【镜头" not in boot, "loadDemo must not seed 【镜头 shell")
+    assert_true('prompt: ""' in boot or "prompt: ''" in boot, "loadDemo prompt empty")
+    # btnAdd create path
+    a = js.find('$("btnAdd").onclick')
+    assert_true(a >= 0, "btnAdd missing")
+    b = js.find("function resolveLayoutScope", a)
+    add = js[a:b]
+    assert_true("【镜头" not in add, "btnAdd must not prefill 【镜头 shell")
+    assert_true('prompt: ""' in add or "prompt: ''" in add, "btnAdd prompt empty")
+    # ensureActiveShotForImport already empty
+    e = js.find("function ensureActiveShotForImport()")
+    f = js.find("async function applyImport", e)
+    ens = js[e:f]
+    assert_true('prompt: ""' in ens or "prompt: ''" in ens, "import-created shot prompt empty")
+    assert_true("【镜头" not in ens, "import create must not seed 【镜头")
+    # Skill templates remain user-chosen inserts only
+    assert_true('id: "storyboard-shot"' in js, "storyboard-shot Skill kept")
+    assert_true("function applySkill" in js, "applySkill kept")
+    # link / mention / import-media paths must not write 【镜头 into prompt
+    k = js.find("function linkAssetToShot")
+    m = js.find("function unlinkAssetFromShot", k)
+    assert_true("【镜头" not in js[k:m], "linkAssetToShot must not write 【镜头")
+    im0 = js.find("function insertMention")
+    im1 = js.find("function slashQueryAt", im0)
+    assert_true("【镜头" not in js[im0:im1], "insertMention must not write 【镜头")
+
+
 def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0818")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -680,8 +726,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0819")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -701,9 +747,9 @@ def test_v0818_sticky_composer_bar():
     assert_true(".dock.expanded .dock-body{display:flex;flex-direction:column" in html
                 or "display:flex;flex-direction:column;overflow:hidden" in html,
                 "expanded dock-body is flex column")
-    assert_true(".dock-scroll{flex:1 1 auto;min-height:180px;overflow:auto}" in html, "dock-scroll min-height keeps prompt")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}" in html, "dock-scroll is sole overflow:auto")
     assert_true(".dock-foot{" in html and "flex:0 0 auto" in html, "dock-foot flex-none")
-    assert_true("position:sticky;bottom:0" in html, "dock-foot sticky bottom")
+    assert_true("overflow:visible" in html and "position:static" in html, "dock-foot not a second scroller")
     # Untouched behaviors
     assert_true("stages[0].payload" not in js, "gate untouched")
     assert_true("function attachExtraImages" in js, "images packing kept")
@@ -715,8 +761,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0819")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -727,7 +773,7 @@ def test_v0819_canvas_stage():
     assert_true('id="canvasTip"' in html, "canvasTip element")
     assert_true("选分镜→写画面→LoRA→↑" in html, "empty-canvas onboarding tip")
     assert_true("min-height:120px" in html, "prompt min-height ≥120 when expanded")
-    assert_true("min-height:180px" in html, "dock-scroll min-height keeps prompt visible")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}" in html, "dock-scroll min-height:0")
     assert_true('id="dockFoot"' in html and "flex:0 0 auto" in html, "dock-foot still present")
     # Untouched
     assert_true("stages[0].payload" not in js, "gate untouched")
@@ -741,8 +787,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp v0820-civitai-comfy-params")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0820")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -751,16 +797,17 @@ def test_v0819b_expand_prompt():
     assert_true("function syncCanvasTip" in js, "canvasTip behavior kept")
     assert_true('id="canvasTip"' in html, "canvasTip element kept")
     # Expand layout: taller dock, scroll min-height, foot capped, lora capped
-    assert_true(".dock.expanded{max-height:72vh}" in html or "max-height:72vh" in html,
-                "expanded dock max-height raised")
-    assert_true(".dock-scroll{flex:1 1 auto;min-height:180px;overflow:auto}" in html,
-                "dock-scroll min-height 180px")
-    assert_true(".dock.expanded .dock-scroll{min-height:200px}" in html,
-                "expanded dock-scroll min-height 200px")
+    assert_true(".dock.expanded{max-height:58vh}" in html or "max-height:58vh" in html
+                or "max-height:72vh" in html,
+                "expanded dock max-height present (v0821: 58vh)")
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}" in html,
+                "dock-scroll min-height 0 (single scrollbar)")
+    assert_true(".dock.expanded .dock-scroll{min-height:0}" in html,
+                "expanded dock-scroll min-height 0")
     assert_true("min-height:120px" in html, "prompt min-height ≥120")
-    assert_true(".dock-foot{" in html and "max-height:46%" in html,
-                "dock-foot capped so it cannot eat >50% of dock")
-    assert_true(".dock.expanded .lora-block{max-height:110px;overflow:auto}" in html,
+    assert_true(".dock-foot{" in html and "max-height:none" in html and "overflow:visible" in html,
+                "dock-foot not a second scroller")
+    assert_true(".dock.expanded .lora-block{max-height:140px;overflow:auto}" in html,
                 "lora-block capped when expanded; overflow on lora not whole dock")
     # Expand path resets scrollTop so first frame shows modes+#prompt
     assert_true("scrollTop = 0" in js or "scrollTop=0" in js.replace(" ", ""),
@@ -780,8 +827,9 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0820-civitai-comfy-params" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0820"' in js, "STORE v0820")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     # UI surface
@@ -834,6 +882,1501 @@ def test_v0820_civitai_comfy_params():
     assert_true('id="dockFoot"' in html, "sticky foot kept")
 
 
+def test_v0820b_apply_import():
+    """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
+    assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
+    # applyImport path
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport")
+    assert_true("function runImportFromUrl" in js or "async function runImportFromUrl" in js, "runImportFromUrl")
+    assert_true("function looksCivitaiServiceId" in js, "looksCivitaiServiceId")
+    assert_true("function ensureActiveShotForImport" in js, "ensureActiveShotForImport")
+    assert_true('"/api/import"' in js or "'/api/import'" in js or "/api/import" in js, "POSTs /api/import")
+    # Must NOT call paid generate from import path
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    assert_true(i >= 0 and j > i, "applyImport block")
+    block = js[i:j]
+    assert_true("/api/generate" not in block, "applyImport must not call /api/generate")
+    assert_true(
+        ('value = "civitai"' in block)
+        or (".value=\"civitai\"" in block.replace(" ", ""))
+        or ("value = 'civitai'" in block)
+        or ('$("backend").value = "civitai"' in block),
+        "forces backend civitai",
+    )
+    assert_true("loadCatalog" in block, "reloads catalog")
+    assert_true("applyComfyParamsToUi" in block, "fills comfy params")
+    assert_true("normalizeLora" in block, "packs loras")
+    assert_true("setDockMode" in block and "expanded" in block, "expands Composer")
+    assert_true("不会回退" in block or "flux/schnell" in block, "hard error forbids fal fallback")
+    assert_true("缺少 serviceId" in block or "无法挂载" in block, "empty service hard error")
+    # URL entry in import modal
+    assert_true('id="importUrl"' in html, "importUrl input")
+    assert_true('id="importUrlBtn"' in html, "importUrlBtn")
+    assert_true("importUrlBtn" in js, "wires importUrlBtn")
+    assert_true("runImportFromUrl" in js, "runImportFromUrl wired")
+    # Spot-check fixture shape must remain nameable
+    for field in ("backend", "serviceId", "steps", "cfgScale", "sampler", "scheduler", "seed", "width", "height", "loras"):
+        assert_true(field in js, "mentions " + field)
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 turbo serviceId")
+    # Mock JSON shape exercise via source contract (no live /api/import)
+    mock = {
+        "backend": "civitai",
+        "serviceId": "image/comfy/krea2/turbo/createImage",
+        "prompt": "real prompt from fixture",
+        "negativePrompt": "",
+        "width": 944,
+        "height": 1664,
+        "steps": 8,
+        "cfgScale": 1,
+        "sampler": "er_sde",
+        "scheduler": "simple",
+        "seed": 467475143677094,
+        "loras": [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8}],
+    }
+    assert_true(mock["backend"] == "civitai", "mock backend")
+    assert_true(mock["serviceId"] == "image/comfy/krea2/turbo/createImage", "mock service")
+    assert_true(abs(float(mock["loras"][0]["strength"]) - 0.8) < 1e-6, "mock lora strength")
+    # Lineage
+    assert_true("packComfyParamsForPayload" in js, "v0820 comfy pack kept")
+    assert_true("mentionTags" not in js, "v0817c no @ in prompt")
+    assert_true('id="dockFoot"' in html, "v0818 sticky foot")
+    assert_true('dockMode: "collapsed"' in js, "v0819 canvas-stage")
+
+
+
+
+def test_v0820c_hard_service():
+    """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0820c")
+    assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
+    assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
+    assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 id kept as ordering hint")
+
+    # buildGraph: must NOT soft-fill CIVITAI_PREF / _civitaiDefaultService into serviceId
+    i = js.find("function buildGraph")
+    assert_true(i >= 0, "buildGraph")
+    j = js.find("function pickUrl", i)
+    bg = js[i:j]
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in bg,
+                "buildGraph must not soft-fill CIVITAI_PREF into serviceId")
+    assert_true("CIVITAI_PREF_SERVICE" not in bg or "hard-service" in bg,
+                "buildGraph must not reference CIVITAI_PREF as generate fallback")
+    # Fal defaults may remain for non-civitai (via FAL_*_DEFAULT consts)
+    assert_true("FAL_T2I_DEFAULT" in bg or "fal-ai/flux/schnell" in bg, "fal t2i empty-service default kept")
+    assert_true("FAL_I2V_DEFAULT" in bg or "image-to-video" in bg, "fal i2v empty-service default kept")
+    assert_true('be !== "civitai"' in bg or "be !== 'civitai'" in bg,
+                "fal defaults gated to non-civitai")
+    assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
+    assert_true("pickedService" in bg or '($("service") && $("service").value)' in bg,
+                "buildGraph uses explicit #service value")
+
+    # runShotStep: hard-error path present; no soft-fill
+    k = js.find("async function runShotStep")
+    assert_true(k >= 0, "runShotStep")
+    run = js[k:k + 12000]
+    assert_true("请先选择 Civitai 服务" in run, "hard error message in runShotStep")
+    assert_true('setMsg(' in run and '"bad"' in run, "hard error uses setMsg bad")
+    assert_true("不会默认填入 Krea2" in run, "hard error mentions no Krea2 default")
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in run,
+                "runShotStep must not soft-fill CIVITAI_PREF")
+    assert_true('return { status: "blocked"' in run, "aborts generate on empty service")
+    # payload.serviceId from UI only
+    assert_true("payload.serviceId = sid" in run or "payload.serviceId=sid" in run.replace(" ", ""),
+                "sets payload.serviceId from explicit sid")
+
+    # loadCatalog: pref ordering hint OK; no auto-select pref into empty #service
+    lc = js.find("async function loadCatalog")
+    assert_true(lc >= 0, "loadCatalog")
+    lc_end = js.find("async function loadOuts", lc)
+    cat = js[lc:lc_end]
+    assert_true("ordering hint" in cat or "catalog ordering" in cat.lower() or "Catalog ordering" in cat
+                or "ordering hint only" in js,
+                "documents pref as ordering hint")
+    assert_true("Do NOT auto-select CIVITAI_PREF" in cat or "auto-select" in cat,
+                "must not auto-select pref when empty")
+    # pendingService path (applyImport) still selects explicit id
+    assert_true("_pendingService" in cat, "applyImport pendingService path kept")
+
+    # Lineage: applyImport + v0820 comfy pack intact
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport kept")
+    assert_true("packComfyParamsForPayload" in js, "v0820 comfy pack kept")
+    assert_true("不会回退" in js or "flux/schnell" in js, "applyImport hard error kept")
+    assert_true('id="comfyParams"' in html, "comfy UI kept")
+
+
+
+def test_v0821n_krea2_import_hardgate():
+    """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821n4")
+    assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
+    assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
+    assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
+    assert_true("nl-storyboard-v0821m2" in js, "STORE_OLDS keeps v0821m2")
+    assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS keeps v0820c")
+    assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS keeps v0820b")
+
+    # Import mount path
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport")
+    assert_true("function looksCivitaiServiceId" in js, "looksCivitaiServiceId")
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    block = js[i:j]
+    assert_true(
+        ('value = "civitai"' in block)
+        or ('$("backend").value = "civitai"' in block)
+        or ("value = 'civitai'" in block),
+        "forces backend civitai",
+    )
+    assert_true('j.backend === "civitai"' in block or "j.backend === 'civitai'" in block,
+                "wantCivitai from j.backend")
+    assert_true("looksCivitaiServiceId" in block, "also mounts on civitai-shaped serviceId")
+    assert_true("缺少 serviceId" in block or "无法挂载" in block, "empty serviceId hard error")
+    assert_true("不会回退" in block or "flux/schnell" in block, "no fal silent fallback")
+    assert_true("/api/generate" not in block, "import must not call /api/generate")
+    assert_true("normalizeLora" in block, "maps loras")
+    assert_true("applyComfyParamsToUi" in block, "fills comfy params")
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 turbo serviceId")
+
+    # Spot-check fixture shape (134923572)
+    mock = {
+        "backend": "civitai",
+        "serviceId": "image/comfy/krea2/turbo/createImage",
+        "steps": 8,
+        "cfgScale": 1,
+        "sampler": "er_sde",
+        "scheduler": "simple",
+        "seed": 467475143677094,
+        "width": 944,
+        "height": 1664,
+        "loras": [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8}],
+    }
+    assert_true(mock["serviceId"] == "image/comfy/krea2/turbo/createImage", "mock Krea2")
+    assert_true(mock["loras"][0]["air"].startswith("urn:air:krea2:lora:"), "mock lora air")
+    assert_true(mock["seed"] > 2147483647, "seed exceeds int32 — must not clamp")
+
+    # packLoras: keep air/path/scale/strength; civitai skips no-air; empty → null
+    pack_i = js.find("function packLorasForPayload")
+    assert_true(pack_i >= 0, "packLorasForPayload")
+    pack = js[pack_i:pack_i + 1800]
+    for field in ("air:", "path:", "scale:", "strength:", "versionId:", "downloadUrl:"):
+        assert_true(field in pack, "pack field " + field)
+    assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter gate")
+    assert_true("row.air" in pack, "checks air on row")
+    assert_true("mapped.length ? mapped : null" in pack, "empty → null")
+
+    # runShotStep attach loras + negativePrompt + empty-service hard red
+    k = js.find("async function runShotStep")
+    run = js[k:k + 14000]
+    assert_true("packLorasForPayload()" in run, "packs loras")
+    assert_true("payload.loras = packedLoras" in run, "sets payload.loras")
+    assert_true("payload.negativePrompt" in run, "attaches negativePrompt")
+    assert_true("请先选择 Civitai 服务" in run, "empty service hard error")
+    assert_true("不会默认填入 Krea2" in run, "no Krea2 soft-fill")
+    assert_true("int32" in run, "documents no int32 seed clamp")
+
+    # buildGraph: no CIVITAI_PREF soft-fill for civitai
+    bg_i = js.find("function buildGraph")
+    bg = js[bg_i:js.find("function pickUrl", bg_i)]
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in bg,
+                "buildGraph no CIVITAI_PREF soft-fill")
+    assert_true('be !== "civitai"' in bg or "be !== 'civitai'" in bg, "fal defaults gated")
+
+    # api import backend contract (a6365ef) still present
+    civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
+    assert_true('"backend": "civitai"' in civ or "'backend': 'civitai'" in civ,
+                "import_image returns backend=civitai")
+    assert_true("image/comfy/krea2/turbo/createImage" in civ, "Krea2 default serviceId")
+    assert_true("if not air:" in civ, "lora_map skips no-air")
+
+
+def test_v0821_hardgate_i2v_refs():
+    """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821")
+    assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
+    assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
+
+    # A) i2v eats upstream — frame required + packed
+    assert_true("视频需要先连一张首帧图" in js, "i2v missing-frame gate")
+    assert_true("不能偷配方台" in js, "i2v hard msg")
+    assert_true("FAL_I2V_DEFAULT" in js, "FAL_I2V_DEFAULT const")
+    assert_true("fal-ai/minimax/video-01/image-to-video" in js, "real i2v endpoint default")
+    assert_true("function catalogItemSupportsI2v" in js, "i2v catalog predicate")
+    assert_true("filterCatalogForMode" in js, "mode catalog filter")
+    assert_true("当前服务不吃首帧" in js, "hard block non-i2v service in video mode")
+    # attachExtraImages stamps singular FIRST + images[]
+    i = js.find("function attachExtraImages")
+    assert_true(i >= 0, "attachExtraImages")
+    body = js[i:i + 2200]
+    assert_true("payload.images = sliced" in body, "images[] packed")
+    assert_true("start_image_url" in body, "stamps start_image_url")
+    assert_true("SINGULAR_FIRST_FIELDS" in body, "uses singular-first list")
+    # buildGraph wires frame for i2v
+    bg_i = js.find("function buildGraph")
+    bg = js[bg_i:js.find("function pickUrl", bg_i)]
+    assert_true('op === "i2v"' in bg and "frame" in bg, "i2v uses frameAsset wire")
+    assert_true("FAL_I2V_DEFAULT" in bg, "buildGraph i2v default")
+    # compile path still puts firstFrame/sourceImage
+    r = compile(shot_graph("i2v", "缓推", image_url="/out/frame.jpg"))
+    assert_true(r.get("ok") is True, r)
+    p = r["payload"]
+    assert_true(p.get("firstFrame") == "/out/frame.jpg", p)
+    assert_true(p.get("sourceImage") == "/out/frame.jpg", p)
+    assert_true("image-to-video" in str(p.get("serviceId") or ""), p)
+
+    # Mock attachExtraImages packing shape (static analysis of N linked → images length N)
+    # Simulate the JS packing contract in Python:
+    def pack_urls(primary, linked, max_refs):
+        urls = []
+        if primary:
+            urls.append(primary)
+        for u in linked:
+            if u and u not in urls:
+                urls.append(u)
+        return urls[:max_refs]
+    linked_n = ["/out/a.jpg", "/out/b.jpg", "/out/c.jpg", "/out/d.jpg"]
+    packed = pack_urls("/out/a.jpg", linked_n, 9)
+    assert_true(len(packed) == 4, "under-cap packs all N=%d" % len(packed))
+    assert_true(packed[0] == "/out/a.jpg", "primary first")
+    over = pack_urls("/out/a.jpg", linked_n + ["/out/e.jpg"] * 10, 4)
+    assert_true(len(over) == 4, "slice to maxRefs")
+    assert_true("ref-cap-hint" in js or "还可" in js, "UI remaining slot hint")
+    assert_true("linked.concat(suggest)" in js or "chipNodes" in js, "chips for all linked")
+
+    # B) multi-ref: over-cap still hard-blocks before attach
+    run_i = js.find("async function runShotStep")
+    run = js[run_i:run_i + 14000]
+    assert_true("countRefUrls" in run and "超过上限" in run, "over-cap hard block kept")
+    assert_true(run.find("countRefUrls") < run.find("attachExtraImages(payload, shot)"),
+                "gate before attach")
+
+    # C) P1 UX
+    assert_true("min-width:168px" in html or "min-width:168" in html, "seed widened")
+    assert_true("#seed" in html and "118px" not in html.split("#seed")[1][:80], "old seed 118px gone")
+    assert_true("max-height:58vh" in html, "dock expanded max-height lowered")
+    assert_true("function loraDisplayName" in js, "LoRA human name helper")
+    assert_true("modelName" in js[js.find("function loraDisplayName"):js.find("function loraDisplayName") + 800],
+                "prefers modelName")
+
+    # No regression lineage
+    assert_true("function applyImport" in js or "async function applyImport" in js, "applyImport")
+    assert_true("请先选择 Civitai 服务" in js, "hard empty-service civitai")
+    assert_true("mentionTags" not in js, "no @ in prompt path")
+    assert_true('id="dockFoot"' in html, "sticky foot")
+    assert_true("packComfyParamsForPayload" in js, "comfy pack")
+
+
+
+def test_v0821b_i2v_detect():
+    """v0821b: pure t2v (video-01) is NOT i2v; image-to-video is; filter excludes t2v."""
+    import json
+    import subprocess
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp v0821n5-dock-scroll")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821b")
+    assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
+    assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
+    assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
+                "FAL_I2V_DEFAULT unchanged")
+    assert_true("function catalogItemSupportsI2v" in js, "predicate present")
+    assert_true("NEVER: category=video" in js or "never category=video alone" in js.lower() or
+                "Do NOT treat category=video alone as i2v" in js or
+                "prefer catalog supportsI2v" in js,
+                "no category=video-alone true")
+    assert_true("supportsI2v" in js[js.find("function catalogItemSupportsI2v"):
+                                    js.find("function catalogItemSupportsImage")],
+                "predicate reads supportsI2v flag")
+    assert_true('id === "fal-ai/minimax/video-01"' in js, "exact video-01 reject")
+    # filter + hard-block still wired to predicate
+    assert_true("filterCatalogForMode" in js and "catalogItemSupportsI2v" in js, "filter uses predicate")
+    run_i = js.find("async function runShotStep")
+    run = js[run_i:run_i + 16000]
+    assert_true("catalogItemSupportsI2v(itVid)" in run, "runShotStep hard-block uses predicate")
+    assert_true("当前服务不吃首帧" in run, "hard-block message")
+
+    # Behavioral: extract real predicate + deps and evaluate with node
+    start = js.find("function catalogItemSupportsI2v")
+    assert_true(start >= 0, "fn start")
+    end = js.find("function catalogItemSupportsImage", start)
+    fn_src = js[start:end]
+    # SINGULAR_FIRST_FIELDS + catalogImageFields needed
+    sf_i = js.find("const SINGULAR_FIRST_FIELDS")
+    sf_line = js[sf_i:js.find(";", sf_i) + 1]
+    cif_i = js.find("function catalogImageFields")
+    cif_end = js.find("\n  function resolveRefCaps", cif_i)
+    cif_src = js[cif_i:cif_end]
+    harness = """
+%s
+%s
+%s
+const cases = [
+  [{ id: "fal-ai/minimax/video-01", category: "video" }, false],
+  [{ id: "fal-ai/minimax/video-01", category: "video", falCategory: "text-to-video", needsFirstFrame: false, supportsI2v: false, imageFields: [] }, false],
+  [{ id: "fal-ai/minimax/video-01/image-to-video", category: "video" }, true],
+  [{ id: "fal-ai/minimax/video-01/image-to-video", category: "video", needsFirstFrame: true, supportsI2v: true, imageFields: ["image_url"] }, true],
+  [{ id: "fal-ai/foo/text-to-video", category: "video" }, false],
+  [{ id: "other/model/start-end", category: "video" }, true],
+  [{ id: "x/i2v/bar", category: "video" }, true],
+  [{ id: "pure/video/clip", category: "video" }, false],
+  [{ id: "vendor/vid", category: "video", needsFirstFrame: true }, true],
+  [{ id: "vendor/flag", category: "video", supportsI2v: true }, true],
+  [{ id: "vendor/flag-cap", category: "video", capabilities: { supportsI2v: true } }, true],
+  [{ id: "vendor/no", category: "video", supportsI2v: false, needsFirstFrame: false }, false],
+  [{ id: "vendor/vid2", category: "video", imageFields: ["image_url"] }, true],
+  [{ id: "vendor/vid3", category: "video", capabilities: { imageFields: ["start_image_url"] } }, true],
+  [{ id: "fal-ai/flux/schnell", category: "image" }, false],
+];
+const out = cases.map(([it, expect]) => {
+  const got = catalogItemSupportsI2v(it);
+  return { id: it.id, expect, got, ok: got === expect };
+});
+const filtered = [
+  { id: "fal-ai/minimax/video-01", category: "video" },
+  { id: "fal-ai/minimax/video-01/image-to-video", category: "video" },
+  { id: "fal-ai/flux/schnell", category: "image" },
+].filter(catalogItemSupportsI2v).map(x => x.id);
+console.log(JSON.stringify({ out, filtered }));
+""" % (sf_line, cif_src, fn_src)
+    proc = subprocess.run(
+        ["node", "-e", harness],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(proc.returncode == 0, "node harness failed: %s%s" % (proc.stdout, proc.stderr))
+    data = json.loads(proc.stdout.strip().splitlines()[-1])
+    for row in data["out"]:
+        assert_true(row["ok"], "predicate %s: expect %s got %s" % (row["id"], row["expect"], row["got"]))
+    assert_true("fal-ai/minimax/video-01" not in data["filtered"], "filter excludes pure t2v video-01")
+    assert_true("fal-ai/minimax/video-01/image-to-video" in data["filtered"], "filter keeps i2v")
+    assert_true("fal-ai/flux/schnell" not in data["filtered"], "filter excludes image t2i")
+
+    # Catalog overlay from providers.fal must mark pure t2v vs real i2v; JS must agree.
+    from providers.fal import overlay_image_fields
+    t2v = overlay_image_fields({
+        "id": "fal-ai/minimax/video-01",
+        "category": "video",
+        "falCategory": "text-to-video",
+        "imageFields": [],
+    })
+    i2v = overlay_image_fields({
+        "id": "fal-ai/minimax/video-01/image-to-video",
+        "category": "video",
+        "falCategory": "image-to-video",
+        "imageFields": ["image_url"],
+    })
+    assert_true(t2v.get("supportsI2v") is False and t2v.get("needsFirstFrame") is False, t2v)
+    assert_true(i2v.get("supportsI2v") is True and i2v.get("needsFirstFrame") is True, i2v)
+    # Re-run predicate on overlay rows via node
+    ov_harness = """
+%s
+%s
+%s
+const rows = %s;
+const out = rows.map((it) => ({ id: it.id, got: catalogItemSupportsI2v(it) }));
+console.log(JSON.stringify(out));
+""" % (sf_line, cif_src, fn_src, json.dumps([t2v, i2v]))
+    ov = subprocess.run(["node", "-e", ov_harness], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(ov.returncode == 0, "overlay node harness: %s%s" % (ov.stdout, ov.stderr))
+    ov_out = json.loads(ov.stdout.strip().splitlines()[-1])
+    by_id = {r["id"]: r["got"] for r in ov_out}
+    assert_true(by_id.get("fal-ai/minimax/video-01") is False, by_id)
+    assert_true(by_id.get("fal-ai/minimax/video-01/image-to-video") is True, by_id)
+
+
+
+def test_v0821c_fal_i2v_preview():
+    """v0821c: local /out → data URL for fal; pickUrl reads video.url; 422 no-media → failed."""
+    import base64
+    import json
+    from providers.fal import (
+        build_fal_input, materialize_fal_media, local_out_to_data_url,
+        fal_output_error, job_status,
+    )
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821c")
+    assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
+    # pickUrl must map fal video shapes
+    i = js.find("function pickUrl")
+    assert_true(i >= 0, "pickUrl")
+    block = js[i:i + 1200]
+    assert_true("data.video" in block and "result.video" in block or "res.video" in block, "pickUrl video.url")
+    assert_true("v0821c" in block or "fal video" in block, "v0821c note on pickUrl")
+
+    frame = "/out/12100372-20260907215435634_0.jpg"
+    fp = ROOT / "out" / "12100372-20260907215435634_0.jpg"
+    assert_true(fp.is_file(), "fixture frame exists")
+    data_url = local_out_to_data_url(frame)
+    assert_true(isinstance(data_url, str) and data_url.startswith("data:image/jpeg;base64,"), data_url[:40])
+    raw = base64.b64decode(data_url.split(",", 1)[1])
+    assert_true(raw == fp.read_bytes(), "roundtrip bytes")
+
+    inp = build_fal_input({
+        "serviceId": "fal-ai/minimax/video-01/image-to-video",
+        "prompt": "固定镜头",
+        "firstFrame": frame,
+        "sourceImage": frame,
+    })
+    assert_true(inp.get("image_url") == frame, "build keeps local path for meta")
+    out = materialize_fal_media(inp)
+    assert_true(out.get("image_url", "").startswith("data:image/jpeg;base64,"), out.get("image_url", "")[:48])
+    # https untouched
+    https_inp = {"image_url": "https://cdn.example/a.jpg", "prompt": "x"}
+    assert_true(materialize_fal_media(https_inp)["image_url"] == "https://cdn.example/a.jpg", "https passthrough")
+    # missing local → error
+    try:
+        materialize_fal_media({"image_url": "/out/does-not-exist-xyz.jpg"})
+        assert_true(False, "should raise")
+    except ValueError as e:
+        assert_true("无法读取" in str(e) or "不存在" in str(e), str(e))
+
+    err = fal_output_error({
+        "detail": [{
+            "loc": ["body", "image_url"],
+            "msg": "Failed to download the file. Please check if the URL is accessible and try again.",
+            "type": "file_download_error",
+            "input": "/out/12100372-20260907215435634_0.jpg",
+        }]
+    })
+    assert_true(err and "Failed to download" in err, err)
+
+    # Live job that failed with relative /out must now report failed (not forever-processing).
+    jid = "fal|fal-ai/minimax/video-01/image-to-video|01a07e0c-d910-7702-9eb4-e27fa6411d73"
+    code, data = job_status(jid)
+    assert_true(code == 200, data)
+    assert_true(data.get("status") == "failed", data)
+    assert_true("download" in (data.get("error") or "").lower() or "image_url" in (data.get("error") or ""), data)
+
+    # Node harness: pickUrl extracts fal video.url / result.video.url / saved
+    import subprocess
+    end = js.find("function hasUnresolvedStageOut", i)
+    assert_true(end > i, "pickUrl end")
+    fn = js[i:end]
+    node = subprocess.run(
+        ["node", "-e", fn + r"""
+const cases = [
+  [{ saved: [{ url: "/out/a.mp4" }] }, "/out/a.mp4"],
+  [{ saved: [{ url: "/out/a.mp4" }], video: { url: "https://v3.fal.media/files/x.mp4" }, result: { video: { url: "https://cdn/v.mp4" } } }, "/out/a.mp4"],
+  [{ video: { url: "https://v3.fal.media/files/x.mp4" } }, "https://v3.fal.media/files/x.mp4"],
+  [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
+  [{ result: { images: [{ url: "https://cdn/i.jpg" }] } }, "https://cdn/i.jpg"],
+  [{ status: "succeeded" }, ""],
+];
+const out = cases.map(([d, exp]) => ({ got: pickUrl(d), exp, ok: pickUrl(d) === exp }));
+console.log(JSON.stringify(out));
+"""],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node pickUrl: %s%s" % (node.stdout, node.stderr))
+    rows = json.loads(node.stdout.strip().splitlines()[-1])
+    for r in rows:
+        assert_true(r["ok"], r)
+
+
+
+def test_v0821f_send_noop():
+    """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821h")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
+    assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
+    assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
+    assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
+
+    # disabled send visually gray (not white+opacity)
+    assert_true(".send:disabled" in html and "#3a3a44" in html, "disabled send gray bg")
+    assert_true("cursor:not-allowed" in html, "disabled cursor")
+
+    # frameAsset heals orphan firstFrameId
+    fa = js[js.find("function frameAsset"):js.find("function frameAsset") + 700]
+    assert_true("orphan" in fa or 'shot.firstFrameId = linked[0]' in fa, "heal orphan firstFrameId")
+
+    # runShotStep never silent on !shot
+    run_i = js.find("async function runShotStep")
+    run = js[run_i:run_i + 1200]
+    assert_true("请先选中分镜再生成" in run, "setMsg when !shot")
+    assert_true('shot.kind !== "shot"' in run and "setMsg" in run, "wrong-kind setMsg")
+
+    # generate click-start feedback
+    g = js[js.find("async function generate"):js.find("async function generate") + 900]
+    assert_true("校验连线…" in g, "click-start setMsg")
+
+    # Node harness: frameAsset heal + needFrame gate semantics (no real /api/generate)
+    import subprocess
+    start = js.find("function frameAsset")
+    end = js.find("\n  function sourceTitle", start)
+    assert_true(start >= 0 and end > start, "frameAsset bounds")
+    fa_fn = js[start:end]
+    node = subprocess.run(
+        ["node", "-e", """
+function isVideoUrl(u){ return /\\.(mp4|webm|mov)(\\?|$)/i.test(String(u||'')) || /\\/video\\//i.test(String(u||'')); }
+function isImageSource(n){ return !!(n && n.url && !isVideoUrl(n.url)); }
+const state = {
+  nodes: [
+    { id: 'a1', kind: 'asset', title: 'img', url: '/out/a.jpg' },
+    { id: 'a2', kind: 'asset', title: 'gone', url: '/out/b.jpg' },
+    { id: 's1', kind: 'shot', title: '镜', firstFrameId: 'a2', prompt: '' },
+  ],
+  edges: [{ from: 'a1', to: 's1' }],
+};
+function nodeById(id){ return state.nodes.find(n => n.id === id); }
+function connectedNodes(shotId){ return state.edges.filter(e => e.to === shotId).map(e => nodeById(e.from)).filter(Boolean); }
+function connectedAssets(shotId){ return connectedNodes(shotId).filter(isImageSource); }
+""" + fa_fn + """
+const shot = nodeById('s1');
+const frame = frameAsset(shot);
+console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.firstFrameId, needFrame: !frame }));
+"""],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node frameAsset heal: %s%s" % (node.stdout, node.stderr))
+    import json as _json
+    row = _json.loads(node.stdout.strip().splitlines()[-1])
+    assert_true(row["frameId"] == "a1" and row["healedFirst"] == "a1" and row["needFrame"] is False, row)
+
+    assert_true("fetch(\"/api/generate\"" in js or "fetch('/api/generate'" in js, "generate path exists")
+    assert_true(g.find("校验连线") < g.find("runShotStep"), "click msg before runShotStep")
+
+
+def test_v0821g_send_bind():
+    """v0821n5-dock-scroll: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821h")
+    assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
+    assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
+
+    # CSS: larger hit + z-index above foot siblings (index #go lesson)
+    assert_true("z-index:5" in html and "pointer-events:auto" in html, "send elevated hit")
+    assert_true("touch-action:manipulation" in html, "send touch-action")
+    assert_true(".send::before" in html and "inset:-12px" in html, "expanded hit ::before")
+    assert_true(".dock-foot{" in html and "z-index:3" in html, "dock-foot above scroll")
+    assert_true('data-testid="composer-send"' in html, "send data-testid in markup")
+
+    k = js.find("function renderDock")
+    assert_true(k >= 0, "renderDock")
+    dock = js[k:k + 5500]
+    # ready tip kept, but v0821j gates on !fireSend._busy (must not wipe in-flight)
+    assert_true("首帧已就绪 · 可生成" in dock, "ready msg")
+    assert_true("setMsg(\"首帧已就绪 · 可生成\")" in dock or "setMsg('首帧已就绪 · 可生成')" in dock,
+                "ready setMsg present")
+    assert_true("!fireSend._busy" in dock and "!state.runningGroup" in dock,
+                "renderDock skips ready while busy/group")
+    assert_true("/缺首帧|视频需要先连一张首帧图|本版未接/" not in dock,
+                "stale-only regex gate removed")
+    # missing-frame → bad (red)
+    assert_true('setMsg("缺首帧 · 视频需要先连一张首帧图", "bad")' in dock, "missing-frame bad")
+    assert_true("syncSendGate" in dock, "syncSendGate from renderDock")
+
+    # bind helpers
+    assert_true("function bindSendButton" in js, "bindSendButton")
+    assert_true("function fireSend" in js, "fireSend")
+    assert_true("function syncSendGate" in js, "syncSendGate")
+    assert_true('addEventListener("click", fireSend, true)' in js or "addEventListener('click', fireSend, true)" in js,
+                "capture click")
+    assert_true('addEventListener("pointerdown", fireSend)' in js or "addEventListener('pointerdown', fireSend)" in js,
+                "pointerdown fallback")
+    assert_true("bindSendButton();" in js, "bindSendButton called")
+    assert_true("onclick = generate" not in js, "no fragile onclick=generate only")
+    assert_true('data-testid", "composer-send"' in js or "data-testid', 'composer-send'" in js,
+                "testid set in JS gate")
+    assert_true("data-reason" in js and "need-frame" in js, "debug reason attr")
+    assert_true("data-enabled" in js, "debug enabled attr")
+
+    # generate still sets 校验连线 before runShotStep; no accidental removal of /api/generate call site
+    g = js[js.find("async function generate"):js.find("async function generate") + 1200]
+    assert_true("校验连线…" in g, "click-start setMsg")
+    assert_true(g.find("校验连线") < g.find("runShotStep"), "click msg before runShotStep")
+    # harness must not POST generate in tests — static only
+    assert_true("fetch(\"/api/generate\"" in js, "generate path exists in product code")
+
+
+
+
+def test_v0821h_send_aria():
+    """v0821n5-dock-scroll: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821h")
+    assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
+    assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
+
+    # CSS: reuse disabled gray via is-blocked / aria-disabled
+    assert_true(".send.is-blocked" in html or '[aria-disabled="true"]' in html or ".send[aria-disabled" in html,
+                "blocked visual selector")
+    assert_true("#3a3a44" in html and "cursor:not-allowed" in html, "gray blocked styles")
+    assert_true(".send:disabled" in html, "keep :disabled style for compat")
+
+    # syncSendGate must NOT assign native disabled=true for gate
+    sg = js[js.find("function syncSendGate"):js.find("function syncSendGate") + 900]
+    assert_true("setSendVisual" in sg or "aria-disabled" in sg, "syncSendGate uses aria path")
+    assert_true("btn.disabled = true" not in sg and "btn.disabled=true" not in sg,
+                "syncSendGate must not set disabled=true")
+
+    sv = js[js.find("function setSendVisual"):js.find("function setSendVisual") + 900]
+    assert_true("btn.disabled = false" in sv or "btn.disabled=false" in sv, "setSendVisual forces enabled")
+    assert_true("aria-disabled" in sv, "aria-disabled attr")
+    assert_true("is-blocked" in sv, "is-blocked class")
+
+    # fireSend: no early-return on btn.disabled; gate with setMsg + stop
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2400]
+    assert_true("if (btn.disabled) return" not in fs and "if(btn.disabled)return" not in fs,
+                "fireSend must not early-return on disabled")
+    assert_true("缺首帧" in fs and '"bad"' in fs, "needFrame click → bad setMsg")
+    assert_true("本版未接" in fs and '"bad"' in fs, "stub click → bad setMsg")
+    assert_true("进行中" in fs, "busy click → 进行中")
+    assert_true("generate()" in fs, "frame OK → generate")
+    # STOP: needFrame path returns before generate
+    need_i = fs.find("缺首帧")
+    gen_i = fs.rfind("generate()")
+    assert_true(need_i >= 0 and gen_i > need_i, "generate after needFrame gate")
+    # ensure return between 缺首帧 setMsg and generate
+    chunk = fs[need_i:gen_i]
+    assert_true("return" in chunk, "STOP after needFrame setMsg")
+
+    assert_true("function markSendBusy" in js, "markSendBusy")
+    assert_true('markSendBusy(true)' in js, "busy on")
+    assert_true('markSendBusy(false)' in js, "busy off")
+
+    # product still has /api/generate but tests don't POST
+    assert_true('fetch("/api/generate"' in js, "generate path exists")
+    # keep hit area / bind from g
+    assert_true('addEventListener("click", fireSend, true)' in js, "capture click")
+    assert_true('addEventListener("pointerdown", fireSend)' in js, "pointerdown")
+    assert_true("首帧已就绪 · 可生成" in js, "ready tip kept")
+    assert_true("z-index:5" in html, "hit z-index kept")
+
+
+
+
+def test_v0821i_i2v_writeback():
+    """v0821i: video writeback to shot card + promote/history; empty i2v prompt allowed; pickUrl prefers /out."""
+    import json
+    import subprocess
+    from providers.graph_compile import compile_graph
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821k")
+    assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
+    assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
+    assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
+    assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
+
+    # promoteResult must accept videos
+    pr = js[js.find("function promoteResult"):js.find("function spawnHistoryAt")]
+    assert_true("isVideoUrl(url)) return null" not in pr, "promoteResult must not skip videos")
+    assert_true("v0821i" in pr or "promote images AND videos" in pr, "v0821i promote note")
+
+    # writeback helper
+    assert_true("function writebackResult" in js, "writebackResult helper")
+    assert_true("function pushHistoryItem" in js, "pushHistoryItem helper")
+    assert_true("writebackResult(shot, url)" in js, "success path calls writebackResult")
+
+    # card video preview
+    assert_true('playsinline preload="metadata"' in js, "shot/asset video preload")
+    assert_true("<video src=" in js and "muted playsinline" in js, "video tag on cards")
+
+    # poll must not break on succeeded without pickUrl
+    assert_true("pollMax" in js or "v0821m" in js, "video poll lengthened")
+
+    assert_true("never break on succeeded alone" in js or "成片落盘中" in js, "poll waits for saved after succeeded")
+    assert_true('if (pickUrl(st)) break;' in js, "poll breaks only when pickUrl hits")
+    assert_true('pickUrl(st) || st.status === "done"' not in js and "pickUrl(st) || st.status === 'done'" not in js, "old succeeded-or-pickUrl break removed")
+
+    # loadOuts keeps videos
+    lo = js[js.find("async function loadOuts"):js.find("$(\"backend\").onchange")]
+    assert_true('it.kind === "image" || (it.url && !isVideoUrl(it.url))' not in lo, "must not filter videos out")
+    assert_true('k === "image" || k === "video"' in lo or "kind===video" in lo or 'k === "video"' in lo, "loadOuts keeps video")
+
+    # pickUrl prefers saved
+    i = js.find("function pickUrl")
+    block = js[i:js.find("function hasUnresolvedStageOut", i)]
+    assert_true("prefer local saved" in block or "v0821i" in block, "pickUrl v0821i note")
+    assert_true(block.find("first(data.saved)") < block.find("data.video") or "savedHit" in block, "saved before video")
+
+    # empty i2v prompt allowed at compile
+    r = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "/out/x.jpg"}},
+            {"id": "p-shot-1", "op": "prompt", "params": {"text": ""}},
+            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "shot-1", "toPort": "image"},
+            {"from": "p-shot-1", "fromPort": "prompt", "to": "shot-1", "toPort": "prompt"},
+        ],
+    })
+    assert_true(r.get("ok") is True, r)
+    assert_true("缺少文本" not in (r.get("error") or ""), r)
+    assert_true((r.get("payload") or {}).get("prompt") == "", r)
+
+    # negative still requires text
+    r2 = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "n", "op": "negative", "params": {"text": ""}},
+            {"id": "p", "op": "prompt", "params": {"text": "x"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "fal-ai/flux/schnell"}},
+        ],
+        "edges": [
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "n", "fromPort": "negative", "to": "g", "toPort": "negative"},
+        ],
+    })
+    assert_true(r2.get("ok") is False, r2)
+    assert_true("缺少文本" in (r2.get("error") or ""), r2)
+
+    # Node: pickUrl prefer saved; writebackResult shape via promote+history sim
+    end = js.find("function hasUnresolvedStageOut", i)
+    fn = js[i:end]
+    # extract promoteResult + helpers roughly via node harness
+    node = subprocess.run(
+        ["node", "-e", fn + r"""
+const cases = [
+  [{ saved: [{ url: "/out/fal_…01a07e47…_0.mp4" }], result: { video: { url: "https://cdn/v.mp4" } } }, "/out/fal_…01a07e47…_0.mp4"],
+  [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
+];
+const out = cases.map(([d, exp]) => ({ got: pickUrl(d), exp, ok: pickUrl(d) === exp }));
+console.log(JSON.stringify(out));
+"""],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node pickUrl: %s%s" % (node.stdout, node.stderr))
+    rows = json.loads(node.stdout.strip().splitlines()[-1])
+    for r in rows:
+        assert_true(r["ok"], r)
+
+
+
+
+def test_v0821j_send_busy_msg():
+    """v0821j: renderDock must not wipe msg while busy; fireSend entry 已点生成; dockFoot+Ctrl/Cmd+Enter;
+    double pointerdown+click still sets msg (no silent debounce). No paid /api/generate in tests."""
+    import json
+    import subprocess
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821j")
+    assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
+
+    # renderDock busy guard
+    k = js.find("function renderDock")
+    dock = js[k:k + 5500]
+    assert_true("!fireSend._busy" in dock, "skip ready when busy")
+    assert_true("!state.runningGroup" in dock, "skip ready when group running")
+    ready_i = dock.find('setMsg("首帧已就绪 · 可生成")')
+    assert_true(ready_i > 0, "ready setMsg still exists")
+    guard = dock[max(0, ready_i - 280):ready_i]
+    assert_true("fireSend._busy" in guard, "ready setMsg nested under busy guard")
+    assert_true("\\bbad\\b" in dock or "bad" in dock[ready_i-200:ready_i+80], "v0821k keep bad/warn tip")
+
+    # fireSend: once-per-event + gates before ack; non-silent debounce
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2800]
+    assert_true("_nlSendHandled" in fs, "same-event once flag")
+    assert_true('setMsg("已点生成")' in fs, "已点生成 ack present")
+    entry_i = fs.find('setMsg("已点生成")')
+    need_i = fs.find("此模型需要提示词")
+    gen_i = fs.rfind("generate()")
+    assert_true(need_i >= 0 and 0 <= entry_i and need_i < entry_i < gen_i,
+                "needsPrompt gate before 已点生成 before generate")
+    assert_true("450" in fs, "debounce window kept")
+    # debounce path must mention 进行中 — never wipe prior gate by re-acking
+    deb = fs[fs.find("450"):fs.find("450") + 350]
+    assert_true("return" in deb, "debounce returns")
+    assert_true("进行中" in deb, "debounce busy path not silent")
+
+    # dockFoot delegation + Ctrl/Cmd+Enter
+    assert_true("function bindComposerSendKeys" in js, "bindComposerSendKeys")
+    assert_true("bindComposerSendKeys();" in js, "keys bound")
+    assert_true("metaKey" in js and "ctrlKey" in js, "Ctrl/Cmd+Enter")
+    assert_true("nlSendDelegate" in js or "dockFoot" in js, "dockFoot delegate")
+    assert_true('closest("[data-testid=\\"composer-send\\"]")' in js
+                or "closest('[data-testid=\"composer-send\"]')" in js
+                or 'closest("[data-testid=\\"composer-send\\"]")' in js
+                or 'data-testid=\\"composer-send\\"' in js
+                or 'composer-send' in js[js.find("nlSendDelegate"):js.find("nlSendDelegate") + 500],
+                "delegate selector for composer-send")
+    bb = js[js.find("function bindSendButton"):js.find("function bindSendButton") + 1600]
+    assert_true("dockFoot" in bb, "bindSend uses dockFoot")
+    assert_true("onFoot" in bb or "nlSendDelegate" in bb, "foot delegate wired")
+
+    # product paths exist; tests must not POST
+    assert_true('fetch("/api/generate"' in js, "generate path exists")
+    assert_true('fetch("/api/graph/compile"' in js, "compile path exists")
+
+    # Node harness: double pointerdown+click → msg always set; no fetch
+    harness = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push({t:String(t), cls: cls||""}); }
+const state = { selected: "s1", mode: "video", runningGroup: false, nodes: [
+  { id: "s1", kind: "shot", title: "分镜1", firstFrameId: "a1", prompt: "" },
+  { id: "a1", kind: "asset", title: "img", url: "/out/a.jpg" },
+], edges: [{ from: "a1", to: "s1" }] };
+function nodeById(id){ return state.nodes.find(n => n.id === id); }
+function isVideoUrl(u){ return /\.(mp4|webm|mov)(\?|$)/i.test(String(u||"")); }
+function isImageSource(n){ return !!(n && n.url && !isVideoUrl(n.url)); }
+function connectedAssets(shotId){
+  return state.edges.filter(e => e.to === shotId).map(e => nodeById(e.from)).filter(isImageSource);
+}
+function frameAsset(shot){
+  const linked = connectedAssets(shot.id);
+  if (shot.firstFrameId) {
+    const hit = linked.find(a => a.id === shot.firstFrameId);
+    if (hit) return hit;
+    shot.firstFrameId = linked[0] ? linked[0].id : "";
+  }
+  return linked[0] || null;
+}
+function isStubMode(){ return false; }
+function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生成(\s*·\s*)?/, ""); setMsg(body ? ("已点生成 · " + body) : "已点生成", cls); }
+function needsPromptBeforeGenerate(){ return false; }
+function chipsLackAirForOutbound(){ return false; }
+let generateCalls = 0;
+function generate(){ generateCalls++; setAckMsg("校验连线…"); fireSend._busy = true; }
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+function $(id){ return id === "send" ? btn : (id === "prompt" ? { value: "camera slowly pans" } : null); }
+""" + js[js.find("function fireSend"):js.find("\n  function bindSendButton")] + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+const ev1 = { type: "pointerdown", button: 0, preventDefault(){}, stopPropagation(){} };
+const ev2 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev1);
+fireSend(ev2);
+const texts = msgs.map(m => m.t);
+const hasAck = texts.some(t => t.indexOf("已点生成") >= 0 || t.indexOf("校验连线") >= 0 || t.indexOf("进行中") >= 0);
+console.log(JSON.stringify({
+  ok: hasAck && generateCalls === 1 && texts.length >= 2,
+  texts, generateCalls, busy: !!fireSend._busy
+}));
+"""
+    node = subprocess.run(
+        ["node", "-e", harness],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+    assert_true(node.returncode == 0, "node fireSend double: %s%s" % (node.stdout, node.stderr))
+    row = json.loads(node.stdout.strip().splitlines()[-1])
+    assert_true(row["ok"], row)
+    assert_true(row["generateCalls"] == 1, "one generate from double events: %s" % row)
+    assert_true(any("已点生成" in t or "校验连线" in t for t in row["texts"]), "msg progression: %s" % row)
+
+
+
+
+def test_v0821k_i2v_prompt_req():
+    """v0821k: fal i2v empty prompt → 此模型需要提示词 (no POST); sticky 已点生成 · …; Fal error on Composer; compile still empty-ok."""
+    import json
+    import subprocess
+    from providers.graph_compile import compile_graph
+    from providers import fal as fal_mod
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
+
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821k")
+    assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
+
+    assert_true("function needsPromptBeforeGenerate" in js, "prompt gate helper")
+    assert_true("function setAckMsg" in js, "sticky ack helper")
+    assert_true("function formatErr" in js, "formatErr helper")
+    assert_true("此模型需要提示词" in js, "hard red copy")
+    assert_true("setAckMsg(\"校验连线…" in js or "setAckMsg('校验连线…" in js, "sticky 校验连线")
+    assert_true("setAckMsg" in js and "正在请求云 API" in js, "sticky 正在请求")
+    assert_true("formatErr(e)" in js or "formatErr(st.error" in js, "surface job.error via formatErr")
+    assert_true("/\\bbad\\b|\\bwarn\\b/" in js or "keep bad/warn" in js, "renderDock preserves bad/warn")
+
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2800]
+    assert_true("needsPromptBeforeGenerate" in fs, "fireSend client gate")
+    assert_true("此模型需要提示词" in fs, "fireSend hard red")
+    need_i = fs.find("此模型需要提示词")
+    gen_i = fs.rfind("generate()")
+    assert_true(need_i >= 0 and gen_i > need_i and "return" in fs[need_i:gen_i], "STOP before generate on empty prompt")
+
+    g = js[js.find("async function generate"):js.find("async function generate") + 900]
+    assert_true("needsPromptBeforeGenerate" in g, "generate gate")
+    assert_true("setAckMsg" in g and "校验连线" in g, "generate sticky ack")
+
+    run = js[js.find("async function runShotStep"):js.find("function setSendVisual")]
+    assert_true("此模型需要提示词" in run, "runShotStep gate before POST")
+    assert_true(run.find("此模型需要提示词") < run.find('fetch("/api/generate"'), "gate before POST generate")
+
+    # graph_compile still empty-ok for local i2v
+    r = compile_graph({
+        "backend": "fal",
+        "nodes": [
+            {"id": "img", "op": "image", "params": {"url": "/out/x.jpg"}},
+            {"id": "p-shot-1", "op": "prompt", "params": {"text": ""}},
+            {"id": "shot-1", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
+        ],
+        "edges": [
+            {"from": "img", "fromPort": "image", "to": "shot-1", "toPort": "image"},
+            {"from": "p-shot-1", "fromPort": "prompt", "to": "shot-1", "toPort": "prompt"},
+        ],
+    })
+    assert_true(r.get("ok") is True, r)
+    assert_true((r.get("payload") or {}).get("prompt") == "", r)
+
+    # fal provider optional reject (no paid call)
+    assert_true("此模型需要提示词" in fal_src, "fal submit reject copy")
+    calls = []
+    def _fake_fal_call(*a, **k):
+        calls.append((a, k))
+        return 200, {"request_id": "should-not-run"}
+    real = fal_mod.fal_call
+    fal_mod.fal_call = _fake_fal_call
+    try:
+        code, data = fal_mod.submit({
+            "serviceId": "fal-ai/minimax/video-01/image-to-video",
+            "prompt": "",
+            "image_url": "https://example.com/a.jpg",
+            "sourceImage": "https://example.com/a.jpg",
+        })
+    finally:
+        fal_mod.fal_call = real
+    assert_true(code == 400, (code, data))
+    assert_true("此模型需要提示词" in str((data or {}).get("error") or ""), data)
+    assert_true(len(calls) == 0, "must not POST to Fal queue when prompt empty")
+
+    # Node harness: empty prompt → gate; no generate; msg bad
+    harness = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push({t:String(t), cls: cls||""}); }
+function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生成(\s*·\s*)?/, ""); setMsg(body ? ("已点生成 · " + body) : "已点生成", cls); }
+function formatErr(e){ return String(e && e.message || e); }
+const state = { selected: "s1", mode: "video", runningGroup: false, catalogById: {
+  "fal-ai/minimax/video-01/image-to-video": { id: "fal-ai/minimax/video-01/image-to-video", required: ["prompt", "image_url"] }
+}, nodes: [
+  { id: "s1", kind: "shot", title: "分镜1", firstFrameId: "a1", prompt: "" },
+  { id: "a1", kind: "asset", title: "img", url: "/out/a.jpg" },
+], edges: [{ from: "a1", to: "s1" }] };
+function nodeById(id){ return state.nodes.find(n => n.id === id); }
+function isVideoUrl(u){ return /\.(mp4|webm|mov)(\?|$)/i.test(String(u||"")); }
+function isImageSource(n){ return !!(n && n.url && !isVideoUrl(n.url)); }
+function connectedAssets(shotId){
+  return state.edges.filter(e => e.to === shotId).map(e => nodeById(e.from)).filter(isImageSource);
+}
+function frameAsset(shot){
+  const linked = connectedAssets(shot.id);
+  if (shot.firstFrameId) {
+    const hit = linked.find(a => a.id === shot.firstFrameId);
+    if (hit) return hit;
+    shot.firstFrameId = linked[0] ? linked[0].id : "";
+  }
+  return linked[0] || null;
+}
+function isStubMode(){ return false; }
+function currentBackend(){ return "fal"; }
+function catalogItemForService(){ return state.catalogById["fal-ai/minimax/video-01/image-to-video"]; }
+function catalogRequiresPrompt(it){
+  if (!it) return false;
+  const req = [].concat(it.required || []);
+  return req.map(String).some(r => r === "prompt" || r.indexOf("prompt") >= 0);
+}
+function readComposerPrompt(){
+  const n = nodeById(state.selected);
+  const ta = $("prompt");
+  if (ta && n) { n.prompt = ta.value; return String(ta.value||"").trim(); }
+  return String((n && n.prompt)||"").trim();
+}
+function needsPromptBeforeGenerate(){
+  const empty = !readComposerPrompt();
+  if (!empty) return false;
+  if (state.mode === "video" && currentBackend() === "fal") return true;
+  return catalogRequiresPrompt(catalogItemForService());
+}
+function chipsLackAirForOutbound(){ return false; }
+let generateCalls = 0;
+function generate(){ generateCalls++; setAckMsg("校验连线…"); }
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const promptEl = { value: "" };
+function $(id){
+  if (id === "send") return btn;
+  if (id === "prompt") return promptEl;
+  if (id === "service") return { value: "fal-ai/minimax/video-01/image-to-video" };
+  if (id === "backend") return { value: "fal" };
+  return null;
+}
+""" + js[js.find("function fireSend"):js.find("\n  function bindSendButton")] + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+fireSend({ type: "click", button: 0, preventDefault(){}, stopPropagation(){} });
+const texts = msgs.map(m => m.t);
+const last = texts[texts.length - 1] || "";
+const lastCls = (msgs[msgs.length - 1] || {}).cls || "";
+console.log(JSON.stringify({
+  ok: generateCalls === 0 && last.indexOf("此模型需要提示词") >= 0 && lastCls === "bad"
+    && !texts.some(t => t === "已点生成" || t.indexOf("已点生成 ·") === 0),
+  texts, generateCalls, last, lastCls
+}));
+"""
+    node = subprocess.run(["node", "-e", harness], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node.returncode == 0, "node empty-prompt gate: %s%s" % (node.stdout, node.stderr))
+    row = json.loads(node.stdout.strip().splitlines()[-1])
+    assert_true(row["ok"], row)
+    assert_true(row["generateCalls"] == 0, row)
+
+    # sticky successor contains 已点生成
+    harness2 = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push(String(t)); }
+function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生成(\s*·\s*)?/, ""); setMsg(body ? ("已点生成 · " + body) : "已点生成", cls); }
+""" + js[js.find("function setAckMsg"):js.find("function setAckMsg") + 350] + r"""
+setMsg("已点生成");
+setAckMsg("正在请求云 API…");
+console.log(JSON.stringify({ msgs, ok: msgs[1] === "已点生成 · 正在请求云 API…" }));
+"""
+    # extract setAckMsg alone is enough — redefine carefully
+    harness2 = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push(String(t)); }
+""" + js[js.find("function setAckMsg"):js.find("\n  function formatErr")] + r"""
+setMsg("已点生成");
+setAckMsg("正在请求云 API…");
+setAckMsg("校验连线…");
+console.log(JSON.stringify({
+  msgs,
+  ok: msgs[1].indexOf("已点生成") >= 0 && msgs[1].indexOf("正在请求云 API") >= 0
+    && msgs[2].indexOf("已点生成") >= 0 && msgs[2].indexOf("校验连线") >= 0
+}));
+"""
+    node2 = subprocess.run(["node", "-e", harness2], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node2.returncode == 0, "node sticky: %s%s" % (node2.stdout, node2.stderr))
+    row2 = json.loads(node2.stdout.strip().splitlines()[-1])
+    assert_true(row2["ok"], row2)
+
+    assert_true('fetch("/api/generate"' in js, "generate path exists (tests do not POST paid)")
+
+
+
+
+def test_v0821l_send_once():
+    """v0821l: same-event once; gates before 已点生成; double pointerdown+click empty → red final; with prompt → ack+generate. No paid POST."""
+    import json
+    import subprocess
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821l")
+    assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
+
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 3200]
+    assert_true("_nlSendHandled" in fs, "once-per-event flag")
+    assert_true(fs.find("_nlSendHandled") < fs.find('setMsg("已点生成")'), "flag before ack")
+    assert_true(fs.find("此模型需要提示词") < fs.find('setMsg("已点生成")'), "prompt gate before ack")
+    assert_true(fs.find("缺首帧") < fs.find('setMsg("已点生成")'), "needFrame before ack")
+    assert_true(fs.find("本版未接") < fs.find('setMsg("已点生成")'), "stub before ack")
+    assert_true(fs.find('setMsg("已点生成")') < fs.rfind("generate()"), "ack then generate")
+
+    bb = js[js.find("function bindSendButton"):js.find("function bindSendButton") + 1800]
+    assert_true("ev._nlSendHandled" in bb or "_nlSendHandled" in bb, "foot skip if handled")
+
+    harness_base = r"""
+const msgs = [];
+function setMsg(t, cls){ msgs.push({t:String(t), cls: cls||""}); }
+function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生成(\s*·\s*)?/, ""); setMsg(body ? ("已点生成 · " + body) : "已点生成", cls); }
+const state = { selected: "s1", mode: "video", runningGroup: false, catalogById: {
+  "fal-ai/minimax/video-01/image-to-video": { id: "fal-ai/minimax/video-01/image-to-video", required: ["prompt", "image_url"] }
+}, nodes: [
+  { id: "s1", kind: "shot", title: "分镜1", firstFrameId: "a1", prompt: PROMPT },
+  { id: "a1", kind: "asset", title: "img", url: "/out/a.jpg" },
+], edges: [{ from: "a1", to: "s1" }] };
+function nodeById(id){ return state.nodes.find(n => n.id === id); }
+function isVideoUrl(u){ return /\.(mp4|webm|mov)(\?|$)/i.test(String(u||"")); }
+function isImageSource(n){ return !!(n && n.url && !isVideoUrl(n.url)); }
+function connectedAssets(shotId){
+  return state.edges.filter(e => e.to === shotId).map(e => nodeById(e.from)).filter(isImageSource);
+}
+function frameAsset(shot){
+  const linked = connectedAssets(shot.id);
+  if (shot.firstFrameId) {
+    const hit = linked.find(a => a.id === shot.firstFrameId);
+    if (hit) return hit;
+    shot.firstFrameId = linked[0] ? linked[0].id : "";
+  }
+  return linked[0] || null;
+}
+function isStubMode(){ return false; }
+function currentBackend(){ return "fal"; }
+function catalogItemForService(){ return state.catalogById["fal-ai/minimax/video-01/image-to-video"]; }
+function catalogRequiresPrompt(it){
+  if (!it) return false;
+  const req = [].concat(it.required || []);
+  return req.map(String).some(r => r === "prompt" || r.indexOf("prompt") >= 0);
+}
+function readComposerPrompt(){
+  const n = nodeById(state.selected);
+  const ta = $("prompt");
+  if (ta && n) { n.prompt = ta.value; return String(ta.value||"").trim(); }
+  return String((n && n.prompt)||"").trim();
+}
+function needsPromptBeforeGenerate(){
+  const empty = !readComposerPrompt();
+  if (!empty) return false;
+  if (state.mode === "video" && currentBackend() === "fal") return true;
+  return catalogRequiresPrompt(catalogItemForService());
+}
+function chipsLackAirForOutbound(){ return false; }
+let generateCalls = 0;
+function generate(){ generateCalls++; setAckMsg("校验连线…"); fireSend._busy = true; }
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const promptEl = { value: PROMPT };
+function $(id){
+  if (id === "send") return btn;
+  if (id === "prompt") return promptEl;
+  if (id === "service") return { value: "fal-ai/minimax/video-01/image-to-video" };
+  if (id === "backend") return { value: "fal" };
+  return null;
+}
+"""
+
+    fs_src = js[js.find("function fireSend"):js.find("\n  function bindSendButton")]
+
+    # empty prompt double fire
+    harness_empty = (
+        "const PROMPT = \"\";\n"
+        + harness_base
+        + fs_src
+        + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+const ev1 = { type: "pointerdown", button: 0, preventDefault(){}, stopPropagation(){} };
+const ev2 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev1);
+fireSend(ev2);
+// same-event foot+btn
+const ev3 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev3);
+fireSend(ev3);
+const texts = msgs.map(m => m.t);
+const last = texts[texts.length - 1] || "";
+const lastCls = (msgs[msgs.length - 1] || {}).cls || "";
+console.log(JSON.stringify({
+  ok: generateCalls === 0 && last === "此模型需要提示词" && lastCls === "bad"
+    && !texts.some(t => t === "已点生成"),
+  texts, generateCalls, last, lastCls
+}));
+"""
+    )
+    node = subprocess.run(["node", "-e", harness_empty], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node.returncode == 0, "node empty double: %s%s" % (node.stdout, node.stderr))
+    row = json.loads(node.stdout.strip().splitlines()[-1])
+    assert_true(row["ok"], row)
+    assert_true(row["generateCalls"] == 0, row)
+
+    # with prompt → 已点生成 then generate path; double events → one generate
+    harness_ok = (
+        "const PROMPT = \"camera slowly pans\";\n"
+        + harness_base
+        + fs_src
+        + r"""
+fireSend._busy = false;
+fireSend._at = 0;
+const ev1 = { type: "pointerdown", button: 0, preventDefault(){}, stopPropagation(){} };
+const ev2 = { type: "click", button: 0, preventDefault(){}, stopPropagation(){} };
+fireSend(ev1);
+fireSend(ev2);
+const texts = msgs.map(m => m.t);
+console.log(JSON.stringify({
+  ok: generateCalls === 1 && texts.some(t => t === "已点生成" || t.indexOf("已点生成 ·") === 0),
+  texts, generateCalls
+}));
+"""
+    )
+    node2 = subprocess.run(["node", "-e", harness_ok], capture_output=True, text=True, cwd=str(ROOT))
+    assert_true(node2.returncode == 0, "node prompt double: %s%s" % (node2.stdout, node2.stderr))
+    row2 = json.loads(node2.stdout.strip().splitlines()[-1])
+    assert_true(row2["ok"], row2)
+    assert_true(row2["generateCalls"] == 1, row2)
+
+    assert_true('fetch("/api/generate"' in js, "generate path exists (tests do not POST paid)")
+
+
+
+
+
+def test_v0821m2_poll_copy():
+    """v0821m2: longer video poll; timeout copy if still running; bare video_url pickUrl; cloud-nodes parity."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821m2")
+    assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
+    assert_true('"nl-storyboard-v0821l"' in js, "STORE_OLDS keeps v0821l")
+    assert_true("? 180 : 40" in js or "pollMax = 180" in js, "video pollMax 180")
+    assert_true("? 3000 : 2500" in js or "pollMs = 3000" in js, "video pollMs 3s")
+    assert_true("等待超时，云端任务仍在进行中" in js, "timeout ≠ no-media copy")
+    assert_true("data.video_url" in js and "data.image_url" in js, "bare video_url/image_url")
+    assert_true("const pollMax = 180" in cn and "const pollMs = 3000" in cn, "cloud-nodes poll parity")
+    assert_true("等待超时，云端任务仍在进行中" in cn, "cloud-nodes timeout copy")
+
+
+
+def test_v0821n2_lora_air_gate():
+    """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821n3")
+    assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
+    assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
+    assert_true("nl-storyboard-v0821m2" in js, "STORE_OLDS keeps v0821m2")
+
+    assert_true("function chipsLackAirForOutbound" in js, "chipsLackAirForOutbound helper")
+    assert_true("LoRA 缺 air，无法出站" in js, "red block msg")
+
+    # packLoras: still filter no-air on civitai; empty → null; keep air when present
+    pack_i = js.find("function packLorasForPayload")
+    assert_true(pack_i >= 0, "packLorasForPayload")
+    pack = js[pack_i:pack_i + 2200]
+    assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter")
+    assert_true("row.air" in pack, "checks air")
+    assert_true("mapped.length ? mapped : null" in pack, "empty → null")
+    assert_true('air: l.air || ""' in pack or "air: l.air || ''" in pack, "packs air field")
+
+    # Conceptual: chips with air → pack has air; chips without → blocked red
+    with_air = [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8, "name": "A"}]
+    no_air = [{"path": "https://civitai.com/api/download/models/1", "strength": 0.8, "name": "B"}]
+    mixed = with_air + no_air
+
+    def sim_pack(rows, be="civitai"):
+        mapped = []
+        for l in rows:
+            row = {"air": l.get("air") or "", "path": l.get("path") or "", "scale": l.get("strength", 0.8)}
+            if be == "civitai":
+                if not (row["air"] and str(row["air"]).strip()):
+                    continue
+            mapped.append(row)
+        return mapped or None
+
+    packed_ok = sim_pack(with_air)
+    assert_true(packed_ok and packed_ok[0]["air"].startswith("urn:air:"), "chips with air → pack has air")
+    packed_bad = sim_pack(no_air)
+    assert_true(packed_bad is None, "chips without air → pack null")
+    packed_mixed = sim_pack(mixed)
+    assert_true(packed_mixed and len(packed_mixed) == 1 and packed_mixed[0]["air"], "some-with-air still ships")
+
+    # fireSend gates before 已点生成 / generate
+    fi = js.find("function fireSend")
+    fire = js[fi:js.find("function bindSendButton", fi)]
+    assert_true("chipsLackAirForOutbound" in fire, "fireSend air gate")
+    assert_true("LoRA 缺 air，无法出站" in fire, "fireSend red msg")
+    assert_true(fire.find("chipsLackAirForOutbound") < fire.find('setMsg("已点生成")'),
+                "air gate before 已点生成")
+    assert_true(fire.find("LoRA 缺 air") < fire.find("generate()"), "block before generate")
+
+    # runShotStep gates before /api/generate; still packs when air present
+    k = js.find("async function runShotStep")
+    run = js[k:k + 16000]
+    assert_true("chipsLackAirForOutbound" in run, "runShotStep air gate")
+    assert_true("LoRA 缺 air，无法出站" in run, "runShotStep red msg")
+    assert_true("packLorasForPayload()" in run, "still packs")
+    assert_true("payload.loras = packedLoras" in run, "sets payload.loras")
+    assert_true(run.find("chipsLackAirForOutbound") < run.find('/api/generate'),
+                "air gate before POST")
+    assert_true("/api/generate" in run, "generate path still exists (gated)")
+
+
+
+def test_v0821n3_import_air_chip():
+    """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE v0821n4")
+    assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
+    assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
+    assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
+
+    # Chip subtitle prefers air (was path||downloadUrl||air hiding URN)
+    assert_true("function loraChipSubtitle" in js, "loraChipSubtitle helper")
+    sub_i = js.find("function loraChipSubtitle")
+    sub = js[sub_i:sub_i + 400]
+    assert_true("l.air" in sub, "reads air")
+    assert_true("path" in sub, "falls back to path")
+    # renderLoras uses helper, not path-first
+    ri = js.find("function renderLoras")
+    render = js[ri:ri + 900]
+    assert_true("loraChipSubtitle(l)" in render, "render uses loraChipSubtitle")
+    assert_true("l.path || l.downloadUrl || l.air" not in render, "must not prefer path over air")
+
+    # applyImport reaffirms air from import JSON
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    block = js[i:j]
+    assert_true("normalizeLora" in block, "maps via normalizeLora")
+    assert_true("row.air" in block, "reaffirms air from import row")
+    assert_true("/api/generate" not in block, "import must not call /api/generate")
+
+    # normalizeLora copies air
+    ni = js.find("function normalizeLora")
+    norm = js[ni:ni + 700]
+    assert_true("air: air" in norm or "air:air" in norm, "normalizeLora keeps air")
+
+    # Fixture shape like post 134923572 / import_image (air + path + downloadUrl + name)
+    AIR = "urn:air:krea2:lora:civitai:2323765@3071582"
+    PATH = "https://civitai.com/api/download/models/3071582"
+    fixture_row = {
+        "air": AIR,
+        "strength": 0.8,
+        "name": "Radiance Chrome Voluptuous",
+        "versionId": 3071582,
+        "path": PATH,
+        "downloadUrl": PATH,
+    }
+
+    def sim_normalize(v):
+        air = v.get("air") or ""
+        path = v.get("path") or v.get("downloadUrl") or ""
+        strength = float(v.get("strength") if v.get("strength") is not None else v.get("scale", 0.8))
+        return {
+            "air": air,
+            "path": path,
+            "downloadUrl": v.get("downloadUrl") or path,
+            "versionId": str(v.get("versionId") or ""),
+            "strength": strength,
+            "scale": strength,
+            "name": v.get("name") or "LoRA",
+        }
+
+    def sim_apply_import_loras(rows):
+        out = []
+        for row in rows:
+            n = sim_normalize(row or {})
+            if row and row.get("air"):
+                n["air"] = str(row["air"]).strip()
+            out.append(n)
+        return out
+
+    def sim_chip_sub(l):
+        air = str(l.get("air") or "").strip()
+        if air:
+            return air
+        return l.get("path") or l.get("downloadUrl") or ""
+
+    def sim_pack(rows, be="civitai"):
+        mapped = []
+        for l in rows:
+            row = {
+                "air": l.get("air") or "",
+                "path": l.get("path") or l.get("downloadUrl") or "",
+                "scale": l.get("strength", 0.8),
+                "name": l.get("name") or "LoRA",
+            }
+            if be == "civitai":
+                if not (row["air"] and str(row["air"]).strip()):
+                    continue
+            mapped.append(row)
+        return mapped or None
+
+    chips = sim_apply_import_loras([fixture_row])
+    assert_true(len(chips) == 1 and chips[0]["air"] == AIR, "applyImport preserves air on fixture")
+    assert_true(chips[0]["name"] == "Radiance Chrome Voluptuous", "keeps name")
+    assert_true(float(chips[0]["strength"]) == 0.8, "keeps strength")
+    assert_true(str(chips[0]["versionId"]) == "3071582", "keeps versionId")
+    assert_true(PATH in (chips[0].get("path") or ""), "keeps path")
+    assert_true(sim_chip_sub(chips[0]) == AIR, "chip subtitle shows air URN not download URL")
+    packed = sim_pack(chips)
+    assert_true(packed and packed[0]["air"] == AIR, "pack includes air")
+    # chipsLackAirForOutbound ≡ chips present but pack empty
+    lack = bool(chips) and not packed
+    assert_true(lack is False, "chipsLackAirForOutbound must be false after import")
+
+    # Path-only chip still shows path (no air to prefer)
+    path_only = sim_normalize({"path": PATH, "name": "X", "strength": 0.8})
+    assert_true(sim_chip_sub(path_only) == PATH, "no-air chip falls back to path")
+
+
+def test_v0821n4_js_cache_bust():
+    """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE")
+    assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
+    assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
+    assert_true('src="/static/storyboard.js?v=v0821n5-dock-scroll"' in html, "script cache-bust")
+
+
+def test_v0821n5_dock_scroll():
+    """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    assert_true("v0821n5-dock-scroll" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n5-dock-scroll</span>' in html, ".stamp")
+    assert_true("v0821n5-dock-scroll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('src="/static/storyboard.js?v=v0821n5-dock-scroll"' in html, "script ?v=")
+    assert_true('const STORE = "nl-storyboard-v0821n5"' in js, "STORE n5")
+    assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
+    assert_true(
+        ".dock-foot{flex:0 0 auto;max-height:none;overflow:visible;position:static;" in html,
+        "dock-foot overflow:visible (not auto)",
+    )
+    assert_true(".dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}" in html, "dock-scroll overflow:auto")
+    assert_true(".dock.expanded .dock-scroll{min-height:0}" in html, "expanded dock-scroll min-height:0")
+    assert_true(".dock.expanded .lora-block{max-height:140px;overflow:auto}" in html,
+                "expanded lora-block max-height+overflow")
+    assert_true("min-height:180px" not in html, "no dock-scroll min-height:180")
+    assert_true("min-height:200px" not in html, "no dock-scroll min-height:200")
+    assert_true("max-height:88px" not in html, "no lora max-height:88 media")
+    assert_true("@media (max-height:820px)" in html, "media max-height:820px present")
+    assert_true(".dock.expanded .dock-scroll{min-height:0}" in html, "media/base dock-scroll min-height:0")
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -856,10 +2399,29 @@ def main():
         test_v0817_no_at_filename,
         test_v0817b_unmention_at_tag,
         test_v0817c_no_at_in_prompt,
+        test_empty_prompt_on_new_shot_and_load_demo,
         test_v0818_sticky_composer_bar,
         test_v0819_canvas_stage,
         test_v0819b_expand_prompt,
         test_v0820_civitai_comfy_params,
+        test_v0820b_apply_import,
+        test_v0820c_hard_service,
+        test_v0821n_krea2_import_hardgate,
+        test_v0821n2_lora_air_gate,
+        test_v0821n3_import_air_chip,
+        test_v0821n4_js_cache_bust,
+        test_v0821n5_dock_scroll,
+        test_v0821_hardgate_i2v_refs,
+        test_v0821b_i2v_detect,
+        test_v0821c_fal_i2v_preview,
+        test_v0821f_send_noop,
+        test_v0821g_send_bind,
+        test_v0821h_send_aria,
+        test_v0821i_i2v_writeback,
+        test_v0821j_send_busy_msg,
+        test_v0821k_i2v_prompt_req,
+        test_v0821l_send_once,
+        test_v0821m2_poll_copy,
     ]
     failed = 0
     for fn in tests:

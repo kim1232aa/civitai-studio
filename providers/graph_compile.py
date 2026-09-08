@@ -254,7 +254,11 @@ def compile_graph(graph: dict | None) -> dict:
                 val = params.get("value", params.get("seed"))
             else:
                 val = params.get("text", params.get("prompt", params.get("negativePrompt")))
-                if val in (None, ""):
+                # v0821i: prompt may be empty (i2v optional; UI default empty). negative still requires text.
+                if op == "prompt":
+                    if val is None:
+                        val = ""
+                elif val in (None, ""):
                     return _err(f"{op} 节点 {nid} 缺少文本", nodeId=nid)
             values[(nid, OP_SPEC[op]["outs"][0])] = val
             continue

@@ -70,6 +70,13 @@ def main():
     multi = overlay_image_fields({"id": "fal-ai/flux-2-pro/edit", "imageFields": ["image_urls"]})
     assert multi["maxRefs"] == 9, multi
     assert max_refs("fal", gc("fal"), item=single) == 1
+    
+    # Fal t2v must not advertise i2v / first frame
+    from providers.fal import overlay_image_fields as _ov
+    t2v = _ov({"id": "fal-ai/minimax/video-01", "category": "video", "falCategory": "text-to-video"})
+    assert t2v.get("needsFirstFrame") is False and t2v.get("supportsI2v") is False, t2v
+    i2v = _ov({"id": "fal-ai/minimax/video-01/image-to-video", "category": "video", "falCategory": "image-to-video"})
+    assert i2v.get("needsFirstFrame") is True and i2v.get("supportsI2v") is True, i2v
     print("PASS ref_images")
     return 0
 

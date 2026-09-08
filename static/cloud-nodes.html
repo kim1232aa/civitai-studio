@@ -452,7 +452,16 @@
     if (Array.isArray(data.videos) && data.videos[0]) return data.videos[0].url || data.videos[0];
     if (data.image) return data.image.url || data.image;
     if (data.video) return data.video.url || data.video;
-    if (data.result && data.result.url) return data.result.url;
+    // v0821m2 P1: bare video_url / image_url (align storyboard pickUrl)
+    if (typeof data.video_url === "string" && data.video_url) return data.video_url;
+    if (typeof data.image_url === "string" && data.image_url) return data.image_url;
+    if (data.result) {
+      const res = data.result;
+      if (typeof res.video_url === "string" && res.video_url) return res.video_url;
+      if (typeof res.image_url === "string" && res.image_url) return res.image_url;
+      if (res.url) return res.url;
+      if (res.video) return res.video.url || res.video;
+    }
     return "";
   }
 
@@ -587,21 +596,23 @@
         return;
       }
       const jobId = j.id || j.jobId || j.workflowId;
+      // v0821m: i2v/video poll ~9min (MiniMax ~7min); wait for pickUrl not status alone
+      const pollMax = 180;
+      const pollMs = 3000;
       if (jobId && !pickUrl(j) && (j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status)) {
         $("dockMsg").textContent = "云端排队中…";
-        for (let i = 0; i < 40; i++) {
-          await new Promise((res) => setTimeout(res, 2500));
+        for (let i = 0; i < pollMax; i++) {
+          await new Promise((res) => setTimeout(res, pollMs));
           const jr = await fetch("/api/jobs/" + encodeURIComponent(jobId));
           const st = await jr.json();
           $("outBox").textContent = JSON.stringify(st, null, 2);
           if (st.error || st.status === "failed" || st.status === "error") {
             throw new Error(st.error || "任务失败");
           }
-          if (pickUrl(st) || st.status === "done" || st.status === "succeeded" || st.status === "completed") {
-            j = st;
-            break;
-          }
-          $("dockMsg").textContent = "云端进行中 " + (i + 1) + "/40";
+          j = st;
+          if (pickUrl(st)) break;
+          const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
+          $("dockMsg").textContent = (doneish ? "成片落盘中 " : "云端进行中 ") + (i + 1) + "/" + pollMax;
         }
       }
       const url = pickUrl(j);
@@ -623,11 +634,15 @@
           $("dockMsg").textContent = "完成 " + (stage ? stage.op + " · 多步链已全部有成片" : "此步完成");
           $("dockMsg").className = "ok";
         } else {
-          $("dockMsg").textContent = "云端已返回，没有可预览地址";
+          const stillGoing = !!(j && (j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status));
+          $("dockMsg").textContent = stillGoing
+            ? "等待超时，云端任务仍在进行中（视频约需数分钟）"
+            : "云端已返回，没有可预览地址";
           $("dockMsg").className = "warn";
         }
       } else {
-        $("dockMsg").textContent = url ? "此步完成" : "云端已返回，没有可预览地址";
+        const stillGoing2 = !url && !!(j && (j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status));
+        $("dockMsg").textContent = url ? "此步完成" : (stillGoing2 ? "等待超时，云端任务仍在进行中（视频约需数分钟）" : "云端已返回，没有可预览地址");
         $("dockMsg").className = url ? "ok" : "warn";
         $("btnGen").disabled = false;
       }

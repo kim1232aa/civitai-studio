@@ -936,6 +936,8 @@ def import_image(image_id: str) -> dict:
         "comfyNodeCount": node_count,
         "importSource": "+".join(sources) or "partial",
         "empty": not bool(meta.get("prompt") or file_parsed.get("prompt")),
+        # Storyboard must land on this backend after import — never leave fal default.
+        "backend": "civitai",
     }
     return out
 

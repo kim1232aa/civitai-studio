@@ -108,6 +108,41 @@ def test_unknown_op():
     assert_true("未知 op" in (r.get("error") or ""), r)
 
 
+def test_i2v_empty_prompt_allowed():
+    """v0821i: i2v prompt node may be empty string (optional)."""
+    r = g(
+        backend="fal",
+        nodes=[
+            {"id": "img", "op": "image", "params": {"url": "/out/x.jpg"}},
+            {"id": "p", "op": "prompt", "params": {"text": ""}},
+            {"id": "v", "op": "i2v", "params": {"serviceId": "fal-ai/minimax/video-01/image-to-video", "duration": 5}},
+        ],
+        edges=[
+            {"from": "img", "fromPort": "image", "to": "v", "toPort": "image"},
+            {"from": "p", "fromPort": "prompt", "to": "v", "toPort": "prompt"},
+        ],
+    )
+    assert_true(r.get("ok") is True, r)
+    assert_true((r.get("payload") or {}).get("prompt") == "", r)
+    assert_true("缺少文本" not in (r.get("error") or ""), r)
+
+
+
+
+def test_fal_keeps_empty_prompt_key():
+    """v0821k: Fal i2v must send prompt even when empty — omit → 422 Field required (01a07e75)."""
+    from providers.fal import build_fal_input
+    inp = build_fal_input({
+        "serviceId": "fal-ai/minimax/video-01/image-to-video",
+        "prompt": "",
+        "sourceImage": "/out/x.jpg",
+        "firstFrame": "/out/x.jpg",
+        "image_url": "/out/x.jpg",
+    })
+    assert_true("prompt" in inp, inp)
+    assert_true(inp.get("prompt") == "", inp)
+    assert_true(bool(inp.get("image_url") or inp.get("start_image_url")), inp)
+
 def main():
     tests = [
         test_missing_image_blocked,
@@ -116,6 +151,8 @@ def main():
         test_hf_i2v_blocked,
         test_seed_bypass_blocked,
         test_unknown_op,
+        test_i2v_empty_prompt_allowed,
+        test_fal_keeps_empty_prompt_key,
     ]
     failed = 0
     for fn in tests:
