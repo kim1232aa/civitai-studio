@@ -452,7 +452,16 @@
     if (Array.isArray(data.videos) && data.videos[0]) return data.videos[0].url || data.videos[0];
     if (data.image) return data.image.url || data.image;
     if (data.video) return data.video.url || data.video;
-    if (data.result && data.result.url) return data.result.url;
+    // v0821m2 P1: bare video_url / image_url (align storyboard pickUrl)
+    if (typeof data.video_url === "string" && data.video_url) return data.video_url;
+    if (typeof data.image_url === "string" && data.image_url) return data.image_url;
+    if (data.result) {
+      const res = data.result;
+      if (typeof res.video_url === "string" && res.video_url) return res.video_url;
+      if (typeof res.image_url === "string" && res.image_url) return res.image_url;
+      if (res.url) return res.url;
+      if (res.video) return res.video.url || res.video;
+    }
     return "";
   }
 
