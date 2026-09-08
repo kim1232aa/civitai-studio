@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o";
-  const STORE_OLDS = ["nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o2";
+  const STORE_OLDS = ["nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o2: pin fal-ai/z-image/turbo/lora on fixture+generate — never flux-lora / 默认模型 drift
   // v0821o: fal image+LoRA hardgate — pack requires http path; mount z-image/turbo/lora fixture 3231694
   // v0821n5: single Composer scrollbar (port from ui/seko-css-align dock-scroll)
   // v0821n4: cache-bust storyboard.js query to stamp
@@ -2611,7 +2612,12 @@
     let serviceId = pickedService;
     if (!serviceId && be !== "civitai") {
       // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
-      serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+      // v0821o2: LoRAs present → pin turbo/lora (never empty→flux/schnell→flux-lora sibling)
+      if (op !== "i2v" && falHasLoras()) serviceId = FAL_LORA_PREF_SERVICE;
+      else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+    }
+    if (be === "fal" && op !== "i2v") {
+      serviceId = pinFalLoraServiceId(serviceId);
     }
     const genParams = {
       serviceId: serviceId,
@@ -2853,7 +2859,16 @@
         if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked", stageOp: stageOp };
       }
-      if (packedLoras && packedLoras.length) payload.loras = packedLoras;
+      if (packedLoras && packedLoras.length) {
+        payload.loras = packedLoras;
+        // v0821o2: outbound serviceId must stay turbo/lora — block flux-lora swap
+        if (currentBackend() === "fal") {
+          const pinned = pinFalLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          payload.serviceId = pinned;
+          payload.endpoint = pinned;
+          ensureFalLoraServiceSelected();
+        }
+      }
     }
     // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
     {
@@ -3460,10 +3475,56 @@
     const s = String(id || "").trim();
     return /^fal-ai\//i.test(s) || /^fal\.ai\//i.test(s);
   }
+
+  // v0821o2: when LoRAs ship, keep z-image/turbo/lora — never empty→flux/schnell→sibling flux-lora
+  function falHasLoras() {
+    return Array.isArray(state.loras) && state.loras.length > 0;
+  }
+  function isFalFluxLoraDrift(sid) {
+    const s = String(sid || "").trim();
+    return s === "fal-ai/flux-lora" || s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT;
+  }
+  function pinFalLoraServiceId(sid) {
+    const s = String(sid || "").trim();
+    if (!falHasLoras()) return s;
+    // Explicit turbo → turbo/lora sibling only; never fuzzy to flux-lora
+    if (s === "fal-ai/z-image/turbo") return FAL_LORA_PREF_SERVICE;
+    if (s === FAL_LORA_PREF_SERVICE) return s;
+    if (!s || isFalFluxLoraDrift(s)) return FAL_LORA_PREF_SERVICE;
+    return s;
+  }
+  function ensureFalLoraServiceSelected() {
+    if (!falHasLoras()) return;
+    const be = ($("backend") && $("backend").value) || "";
+    if (be !== "fal") return;
+    const sel = $("service");
+    if (!sel) return;
+    const want = pinFalLoraServiceId(sel.value);
+    // Visible label: never leave 「默认模型」 when LoRAs mounted
+    ensureSelectOpt(sel, want);
+    // Prefer a clear option label for the pinned id
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) {
+        const t = sel.options[i].textContent || "";
+        if (!t || t === want || t === "默认模型") {
+          sel.options[i].textContent = "Z-Image Turbo LoRA · " + want;
+        }
+        break;
+      }
+    }
+    sel.value = want;
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) {
+      state.catalogById[want] = { id: want, name: "Z-Image Turbo LoRA", category: "image", tags: ["lora"] };
+    }
+  }
+
   function falLoraFixtureImport() {
+    // Hard-pin — never omit / never fal-ai/flux-lora
     return {
       backend: "fal",
-      serviceId: FAL_LORA_PREF_SERVICE,
+      serviceId: "fal-ai/z-image/turbo/lora",
+      serviceName: "Z-Image Turbo LoRA",
       kind: "image",
       prompt: "portrait, soft light, detailed face, cinematic",
       loras: [{
@@ -3480,6 +3541,10 @@
   async function mountFalLoraFixture() {
     closeImportModal();
     await applyImport(falLoraFixtureImport());
+    // Survive subsequent loadCatalog races — re-pin visible #service
+    ensureFalLoraServiceSelected();
+    state._pendingService = FAL_LORA_PREF_SERVICE;
+    state._pinFalLoraService = FAL_LORA_PREF_SERVICE;
   }
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
@@ -3534,15 +3599,32 @@
     } else if (wantFal) {
       if ($("backend")) $("backend").value = "fal";
       syncParamSurface();
-      const sid = String(j.serviceId || "").trim() || FAL_LORA_PREF_SERVICE;
+      let sid = String(j.serviceId || "").trim() || FAL_LORA_PREF_SERVICE;
       // Pin fal-ai/z-image/turbo(/lora) — never drift to Civitai image/comfy/…
       if (looksCivitaiServiceId(sid)) {
         hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
       } else {
+        // v0821o2: pin turbo/lora; reject flux-lora drift on fixture/import
+        if (Array.isArray(j.loras) && j.loras.length && isFalFluxLoraDrift(sid)) {
+          sid = FAL_LORA_PREF_SERVICE;
+        }
+        if (Array.isArray(j.loras) && j.loras.length && (sid === "fal-ai/z-image/turbo" || !sid)) {
+          sid = FAL_LORA_PREF_SERVICE;
+        }
         state._pendingService = sid;
+        state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid : (state._pinFalLoraService || "");
         await loadCatalog();
         ensureSelectOpt($("service"), sid);
-        if ($("service")) $("service").value = sid;
+        if ($("service")) {
+          // Clear visible label for pinned turbo/lora
+          for (let oi = 0; oi < $("service").options.length; oi++) {
+            if ($("service").options[oi].value === sid) {
+              $("service").options[oi].textContent = (j.serviceName || "Z-Image Turbo LoRA") + " · " + sid;
+              break;
+            }
+          }
+          $("service").value = sid;
+        }
         if (!$("service") || $("service").value !== sid) {
           hardErr = "无法挂载 Fal 服务 " + sid;
         }
@@ -3550,6 +3632,7 @@
         if (!state.catalogById[sid]) {
           state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
         }
+        ensureFalLoraServiceSelected();
       }
     }
 
@@ -3720,6 +3803,8 @@
   bindImportModal();
 
   async function loadCatalog() {
+    // v0821o2: remember selection before wipe — boot loadCatalog must not blank fixture pin to 「默认模型」
+    const prevService = ($("service") && $("service").value) || "";
     $("service").innerHTML = '<option value="">默认模型</option>';
     state.catalogById = state.catalogById || {};
     try {
@@ -3753,6 +3838,21 @@
             needsFirstFrame: true, imageFields: ["image_url"] }].concat(items).slice(0, CAP);
         }
       }
+      // v0821o2: when LoRAs / fixture pin — keep turbo/lora in the capped list (visible, not 默认模型)
+      const pinWant = state._pendingService || state._pinFalLoraService || prevService || "";
+      const needLoraPin = (be === "fal" && state.mode !== "video" && (
+        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === "fal-ai/z-image/turbo"
+      ));
+      if (needLoraPin) {
+        const pinId = FAL_LORA_PREF_SERVICE;
+        let pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+        if (!pinItem) {
+          pinItem = { id: pinId, name: "Z-Image Turbo LoRA", category: "image", tags: ["lora"] };
+        } else {
+          pinItem = Object.assign({}, pinItem, { name: pinItem.name || "Z-Image Turbo LoRA" });
+        }
+        items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; })).slice(0, CAP);
+      }
       state.catalog = items;
       // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
       const byId = {};
@@ -3763,15 +3863,27 @@
           // keep maxImages / maxRefs / imageFields on the catalog row when present
         }
         const o = document.createElement("option");
-        o.value = id; o.textContent = it.name || id;
+        o.value = id;
+        // Clear label for pinned turbo/lora (not bare id-only / not 默认模型)
+        if (id === FAL_LORA_PREF_SERVICE) o.textContent = (it.name && it.name !== id ? it.name + " · " + id : "Z-Image Turbo LoRA · " + id);
+        else o.textContent = it.name || id;
         $("service").appendChild(o);
       });
       state.catalogById = byId;
       if (state._pendingService) {
         // applyImport may SELECT an explicit j.serviceId (intentional, not soft-fill).
+        ensureSelectOpt($("service"), state._pendingService);
         $("service").value = state._pendingService;
         state._pendingService = "";
+      } else if (state._pinFalLoraService && be === "fal") {
+        ensureSelectOpt($("service"), state._pinFalLoraService);
+        $("service").value = state._pinFalLoraService;
+      } else if (prevService) {
+        // Preserve prior selection across catalog refresh (fixture race fix)
+        ensureSelectOpt($("service"), prevService);
+        $("service").value = prevService;
       }
+      if (be === "fal" && falHasLoras()) ensureFalLoraServiceSelected();
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       syncParamSurface();
       syncLoraUi();
@@ -3808,12 +3920,13 @@
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
-  // v0821o: ?fixture=fal-lora or #fal-lora → auto-mount Fal z-image LoRA fixture (no hand edits)
+  // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
+  let _wantFalLoraFixture = false;
   try {
     const q = String(location.search || "");
     const h = String(location.hash || "");
     if (/[?&]fixture=fal-lora\b/.test(q) || h === "#fal-lora" || h === "#fal-lora-fixture") {
-      mountFalLoraFixture();
+      _wantFalLoraFixture = true;
     }
   } catch (_) {}
   applyCam();
@@ -3823,7 +3936,11 @@
   bindLoraUi();
   syncLoraUi();
   syncParamSurface();
-  loadComfyDefaults().then(function () { return loadCatalog(); });
+  loadComfyDefaults().then(function () { return loadCatalog(); }).then(function () {
+    if (_wantFalLoraFixture) return mountFalLoraFixture();
+  }).then(function () {
+    if (_wantFalLoraFixture) ensureFalLoraServiceSelected();
+  });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
 })();
