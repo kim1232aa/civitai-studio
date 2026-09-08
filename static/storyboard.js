@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821m2";
-  const STORE_OLDS = ["nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821n";
+  const STORE_OLDS = ["nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821n: krea2 import hardgate — packLoras skip no-air; attach negativePrompt; empty #service red
   // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
   // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
   // v0821k: fal i2v empty-prompt hard gate; sticky 已点生成 · …; surface job.error; no wipe bad
@@ -2230,7 +2231,9 @@
   function packLorasForPayload() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return null;
-    return list.map(function (l) {
+    const be = currentBackend();
+    // v0821n: civitai lora_map skips no-air — path-only must not ship empty air entries
+    const mapped = list.map(function (l) {
       let path = l.path || l.downloadUrl || l.url || "";
       const versionId = l.versionId || loraVersionId(l) || "";
       if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
@@ -2248,7 +2251,11 @@
         strength: strength,
         name: l.name || "LoRA",
       };
+    }).filter(function (row) {
+      if (be === "civitai") return !!(row.air && String(row.air).trim());
+      return true;
     });
+    return mapped.length ? mapped : null;
   }
   async function searchLoras() {
     const qEl = $("loraQ");
@@ -2820,6 +2827,10 @@
           return { status: "blocked", stageOp: stageOp };
         }
         payload.serviceId = sid;
+        // v0821n: Composer has no negative wire — attach import/shot negativePrompt (may be "")
+        if (shot && shot.negativePrompt != null) payload.negativePrompt = shot.negativePrompt;
+        else if (payload.negativePrompt == null) payload.negativePrompt = "";
+        // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
       }
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));

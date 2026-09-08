@@ -255,7 +255,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("tos.every((to) => scopeIds.indexOf(to) >= 0)" not in js,
                 "exclusive-link tos.every expansion still present")
     assert_true("scopeIds.indexOf(n.id) >= 0" in js, "scoped assetList must filter by scopeIds id")
-    assert_true("nl-storyboard-v0821m2" in js, "STORE must bump to v0820c")
+    assert_true("nl-storyboard-v0821n" in js, "STORE must bump to v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS must keep v0819b for migrate")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS must keep v0819 for migrate")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS must keep v0818 for migrate")
@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "stamp must be v0821m2-poll")
+    assert_true("v0821n-krea2-import" in html, "stamp must be v0821n-krea2-import")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,8 +288,8 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true("nl-storyboard-v0821m2" in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -300,8 +300,8 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true("nl-storyboard-v0821m2" in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -360,8 +360,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -420,8 +420,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "stamp v0821m2-poll")
-    assert_true("nl-storyboard-v0821m2" in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "stamp v0821n-krea2-import")
+    assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -468,8 +468,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -586,11 +586,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821m2-poll: unmention/link helpers still present."""
+    """v0817b lineage under v0821n-krea2-import: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -606,12 +606,12 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821m2-poll: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821n-krea2-import: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821d")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
     assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
@@ -652,8 +652,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -726,8 +726,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -761,8 +761,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -787,8 +787,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -827,8 +827,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -886,8 +886,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -957,8 +957,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0820c")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -1016,13 +1016,101 @@ def test_v0820c_hard_service():
     assert_true('id="comfyParams"' in html, "comfy UI kept")
 
 
+
+def test_v0821n_krea2_import_hardgate():
+    """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821n")
+    assert_true("nl-storyboard-v0821m2" in js, "STORE_OLDS keeps v0821m2")
+    assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS keeps v0820c")
+    assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS keeps v0820b")
+
+    # Import mount path
+    assert_true("async function applyImport" in js or "function applyImport" in js, "applyImport")
+    assert_true("function looksCivitaiServiceId" in js, "looksCivitaiServiceId")
+    i = js.find("async function applyImport")
+    if i < 0:
+        i = js.find("function applyImport")
+    j = js.find("function bindImportModal", i)
+    block = js[i:j]
+    assert_true(
+        ('value = "civitai"' in block)
+        or ('$("backend").value = "civitai"' in block)
+        or ("value = 'civitai'" in block),
+        "forces backend civitai",
+    )
+    assert_true('j.backend === "civitai"' in block or "j.backend === 'civitai'" in block,
+                "wantCivitai from j.backend")
+    assert_true("looksCivitaiServiceId" in block, "also mounts on civitai-shaped serviceId")
+    assert_true("缺少 serviceId" in block or "无法挂载" in block, "empty serviceId hard error")
+    assert_true("不会回退" in block or "flux/schnell" in block, "no fal silent fallback")
+    assert_true("/api/generate" not in block, "import must not call /api/generate")
+    assert_true("normalizeLora" in block, "maps loras")
+    assert_true("applyComfyParamsToUi" in block, "fills comfy params")
+    assert_true("image/comfy/krea2/turbo/createImage" in js, "Krea2 turbo serviceId")
+
+    # Spot-check fixture shape (134923572)
+    mock = {
+        "backend": "civitai",
+        "serviceId": "image/comfy/krea2/turbo/createImage",
+        "steps": 8,
+        "cfgScale": 1,
+        "sampler": "er_sde",
+        "scheduler": "simple",
+        "seed": 467475143677094,
+        "width": 944,
+        "height": 1664,
+        "loras": [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8}],
+    }
+    assert_true(mock["serviceId"] == "image/comfy/krea2/turbo/createImage", "mock Krea2")
+    assert_true(mock["loras"][0]["air"].startswith("urn:air:krea2:lora:"), "mock lora air")
+    assert_true(mock["seed"] > 2147483647, "seed exceeds int32 — must not clamp")
+
+    # packLoras: keep air/path/scale/strength; civitai skips no-air; empty → null
+    pack_i = js.find("function packLorasForPayload")
+    assert_true(pack_i >= 0, "packLorasForPayload")
+    pack = js[pack_i:pack_i + 1800]
+    for field in ("air:", "path:", "scale:", "strength:", "versionId:", "downloadUrl:"):
+        assert_true(field in pack, "pack field " + field)
+    assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter gate")
+    assert_true("row.air" in pack, "checks air on row")
+    assert_true("mapped.length ? mapped : null" in pack, "empty → null")
+
+    # runShotStep attach loras + negativePrompt + empty-service hard red
+    k = js.find("async function runShotStep")
+    run = js[k:k + 14000]
+    assert_true("packLorasForPayload()" in run, "packs loras")
+    assert_true("payload.loras = packedLoras" in run, "sets payload.loras")
+    assert_true("payload.negativePrompt" in run, "attaches negativePrompt")
+    assert_true("请先选择 Civitai 服务" in run, "empty service hard error")
+    assert_true("不会默认填入 Krea2" in run, "no Krea2 soft-fill")
+    assert_true("int32" in run, "documents no int32 seed clamp")
+
+    # buildGraph: no CIVITAI_PREF soft-fill for civitai
+    bg_i = js.find("function buildGraph")
+    bg = js[bg_i:js.find("function pickUrl", bg_i)]
+    assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in bg,
+                "buildGraph no CIVITAI_PREF soft-fill")
+    assert_true('be !== "civitai"' in bg or "be !== 'civitai'" in bg, "fal defaults gated")
+
+    # api import backend contract (a6365ef) still present
+    civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
+    assert_true('"backend": "civitai"' in civ or "'backend': 'civitai'" in civ,
+                "import_image returns backend=civitai")
+    assert_true("image/comfy/krea2/turbo/createImage" in civ, "Krea2 default serviceId")
+    assert_true("if not air:" in civ, "lora_map skips no-air")
+
+
 def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1103,9 +1191,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp v0821m2-poll")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821b")
+    assert_true("v0821n-krea2-import" in html, "html stamp v0821n-krea2-import")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1225,9 +1313,9 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821c")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
@@ -1311,9 +1399,9 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821h")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1375,13 +1463,13 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821m2-poll: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821n-krea2-import: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true("v0821m2-poll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821h")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true("v0821n-krea2-import" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1433,13 +1521,13 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821m2-poll: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821n-krea2-import: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true("v0821m2-poll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821h")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true("v0821n-krea2-import" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1499,9 +1587,9 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821k")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
@@ -1603,10 +1691,10 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true("v0821m2-poll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821j")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true("v0821n-krea2-import" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
     # renderDock busy guard
@@ -1722,10 +1810,10 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true("v0821m2-poll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821k")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true("v0821n-krea2-import" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
     assert_true("function needsPromptBeforeGenerate" in js, "prompt gate helper")
@@ -1908,10 +1996,10 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true("v0821m2-poll" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821l")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true("v0821n-krea2-import" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
     fs = js[js.find("function fireSend"):js.find("function fireSend") + 3200]
@@ -2053,9 +2141,9 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821m2-poll" in html, "html stamp")
-    assert_true('<span class="stamp">v0821m2-poll</span>' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821m2"' in js, "STORE v0821m2")
+    assert_true("v0821n-krea2-import" in html, "html stamp")
+    assert_true('<span class="stamp">v0821n-krea2-import</span>' in html, ".stamp")
+    assert_true('const STORE = "nl-storyboard-v0821n"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
     assert_true('"nl-storyboard-v0821l"' in js, "STORE_OLDS keeps v0821l")
     assert_true("? 180 : 40" in js or "pollMax = 180" in js, "video pollMax 180")
@@ -2096,6 +2184,7 @@ def main():
         test_v0820_civitai_comfy_params,
         test_v0820b_apply_import,
         test_v0820c_hard_service,
+        test_v0821n_krea2_import_hardgate,
         test_v0821_hardgate_i2v_refs,
         test_v0821b_i2v_detect,
         test_v0821c_fal_i2v_preview,
