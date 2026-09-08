@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821n5";
-  const STORE_OLDS = ["nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o";
+  const STORE_OLDS = ["nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o: fal image+LoRA hardgate — pack requires http path; mount z-image/turbo/lora fixture 3231694
   // v0821n5: single Composer scrollbar (port from ui/seko-css-align dock-scroll)
   // v0821n4: cache-bust storyboard.js query to stamp
   // v0821n3: import air — chip subtitle prefers air URN (was path||downloadUrl hiding it); applyImport keeps air
@@ -22,6 +23,9 @@
   // v0821b: real i2v endpoint (plain video-01 is t2v and drops first frame)
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
+  const FAL_LORA_PREF_SERVICE = "fal-ai/z-image/turbo/lora";
+  const FAL_LORA_FIXTURE_VERSION = "3231694";
+  const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
   const SNAP_PX = 36;
@@ -2265,16 +2269,26 @@
       };
     }).filter(function (row) {
       if (be === "civitai") return !!(row.air && String(row.air).trim());
+      // v0821o: fal outbound needs http path (AIR-only chips would silent-drop in providers/fal.py)
+      if (be === "fal") {
+        const p = String(row.path || "").trim();
+        return !!(p && isHttpUrl(p) && !looksAir(p));
+      }
       return true;
     });
     return mapped.length ? mapped : null;
   }
   // v0821n2: UI chips present but pack empty (all lack air on civitai) → must not POST without loras[]
+  // v0821o: same helper for fal — chips present but no http path → pack empty → red block
   function chipsLackAirForOutbound() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return false;
     const packed = packLorasForPayload();
     return !packed || !packed.length;
+  }
+  function outboundLoraBlockMsg() {
+    if (currentBackend() === "fal") return "LoRA 缺 http path，无法出站";
+    return "LoRA 缺 air，无法出站";
   }
   async function searchLoras() {
     const qEl = $("loraQ");
@@ -2763,7 +2777,7 @@
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
-      setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+      setMsg(prefix + outboundLoraBlockMsg(), "bad");
       return { status: "blocked" };
     }
     if (!opts.keepSend) markSendBusy(true);
@@ -2835,7 +2849,7 @@
       const packedLoras = packLorasForPayload();
       const list = Array.isArray(state.loras) ? state.loras : [];
       if (list.length && (!packedLoras || !packedLoras.length)) {
-        setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+        setMsg(prefix + outboundLoraBlockMsg(), "bad");
         if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked", stageOp: stageOp };
       }
@@ -3056,7 +3070,7 @@
     }
     // v0821n2: LoRA chips without air → red before 已点生成 / generate
     if (chipsLackAirForOutbound()) {
-      setMsg("LoRA 缺 air，无法出站", "bad");
+      setMsg(outboundLoraBlockMsg(), "bad");
       return;
     }
     // v0821l: only ack when proceeding to generate()
@@ -3442,6 +3456,31 @@
     const s = String(id || "");
     return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
   }
+  function looksFalServiceId(id) {
+    const s = String(id || "").trim();
+    return /^fal-ai\//i.test(s) || /^fal\.ai\//i.test(s);
+  }
+  function falLoraFixtureImport() {
+    return {
+      backend: "fal",
+      serviceId: FAL_LORA_PREF_SERVICE,
+      kind: "image",
+      prompt: "portrait, soft light, detailed face, cinematic",
+      loras: [{
+        versionId: Number(FAL_LORA_FIXTURE_VERSION),
+        path: FAL_LORA_FIXTURE_PATH,
+        downloadUrl: FAL_LORA_FIXTURE_PATH,
+        url: FAL_LORA_FIXTURE_PATH,
+        scale: 0.8,
+        strength: 0.8,
+        name: "Asian Mix fixture " + FAL_LORA_FIXTURE_VERSION,
+      }],
+    };
+  }
+  async function mountFalLoraFixture() {
+    closeImportModal();
+    await applyImport(falLoraFixtureImport());
+  }
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
     if (shot && shot.kind === "shot") return shot;
@@ -3465,7 +3504,10 @@
   async function applyImport(j) {
     j = j || {};
     const civitaiSid = looksCivitaiServiceId(j.serviceId);
-    const wantCivitai = (j.backend === "civitai") || civitaiSid;
+    const falSid = looksFalServiceId(j.serviceId);
+    // Explicit backend wins; never treat fal-ai/… as civitai image/… drift
+    const wantCivitai = (j.backend === "civitai") || (civitaiSid && j.backend !== "fal");
+    const wantFal = (j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai);
     const shot = ensureActiveShotForImport();
     let hardErr = "";
 
@@ -3483,6 +3525,26 @@
         if ($("service")) $("service").value = sid;
         if (!$("service") || $("service").value !== sid) {
           hardErr = "无法挂载服务 " + sid + "（不会回退 fal/flux/schnell）";
+        }
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) {
+          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+        }
+      }
+    } else if (wantFal) {
+      if ($("backend")) $("backend").value = "fal";
+      syncParamSurface();
+      const sid = String(j.serviceId || "").trim() || FAL_LORA_PREF_SERVICE;
+      // Pin fal-ai/z-image/turbo(/lora) — never drift to Civitai image/comfy/…
+      if (looksCivitaiServiceId(sid)) {
+        hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
+      } else {
+        state._pendingService = sid;
+        await loadCatalog();
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) $("service").value = sid;
+        if (!$("service") || $("service").value !== sid) {
+          hardErr = "无法挂载 Fal 服务 " + sid;
         }
         if (!state.catalogById) state.catalogById = {};
         if (!state.catalogById[sid]) {
@@ -3600,6 +3662,9 @@
         const v = ($("importUrl") && $("importUrl").value) || "";
         runImportFromUrl(v);
       };
+    }
+    if ($("btnFalLoraFix")) {
+      $("btnFalLoraFix").onclick = function () { mountFalLoraFixture(); };
     }
     if ($("importUrl")) {
       $("importUrl").addEventListener("keydown", (e) => {
@@ -3743,6 +3808,14 @@
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
+  // v0821o: ?fixture=fal-lora or #fal-lora → auto-mount Fal z-image LoRA fixture (no hand edits)
+  try {
+    const q = String(location.search || "");
+    const h = String(location.hash || "");
+    if (/[?&]fixture=fal-lora\b/.test(q) || h === "#fal-lora" || h === "#fal-lora-fixture") {
+      mountFalLoraFixture();
+    }
+  } catch (_) {}
   applyCam();
   syncZoomPresets();
   renderCards();
