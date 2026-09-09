@@ -3129,6 +3129,7 @@
     }
     setMsg(info.text, tone, info.excerpt);
     renderCards();
+    if (typeof keepComposerPromptVisible === "function") keepComposerPromptVisible();
     return info.text;
   }
 
@@ -3475,11 +3476,7 @@
         const over = (lo != null && n < lo) || (hi != null && n > hi);
         markOver(seedEl, over);
         if (over) {
-          if (seedSpec.clamp === "reject" || seedSpec.clamp === "none") {
-            msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
-          } else {
-            msgs.push("种子 " + n + " 超出范围，发送前会按官方规则处理");
-          }
+          msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
         }
       }
     } else {
