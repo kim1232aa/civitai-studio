@@ -964,12 +964,15 @@
     const needFrame = state.mode === "video" && !frame;
     const stub = isStubMode();
     const capMsg = refCapGateMessage(n);
+    const unusedMsg = refUnusedGateMessage(n);
     syncSendGate(needFrame, stub);
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
       // v0821g: missing-frame is hard stop (red), not yellow warn
       setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+    } else if (unusedMsg) {
+      setMsg(unusedMsg, "bad");
     } else if (capMsg) {
       setMsg(capMsg, "bad");
     } else if (state.mode !== "video") {
@@ -2539,6 +2542,8 @@
     if (dependency) msgs.push(dependency);
     const needRef = requiredRefMessage(selectedShot);
     if (needRef) msgs.push(needRef);
+    const unusedMsg = refUnusedGateMessage(selectedShot);
+    if (unusedMsg) msgs.push(unusedMsg);
     const capMsg = refCapGateMessage(selectedShot);
     if (capMsg) msgs.push(capMsg);
     const promptEl = $("prompt");
@@ -3064,8 +3069,10 @@
   }
   function filterCatalogForMode(items) {
     const list = Array.isArray(items) ? items : [];
+    // text/audio are stub modes — do not list image models (looks like they work).
+    if (state.mode === "text" || state.mode === "audio") return [];
     if (state.mode === "video") return list.filter(catalogItemSupportsI2v);
-    if (state.mode === "image" || state.mode === "text" || state.mode === "audio") {
+    if (state.mode === "image") {
       return list.filter(catalogItemSupportsImage);
     }
     return list;
@@ -3171,6 +3178,36 @@
       return "参考图 " + nRefs + "/" + cap + " · 超过上限，请减少连线后再生成（不静默丢弃）";
     }
     return "";
+  }
+
+  // Explicit catalog.image_to_image === false (Flare/Sunburst t2i): connected
+  // refs must hard-block. Never attach them onto a text-to-image body and
+  // write back a green "此镜完成" that ignored the product photos.
+  function catalogEatsRefs(it) {
+    if (!it) return true;
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    if (caps.image_to_image === true || caps.inpainting === true) return true;
+    if (it.needsSource) return true;
+    if (caps.image_to_image === false) return false;
+    return true;
+  }
+  function editSiblingHint(it) {
+    const id = String((it && it.id) || "");
+    const editId = id.replace(/\/text-to-image$/, "/edit");
+    if (editId !== id && state.catalogById && state.catalogById[editId]) {
+      const sib = state.catalogById[editId];
+      return "请改选 " + (sib.name || editId) + "，或断开参考连线";
+    }
+    return "请改选带 Edit 的图生图模型，或断开参考连线";
+  }
+  function refUnusedGateMessage(shot) {
+    if (!shot || shot.kind !== "shot") return "";
+    const nRefs = countRefUrls(null, shot).length;
+    if (!nRefs) return "";
+    const it = catalogItemForService();
+    if (catalogEatsRefs(it)) return "";
+    const name = (it && (it.name || it.id)) || "当前模型";
+    return name + " 是文生图，不吃已连的 " + nRefs + " 张参考图。" + editSiblingHint(it) + "（不静默忽略）";
   }
 
   // After compile: pack [primary, ...other linked] onto studio-inbound images[]
@@ -3558,6 +3595,12 @@
     // Hard gate: over-cap refs must block — never silent-drop N-1 on single-slot endpoints.
     const refUrls = countRefUrls(payload, shot);
     const refCap = maxRefCount(catalogItemForService());
+    const unusedMsg = refUnusedGateMessage(shot);
+    if (unusedMsg) {
+      setMsg(prefix + unusedMsg, "bad");
+      if (!opts.keepSend) markSendBusy(false);
+      return { status: "blocked", stageOp: stageOp };
+    }
     if (refUrls.length > refCap) {
       setMsg(prefix + "参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "bad");
       if (!opts.keepSend) markSendBusy(false);
@@ -3766,11 +3809,13 @@
       return;
     }
     const shot = nodeById(state.selected);
+    const unusedMsg = refUnusedGateMessage(shot);
     const capMsg = refCapGateMessage(shot);
-    const blocked = !!(needFrame || stub || capMsg);
+    const blocked = !!(needFrame || stub || unusedMsg || capMsg);
     let reason = "enabled";
     if (stub) reason = "stub-mode";
     else if (needFrame) reason = "need-frame";
+    else if (unusedMsg) reason = "ref-unused";
     else if (capMsg) reason = "ref-over-cap";
     setSendVisual(blocked, reason);
   }

@@ -622,6 +622,26 @@ def _min_input_images(spec: dict | None) -> int:
     return 0
 
 
+def _image_eats_refs(spec: dict | None) -> bool:
+    """False only when catalog explicitly says this row is not image-to-image.
+
+    Flare/Sunburst text-to-image advertise image_generation and image_to_image=false.
+    Attaching input_references there makes Nano ignore the product photos and still
+    return 200 — the canvas then writes a green success that is not the connected refs.
+    """
+    spec = spec or {}
+    if spec.get("needsSource"):
+        return True
+    if _looks_like_required_edit(spec.get("id") or "", spec.get("name") or ""):
+        return True
+    caps = spec.get("capabilities") or {}
+    if caps.get("image_to_image") is True or caps.get("inpainting") is True:
+        return True
+    if caps.get("image_to_image") is False:
+        return False
+    return True
+
+
 def _source_images(payload: dict) -> list:
     """Collect + clamp refs for Nano input_references (provider maxRefs default 5)."""
     from .ref_images import payload_ref_images, materialize_local_refs
@@ -826,6 +846,10 @@ def _image_body(payload: dict, spec: dict) -> dict:
         rng = f"{min_in}–{max_in}" if max_in else str(min_in)
         raise ValueError(
             f"当前模型需要 {rng} 张参考图，请求里是 {len(imgs)} 张。请先把图片连到分镜，不能静默发 0 张"
+        )
+    if imgs and not _image_eats_refs(spec):
+        raise ValueError(
+            f"当前模型是文生图，不吃参考图（已连 {len(imgs)} 张）。请改选 Edit 模型或断开参考连线，不能静默忽略"
         )
     if imgs:
         # NanoGPT rejects mixing input_references with image / imageDataUrl / image_url.

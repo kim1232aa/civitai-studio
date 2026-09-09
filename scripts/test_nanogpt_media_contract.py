@@ -153,6 +153,27 @@ def main():
         check(isinstance(packed.get("input_references"), list) and len(packed["input_references"]) >= 1)
         check(all(str(u).startswith("data:image/") for u in packed["input_references"]))
 
+        flare_t2i = {
+            "id": "openai/gpt-image-2.5/flare/text-to-image",
+            "name": "GPT Image 2.5 Flare",
+            "supported_parameters": {
+                "resolutions": ["1024x1024"],
+                "max_output_images": 4,
+            },
+            "capabilities": {"image_generation": True, "image_to_image": False},
+        }
+        check(nano._image_eats_refs(flare_t2i) is False)
+        check(nano._image_eats_refs(flare) is True)
+        t2i_ok = nano._image_body({"prompt": "淘宝主图", "resolution": "1024x1024"}, flare_t2i)
+        check("input_references" not in t2i_ok)
+        rejects(nano._image_body, {
+            "prompt": "淘宝主图",
+            "resolution": "1024x1024",
+            "sourceImage": "https://example.invalid/ref.png",
+            "images": ["https://example.invalid/ref.png"],
+            "serviceId": flare_t2i["id"],
+        }, flare_t2i)
+
         provider = nano.NanoGptProvider()
         code, data = provider._generate_video({**BASE, "mode": "text-to-video"}, VIDEO, VIDEO["id"])
         check(code == 422 and data["error"] == "OFFLINE transport sentinel")

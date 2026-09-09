@@ -453,6 +453,13 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     assert_true("refUrls.length > refCap" in run, "over-cap compare in runShotStep")
     assert_true('status: "blocked"' in run and "超过上限" in run, "over-cap returns blocked with setMsg")
     assert_true("不静默丢弃" in run or "超过上限" in run, "loud over-cap message")
+    assert_true("function catalogEatsRefs" in js, "t2i image_to_image=false helper")
+    assert_true("function refUnusedGateMessage" in js, "t2i-with-refs hard gate")
+    assert_true("不静默忽略" in js, "unused-refs loud copy")
+    assert_true("refUnusedGateMessage(shot)" in run, "unused-refs gate in runShotStep")
+    assert_true(run.find("refUnusedGateMessage") < run.find("attachExtraImages(payload, shot)"),
+                "unused-refs gate before attachExtraImages")
+    assert_true("reason = \"ref-unused\"" in js or "reason = 'ref-unused'" in js, "send data-reason ref-unused")
     # count check before fetch / attach path
     assert_true("countRefUrls(payload, shot)" in run, "count before generate")
     assert_true(run.find("countRefUrls") < run.find("attachExtraImages(payload, shot)"),
