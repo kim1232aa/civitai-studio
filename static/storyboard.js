@@ -1772,17 +1772,18 @@
       ? '<button class="chip-btn" type="button" data-act="promote" title="收进资产库">入库</button>'
       : "";
     const refCap = maxRefCount(catalogItemForService());
-    // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink;
-    // fill remaining slots with unlinked suggestions up to maxRefs.
+    // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink.
     // Hint numerator uses the same URL set as the send gate (countRefUrls), not a stale default cap.
     const refCount = countRefUrls(null, n).length;
-    const remain = Math.max(0, refCap - linked.length);
+    const remain = Math.max(0, refCap - refCount);
     const refHint = refCount > refCap
       ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出，请减少连线</span>'
       : '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap +
           (remain ? (' · 还可 ' + remain) : '') + '</span>';
-    const suggest = list.filter((a) => !linked.some((x) => x.id === a.id)).slice(0, remain);
-    const chipNodes = linked.concat(suggest);
+    // Unlinked thumbnails are selectable suggestions, not sent references.
+    // Keep them out of this row so the visible count cannot claim 0/n beside
+    // a thumbnail that will not be sent.
+    const chipNodes = linked;
     $("refs").innerHTML = frameHtml +
       '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
       '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
@@ -2304,9 +2305,24 @@
     const list = shots();
     if (!list.length) return;
     const pad = 12;
-    const left = area.left + pad, right = area.right - pad;
-    const top = area.top + pad, bottom = area.bottom - pad;
+    let left = area.left + pad, right = area.right - pad;
+    let top = area.top + pad, bottom = area.bottom - pad;
     const scale = state.cam.s;
+    if (focus && scale >= 1) {
+      // At 100%, keep the selected card inside the actual canvas viewport;
+      // controls reduce the safe area below a card's physical 360px height.
+      const vr = vp.getBoundingClientRect();
+      left = 2; right = vr.width - 2; top = 2; bottom = vr.height - 2;
+      const fb = box(focus);
+      const fw = fb.w * scale, fh = fb.h * scale;
+      state.cam.x = fw > right - left
+        ? (left + right - fw) / 2 - focus.x * scale
+        : Math.max(left - focus.x * scale, Math.min(right - fw - focus.x * scale, state.cam.x));
+      state.cam.y = fh > bottom - top
+        ? (top + bottom - fh) / 2 - focus.y * scale
+        : Math.max(top - focus.y * scale, Math.min(bottom - fh - focus.y * scale, state.cam.y));
+      return;
+    }
     const bounds = list.reduce((out, item) => {
       const b = box(item);
       out.minX = Math.min(out.minX, item.x);
@@ -2357,7 +2373,7 @@
   function separateOverlappingShots() {
     const list = shots();
     let changed = false;
-    const gap = 72;
+    const gap = 48;
     const overlapRatio = (a, b) => {
       const ab = box(a), bb = box(b);
       const w = Math.max(0, Math.min(a.x + ab.w, b.x + bb.w) - Math.max(a.x, b.x));
@@ -2365,12 +2381,16 @@
       return (w * h) / Math.max(1, Math.min(ab.w * ab.h, bb.w * bb.h));
     };
     list.forEach((n, i) => {
-      let guard = 0;
-      while (list.slice(0, i).some((prev) => overlapRatio(prev, n) > 0.25) && guard++ < list.length) {
-        const prev = list[i - 1] || list[0];
-        n.x = prev.x + box(prev).w + gap;
-        n.y = prev.y;
-        changed = true;
+      if (!list.slice(0, i).some((prev) => overlapRatio(prev, n) > 0.25)) return;
+      const anchor = list[0];
+      const ab = box(anchor);
+      for (let slot = 0; slot < list.length * 2; slot++) {
+        n.x = anchor.x + (slot % 2) * (ab.w + gap);
+        n.y = anchor.y + Math.floor(slot / 2) * (ab.h + gap);
+        if (!list.slice(0, i).some((prev) => overlapRatio(prev, n) > 0.25)) {
+          changed = true;
+          return;
+        }
       }
     });
     if (changed) persist();
@@ -5302,6 +5322,7 @@
       url: "", firstFrameId: "",
       prompt: "",
     });
+    separateOverlappingShots();
     constrainShotsToViewport();
     selectNode(id); persist();
   };
