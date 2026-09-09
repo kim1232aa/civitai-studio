@@ -199,15 +199,14 @@ class CivitaiContract(unittest.TestCase):
             payload = krea_payload(loras=loras)
             with self.subTest(loras=loras):
                 self.transport.reset_mock()
-                inp = step_input(civ.build_workflow(payload))
-                self.assertEqual(inp["loras"], [{"air": KLEA_AIR}])
-                self.assertNotIn("strength", inp["loras"][0])
-                self.assertNotEqual(inp["loras"][0].get("strength"), 1.0)
+                with self.assertRaises(ValueError) as raised:
+                    civ.build_workflow(payload)
+                msg = str(raised.exception)
+                self.assertIn("ImmutableDictionary", msg)
+                self.assertIn("不会默认为 1.0", msg)
                 code, data = civ.CivitaiProvider().generate(payload)
-                self.assertEqual(code, 200, data)
-                submitted = data["submittedInput"]["loras"]
-                self.assertEqual(submitted, [{"air": KLEA_AIR}])
-                self.assertNotIn("1.0", str(submitted))
+                self.assertEqual(code, 400, data)
+                self.transport.assert_not_called()
 
     def test_hunyuan_keeps_array_loras_and_original_duration_steps(self):
         air = "urn:air:hunyuan:lora:civitai:9@9"
@@ -568,12 +567,12 @@ class CivitaiContract(unittest.TestCase):
 
         self.transport.reset_mock()
         payload = krea_payload(loras=[{"air": air, "strength": loras[0]["strength"]}])
-        inp = step_input(civ.build_workflow(payload))
-        self.assertEqual(inp["loras"], [{"air": air}])
-        self.assertNotIn("strength", inp["loras"][0])
+        with self.assertRaises(ValueError) as raised:
+            civ.build_workflow(payload)
+        self.assertIn("ImmutableDictionary", str(raised.exception))
         code, data = civ.CivitaiProvider().generate(payload)
-        self.assertEqual(code, 200, data)
-        self.assertEqual(data["submittedInput"]["loras"], [{"air": air}])
+        self.assertEqual(code, 400, data)
+        self.transport.assert_not_called()
 
     def test_prompt_lora_tag_without_weight_is_not_defaulted_to_0_8(self):
         tagged = civ._prompt_lora_tags("<lora:RadianceChrome>")

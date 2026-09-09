@@ -693,11 +693,16 @@ def _lora_payload(loras: dict, cap: dict | None, engine: str | None):
     """
     cons = _constraint(cap, "loras")
     kind = (cons.get("type") or "").lower()
-    use_array = kind == "array" or (not kind and engine == "hunyuan") or any(
-        v is None for v in loras.values()
-    )
+    use_array = kind == "array" or (not kind and engine == "hunyuan")
+    missing = [k for k, v in loras.items() if v is None]
     if use_array:
         return [_lora_row(k, v) for k, v in loras.items()]
+    # Comfy / sdcpp live recipe: ImmutableDictionary<AIR, double>. Null cannot convert.
+    if missing:
+        raise ValueError(
+            "Civitai 官方 loras 是 {AIR: number}（ImmutableDictionary<AIR,double>），"
+            f"导入 strength 为空：{', '.join(missing)}。请填写强度后再生成，不会默认为 1.0"
+        )
     return loras
 
 

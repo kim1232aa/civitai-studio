@@ -480,7 +480,10 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         if mapping_task == "image-to-image" and not fields:
             body["image_url"] = refs[0]
             body["image_urls"] = refs
-    _force_loras(body, payload or {})
+    if (payload or {}).get("loras") not in (None, [], {}):
+        # Same official LoRA rules as Fal: omit null scale, refuse non-LoRA endpoints
+        # (including mapped fal-ai/krea-2/turbo). Never invent /lora sibling.
+        fal_mod.apply_fal_loras(body, payload or {}, spec, pid)
     # Pass endpoint-specific input fields through; never silently discard a supplied field.
     for field in fields.intersection(payload):
         if payload[field] not in (None, "") and field not in ("loras", "prompt"):

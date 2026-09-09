@@ -21,6 +21,17 @@ def extract_error(parsed, fallback="请求失败"):
             m = v.get("message") or v.get("msg") or v.get("detail")
             if m:
                 return str(m)
+        if isinstance(v, list) and v:
+            first = v[0]
+            if isinstance(first, str) and first.strip():
+                return first.strip()
+            if isinstance(first, dict):
+                loc = first.get("loc")
+                msg = first.get("msg") or first.get("message") or first.get("detail")
+                if msg:
+                    if isinstance(loc, list) and loc:
+                        return ".".join(str(x) for x in loc) + ": " + str(msg)
+                    return str(msg)
     errors = parsed.get("errors")
     if isinstance(errors, dict):
         m = errors.get("message") or errors.get("msg") or errors.get("detail")

@@ -123,7 +123,7 @@ class HFContract(unittest.TestCase):
 
     def test_fal_extra_fields_preserved_without_lora_clipping(self):
         with patch("providers.fal.find_model", return_value={}):
-            _, _, body = hf._call_fal("fal-ai", "fal-ai/model", {
+            _, _, body = hf._call_fal("fal-ai", "fal-ai/krea-2/turbo/lora", {
                 "prompt": "x", "quantity": 2, "aspectRatio": "3:2", "resolution": "1080p",
                 "duration": 5, "denoise": 0.375,
                 "loras": [{"path": "org/lora", "scale": -0.25}],
