@@ -1449,6 +1449,7 @@
     if (!cv) return;
     const ctx = cv.getContext("2d");
     const W = cv.width, H = cv.height;
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#121216";
     ctx.fillRect(0, 0, W, H);
@@ -1463,15 +1464,28 @@
       const nb = box(n);
       const x = ox + (n.x - b.minX) * scale;
       const y = oy + (n.y - b.minY) * scale;
-      const w = Math.max(2, nb.w * scale);
-      const h = Math.max(2, nb.h * scale);
+      // Keep the overview useful when a large canvas compresses cards below a
+      // visible pixel. The map is a navigation aid, not a second renderer.
+      const w = Math.max(8, Math.min(28, nb.w * scale));
+      const h = Math.max(6, Math.min(20, nb.h * scale));
       const preview = ensureMinimapPreview(n);
       if (n.url && minimapPreviewReady(preview)) {
         ctx.drawImage(preview, x, y, w, h);
       } else {
         ctx.fillStyle = n.kind === "shot" ? "#3a3a48" : "#2a3a36";
         ctx.fillRect(x, y, w, h);
-
+      }
+      ctx.strokeStyle = n.kind === "shot" ? "#777887" : "#5ee0c5";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + .5, y + .5, Math.max(1, w - 1), Math.max(1, h - 1));
+      if (n.kind === "shot" && w >= 12 && h >= 9) {
+        ctx.strokeStyle = "rgba(255,255,255,.22)";
+        ctx.beginPath();
+        ctx.moveTo(x + w * .5, y + 1);
+        ctx.lineTo(x + w * .5, y + h - 1);
+        ctx.moveTo(x + 1, y + h * .5);
+        ctx.lineTo(x + w - 1, y + h * .5);
+        ctx.stroke();
       }
       if (state.selected === n.id) {
         ctx.strokeStyle = n.kind === "shot" ? "#fff" : "#5ee0c5";
@@ -2310,8 +2324,10 @@
     state.cam.s = next;
     state.cam.x = cx - w0.x * next;
     state.cam.y = cy - w0.y * next;
+    const compacted = next === 1 && compactShotsAt100();
     if (constrainShotsToViewport()) renderCards();
-    constrainCameraToShots(n);
+    if (!compacted) constrainCameraToShots(n);
+    if (compacted) renderCards();
     applyCam(); persist();
     syncZoomPresets();
   }
@@ -2492,6 +2508,29 @@
     state.cam = { x: 90, y: 36, s: 0.5 };
     applyCam(); persist();
     syncZoomPresets();
+  }
+  function compactShotsAt100() {
+    const list = shots();
+    if (state.cam.s < 1 || list.length < 2) return false;
+    const area = canvasArea();
+    const cardW = Math.max.apply(null, list.map((n) => box(n).w));
+    const cardH = Math.max.apply(null, list.map((n) => box(n).h));
+    const cols = Math.min(list.length, Math.max(2, Math.ceil(list.length / 2)));
+    const rows = Math.ceil(list.length / cols);
+    const stepX = cols > 1
+      ? Math.max(1, (area.right - area.left - cardW) / (cols - 1))
+      : 0;
+    const stepY = rows > 1
+      ? Math.max(1, (area.bottom - area.top - cardH) / (rows - 1))
+      : 0;
+    list.forEach((n, i) => {
+      n.x = area.left + (i % cols) * stepX;
+      n.y = area.top + Math.floor(i / cols) * stepY;
+    });
+    state.cam.x = 0;
+    state.cam.y = 0;
+    persist();
+    return true;
   }
   function syncZoomPresets() {
     const box = $("zPresets");
@@ -5588,8 +5627,9 @@
       prompt: "",
     });
     separateOverlappingShots();
+    compactShotsAt100();
     constrainShotsToViewport();
-    selectNode(id); persist();
+    selectNode(id, { preserveLayout: state.cam.s >= 1 }); persist();
   };
   if ($("btnText")) {
     $("btnText").onclick = () => {
