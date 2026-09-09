@@ -342,6 +342,15 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 .editor-preview-media :is(img, video) { width: 100%; max-height: 420px; object-fit: contain; }
 .editor-preview-media .placeholder { padding: 24px; }
 .editor-preview-media .placeholder strong { display: block; color: #ddd; margin-bottom: 5px; }
+.editor-fields { display: flex; flex-direction: column; gap: 9px; }
+.editor-fields label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; }
+.editor-fields :is(input, textarea) {
+  width: 100%; border: 1px solid #34343e; border-radius: 8px; background: #141416;
+  color: #eee; padding: 8px 9px; font: inherit; line-height: 1.45;
+}
+.editor-fields textarea { min-height: 64px; resize: vertical; }
+.editor-fields :is(input, textarea):focus { border-color: var(--teal); outline: 1px solid rgba(94,224,197,.22); }
+.editor-fields-empty { padding: 11px; border: 1px dashed #383842; border-radius: 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .editor-timeline { min-width: 0; }
 .editor-timeline .workspace-card-body { padding: 10px; }
 .editor-stats {

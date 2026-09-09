@@ -393,6 +393,11 @@
     if (state.editor.activeShotId && !nodeById(state.editor.activeShotId)) state.editor.activeShotId = sequence[0] ? sequence[0].shot.id : null;
     const active = nodeById(state.editor.activeShotId);
     const total = sequence.reduce((n, item) => n + shotDurationSeconds(item.shot), 0);
+    const activeFields = active
+      ? '<div class="editor-fields"><label><span>镜头标题</span><input data-editor-field="title" value="' + esc(active.title || "分镜") + '"></label>' +
+        '<label><span>画面提示词</span><textarea data-editor-field="prompt" placeholder="描述这一镜的主体、动作、构图与光线">' + esc(active.prompt || "") + '</textarea></label>' +
+        '<label><span>负面提示</span><textarea data-editor-field="negative" placeholder="可选：不希望出现的内容">' + esc(active.negativePrompt || "") + '</textarea></label></div>'
+      : '<div class="editor-fields editor-fields-empty">选择一个分镜后，在这里编辑标题、画面提示词和负面提示。</div>';
     const grouped = state.script.scenes.map((scene) => {
       const rows = (scene.shotIds || []).map((id, i) => {
         const shot = nodeById(id);
@@ -426,7 +431,8 @@
       '<div class="editor-rows">' + (grouped || '<div class="editor-empty">先在剧本策划中创建分镜。</div>') + '</div></div></div>' +
       '<div class="editor-preview"><div class="editor-preview-head"><strong>' + esc(active ? active.title : "未选择分镜") + '</strong><span class="muted">' + (active ? formatDuration(shotDurationSeconds(active)) : "") + '</span></div>' +
       '<div class="editor-preview-media">' + workspaceMedia(active) + '</div>' +
-      '<div class="workspace-note">' + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
+      activeFields +
+      '<div class="workspace-note">' + + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
   }
   function renderWorkspace() {
     ensureWorkspaceModel();
@@ -564,6 +570,7 @@
       if (shotBtn) {
         state._scriptShotId = shotBtn.dataset.workspaceShot;
         state.editor.activeShotId = state._scriptShotId;
+        setWorkspace("canvas");
         selectNode(state._scriptShotId, { keepClosed: true });
         return;
       }
@@ -628,6 +635,19 @@
       }
       const move = e.target.closest("[data-editor-move]");
       if (move) moveEditorShot(move.dataset.shotId, move.dataset.editorMove);
+    });
+    if (editor) editor.addEventListener("input", (e) => {
+      const field = e.target.closest("[data-editor-field]");
+      const shot = field && nodeById(state.editor.activeShotId);
+      if (!field || !shot) return;
+      const key = field.dataset.editorField === "negative" ? "negativePrompt" : field.dataset.editorField;
+      shot[key] = field.value;
+      if (shot.id === _composerShotId) {
+        if ($("prompt")) $("prompt").value = shot.prompt || "";
+        if ($("negative")) $("negative").value = shot.negativePrompt || "";
+      }
+      if (key === "title") renderCards();
+      persist();
     });
     if (editor) editor.addEventListener("change", (e) => {
       const sceneSelect = e.target.closest("[data-editor-scene]");
