@@ -6,6 +6,7 @@ __pycache__/
 .env
 .env.*
 out/
+temp/
 docs/review-shots/
 docs/air-cache/manager/
 docs/_ui_findings.md
