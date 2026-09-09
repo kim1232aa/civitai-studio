@@ -3899,7 +3899,7 @@
         let pollMax = isVideoPoll ? 180 : 40;
         const pollMs = isVideoPoll ? 3000 : 2500;
         const bePoll = currentBackend() || (payload && payload.backend) || "";
-        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface")) {
+        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface" || bePoll === "fal")) {
           pollMax = 120;
         }
         for (let i = 0; i < pollMax; i++) {
