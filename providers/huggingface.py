@@ -18,6 +18,7 @@ from .http import collect_urls, extract_error, json_call, parse_job_id, raw_call
 from .io_meta import looks_like_civitai_service, remember_job, job_meta
 
 TOKEN_PATH = Path.home() / ".config/huggingface/token"
+TOKENS_PATH = Path.home() / ".config/huggingface/tokens"
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 ROUTER = "https://router.huggingface.co"
@@ -52,14 +53,41 @@ def _mapping_as_dict(raw):
     return out
 
 
+def hf_keys() -> list[str]:
+    """All configured HF tokens, first-file then extra lines then env. Never log values."""
+    found: list[str] = []
+
+    def add(raw):
+        token = (raw or "").strip()
+        if token and token not in found:
+            found.append(token)
+
+    for path in (TOKEN_PATH, TOKENS_PATH):
+        try:
+            for line in path.read_text().splitlines():
+                add(line)
+        except Exception:
+            pass
+    add(os.environ.get("HF_TOKEN"))
+    add(os.environ.get("HUGGINGFACE_TOKEN"))
+    return found
+
+
 def hf_key() -> str:
-    try:
-        t = TOKEN_PATH.read_text().strip()
-        if t:
-            return t
-    except Exception:
-        pass
-    return (os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN") or "").strip()
+    keys = hf_keys()
+    return keys[0] if keys else ""
+
+
+def _hf_credit_exhausted(code, data) -> bool:
+    if code == 402:
+        return True
+    blob = ""
+    if isinstance(data, dict):
+        blob = " ".join(str(data.get(k) or "") for k in ("error", "message", "msg", "detail"))
+    elif data:
+        blob = str(data)
+    low = blob.lower()
+    return "depleted" in low or "monthly included credits" in low or "payment required" in low
 
 
 _KREA_PIN = {
@@ -1068,8 +1096,8 @@ class HuggingFaceProvider(Provider):
     def generate(self, payload: dict):
         if not isinstance(payload, dict) or not isinstance(payload.get("serviceId", ""), str):
             return 400, {"error": "请求必须是对象，serviceId 必须是文本", "backend": self.id}
-        key = hf_key()
-        if not key:
+        keys = hf_keys()
+        if not keys:
             return 401, {"error": "没有 Hugging Face API Key"}
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
@@ -1084,134 +1112,151 @@ class HuggingFaceProvider(Provider):
         candidates = _provider_candidates(mapping, mid, spec, payload)
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
-        # One click authorizes one route, not a sequence of billable fallback POSTs.
-        for provider, pid, style in candidates[:1]:
-            if style == "openai" and provider in _SKIP_OPENAI:
-                continue
-            jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
-            submitted = {"model": mid, "provider": provider}
-            saved = []
-            meta = {
-                "backend": "huggingface",
-                "serviceId": mid,
-                "prompt": (payload or {}).get("prompt"),
-                "negativePrompt": (payload or {}).get("negativePrompt"),
-                "seed": (payload or {}).get("seed"),
-                "jobId": jid,
-            }
-            try:
-                routed_payload = dict(payload, task=_task(payload, spec))
-                adapter_path = (mapping.get(provider) or {}).get("adapterWeightsPath")
-                if adapter_path is not None:
-                    if provider != "fal-ai" or not isinstance(adapter_path, str) or not adapter_path or adapter_path.startswith("/") or ".." in adapter_path.split("/"):
-                        raise ValueError("HF 映射的 adapterWeightsPath 无法接入，拒绝只生成底模")
-                    loras = payload.get("loras") or []
-                    if not isinstance(loras, list):
-                        raise ValueError("HF LoRA 必须是数组")
-                    routed_payload["loras"] = [{
-                        "path": f"https://huggingface.co/{quote(mid, safe='/')}/resolve/main/{quote(adapter_path, safe='/')}",
-                        "scale": 1.0,
-                    }, *loras]
-                    if pid == "fal-ai/lora":
-                        # The HF official Fal helper specifies this base for SDXL adapters.
-                        routed_payload["model_name"] = "stabilityai/stable-diffusion-xl-base-1.0"
-                if style == "bytes":
-                    code, data, raw, ctype, submitted = _call_bytes(mid, payload or {}, spec, key, timeout)
-                    meta["submittedInput"] = submitted
-                    if code == 503:
-                        last = (503, {"error": "模型正在加载，请稍后再试"})
-                        continue
-                    if code >= 400 or (isinstance(data, dict) and data.get("error")):
-                        err = data if isinstance(data, dict) else {"error": (raw or b"")[:400].decode("utf-8", "replace")}
-                        if isinstance(err, dict):
-                            err.setdefault("error", extract_error(err, f"HTTP {code}"))
-                        last = (code if code >= 400 else 502, err)
-                        continue
-                    if isinstance(data, dict) and (data.get("error") or data.get("images") or data.get("data")):
-                        saved = _save_json_images(data, jid, meta=meta)
-                    elif raw and not (ctype or "").startswith("application/json"):
-                        saved = save_bytes(raw, jid, meta=meta)
-                    elif isinstance(data, dict):
-                        saved = _save_json_images(data, jid, meta=meta)
-                    elif raw:
-                        saved = save_bytes(raw, jid, meta=meta)
-                elif style == "fal":
-                    # o5 fake_call is 5-arg; do not TypeError mapping_task into a fake fal-ai error.
-                    extra = {}
-                    mapping_task = (mapping.get(provider) or {}).get("task")
-                    try:
-                        inspect.signature(_call_fal).bind(
-                            provider, pid, routed_payload, key, timeout,
-                            mapping_task=mapping_task,
-                        )
-                    except TypeError:
-                        pass
-                    else:
-                        extra["mapping_task"] = mapping_task
-                    code, data, submitted = _call_fal(
-                        provider, pid, routed_payload, key, timeout, **extra
-                    )
-                    meta["submittedInput"] = submitted
-                    if code >= 400 or data.get("error"):
-                        if isinstance(data, dict):
-                            data.setdefault("error", extract_error(data, f"HTTP {code}"))
-                        last = (code if code >= 400 else 502, data)
-                        # v0821o5: do not continue to wavespeed and overwrite the fal-ai error
-                        if _fal_ai_error_is_final(provider, mid, mapping):
-                            return last
-                        continue
-                    if data.get("request_id"):
+        # One click authorizes one route. Extra keys are only for HTTP 402 credits,
+        # never a second billable provider fallback.
+        for key in keys:
+            credit_retry = False
+            for provider, pid, style in candidates[:1]:
+                if style == "openai" and provider in _SKIP_OPENAI:
+                    continue
+                jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
+                submitted = {"model": mid, "provider": provider}
+                saved = []
+                meta = {
+                    "backend": "huggingface",
+                    "serviceId": mid,
+                    "prompt": (payload or {}).get("prompt"),
+                    "negativePrompt": (payload or {}).get("negativePrompt"),
+                    "seed": (payload or {}).get("seed"),
+                    "jobId": jid,
+                }
+                try:
+                    routed_payload = dict(payload, task=_task(payload, spec))
+                    adapter_path = (mapping.get(provider) or {}).get("adapterWeightsPath")
+                    if adapter_path is not None:
+                        if provider != "fal-ai" or not isinstance(adapter_path, str) or not adapter_path or adapter_path.startswith("/") or ".." in adapter_path.split("/"):
+                            raise ValueError("HF 映射的 adapterWeightsPath 无法接入，拒绝只生成底模")
+                        loras = payload.get("loras") or []
+                        if not isinstance(loras, list):
+                            raise ValueError("HF LoRA 必须是数组")
+                        routed_payload["loras"] = [{
+                            "path": f"https://huggingface.co/{quote(mid, safe='/')}/resolve/main/{quote(adapter_path, safe='/')}",
+                            "scale": 1.0,
+                        }, *loras]
+                        if pid == "fal-ai/lora":
+                            # The HF official Fal helper specifies this base for SDXL adapters.
+                            routed_payload["model_name"] = "stabilityai/stable-diffusion-xl-base-1.0"
+                    if style == "bytes":
+                        code, data, raw, ctype, submitted = _call_bytes(mid, payload or {}, spec, key, timeout)
+                        meta["submittedInput"] = submitted
+                        if code == 503:
+                            last = (503, {"error": "模型正在加载，请稍后再试"})
+                            continue
+                        if code >= 400 or (isinstance(data, dict) and data.get("error")):
+                            err = data if isinstance(data, dict) else {"error": (raw or b"")[:400].decode("utf-8", "replace")}
+                            if isinstance(err, dict):
+                                err.setdefault("error", extract_error(err, f"HTTP {code}"))
+                            last = (code if code >= 400 else 502, err)
+                            if _hf_credit_exhausted(code, err):
+                                credit_retry = True
+                                break
+                            continue
+                        if isinstance(data, dict) and (data.get("error") or data.get("images") or data.get("data")):
+                            saved = _save_json_images(data, jid, meta=meta)
+                        elif raw and not (ctype or "").startswith("application/json"):
+                            saved = save_bytes(raw, jid, meta=meta)
+                        elif isinstance(data, dict):
+                            saved = _save_json_images(data, jid, meta=meta)
+                        elif raw:
+                            saved = save_bytes(raw, jid, meta=meta)
+                    elif style == "fal":
+                        # o5 fake_call is 5-arg; do not TypeError mapping_task into a fake fal-ai error.
+                        extra = {}
+                        mapping_task = (mapping.get(provider) or {}).get("task")
                         try:
-                            result_url = _queue_url(data.get("response_url"))
-                            status_url = _queue_url(data["status_url"]) if data.get("status_url") else result_url.replace("?_subdomain=queue", "/status?_subdomain=queue")
-                        except ValueError as exc:
-                            return 502, {"error": str(exc), "backend": self.id, "provider": provider}
-                        jid = jid.replace("|sync|", "|queue|")
-                        meta.update(jobId=jid, queueResultUrl=result_url, queueStatusUrl=status_url, provider=provider)
-                        remember_job(jid, meta)
-                        return 200, {
-                            "id": jid, "status": "pending", "backend": self.id, "endpoint": mid,
-                            "provider": provider, "submittedInput": submitted,
-                        }
-                    saved = _save_json_images(data, jid, meta=meta)
-                else:
-                    code, data, submitted = _call_openai(provider, pid, payload or {}, key, timeout)
-                    meta["submittedInput"] = submitted
-                    err_txt = extract_error(data, f"HTTP {code}") if isinstance(data, dict) else str(data)
-                    if code >= 400 or data.get("error") or (isinstance(err_txt, str) and "Not allowed to POST" in err_txt):
-                        if isinstance(data, dict):
-                            data.setdefault("error", err_txt)
-                        last = (code if code >= 400 else 400, data if isinstance(data, dict) else {"error": err_txt})
-                        continue
-                    saved = _save_json_images(data, jid, meta=meta)
-            except ValueError as e:
-                return 400, {"error": str(e), "backend": self.id, "provider": provider}
-            except Exception as e:
-                last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
+                            inspect.signature(_call_fal).bind(
+                                provider, pid, routed_payload, key, timeout,
+                                mapping_task=mapping_task,
+                            )
+                        except TypeError:
+                            pass
+                        else:
+                            extra["mapping_task"] = mapping_task
+                        code, data, submitted = _call_fal(
+                            provider, pid, routed_payload, key, timeout, **extra
+                        )
+                        meta["submittedInput"] = submitted
+                        if code >= 400 or data.get("error"):
+                            if isinstance(data, dict):
+                                data.setdefault("error", extract_error(data, f"HTTP {code}"))
+                            last = (code if code >= 400 else 502, data)
+                            if _hf_credit_exhausted(code, data):
+                                credit_retry = True
+                                break
+                            # v0821o5: do not continue to wavespeed and overwrite the fal-ai error
+                            if _fal_ai_error_is_final(provider, mid, mapping):
+                                return last
+                            continue
+                        if data.get("request_id"):
+                            try:
+                                result_url = _queue_url(data.get("response_url"))
+                                status_url = _queue_url(data["status_url"]) if data.get("status_url") else result_url.replace("?_subdomain=queue", "/status?_subdomain=queue")
+                            except ValueError as exc:
+                                return 502, {"error": str(exc), "backend": self.id, "provider": provider}
+                            jid = jid.replace("|sync|", "|queue|")
+                            meta.update(jobId=jid, queueResultUrl=result_url, queueStatusUrl=status_url, provider=provider)
+                            remember_job(jid, meta)
+                            return 200, {
+                                "id": jid, "status": "pending", "backend": self.id, "endpoint": mid,
+                                "provider": provider, "submittedInput": submitted,
+                            }
+                        saved = _save_json_images(data, jid, meta=meta)
+                    else:
+                        code, data, submitted = _call_openai(provider, pid, payload or {}, key, timeout)
+                        meta["submittedInput"] = submitted
+                        err_txt = extract_error(data, f"HTTP {code}") if isinstance(data, dict) else str(data)
+                        if code >= 400 or data.get("error") or (isinstance(err_txt, str) and "Not allowed to POST" in err_txt):
+                            if isinstance(data, dict):
+                                data.setdefault("error", err_txt)
+                            last = (code if code >= 400 else 400, data if isinstance(data, dict) else {"error": err_txt})
+                            if _hf_credit_exhausted(code, last[1]):
+                                credit_retry = True
+                                break
+                            continue
+                        saved = _save_json_images(data, jid, meta=meta)
+                except ValueError as e:
+                    return 400, {"error": str(e), "backend": self.id, "provider": provider}
+                except Exception as e:
+                    last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
+                    if _fal_ai_error_is_final(provider, mid, mapping):
+                        return last
+                    continue
+                if saved:
+                    out = {
+                        "id": jid,
+                        "status": "succeeded",
+                        "backend": "huggingface",
+                        "endpoint": mid,
+                        "provider": provider,
+                        "saved": saved,
+                        "submittedInput": submitted,
+                    }
+                    # Fake-confidence: body may carry loras[] on mapped turbo; router has no /lora sibling.
+                    if (payload or {}).get("loras") and isinstance(submitted, dict) and submitted.get("loras"):
+                        out["warning"] = (
+                            "Hugging Face 已把 loras[] 附在 mapped 端点发出去；"
+                            "上游是否加载未证实（路由没有 /lora sibling）"
+                        )
+                    remember_job(jid, {**meta, "result": out})
+                    return 200, out
+                last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
                 if _fal_ai_error_is_final(provider, mid, mapping):
                     return last
+                if credit_retry:
+                    break
+            if credit_retry:
                 continue
-            if saved:
-                out = {
-                    "id": jid,
-                    "status": "succeeded",
-                    "backend": "huggingface",
-                    "endpoint": mid,
-                    "provider": provider,
-                    "saved": saved,
-                    "submittedInput": submitted,
-                }
-                # Fake-confidence: body may carry loras[] on mapped turbo; router has no /lora sibling.
-                if (payload or {}).get("loras") and isinstance(submitted, dict) and submitted.get("loras"):
-                    out["warning"] = (
-                        "Hugging Face 已把 loras[] 附在 mapped 端点发出去；"
-                        "上游是否加载未证实（路由没有 /lora sibling）"
-                    )
-                remember_job(jid, {**meta, "result": out})
-                return 200, out
-            last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
-            if _fal_ai_error_is_final(provider, mid, mapping):
-                return last
+            return last
         return last
 
     def job_status(self, job_id: str):
@@ -1222,11 +1267,16 @@ class HuggingFaceProvider(Provider):
             return 200, meta["result"]
         if not meta.get("queueStatusUrl"):
             return 502, {"id": job_id, "error": "HF 任务缺少查询地址", "backend": self.id}
-        key = hf_key()
-        if not key:
+        keys = hf_keys()
+        if not keys:
             return 401, {"error": "没有 Hugging Face API Key", "backend": self.id}
-        headers = _auth_headers(key)
-        code, data = json_call(meta["queueStatusUrl"], headers=headers, timeout=60)
+        code, data = 401, {}
+        for key in keys:
+            headers = _auth_headers(key)
+            code, data = json_call(meta["queueStatusUrl"], headers=headers, timeout=60)
+            if _hf_credit_exhausted(code, data) or (code in (401, 403) and key != keys[-1]):
+                continue
+            break
         if code >= 400 or not isinstance(data, dict):
             return code if code >= 400 else 502, {"id": job_id, "error": extract_error(data), "backend": self.id}
         state = str(data.get("status") or "").upper()

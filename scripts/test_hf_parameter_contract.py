@@ -18,6 +18,7 @@ class HFContract(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch("socket.socket", side_effect=AssertionError("offline only")))
         self.enterContext(patch("socket.getaddrinfo", side_effect=AssertionError("offline only")))
+        self.enterContext(patch.object(hf, "hf_keys", return_value=["offline-token"]))
         self.enterContext(patch.object(hf, "hf_key", return_value="offline-token"))
         self.transport = self.enterContext(patch.object(hf, "json_call", return_value=(200, {"images": []})))
         self.enterContext(patch.object(hf, "raw_call", side_effect=AssertionError("unexpected bytes call")))
@@ -64,6 +65,37 @@ class HFContract(unittest.TestCase):
             code, data = hf.HuggingFaceProvider().generate({"serviceId": "org/flux", "prompt": "x"})
         self.assertEqual(code, 422)
         self.assertEqual(data["error"], "original rejection")
+        self.assertEqual(self.transport.call_count, 1)
+
+    def test_402_retries_next_hf_key_not_another_route(self):
+        mapping = {
+            "fal-ai": {"status": "live", "providerId": "fal-ai/flux/dev", "task": "text-to-image"},
+            "nscale": {"status": "live", "providerId": "org/flux"},
+        }
+
+        def transport(url, method="GET", headers=None, body=None, timeout=90):
+            auth = (headers or {}).get("Authorization") or ""
+            if "key-dead" in auth:
+                return 402, {"error": "You have depleted your monthly included credits."}
+            return 200, {"images": [{"url": "https://example.invalid/ok.png"}]}
+
+        self.transport.side_effect = transport
+        with patch.object(hf, "hf_keys", return_value=["key-dead", "key-live"]), \
+                patch.object(hf, "inference_mapping", return_value=mapping):
+            code, data = hf.HuggingFaceProvider().generate({"serviceId": "org/flux", "prompt": "x"})
+        self.assertEqual(code, 200, data)
+        self.assertEqual(data.get("status"), "succeeded")
+        self.assertEqual(self.transport.call_count, 2)
+        auths = [c.kwargs.get("headers", {}).get("Authorization") for c in self.transport.call_args_list]
+        self.assertEqual(auths, ["Bearer key-dead", "Bearer key-live"])
+
+    def test_422_does_not_burn_a_second_hf_key(self):
+        mapping = {"fal-ai": {"status": "live", "providerId": "fal-ai/flux/dev", "task": "text-to-image"}}
+        self.transport.return_value = (422, {"error": "HTTP 422"})
+        with patch.object(hf, "hf_keys", return_value=["key-a", "key-b"]), \
+                patch.object(hf, "inference_mapping", return_value=mapping):
+            code, data = hf.HuggingFaceProvider().generate({"serviceId": "org/flux", "prompt": "x"})
+        self.assertEqual(code, 422, data)
         self.assertEqual(self.transport.call_count, 1)
 
     def test_lora_weights_and_all_entries_preserved(self):

@@ -692,41 +692,34 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert nano_src.count("resolve_nano_loras") >= 2  # image + video
     assert "video path also runs resolve_nano_loras" in nano_src
 
-    # v0772: Nano prompt length precheck (server + FE) — do not waste a generate
+    # Live 2026-09-10: official Nano Image API accepted 1311 chars. Local 1200
+    # was a stale historical 400, not a documented max — do not invent one.
     from providers.nanogpt import prompt_length_error, NANO_PROMPT_MAX, NanoGptProvider
-    assert NANO_PROMPT_MAX == 1200
+    assert NANO_PROMPT_MAX is None
     assert prompt_length_error("x" * 1200) is None
     assert prompt_length_error("ok") is None
     assert prompt_length_error("") is None
     assert prompt_length_error(None) is None
-    err_long = prompt_length_error("y" * 1408)
-    assert err_long and err_long.get("code") == "prompt_too_long"
-    assert err_long["length"] == 1408 and err_long["max"] == 1200 and err_long["limit"] == 1200
-    assert "1408/1200" in err_long["error"]
-    assert "提示词过长" in err_long["error"]
-    # Provider generate path returns 400 before Nano API when overlong
+    assert prompt_length_error("y" * 1311) is None
+    assert prompt_length_error("y" * 1408) is None
     prov = NanoGptProvider()
-    # Patch nano_key so we get past auth; prompt gate runs in _generate_image/_video
     import unittest.mock as mock
     with mock.patch("providers.nanogpt.nano_key", return_value="test-key"):
         with mock.patch("providers.nanogpt.find_spec", return_value={
-            "id": "wavespeed-ai/krea-v2/turbo",
+            "id": "krea-v2/turbo-lora",
             "category": "image",
-            "supported_parameters": {"resolutions": ["1024x1024"]},
+            "supported_parameters": {"resolutions": ["1k"]},
             "capabilities": {},
         }):
-            with mock.patch("providers.nanogpt.json_call") as jc:
+            with mock.patch("providers.nanogpt.json_call", return_value=(502, {"error": "offline"})) as jc:
                 code, body = prov.generate({
-                    "serviceId": "wavespeed-ai/krea-v2/turbo",
-                    "prompt": "z" * 1408,
-                    "width": 1024,
-                    "height": 1024,
+                    "serviceId": "krea-v2/turbo-lora",
+                    "prompt": "z" * 1311,
+                    "resolution": "1k",
                 })
-                assert code == 400, (code, body)
-                assert body.get("code") == "prompt_too_long"
-                assert body.get("length") == 1408 and body.get("max") == 1200
-                assert not jc.called, "must not call Nano API when prompt_too_long"
-    # FE: constant + precheck + truncate + import/switch warn
+                assert jc.called, "1311-char prompt must reach Nano, not a local 1200 gate"
+                assert body.get("code") != "prompt_too_long", body
+    # index.html still has the old truncate UI (out of storyboard scope)
     assert "NANO_PROMPT_MAX = 1200" in html
     assert "提示词过长" in html
     assert "nPrompt > NANO_PROMPT_MAX" in html
@@ -736,7 +729,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "nanoPromptHint" in html
     assert 'title="v0776"' in html
     assert "prompt_length_error" in nano_src
-    assert "NANO_PROMPT_MAX = 1200" in nano_src
+    assert "NANO_PROMPT_MAX = None" in nano_src
 
 
     # v0773: seed sync after generate; fixed-seed warn; Nano prefers response seed
@@ -837,7 +830,7 @@ console.log('PASS isMusePublicQwenImageCousin');
         assert caps["progress"] in ("rate", "queue", "status_only", "none")
     assert pub["huggingface"]["capabilities"]["loraConfidence"] == "unverified"
     assert pub["nano-gpt"]["capabilities"]["resolution"] == "catalog_token"
-    assert pub["nano-gpt"]["capabilities"]["promptMax"] == 1200
+    assert pub["nano-gpt"]["capabilities"]["promptMax"] is None
     # override must not raise: provider lora=none cannot get supportsLora true
     weak = get_provider_capabilities("huggingface")
     # simulate a none provider
@@ -855,12 +848,12 @@ console.log('PASS isMusePublicQwenImageCousin');
     bad_conf = merge_catalog_override(hf, {"loraConfidence": "official"})
     assert bad_conf["loraConfidence"] == "unverified", bad_conf
     nano = get_provider_capabilities("nano-gpt")
-    assert nano["promptMax"] == 1200 and nano["progress"] == "none"
+    assert nano["promptMax"] is None and nano["progress"] == "none"
     bad_prog = merge_catalog_override(nano, {"progress": "rate"})
     assert bad_prog["progress"] == "none", bad_prog
-    bad_max = merge_catalog_override(nano, {"promptMax": None})
-    assert bad_max["promptMax"] == 1200, bad_max
-    # narrowing still ok
+    same_max = merge_catalog_override(nano, {"promptMax": None})
+    assert same_max["promptMax"] is None, same_max
+    # catalog may narrow unlimited → finite; must not invent a local 1200
     ok_max = merge_catalog_override(nano, {"promptMax": 800})
     assert ok_max["promptMax"] == 800
 

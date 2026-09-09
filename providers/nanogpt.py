@@ -38,13 +38,17 @@ CHAT_COMPLETIONS = BASE + "/v1/chat/completions"
 _CACHE = {"at": 0.0, "items": None}
 _TTL = 300
 
-# Nano Image API rejects prompts over this many characters with HTTP 400
-# code prompt_too_long (observed: "1408 > 1200"). Keep FE/server in sync.
-NANO_PROMPT_MAX = 1200
+# Live 2026-09-10: POST https://nano-gpt.com/api/v1/images accepted a 1311-char
+# SFW prompt (HTTP 200, billed). Docs still publish no prompt max. The old
+# local 1200 ceiling (historical 400 "1408 > 1200") is not an official limit
+# and must not invent one. Upstream prompt_too_long still surfaces as 400.
+NANO_PROMPT_MAX = None
 
 
 def prompt_length_error(prompt) -> dict | None:
-    """Return 400 body if prompt exceeds NANO_PROMPT_MAX; else None."""
+    """Local precheck only when an official max is known. None = pass through."""
+    if NANO_PROMPT_MAX is None:
+        return None
     text = prompt if isinstance(prompt, str) else ("" if prompt is None else str(prompt))
     n = len(text)
     if n <= NANO_PROMPT_MAX:

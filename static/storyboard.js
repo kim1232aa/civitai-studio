@@ -1536,7 +1536,10 @@
     vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar").forEach((el) => {
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height) return;
-      if (el.classList.contains("selbar") || (narrow && !el.classList.contains("zoom"))) {
+      // On narrow canvases the tool/asset rail is an overlay, not a top
+      // boundary. Reserving it here collapses the usable area and leaves an
+      // expanded Composer with only a 100px viewport.
+      if (el.classList.contains("selbar")) {
         area.top = Math.max(area.top, b.bottom - r.top + 12);
       } else if (!narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
@@ -1563,16 +1566,26 @@
       maxH = Math.min(height, below);
       left = x + (nw - dockW) / 2;
       top = y + nh + gap;
-    } else if (above >= minHeight || Math.max(right, leftRoom) < 360) {
+    } else if (above >= minHeight) {
       maxH = Math.min(height, above);
       left = x + (nw - dockW) / 2;
       top = y - 34 * state.cam.s - gap - maxH;
     } else {
       const onRight = right >= 360;
-      dockW = Math.min(400, onRight ? right : leftRoom);
-      maxH = Math.min(height, area.bottom - area.top);
-      left = onRight ? x + nw + gap : x - gap - dockW;
-      top = y;
+      if (onRight || leftRoom >= 360) {
+        dockW = Math.min(400, onRight ? right : leftRoom);
+        maxH = Math.min(height, area.bottom - area.top);
+        left = onRight ? x + nw + gap : x - gap - dockW;
+        top = y;
+      } else {
+        // No side/above slot (common on short narrow viewports): overlay the
+        // dock in the usable canvas instead of collapsing it to the 112px
+        // minimum and hiding the reference row.
+        dockW = width;
+        maxH = Math.min(height, area.bottom - area.top);
+        left = area.left;
+        top = area.top;
+      }
     }
     maxH = Math.min(area.bottom - area.top, Math.max(Math.min(height, 112), maxH));
     left = Math.max(area.left, Math.min(left, area.right - dockW));
@@ -2312,14 +2325,15 @@
       // At 100%, keep the selected card inside the actual canvas viewport;
       // controls reduce the safe area below a card's physical 360px height.
       const vr = vp.getBoundingClientRect();
-      left = 2; right = vr.width - 2; top = 2; bottom = vr.height - 2;
+      const narrow = vr.width <= 900;
+      left = narrow ? 76 : 2; right = vr.width - (narrow ? 12 : 2); top = 38; bottom = vr.height - 2;
       const fb = box(focus);
       const fw = fb.w * scale, fh = fb.h * scale;
       state.cam.x = fw > right - left
-        ? (left + right - fw) / 2 - focus.x * scale
+        ? left - focus.x * scale
         : Math.max(left - focus.x * scale, Math.min(right - fw - focus.x * scale, state.cam.x));
       state.cam.y = fh > bottom - top
-        ? (top + bottom - fh) / 2 - focus.y * scale
+        ? top - focus.y * scale
         : Math.max(top - focus.y * scale, Math.min(bottom - fh - focus.y * scale, state.cam.y));
       return;
     }
@@ -2423,6 +2437,11 @@
     const dx = shift(bounds.minX, bounds.maxX, loX, hiX);
     const dy = shift(bounds.minY, bounds.maxY, loY, hiY);
     let changed = false;
+    // A multi-card layout can be larger than the viewport at 100%. Shift the
+    // collection once, but do not clamp each card to the same edge (that
+    // collapses the minimap into a stack).
+    const fitX = bounds.maxX - bounds.minX <= hiX - loX;
+    const fitY = bounds.maxY - bounds.minY <= hiY - loY;
     list.forEach((n) => {
       const b = box(n);
       const oldX = n.x, oldY = n.y;
@@ -2430,8 +2449,8 @@
       n.y += dy;
       const maxX = hiX - b.w;
       const maxY = hiY - b.h;
-      if (maxX >= loX) n.x = Math.max(loX, Math.min(n.x, maxX));
-      if (maxY >= loY) n.y = Math.max(loY, Math.min(n.y, maxY));
+      if (fitX && maxX >= loX) n.x = Math.max(loX, Math.min(n.x, maxX));
+      if (fitY && maxY >= loY) n.y = Math.max(loY, Math.min(n.y, maxY));
       changed = changed || n.x !== oldX || n.y !== oldY;
     });
     return changed;
@@ -2441,24 +2460,29 @@
     const area = canvasArea();
     const scale = state.cam.s || 1;
     const selected = nodeById(state.selected);
+    const existing = shots();
     const comfy = readComfyParamsFromUi();
     const bNew = scaleShotBox(comfy.width, comfy.height);
-    const bSel = (selected && selected.kind === "shot") ? box(selected) : bNew;
     const pad = 16;
+    const gap = 48;
     const minX = (area.left + pad - state.cam.x) / scale;
     const maxX = (area.right - pad - state.cam.x) / scale - bNew.w;
     const minY = (area.top + pad - state.cam.y) / scale;
     const maxY = (area.bottom - pad - state.cam.y) / scale - bNew.h;
-    const baseX = selected && selected.kind === "shot"
-      ? selected.x + bSel.w + 24 / scale
-      : ((area.left + area.right) / 2 - state.cam.x) / scale - bNew.w / 2;
-    const baseY = selected && selected.kind === "shot"
-      ? selected.y
-      : ((area.top + area.bottom) / 2 - state.cam.y) / scale - bNew.h / 2;
-    const clamp = (v, lo, hi) => hi < lo ? (lo + hi) / 2 : Math.max(lo, Math.min(v, hi));
+    const clamp = (v, lo, hi) => hi < lo ? lo : Math.max(lo, Math.min(v, hi));
+    // First card stays in the viewport. Later cards go to the right of the
+    // rightmost shot with a full card gap — never a 24px nudge that stacks
+    // 360×640 cards, and never clamp them onto the same viewport edge.
+    if (!existing.length) {
+      const cx = ((area.left + area.right) / 2 - state.cam.x) / scale - bNew.w / 2;
+      const cy = ((area.top + area.bottom) / 2 - state.cam.y) / scale - bNew.h / 2;
+      return { x: clamp(cx, minX, maxX), y: clamp(cy, minY, maxY) };
+    }
+    const rightmost = existing.reduce((a, n) => (n.x + box(n).w > a.x + box(a).w ? n : a), existing[0]);
+    const anchor = (selected && selected.kind === "shot") ? selected : rightmost;
     return {
-      x: clamp(baseX + (index % 2) * (24 / scale), minX, maxX),
-      y: clamp(baseY + Math.floor(index / 2) * (24 / scale), minY, maxY),
+      x: rightmost.x + box(rightmost).w + gap,
+      y: anchor.y,
     };
   }
   function fitCam() {

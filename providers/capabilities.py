@@ -141,7 +141,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "loraConfidence": "official",
         "resolution": "catalog_token",
         "seed": _seed(min_v=-1, max_v=2147483647, clamp="reject"),
-        "promptMax": 1200,
+        "promptMax": None,
         "negative": True,
         "progress": "none",
         "cancel": False,
