@@ -45,7 +45,7 @@ def source_contracts():
     ok("function loraModelId" in JS, "loraModelId parses air")
     ok('payload.pop("loras", None)' not in COMPILE, "compile does not silent-pop loras")
     ok("已选 LoRA 不能静默丢掉" in COMPILE, "compile refuses residual LoRA")
-    ok("storyboard.js?v=20260910-lora-req" in HTML, "cache stamp")
+    ok("storyboard.js?v=20260910-astra-0163679" in HTML, "cache stamp")
     ok("revalidateLorasForService()" in JS, "syncParamChrome revalidates")
 
 
