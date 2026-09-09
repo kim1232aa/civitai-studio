@@ -117,6 +117,7 @@
     groupRunAbort: false,
     uploading: 0,
     dockMode: "collapsed",
+    _overview100: false,
     workspace: "canvas",
     script: { title: "未命名故事", logline: "", scenes: [] },
     editor: { activeShotId: null, playing: false, playIndex: 0, timer: null },
@@ -176,7 +177,13 @@
   function box(n) {
     if (n.kind === "shot") {
       const px = shotPixelSize(n);
-      return scaleShotBox(px.w, px.h);
+      const scaled = scaleShotBox(px.w, px.h);
+      if (state._overview100) {
+        const cap = 300;
+        const ratio = Math.min(1, cap / Math.max(scaled.w, scaled.h));
+        return { w: Math.max(1, Math.round(scaled.w * ratio)), h: Math.max(1, Math.round(scaled.h * ratio)) };
+      }
+      return scaled;
     }
     if (n.kind === "text") return { w: 320, h: 280 };
     return { w: 132, h: 208 };
@@ -2315,6 +2322,7 @@
   }
   function setZoomScale(s) {
     const next = Math.min(1.5, Math.max(0.16, s));
+    state._overview100 = next === 1;
     const r = vp.getBoundingClientRect();
     const n = nodeById(state.selected), b = n && box(n);
     // Toolbar zoom keeps the selection, not the unrelated viewport centre, in view.
@@ -2511,21 +2519,26 @@
   }
   function compactShotsAt100() {
     const list = shots();
+    state._overview100 = state.cam.s >= 1;
     if (state.cam.s < 1 || list.length < 2) return false;
     const area = canvasArea();
-    const cardW = Math.max.apply(null, list.map((n) => box(n).w));
-    const cardH = Math.max.apply(null, list.map((n) => box(n).h));
-    const cols = Math.min(list.length, Math.max(2, Math.ceil(list.length / 2)));
+    const cols = Math.min(list.length, 4);
     const rows = Math.ceil(list.length / cols);
-    const stepX = cols > 1
-      ? Math.max(1, (area.right - area.left - cardW) / (cols - 1))
-      : 0;
-    const stepY = rows > 1
-      ? Math.max(1, (area.bottom - area.top - cardH) / (rows - 1))
-      : 0;
+    const gap = 24;
+    const widths = list.map((n) => box(n).w);
+    const heights = list.map((n) => box(n).h);
+    const colW = Array.from({ length: cols }, (_, col) =>
+      Math.max(...list.filter((_, i) => i % cols === col).map((_, i) => widths[col + i * cols] || 1)));
+    const rowH = Array.from({ length: rows }, (_, row) =>
+      Math.max(...list.slice(row * cols, (row + 1) * cols).map((_, i) => heights[row * cols + i] || 1)));
+    const totalW = colW.reduce((sum, w) => sum + w, 0) + gap * (cols - 1);
+    const startX = Math.max(area.left, area.left + (area.right - area.left - totalW) / 2);
+    const colX = colW.map((_, i) => startX + colW.slice(0, i).reduce((sum, w) => sum + w, 0) + gap * i);
+    const rowY = rowH.map((_, i) => area.top + rowH.slice(0, i).reduce((sum, h) => sum + h, 0) + gap * i);
     list.forEach((n, i) => {
-      n.x = area.left + (i % cols) * stepX;
-      n.y = area.top + Math.floor(i / cols) * stepY;
+      const col = i % cols, row = Math.floor(i / cols);
+      n.x = colX[col] + (colW[col] - widths[i]) / 2;
+      n.y = rowY[row] + (rowH[row] - heights[i]) / 2;
     });
     state.cam.x = 0;
     state.cam.y = 0;
