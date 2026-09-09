@@ -44,7 +44,11 @@ ok("syncParamChrome()" in body, "B1 applyServiceConstraints 里调了 syncParamC
 
 sync = fn_body("syncParamChrome")
 ok("syncLoraUi()" in sync, "syncParamChrome 刷新 LoRA 开关")
+ok("revalidateLorasForService()" in sync, "换模后重跑 LoRA capability 校验")
 ok("syncParamSurface()" in sync, "syncParamChrome 仍会刷参数面")
+ok("function catalogItemSupportsLora" in JS, "catalogItemSupportsLora")
+ok("function revalidateLorasForService" in JS, "revalidateLorasForService")
+ok("当前模型不支持 LoRA" in JS, "unsupported-model LoRA 红字")
 
 ok('applyServiceConstraints();' in JS, "#service/#backend change 调 applyServiceConstraints")
 ok("loadCatalog().then(function () { applyServiceConstraints(); })" in JS,

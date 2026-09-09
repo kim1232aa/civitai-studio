@@ -499,6 +499,8 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
     if refs:
         if not wants_img and not fields.intersection({"image_url", "image_urls"}):
             raise ValueError(f"HF {pid} 当前未接参考图，拒绝丢图生成")
+        if ref_cap is None:
+            raise ValueError(f"HF {pid} 参考图上限未知，拒绝按通用上限截断")
         if len(refs) > ref_cap or (fields and "image_urls" not in fields and len(refs) > 1):
             raise ValueError(f"HF {pid} 当前参考图接线不能接收 {len(refs)} 张，拒绝截断")
         if "image_urls" in fields or (not fields and len(refs) > 1):

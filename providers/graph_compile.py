@@ -447,7 +447,13 @@ def compile_graph(graph: dict | None) -> dict:
                 payload.pop("width", None)
                 payload.pop("height", None)
             if caps.get("lora") == "none":
-                payload.pop("loras", None)
+                if merged:
+                    return _err(
+                        f"后端 {backend} 不支持 LoRA，已选 LoRA 不能静默丢掉",
+                        blocked=True,
+                        nodeId=nid,
+                        parameter="loras",
+                    )
             if caps.get("promptMax") and isinstance(payload.get("prompt"), str):
                 mx = int(caps["promptMax"])
                 if len(payload["prompt"]) > mx:
@@ -543,7 +549,13 @@ def compile_graph(graph: dict | None) -> dict:
                 payload.pop("width", None)
                 payload.pop("height", None)
             if caps.get("lora") == "none":
-                payload.pop("loras", None)
+                if merged:
+                    return _err(
+                        f"后端 {backend} 不支持 LoRA，已选 LoRA 不能静默丢掉",
+                        blocked=True,
+                        nodeId=nid,
+                        parameter="loras",
+                    )
             if caps.get("promptMax") and isinstance(payload.get("prompt"), str):
                 mx = int(caps["promptMax"])
                 if len(payload["prompt"]) > mx:

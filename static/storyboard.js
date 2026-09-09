@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o10: mixed LoRA no silent drop; ref cap single-source; model-switch LoRA revalidate
   // v0821o9: LoRA D/E — versionId→AIR, Checkpoint type gate, syncParamChrome, duration gate
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
@@ -16,7 +17,7 @@
   // v0821n5: single Composer scrollbar (port from ui/seko-css-align dock-scroll)
   // v0821n4: cache-bust storyboard.js query to stamp
   // v0821n3: import air — chip subtitle prefers air URN (was path||downloadUrl hiding it); applyImport keeps air
-  // v0821n2: LoRA chips without air → red block (no silent omit loras[]); some-with-air still filter
+  // v0821n2: LoRA chips without air → red block (no silent omit loras[]); mixed chips also block
   // v0821n: krea2 import hardgate — packLoras skip no-air; attach negativePrompt; empty #service red
   // v0821m: i2v poll ≥9min (40×2.5s=100s timed out while Fal still IN_PROGRESS; success ~7min)
   // v0821l: fireSend once-per-event; blocking gates before 已点生成 ack (empty↑ keeps red)
@@ -3449,10 +3450,52 @@
       status: v.status || "",
     };
   }
+  function falEndpointTakesLora(item) {
+    item = item || {};
+    const eid = String(item.id || item.name || "").toLowerCase();
+    const name = String(item.name || "").toLowerCase();
+    const fcat = String(item.falCategory || "").toLowerCase();
+    const tags = (item.tags || []).map(function (t) { return String(t).toLowerCase(); });
+    const fields = [].concat(item.required || [], item.optional || []).map(function (x) {
+      return String(x).toLowerCase();
+    });
+    if (eid.indexOf("lora") >= 0 || name.indexOf("lora") >= 0) return true;
+    if (fields.some(function (k) {
+      return k === "loras" || k === "lora" || k === "lora_url" || k === "lora_path";
+    })) return true;
+    if (fcat.indexOf("lora") >= 0 || tags.some(function (t) { return t.indexOf("lora") >= 0; })) return true;
+    return false;
+  }
+  function catalogItemSupportsLora(it) {
+    it = (arguments.length ? it : catalogItemForService());
+    const be = currentBackend();
+    const caps = catalogCaps();
+    if (caps && caps.lora === "none") return false;
+    if (it && it.supportsLora === false) return false;
+    if (caps && caps.supportsLora === false) return false;
+    if (it && it.supportsLora === true) return true;
+    const sid = String((it && (it.id || it.name)) || ($("service") && $("service").value) || "");
+    if (be === "fal") {
+      if (falEndpointTakesLora(it || { id: sid })) return true;
+      if (sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo") return true;
+      if (!sid) return true;
+      return false;
+    }
+    if (be === "huggingface") {
+      if (it && Object.prototype.hasOwnProperty.call(it, "supportsLora")) return !!it.supportsLora;
+      if (/lora/i.test(sid) || /lora/i.test(String((it && it.name) || ""))) return true;
+      return true;
+    }
+    if (isNanogptBe()) {
+      if (it && Object.prototype.hasOwnProperty.call(it, "supportsLora")) return !!it.supportsLora;
+      return true;
+    }
+    return true;
+  }
   function showLoraBlock() {
     const be = currentBackend();
     if (Array.isArray(state.loras) && state.loras.length) return true;
-    // Prefer show for fal / civitai / nano; modelscope+hf show with hint.
+    if (!catalogItemSupportsLora()) return false;
     if (be === "fal" || be === "civitai" || be === "nano-gpt") return true;
     if (isModelscopeBe() || be === "huggingface") return true;
     return false;
@@ -3581,6 +3624,10 @@
     }
   }
   async function addLora(v) {
+    if (!catalogItemSupportsLora()) {
+      setLoraNote("当前模型不支持 LoRA，没加进来", true);
+      return false;
+    }
     const draft = normalizeLora(v);
     if (!loraTypeUsable(draft.type, draft.air)) {
       const kind = normalizeLoraType(draft.type) || airKind(draft.air) || "非 LoRA";
@@ -3935,6 +3982,7 @@
     // Model/backend switch must refresh LoRA visibility and param gates
     // without requiring a second click on the shot card.
     syncLoraUi();
+    revalidateLorasForService();
     syncParamSurface();
   }
   function applyServiceConstraints() {
@@ -4047,66 +4095,106 @@
   }
 
   // Pack like index.html base.loras (~2231) + slimPayload (~2302): path/url/versionId/air/scale.
+  // Keep air/modelId/versionId/strength on every row. Never silent-filter mixed chips.
+  function packLoraRow(l) {
+    l = l || {};
+    let path = l.path || l.downloadUrl || l.url || "";
+    const versionId = l.versionId || loraVersionId(l) || "";
+    if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
+      path = "https://civitai.com/api/download/models/" + versionId;
+    }
+    const rawScale = (l.scale != null ? l.scale : l.strength);
+    const rawStrength = (l.strength != null ? l.strength : l.scale);
+    const missing = !!(l.strengthMissing) || (rawScale == null && rawStrength == null) || rawScale === "" || rawStrength === "";
+    const scale = missing ? null : clampLoraScale(rawScale, null);
+    const strength = missing ? null : clampLoraScale(rawStrength, null);
+    return {
+      air: l.air || "",
+      modelId: l.modelId || "",
+      path: path,
+      url: path,
+      downloadUrl: l.downloadUrl || path,
+      versionId: versionId,
+      scale: scale,
+      strength: strength,
+      strengthMissing: missing,
+      name: l.name || "LoRA",
+      type: l.type || "",
+    };
+  }
+  function loraRowCanOutbound(row, be) {
+    be = be || currentBackend();
+    row = row || {};
+    if (be === "civitai") return !!(row.air && String(row.air).trim());
+    if (be === "fal" || be === "huggingface") {
+      const p = String(row.path || "").trim();
+      return !!(p && isHttpUrl(p) && !looksAir(p));
+    }
+    if (be === "modelscope-ai" || be === "modelscope-cn") {
+      const p = String(row.path || "").trim();
+      if (isHttpUrl(p) || looksAir(p) || p.indexOf("3231694") >= 0) return false;
+      return isHfRepo(p);
+    }
+    return true;
+  }
   function packLorasForPayload() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return null;
+    if (!catalogItemSupportsLora()) return null;
     const be = currentBackend();
-    // v0821n: civitai lora_map skips no-air — path-only must not ship empty air entries
-    const mapped = list.map(function (l) {
-      let path = l.path || l.downloadUrl || l.url || "";
-      const versionId = l.versionId || loraVersionId(l) || "";
-      if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
-        path = "https://civitai.com/api/download/models/" + versionId;
-      }
-      const rawScale = (l.scale != null ? l.scale : l.strength);
-      const rawStrength = (l.strength != null ? l.strength : l.scale);
-      const missing = !!(l.strengthMissing) || (rawScale == null && rawStrength == null) || rawScale === "" || rawStrength === "";
-      const scale = missing ? null : clampLoraScale(rawScale, null);
-      const strength = missing ? null : clampLoraScale(rawStrength, null);
-      return {
-        air: l.air || "",
-        path: path,
-        url: path,
-        downloadUrl: l.downloadUrl || path,
-        versionId: versionId,
-        scale: scale,
-        strength: strength,
-        strengthMissing: missing,
-        name: l.name || "LoRA",
-      };
-    }).filter(function (row) {
-      if (be === "civitai") return !!(row.air && String(row.air).trim());
-      // v0821o: fal outbound needs http path (AIR-only chips would silent-drop in providers/fal.py)
-      // v0821o4: huggingface same — _fal_lora_path / _force_loras drop AIR-only
-      if (be === "fal" || be === "huggingface") {
-        const p = String(row.path || "").trim();
-        return !!(p && isHttpUrl(p) && !looksAir(p));
-      }
-      // v0821o6: Magao outbound is Hub owner/repo only — skip Civitai http / 3231694 / AIR
-      if (be === "modelscope-ai" || be === "modelscope-cn") {
-        const p = String(row.path || "").trim();
-        if (isHttpUrl(p) || looksAir(p) || p.indexOf("3231694") >= 0) return false;
-        return isHfRepo(p);
-      }
-      return true;
-    });
+    const mapped = list.map(packLoraRow);
+    for (let i = 0; i < mapped.length; i++) {
+      if (!loraRowCanOutbound(mapped[i], be)) return null;
+    }
     return mapped.length ? mapped : null;
   }
-  // v0821n2: UI chips present but pack empty (all lack air on civitai) → must not POST without loras[]
-  // v0821o: same helper for fal — chips present but no http path → pack empty → red block
+  // chips present but any row cannot ship → red block. Mixed must not drop the bad row.
   function chipsLackAirForOutbound() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return false;
+    if (!catalogItemSupportsLora()) return true;
     const packed = packLorasForPayload();
-    return !packed || !packed.length;
+    return !packed || packed.length !== list.length;
   }
   function outboundLoraBlockMsg() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    if (list.length && !catalogItemSupportsLora()) {
+      return "当前模型不支持 LoRA，已选 LoRA 不能静默丢掉，请删除芯片或改选支持 LoRA 的模型";
+    }
     const be = currentBackend();
+    const mapped = list.map(packLoraRow);
+    const bad = mapped.filter(function (row) { return !loraRowCanOutbound(row, be); });
+    if (bad.length && bad.length < mapped.length) {
+      return "有 " + bad.length + " 条 LoRA 无法按当前后端出站，不能只带走其余条";
+    }
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
     }
     if (be === "fal" || be === "huggingface") return "LoRA 缺 http path，无法出站";
     return "LoRA 缺 air，无法出站";
+  }
+  function revalidateLorasForService() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    if (!list.length) return;
+    const be = currentBackend();
+    if (!catalogItemSupportsLora()) {
+      list.forEach(function (l) { l.status = "当前模型不支持"; });
+      setLoraNote("当前模型不支持 LoRA，已选芯片还在，生成会被拦住（不会静默丢掉）", true);
+      renderLoras();
+      return;
+    }
+    let bad = 0;
+    list.forEach(function (l) {
+      if (!loraRowCanOutbound(packLoraRow(l), be)) {
+        if (l.status !== "无直链") l.status = "无法出站";
+        bad += 1;
+      } else if (l.status === "当前模型不支持" || l.status === "无法出站") {
+        l.status = "";
+      }
+    });
+    if (bad) setLoraNote("有 " + bad + " 条 LoRA 无法按当前后端出站，不能只带走其余条", true);
+    else setLoraNote("");
+    renderLoras();
   }
   async function searchLoras() {
     const qEl = $("loraQ");
@@ -4574,6 +4662,12 @@
   };
 
   function providerRefDefaults() {
+    const fromProv = providerCaps();
+    const max = Number(fromProv && (fromProv.maxRefs || fromProv.maxImages));
+    const field = fromProv && fromProv.refImagesField;
+    if (max > 0 && max < 99) {
+      return { maxRefs: max, refImagesField: field || "images" };
+    }
     const backend = ($("backend") && $("backend").value) || "fal";
     return PROVIDER_REF_CAPS[backend] || { maxRefs: 9, refImagesField: "images" };
   }
@@ -4589,31 +4683,94 @@
     return Array.isArray(raw) ? raw.map(String) : [];
   }
 
+  function _positiveRefCap(raw) {
+    const n = Number(raw);
+    return (n > 0 && n < 99) ? n : null;
+  }
+  function declaredRefCap(it) {
+    if (!it) return null;
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const sp = it.supported_parameters || {};
+    const direct = [
+      caps.maxRefs, caps.maxImages, caps.maxRefImages,
+      it.maxRefs, it.maxImages, it.referenceLimit,
+      sp.max_input_images, sp.max_images,
+    ];
+    for (let i = 0; i < direct.length; i++) {
+      const n = _positiveRefCap(direct[i]);
+      if (n != null) return n;
+    }
+    const cap = capabilityForCatalogItem(it) || it.capability || null;
+    if (cap) {
+      const fromLimit = _positiveRefCap(cap.referenceLimit);
+      if (fromLimit != null) return fromLimit;
+      const cons = cap.constraints || {};
+      const frameFields = cap.frameFields || [];
+      let best = null;
+      function consider(rule) {
+        if (!rule || typeof rule !== "object") return;
+        if (rule.type && rule.type !== "array") return;
+        const n = _positiveRefCap(rule.maxItems != null ? rule.maxItems : rule.maxLength);
+        if (n != null) best = (best == null) ? n : Math.max(best, n);
+      }
+      frameFields.forEach(function (f) { consider(cons[f]); });
+      Object.keys(cons).forEach(function (k) { consider(cons[k]); });
+      if (best != null) return best;
+      const multiFrames = { images: 1, referenceImages: 1 };
+      const singularFrames = {
+        firstFrame: 1, sourceImage: 1, startImage: 1, lastFrame: 1, endImage: 1,
+        sourceImageUrl: 1, firstFrameImage: 1, lastFrameImage: 1, endSourceImage: 1,
+        image: 1,
+      };
+      const hasMultiFrame = frameFields.some(function (f) { return multiFrames[f]; });
+      const hasSingularFrame = frameFields.some(function (f) { return singularFrames[f]; });
+      if (!hasMultiFrame && hasSingularFrame) return 1;
+    }
+    return null;
+  }
+
   // Resolve caps from catalog item.capabilities (or top-level), clamped to provider default.
-  // Catalog may only tighten. If imageFields has NO multi bag and only singular FIRST,
-  // force maxRefs=1 so Fal single-image endpoints cannot silently drop N-1 refs.
+  // Catalog may only tighten. Unknown model cap → known=false (do not silent-slice to 9).
+  // If imageFields has NO multi bag and only singular FIRST, force maxRefs=1.
   function resolveRefCaps(it) {
     const prov = providerRefDefaults();
     const caps = (it && it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
-    const raw = caps.maxRefs || caps.maxImages || (it && (it.maxRefs || it.maxImages));
-    let max = Number(raw);
-    if (!(max > 0 && max < 99)) max = Number(prov.maxRefs) || 9;
-    const ceil = Number(prov.maxRefs) || 9;
-    if (max > ceil) max = ceil; // catalog may only tighten
-    if (!(max > 0)) max = 1; // slice(0, caps.maxRefs||caps.maxImages||1)
+    let declared = declaredRefCap(it);
     const fields = catalogImageFields(it);
     if (fields.length) {
       const hasMulti = fields.some((f) => MULTI_REF_FIELDS.indexOf(f) >= 0);
       const hasSingularFirst = fields.some((f) => SINGULAR_FIRST_FIELDS.indexOf(f) >= 0);
-      // No multi bag + singular FIRST (or any non-multi schema) → maxRefs=1 (catalog tighten).
-      if (!hasMulti && (hasSingularFirst || fields.length > 0)) max = Math.min(max, 1);
+      if (!hasMulti && (hasSingularFirst || fields.length > 0)) {
+        declared = (declared == null) ? 1 : Math.min(declared, 1);
+      }
     }
     const field = (caps.refImagesField || (it && it.refImagesField) || prov.refImagesField || "images");
-    return { maxRefs: max, refImagesField: String(field) };
+    if (declared == null) {
+      const capRow = (typeof capabilityForCatalogItem === "function") ? capabilityForCatalogItem(it) : null;
+      const frameFields = (capRow && capRow.frameFields) || (it && it.frameFields) || [];
+      const hasMultiFrame = frameFields.some(function (f) { return f === "images" || f === "referenceImages"; });
+      const hasMulti = fields.some((f) => MULTI_REF_FIELDS.indexOf(f) >= 0) || hasMultiFrame;
+      if (hasMulti) {
+        return { maxRefs: Number(prov.maxRefs) || 9, known: true, refImagesField: String(field) };
+      }
+      const blob = [it && it.id, it && it.name, it && it.category, it && it.kind, it && it.falCategory, it && it.task]
+        .map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
+      const looksVideo = blob.indexOf("video") >= 0 || blob.indexOf("image-to-video") >= 0 || blob.indexOf("/i2v") >= 0;
+      if (looksVideo && !fields.length && !frameFields.length) {
+        return { maxRefs: null, known: false, refImagesField: String(field) };
+      }
+      return { maxRefs: Number(prov.maxRefs) || 9, known: true, refImagesField: String(field), fromProvider: true };
+    }
+    const ceil = Number(prov.maxRefs) || 9;
+    let max = declared;
+    if (max > ceil) max = ceil;
+    if (!(max > 0)) max = 1;
+    return { maxRefs: max, known: true, refImagesField: String(field) };
   }
 
   function maxRefCount(it) {
-    return resolveRefCaps(it).maxRefs;
+    const resolved = resolveRefCaps(it);
+    return resolved.known ? resolved.maxRefs : null;
   }
 
   function catalogMinInputImages(it) {
@@ -4659,9 +4816,12 @@
     // t2i-with-refs is a different failure (unused), not "cap=1".
     if (refUnusedGateMessage(shot)) return "";
     const nRefs = countRefUrls(null, shot).length;
-    const cap = maxRefCount(catalogItemForService());
-    if (nRefs > cap) {
-      return "参考图 " + nRefs + "/" + cap + " · 超过上限，请减少连线后再生成（不静默丢弃）";
+    const resolved = resolveRefCaps(catalogItemForService());
+    if (nRefs && !resolved.known) {
+      return "当前模型参考图上限未知，不能按通用上限截断。请减少连线或改选已声明上限的模型";
+    }
+    if (resolved.known && nRefs > resolved.maxRefs) {
+      return "参考图 " + nRefs + "/" + resolved.maxRefs + " · 超过上限，请减少连线后再生成（不静默丢弃）";
     }
     return "";
   }
@@ -4727,12 +4887,10 @@
     });
     if (!urls.length) return payload;
     const resolved = resolveRefCaps(catalogItemForService());
-    const cap = resolved.maxRefs;
     const field = resolved.refImagesField || "images";
-    const sliced = urls.slice(0, cap);
+    // Never silent-slice. Over-cap / unknown cap is a hard gate before attach.
     // Do NOT infer "always 1" from field name alone — honor cap.
-    // Studio inbound: always images[] so collectors see multi-ref (N>0).
-    payload.images = sliced;
+    payload.images = urls;
     // Keep/ensure primary wires when present.
     if (primary) {
       if (!payload.firstFrame) payload.firstFrame = primary;
@@ -4742,15 +4900,15 @@
     if (field && field !== "images") {
       if (field === "image_url") {
         // modelscope singular: BOTH images=[url] and image_url=url
-        payload.image_url = sliced[0];
+        payload.image_url = urls[0];
       } else {
-        payload[field] = sliced;
+        payload[field] = urls;
       }
     }
     // v0821: also stamp provider-correct singular FIRST (Fal start_image_url / image_url / …)
     // so packed inbound keeps first-frame even when compile default was t2v-ish.
-    if (primary || sliced[0]) {
-      const firstUrl = primary || sliced[0];
+    if (primary || urls[0]) {
+      const firstUrl = primary || urls[0];
       const imgFields = catalogImageFields(catalogItemForService());
       let stamped = false;
       imgFields.forEach(function (f) {
@@ -5171,19 +5329,22 @@
       }
     }
     const stageOp = stage ? stage.op : "";
-    // Hard gate: over-cap refs must block — never silent-drop N-1 on single-slot endpoints.
+    // Hard gate: over-cap / unknown cap must block — never silent-drop N-1.
     const refUrls = countRefUrls(payload, shot);
-    const refCap = maxRefCount(catalogItemForService());
+    const resolvedRefs = resolveRefCaps(catalogItemForService());
     const unusedMsg = refUnusedGateMessage(shot);
     if (unusedMsg) {
       return fail(unusedMsg, "blocked");
     }
-    if (refUrls.length > refCap) {
-      return fail("参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "blocked");
+    if (refUrls.length && !resolvedRefs.known) {
+      return fail("当前模型参考图上限未知，不能按通用上限截断。请减少连线或改选已声明上限的模型", "blocked");
+    }
+    if (resolvedRefs.known && refUrls.length > resolvedRefs.maxRefs) {
+      return fail("参考图 " + refUrls.length + "/" + resolvedRefs.maxRefs + " · 超过上限，请减少连线后再生成（不静默丢弃）", "blocked");
     }
     attachExtraImages(payload, shot);
     // v0816-sb-lora: attach selected LoRAs (index.html base.loras shape)
-    // v0821n2: chips without air already gated above; some-with-air still ship filtered rows
+    // v0821n2/o10: chips without air / mixed / unsupported already gated; never ship a filtered subset
     {
       const packedLoras = packLorasForPayload();
       const list = Array.isArray(state.loras) ? state.loras : [];

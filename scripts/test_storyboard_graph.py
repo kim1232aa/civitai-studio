@@ -324,18 +324,18 @@ def test_v0815_gen_hardgate():
     assert_true("input_references" in js, "nano default field")
     assert_true("attachExtraImages(payload, shot)" in js, "attach before generate")
     # Packing target is always studio-inbound images[] (not sole-write image_urls).
-    assert_true("payload.images = sliced" in js, "attachExtraImages always writes images[]")
+    assert_true("payload.images = urls" in js, "attachExtraImages always writes images[]")
     assert_true("studio-inbound images[]" in js or "ALWAYS" in js, "comment: always images inbound")
     # Extract attachExtraImages body: must not sole-assign only to refImagesField
     i = js.find("function attachExtraImages")
     assert_true(i >= 0, "attachExtraImages loc")
     j = js.find("function setShotBusy", i)
     body = js[i:j]
-    assert_true("payload.images = sliced" in body, "images=sliced inside attachExtraImages")
-    assert_true('payload[field] = sliced' in body or "payload[field] = sliced" in body,
+    assert_true("payload.images = urls" in body, "images=urls inside attachExtraImages")
+    assert_true('payload[field] = urls' in body or "payload[field] = urls" in body,
                 "optional mirror to refImagesField still allowed")
     # Must not be the ONLY write path that skips images when field is image_urls
-    assert_true("never sole-write" in body or "not the sole bag" in body or "payload.images = sliced" in body,
+    assert_true("never sole-write" in body or "not the sole bag" in body or "payload.images = urls" in body,
                 "must not sole-write provider-native field")
     assert_true("aspectRatio" in js, "buildGraph aspectRatio from UI")
     assert_true("catalogById" in js, "loadCatalog catalogById")
@@ -356,7 +356,7 @@ def test_v0815_gen_hardgate():
     # Do not infer always-1 from field name alone
     assert_true('Do NOT infer "always 1" from field name alone' in js or "Do NOT infer" in js, "no always-1 from field name")
     # modelscope: BOTH images=[url] and image_url
-    assert_true("payload.image_url = sliced[0]" in body, "modelscope sets image_url alongside images[]")
+    assert_true("payload.image_url = urls[0]" in body, "modelscope sets image_url alongside images[]")
 
 
 
@@ -405,10 +405,12 @@ def test_v0816_sb_lora():
     assert_true(run.find("attachExtraImages(payload, shot)") < run.find("packLorasForPayload()"),
                 "loras packed after attachExtraImages")
     # Shape fields matching index base.loras
-    pack_i = js.find("function packLorasForPayload")
+    pack_i = js.find("function packLoraRow")
+    if pack_i < 0:
+        pack_i = js.find("function packLorasForPayload")
     pack_j = js.find("async function searchLoras", pack_i)
-    pack = js[pack_i:pack_j if pack_j > 0 else pack_i + 2000]
-    for field in ("path:", "url:", "versionId:", "air:", "scale:", "strength:", "downloadUrl:"):
+    pack = js[pack_i:pack_j if pack_j > 0 else pack_i + 4000]
+    for field in ("path:", "url:", "versionId:", "air:", "scale:", "strength:", "downloadUrl:", "modelId:"):
         assert_true(field in pack, "pack field " + field)
     # modelscope hint, no invent remap
     assert_true("owner/repo" in js or "Hub owner/repo" in html or "魔搭" in js, "modelscope hub hint")
@@ -442,7 +444,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     j = js.find("function maxRefCount", i)
     body = js[i:j]
     assert_true("hasMulti" in body, "resolve checks hasMulti")
-    assert_true("Math.min(max, 1)" in body, "force maxRefs=1 for single-slot")
+    assert_true("Math.min(declared, 1)" in body or "Math.min(max, 1)" in body, "force maxRefs=1 for single-slot")
     assert_true("image_urls" in js and "input_references" in js, "multi names present")
     # over-cap hard gate in runShotStep
     k = js.find("async function runShotStep")
@@ -450,7 +452,8 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     if m < 0:
         m = js.find("function runSelected", k)
     run = js[k:m if m > 0 else k + 16000]
-    assert_true("refUrls.length > refCap" in run, "over-cap compare in runShotStep")
+    assert_true("refUrls.length > resolvedRefs.maxRefs" in run or "refUrls.length > refCap" in run,
+                "over-cap compare in runShotStep")
     assert_true("return fail(" in run and "超过上限" in run, "over-cap returns fail/blocked")
     assert_true("不静默丢弃" in run or "超过上限" in run, "loud over-cap message")
     assert_true("function catalogEatsRefs" in js, "t2i image_to_image=false helper")
@@ -729,7 +732,7 @@ def test_v0817c_no_at_in_prompt():
 
     # images[] still via edges / attachExtraImages
     assert_true("function attachExtraImages" in js, "images packing kept")
-    assert_true("payload.images = sliced" in js, "images[] via edges")
+    assert_true("payload.images = urls" in js, "images[] via edges")
     assert_true("function packLorasForPayload" in js, "LoRA packing kept")
     assert_true("stages[0].payload" not in js, "gate untouched")
 
@@ -1090,12 +1093,15 @@ def test_v0821n_krea2_import_hardgate():
     # packLoras: keep air/path/scale/strength; civitai skips no-air; empty → null
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i:pack_i + 2800]
-    for field in ("air:", "path:", "scale:", "strength:", "versionId:", "downloadUrl:"):
+    pack = js[pack_i - 2200:pack_i + 1600]
+    for field in ("air:", "path:", "scale:", "strength:", "versionId:", "downloadUrl:", "modelId:"):
         assert_true(field in pack, "pack field " + field)
+    assert_true("function loraRowCanOutbound" in js, "loraRowCanOutbound helper")
     assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter gate")
     assert_true("row.air" in pack, "checks air on row")
     assert_true("mapped.length ? mapped : null" in pack, "empty → null")
+    assert_true("packed.length !== list.length" in pack or "packed.length !== list.length" in js,
+                "mixed chips compare packed vs list")
 
     # runShotStep attach loras + negativePrompt + empty-service hard red
     k = js.find("async function runShotStep")
@@ -1145,7 +1151,8 @@ def test_v0821_hardgate_i2v_refs():
     i = js.find("function attachExtraImages")
     assert_true(i >= 0, "attachExtraImages")
     body = js[i:i + 2200]
-    assert_true("payload.images = sliced" in body, "images[] packed")
+    assert_true("payload.images = urls" in body, "images[] packed without slice")
+    assert_true("urls.slice(0, cap)" not in body, "attach does not silent-slice")
     assert_true("start_image_url" in body, "stamps start_image_url")
     assert_true("SINGULAR_FIRST_FIELDS" in body, "uses singular-first list")
     # buildGraph wires frame for i2v
@@ -1163,20 +1170,21 @@ def test_v0821_hardgate_i2v_refs():
 
     # Mock attachExtraImages packing shape (static analysis of N linked → images length N)
     # Simulate the JS packing contract in Python:
-    def pack_urls(primary, linked, max_refs):
+    def pack_urls(primary, linked):
         urls = []
         if primary:
             urls.append(primary)
         for u in linked:
             if u and u not in urls:
                 urls.append(u)
-        return urls[:max_refs]
+        return urls
     linked_n = ["/out/a.jpg", "/out/b.jpg", "/out/c.jpg", "/out/d.jpg"]
-    packed = pack_urls("/out/a.jpg", linked_n, 9)
+    packed = pack_urls("/out/a.jpg", linked_n)
     assert_true(len(packed) == 4, "under-cap packs all N=%d" % len(packed))
     assert_true(packed[0] == "/out/a.jpg", "primary first")
-    over = pack_urls("/out/a.jpg", linked_n + ["/out/e.jpg"] * 10, 4)
-    assert_true(len(over) == 4, "slice to maxRefs")
+    over = pack_urls("/out/a.jpg", linked_n + ["/out/e.jpg", "/out/f.jpg", "/out/g.jpg"])
+    assert_true(len(over) == 7, "attach keeps all unique refs; over-cap is a gate")
+    assert_true("上限未知" in js, "unknown ref cap failure copy")
     assert_true("ref-cap-hint" in js or "还可" in js, "UI remaining slot hint")
     assert_true("linked.concat(suggest)" in js or "chipNodes" in js, "chips for all linked")
 
@@ -1487,7 +1495,7 @@ def test_v0821g_send_bind():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1545,7 +1553,7 @@ def test_v0821h_send_aria():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1717,7 +1725,7 @@ def test_v0821j_send_busy_msg():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1838,7 +1846,7 @@ def test_v0821k_i2v_prompt_req():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2026,7 +2034,7 @@ def test_v0821l_send_once():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2198,17 +2206,20 @@ def test_v0821n2_lora_air_gate():
 
     assert_true("function chipsLackAirForOutbound" in js, "chipsLackAirForOutbound helper")
     assert_true("LoRA 缺 air，无法出站" in js, "red block msg")
+    assert_true("不能只带走其余条" in js, "mixed LoRA red msg")
 
-    # packLoras: still filter no-air on civitai; empty → null; keep air when present
+    # packLoras: civitai requires air on EVERY chip; empty → null; keep air when present
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i:pack_i + 2200]
+    pack = js[pack_i - 1800:pack_i + 1800]
+    assert_true("function loraRowCanOutbound" in js, "loraRowCanOutbound")
     assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter")
     assert_true("row.air" in pack, "checks air")
     assert_true("mapped.length ? mapped : null" in pack, "empty → null")
-    assert_true('air: l.air || ""' in pack or "air: l.air || ''" in pack, "packs air field")
+    assert_true("modelId:" in pack or "modelId: l.modelId" in js, "packs modelId field")
 
     # Conceptual: chips with air → pack has air; chips without → blocked red
+    # Mixed must fail the whole pack (no silent drop of the bad row).
     with_air = [{"air": "urn:air:krea2:lora:civitai:2323765@3071582", "strength": 0.8, "name": "A"}]
     no_air = [{"path": "https://civitai.com/api/download/models/1", "strength": 0.8, "name": "B"}]
     mixed = with_air + no_air
@@ -2217,9 +2228,11 @@ def test_v0821n2_lora_air_gate():
         mapped = []
         for l in rows:
             row = {"air": l.get("air") or "", "path": l.get("path") or "", "scale": l.get("strength", 0.8)}
+            ok = True
             if be == "civitai":
-                if not (row["air"] and str(row["air"]).strip()):
-                    continue
+                ok = bool(row["air"] and str(row["air"]).strip())
+            if not ok:
+                return None
             mapped.append(row)
         return mapped or None
 
@@ -2228,7 +2241,7 @@ def test_v0821n2_lora_air_gate():
     packed_bad = sim_pack(no_air)
     assert_true(packed_bad is None, "chips without air → pack null")
     packed_mixed = sim_pack(mixed)
-    assert_true(packed_mixed and len(packed_mixed) == 1 and packed_mixed[0]["air"], "some-with-air still ships")
+    assert_true(packed_mixed is None, "mixed air+no-air must fail whole pack")
 
     # fireSend gates before 已点生成 / generate
     fi = js.find("function fireSend")
@@ -2375,7 +2388,7 @@ def test_v0821n4_js_cache_bust():
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
@@ -2384,8 +2397,8 @@ def test_v0821n5_dock_scroll():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2411,8 +2424,8 @@ def test_v0821o_fal_lora_knife():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2486,7 +2499,7 @@ def test_v0821o_fal_lora_knife():
     # packLoras: fal requires http path (not AIR-only)
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i:pack_i + 2200]
+    pack = js[pack_i - 1600:pack_i + 1600]
     assert_true('be === "fal"' in pack or "be === 'fal'" in pack, "fal path filter gate")
     assert_true("isHttpUrl" in pack or "https://" in pack, "http path check in pack")
     assert_true("looksAir" in pack, "rejects air-as-path")
@@ -2511,16 +2524,16 @@ def test_v0821o_fal_lora_knife():
             version_id = str(l.get("versionId") or "")
             if (not path or looks_air(path)) and version_id.isdigit():
                 path = "https://civitai.com/api/download/models/" + version_id
-            scale = float(l.get("scale") if l.get("scale") is not None else l.get("strength", 0.8))
-            scale = max(0.0, min(4.0, scale))
+            scale = l.get("scale") if l.get("scale") is not None else l.get("strength")
             row = {"air": l.get("air") or "", "path": path, "scale": scale}
+            ok = True
             if be == "civitai":
-                if not (row["air"] and str(row["air"]).strip()):
-                    continue
+                ok = bool(row["air"] and str(row["air"]).strip())
             elif be == "fal":
                 p = str(row["path"] or "").strip()
-                if not (p and is_http(p) and not looks_air(p)):
-                    continue
+                ok = bool(p and is_http(p) and not looks_air(p))
+            if not ok:
+                return None
             mapped.append(row)
         return mapped or None
 
@@ -2579,8 +2592,8 @@ def test_v0821o2_fal_turbo_pin():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2641,8 +2654,8 @@ def test_v0821o3_fal_clear_loras():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2783,8 +2796,8 @@ def test_v0821o4_hf_turbo_lora():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -2879,7 +2892,7 @@ def test_v0821o4_hf_turbo_lora():
 
     # packLoras: huggingface requires http path (AIR-only would silent-drop in _fal_lora_path)
     pack_i = js.find("function packLorasForPayload")
-    pack = js[pack_i:pack_i + 2400]
+    pack = js[pack_i - 1800:pack_i + 1600]
     assert_true('be === "huggingface"' in pack or "be === 'huggingface'" in pack,
                 "huggingface path filter in pack")
     assert_true("isHttpUrl" in pack, "http path check")
@@ -2905,13 +2918,14 @@ def test_v0821o4_hf_turbo_lora():
             version_id = str(l.get("versionId") or "")
             if (not path or looks_air(path)) and version_id.isdigit():
                 path = "https://civitai.com/api/download/models/" + version_id
-            scale = float(l.get("scale") if l.get("scale") is not None else l.get("strength", 0.8))
-            scale = max(0.0, min(4.0, scale))
+            scale = l.get("scale") if l.get("scale") is not None else l.get("strength")
             row = {"air": l.get("air") or "", "path": path, "scale": scale}
+            ok = True
             if be in ("fal", "huggingface"):
                 p = str(row["path"] or "").strip()
-                if not (p and is_http(p) and not looks_air(p)):
-                    continue
+                ok = bool(p and is_http(p) and not looks_air(p))
+            if not ok:
+                return None
             mapped.append(row)
         return mapped or None
 
@@ -3006,8 +3020,8 @@ def test_v0821o5_hf_no_wavespeed():
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3150,8 +3164,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3260,7 +3274,7 @@ def test_v0821o6_modelscope_hub_lora():
                 "o3: missing loras[] still clears")
 
     pack_i = js.find("function packLorasForPayload")
-    pack = js[pack_i:pack_i + 2800]
+    pack = js[pack_i - 1800:pack_i + 1600]
     assert_true("isModelscopeBe" in pack or 'modelscope-ai' in pack,
                 "modelscope Hub-repo filter in pack")
     assert_true("isHfRepo" in pack or "owner/repo" in pack or "count(\"/\")" in pack
@@ -3289,19 +3303,20 @@ def test_v0821o6_modelscope_hub_lora():
             version_id = str(l.get("versionId") or "")
             if (not path or looks_air(path)) and version_id.isdigit():
                 path = "https://civitai.com/api/download/models/" + version_id
-            scale = float(l.get("scale") if l.get("scale") is not None else l.get("strength", 0.8))
-            scale = max(0.0, min(4.0, scale))
+            scale = l.get("scale") if l.get("scale") is not None else l.get("strength")
             row = {"air": l.get("air") or "", "path": path, "scale": scale, "name": l.get("name") or ""}
+            ok = True
             if be in ("fal", "huggingface"):
                 p = str(row["path"] or "").strip()
-                if not (p and is_http(p) and not looks_air(p)):
-                    continue
+                ok = bool(p and is_http(p) and not looks_air(p))
             elif be in ("modelscope-ai", "modelscope-cn"):
                 p = str(row["path"] or "").strip()
                 if is_http(p) or looks_air(p) or "3231694" in p:
-                    continue
-                if not is_hub_repo(p):
-                    continue
+                    ok = False
+                elif not is_hub_repo(p):
+                    ok = False
+            if not ok:
+                return None
             mapped.append(row)
         return mapped or None
 
@@ -3316,8 +3331,7 @@ def test_v0821o6_modelscope_hub_lora():
         {"path": HTTP, "scale": 0.8, "versionId": 3231694},
         {"path": HUB_LORA, "scale": 0.8},
     ])
-    assert_true(mixed and len(mixed) == 1 and mixed[0]["path"] == HUB_LORA,
-                "http skipped; Hub repo kept")
+    assert_true(mixed is None, "mixed http+Hub must fail whole pack")
     # chips present but pack empty → lack outbound (false-confidence)
     lack = bool(http_only) and not sim_pack(http_only)
     assert_true(lack is True, "http LoRA chip visible → Magao outbound empty → red-block")
@@ -3525,8 +3539,8 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-astra3" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
@@ -3654,7 +3668,7 @@ def test_v0821o7_param_surface():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-astra3"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3741,8 +3755,10 @@ def test_v0821o7_c1_closeout():
                 "packLoras strength must not clamp null→0.8")
     assert_true("clampLoraScale(inp.value, 0.8)" not in js, "slider must not write 0.8 on empty")
     assert_true("strengthMissing" in js, "strengthMissing flag on normalize/pack")
-    pack_i = js.find("function packLorasForPayload")
-    pack = js[pack_i:pack_i + 2800]
+    pack_i = js.find("function packLoraRow")
+    if pack_i < 0:
+        pack_i = js.find("function packLorasForPayload")
+    pack = js[pack_i:pack_i + 3600]
     assert_true("strengthMissing" in pack or "strength: null" in pack or "strength: l.strength" in pack,
                 "pack ships null strength into payload")
     rend_i = js.find("function renderLoras")

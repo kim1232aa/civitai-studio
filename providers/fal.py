@@ -596,7 +596,11 @@ def build_fal_input(payload: dict) -> dict:
     for name in fields:
         if name == "image_urls":
             if extra:
-                inp["image_urls"] = extra[:ref_cap]
+                if ref_cap is None:
+                    raise ValueError("当前端点参考图上限未知，拒绝按通用上限截断")
+                if len(extra) > ref_cap:
+                    raise ValueError(f"参考图 {len(extra)}/{ref_cap} · 超过上限，拒绝截断")
+                inp["image_urls"] = extra
         elif name == "video_url" and vid:
             inp["video_url"] = vid
         elif name in FIRST and img:

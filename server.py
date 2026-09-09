@@ -510,9 +510,17 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
         elif name == "startImage" and first:
             inp[name] = first
         elif name == "images" and extra:
-            inp[name] = extra[:ref_cap]
+            if ref_cap is None:
+                raise ValueError("当前服务参考图上限未知，拒绝按通用上限截断")
+            if len(extra) > ref_cap:
+                raise ValueError(f"参考图 {len(extra)}/{ref_cap} · 超过上限，拒绝截断")
+            inp[name] = extra
         elif name == "referenceImages" and extra:
-            inp[name] = extra[:ref_cap]
+            if ref_cap is None:
+                raise ValueError("当前服务参考图上限未知，拒绝按通用上限截断")
+            if len(extra) > ref_cap:
+                raise ValueError(f"参考图 {len(extra)}/{ref_cap} · 超过上限，拒绝截断")
+            inp[name] = extra
         elif name == "sourceVideo" and payload.get("sourceVideo"):
             inp[name] = payload["sourceVideo"]
         elif name == "sourceAudio" and payload.get("sourceAudio"):

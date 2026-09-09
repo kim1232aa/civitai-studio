@@ -707,18 +707,18 @@ def _image_eats_refs(spec: dict | None) -> bool:
     return True
 
 
-def _source_images(payload: dict) -> list:
-    """Collect + clamp refs for Nano input_references (provider maxRefs default 5)."""
+def _source_images(payload: dict, spec: dict | None = None) -> list:
+    """Collect refs for Nano input_references. Over-cap / unknown cap fail, never slice."""
     from .ref_images import payload_ref_images, materialize_local_refs
     from .capabilities import get_provider_capabilities
     caps = get_provider_capabilities("nano-gpt")
-    # Prefer catalog-declared max on the model row when present
-    item = None
-    try:
-        mid = model_id((payload or {}).get("serviceId") or "")
-        item = find_spec(mid) if mid else None
-    except Exception:
-        item = None
+    item = spec if isinstance(spec, dict) and spec else None
+    if item is None:
+        try:
+            mid = model_id((payload or {}).get("serviceId") or "")
+            item = find_spec(mid) if mid else None
+        except Exception:
+            item = None
     raw = payload_ref_images(payload, backend="nano-gpt", caps=caps, item=item or {})
     return materialize_local_refs(raw)
 
@@ -904,7 +904,7 @@ def _image_body(payload: dict, spec: dict) -> dict:
     seed = _clamp_seed(payload.get("seed"))
     if seed is not None:
         body["seed"] = seed
-    imgs = _source_images(payload)
+    imgs = _source_images(payload, spec)
     min_in = _min_input_images(spec)
     if min_in and len(imgs) < min_in:
         max_in = ((spec or {}).get("supported_parameters") or {}).get("max_input_images")

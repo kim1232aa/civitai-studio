@@ -157,6 +157,12 @@ def test_unknown_backend_is_blocked():
     assert_true("provider" in (r.get("error") or ""), r)
 
 
+def test_unsupported_lora_is_not_silently_popped():
+    src = (ROOT / "providers" / "graph_compile.py").read_text(encoding="utf-8")
+    assert_true('payload.pop("loras", None)' not in src, "compile must not silent-pop loras")
+    assert_true("已选 LoRA 不能静默丢掉" in src, "unsupported LoRA is a blocked error")
+
+
 def test_malformed_lora_is_blocked_instead_of_dropped():
     r = g(
         backend="modelscope-ai",
@@ -198,6 +204,7 @@ def main():
         test_i2v_empty_prompt_allowed,
         test_fal_keeps_empty_prompt_key,
         test_unknown_backend_is_blocked,
+        test_unsupported_lora_is_not_silently_popped,
         test_malformed_lora_is_blocked_instead_of_dropped,
         test_unsupported_provider_parameters_are_blocked,
     ]

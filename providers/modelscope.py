@@ -246,7 +246,9 @@ def _image_body(payload, mid, backend):
     if t2i_err:
         raise ValueError(t2i_err)
     limit = max_refs(backend=backend, caps=get_provider_capabilities(backend), item=item, payload=payload)
-    if len(refs) > limit:
+    if refs and limit is None:
+        raise ValueError(f"{backend} 当前模型参考图上限未知，拒绝按通用上限截断")
+    if limit is not None and len(refs) > limit:
         raise ValueError(f"{backend} 当前参考图接线最多 {limit} 张，收到 {len(refs)} 张；拒绝截断")
     if refs:
         body["image_url"] = refs[0] if len(refs) == 1 else refs
