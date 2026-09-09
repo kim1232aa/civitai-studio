@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0821n5-dock-scroll</title>
+<title>画布 · Night Lab · v0821o7-param-surface</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -123,14 +123,27 @@
   .prompt{width:100%;min-height:120px;max-height:180px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   .prompt:focus{outline:1px solid #3a3a44}
+  .prompt.neg{min-height:56px;max-height:96px;margin-top:8px}
+  .prompt.is-over{border-color:#e85d4c;outline:1px solid rgba(232,93,76,.45)}
+  .param-warn{margin-top:6px;font-size:11px;color:var(--buzz);min-height:1.1em}
+  .param-warn.bad{color:var(--coral)}
   .mention{color:var(--teal)}
   .bar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;position:relative;z-index:2}
-  .bar select,.bar input[type=number],.bar input[type=text]{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;min-width:0;color:#e8e8ec}
+  .bar select,.bar input[type=number],.bar input[type=text],.bar input[type=search]{background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;min-width:0;color:#e8e8ec}
   .bar input[type=number],.bar input[type=text]{width:72px}
+  .bar input#serviceFilter{width:110px;flex:0 0 110px}
+  .bar input#serviceFilter::-webkit-search-cancel-button{cursor:pointer}
+  .catalog-status{display:flex;align-items:center;gap:6px;flex:1 0 100%;min-width:0;color:var(--muted);font-size:11px;line-height:1.35}
+  .catalog-status .catalog-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .catalog-status button{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;padding:4px 9px;font-size:11px;white-space:nowrap}
+  .catalog-status button:hover{border-color:#4a4a54;color:#fff}
+  .catalog-status button:disabled{opacity:.55;cursor:wait}
   .bar #seed{width:auto;min-width:168px;flex:1 1 168px;max-width:240px}
-  .bar #sampler,.bar #scheduler{max-width:140px}
+  .bar #sampler,.bar #scheduler,.bar #nanoRes{max-width:140px}
   .bar .param-group{display:contents}
   .bar .param-group.hidden{display:none}
+  .bar .hidden,.prompt.hidden{display:none !important}
+  .bar input.is-over, .bar select.is-over{border-color:#e85d4c;box-shadow:0 0 0 1px rgba(232,93,76,.45)}
   .bar .grow{flex:1;min-width:8px}
   .send{width:48px;height:48px;border:0;border-radius:50%;background:#fff;color:#111;font-size:20px;flex-shrink:0;cursor:pointer;
     position:relative;z-index:5;pointer-events:auto;touch-action:manipulation;margin:2px}
@@ -332,6 +345,7 @@
   .composer-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0}
 
 </style>
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260909">
 </head>
 <body>
 <div class="app">
@@ -346,7 +360,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0821n5-dock-scroll</span>
+      <span class="stamp">v0821o7-param-surface</span>
     </div>
   </header>
   <div class="stage">
@@ -416,6 +430,8 @@
         <button type="button" class="act-btn" id="btnCanvasRef" title="引用画布资产（连线到当前分镜，不写入 @filename）">画布引用</button>
       </div>
       <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
+      <textarea class="prompt neg" id="negative" placeholder="负面提示（不想出现的内容，可空）"></textarea>
+      <div class="param-warn" id="paramWarn"></div>
       </div>
       <div class="dock-foot" id="dockFoot">
       <div class="lora-block" id="loraBlock" data-sb-lora="1">
@@ -440,7 +456,13 @@
           <option value="modelscope-cn">modelscope-cn</option>
           <option value="huggingface">huggingface</option>
         </select>
-        <select id="service"></select>
+        <input id="serviceFilter" type="search" placeholder="搜索模型" autocomplete="off" />
+        <select id="service" aria-describedby="catalogHint"></select>
+        <div class="catalog-status" id="catalogStatus" hidden>
+          <span class="catalog-hint" id="catalogHint" role="status" aria-live="polite"></span>
+          <button type="button" id="catalogMore" hidden>加载更多</button>
+          <button type="button" id="catalogRetry" hidden>重试本页</button>
+        </div>
         <span class="param-group" id="falParams">
           <select id="duration">
             <option selected>5s</option><option>12s</option><option>16s</option>
@@ -461,6 +483,9 @@
           <select id="scheduler" title="调度器"></select>
           <input id="seed" type="text" title="种子" placeholder="seed" />
         </span>
+        <span class="param-group hidden" id="nanoParams">
+          <select id="nanoRes" title="Nano 分辨率 token"></select>
+        </span>
         <span class="grow"></span>
         <button type="button" class="send" id="send" data-testid="composer-send" title="生成">↑</button>
       </div>
@@ -470,7 +495,7 @@
     </aside>
   </div>
 </div>
-<input class="hidden-file" id="file" type="file" accept="image/*,video/*,audio/*" />
+<input class="hidden-file" id="file" type="file" accept="image/*,video/*,audio/*" multiple />
 
 <div class="import-backdrop" id="importModal" aria-hidden="true">
   <div class="import-modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
@@ -495,6 +520,9 @@
     <div class="import-url-row" id="importUrlRow">
       <input id="importUrl" type="text" placeholder="Civitai 图 id / 链接，如 https://civitai.red/images/134923572" autocomplete="off" />
       <button type="button" class="primary" id="importUrlBtn">导入参数</button>
+      <button type="button" id="btnFalLoraFix" title="挂载 Fal fal-ai/krea-2/turbo/lora + LoRA 3231694">Fal LoRA夹具</button>
+      <button type="button" id="btnHfLoraFix" title="挂载 HF krea/Krea-2-Turbo + LoRA 3231694">HF LoRA夹具</button>
+      <button type="button" id="btnMsLoraFix" title="选择魔搭 krea/Krea-2-Turbo；不预置 LoRA，请填写真实 Hub 仓库和权重">魔搭模型（不预置 LoRA）</button>
     </div>
     <div class="import-body" id="importBody"></div>
     <div class="import-ft">
@@ -507,6 +535,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=v0821n5-dock-scroll"></script>
+<script src="/static/storyboard.js?v=v0821o7-param-surface"></script>
 </body>
 </html>

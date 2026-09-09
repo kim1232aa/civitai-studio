@@ -105,8 +105,9 @@ def collect_ref_images(payload: dict | None, *, include_primary: bool = True) ->
         if not s or s in seen:
             return
         if not (s.startswith("http") or s.startswith("data:image") or s.startswith("data:application")):
-            # allow plain data: for some providers; still skip stage-out dicts
-            if not s.startswith("data:"):
+            # Studio uploads land as /out/<file>. Fal/HF/魔搭 materialize them later;
+            # dropping here made Nano POST 0 images while the canvas still showed refs.
+            if not s.startswith("data:") and not s.startswith("/out/"):
                 return
         seen.add(s)
         out.append(s)
@@ -165,6 +166,31 @@ def normalize_payload_refs(payload: dict | None) -> dict:
         payload["images"] = list(refs)
     # Keep canvas fields intact; do not delete image_urls / input_references.
     return payload
+
+
+def materialize_local_ref(url: str) -> str:
+    """Keep http(s)/data URLs; turn studio `/out/<file>` into a data URL.
+
+    Remote providers cannot fetch 127.0.0.1. Missing local files raise — never drop.
+    """
+    if not isinstance(url, str):
+        raise ValueError("参考图必须是文本 URL")
+    s = url.strip()
+    if not s:
+        raise ValueError("参考图 URL 为空")
+    if s.startswith(("http://", "https://", "data:")):
+        return s
+    if s.startswith("/out/"):
+        from .fal import local_out_to_data_url
+        data = local_out_to_data_url(s)
+        if not data:
+            raise ValueError(f"无法读取本地参考图 {s}（文件不存在或不可读）")
+        return data
+    raise ValueError("参考图必须是 HTTP(S)、data URL 或已上传的 /out 文件")
+
+
+def materialize_local_refs(urls: list[str] | None) -> list[str]:
+    return [materialize_local_ref(u) for u in (urls or [])]
 
 
 def payload_ref_images(

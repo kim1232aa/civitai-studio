@@ -344,3 +344,124 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
             out[k] = o[k]
 
     return out
+
+
+# Official ModelScope AIGC image_url (2026-09-09). Catalog rows used to ship
+# capabilities=None, so the canvas fell back to provider maxRefs=1 for every
+# 魔搭 model — including t2i Krea-2-Raw — and showed「参考图 5/1」instead of
+# 「文生图不吃参考图」.
+#
+# Sources:
+# - Generic AIGC table: image_url is string, editing models only
+#   https://www.modelscope.cn/docs/model-service/API-Inference/intro
+# - Qwen/Qwen-Image-Edit: image_url string
+#   https://modelscope.cn/models/qwen/Qwen-Image-Edit
+# - Qwen/Qwen-Image-Edit-2509: image_url list, 1–3
+#   https://www.modelscope.cn/models/Qwen/Qwen-Image-Edit-2509
+#   https://www.modelscope.cn/learn/2577
+#
+# Provider maxRefs stays 1 (fail-closed). Do NOT copy Nano's 5: that is a
+# different API (input_references). Catalog may only tighten; 2509's official
+# 3 is recorded on the item but cannot raise the provider ceiling.
+MODELSCOPE_REF_POLICY: dict[str, dict[str, Any]] = {
+    "Qwen/Qwen-Image": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
+    "Qwen/Qwen-Image-Edit": {"task": "image-to-image", "image_to_image": True, "maxRefs": 1},
+    "MusePublic/Qwen-Image-Edit": {"task": "image-to-image", "image_to_image": True, "maxRefs": 1},
+    "Tongyi-MAI/Z-Image-Turbo": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
+    "krea/Krea-2-Turbo": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
+    "krea/Krea-2-Raw": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
+    "krea/krea-realtime-video": {"task": "text-to-video", "image_to_image": False, "maxRefs": 1},
+    "Qwen/Qwen-Image-Edit-2509": {"task": "image-to-image", "image_to_image": True, "maxRefs": 3},
+}
+
+
+def _modelscope_mid(service_id: str | None) -> str:
+    s = (service_id or "").strip().lstrip("/")
+    for pfx in ("modelscope-ai/", "modelscope-cn/", "ms/", "modelscope/", "魔搭/"):
+        if s.startswith(pfx):
+            s = s[len(pfx):]
+    return s
+
+
+def overlay_modelscope_catalog_item(row: dict | None) -> dict:
+    """Fill image_to_image / maxRefs from official policy, Hub task, or id."""
+    row = dict(row or {})
+    mid = _modelscope_mid(row.get("id") or row.get("model") or "")
+    policy = MODELSCOPE_REF_POLICY.get(mid)
+    task = str(row.get("task") or row.get("hubTask") or (policy or {}).get("task") or "").strip().lower()
+    tags = [str(t).lower() for t in (row.get("tags") or []) if t]
+    blob = (mid + " " + str(row.get("name") or "")).lower()
+
+    eats: bool | None = None
+    max_r = 1
+    if policy:
+        eats = bool(policy["image_to_image"])
+        max_r = int(policy["maxRefs"])
+        if not task:
+            task = str(policy["task"])
+            row["task"] = task
+    if eats is None:
+        if row.get("needsSource") or task in ("image-to-image", "image-to-video") or "i2i" in tags or "i2v" in tags:
+            eats = True
+            max_r = 1
+        elif task in ("text-to-image", "text-to-video") or "t2i" in tags or "t2v" in tags:
+            eats = False
+            max_r = 1
+        elif "image-edit" in blob or "/edit" in blob or blob.endswith("-edit"):
+            eats = True
+            max_r = 1
+
+    caps = dict(row["capabilities"]) if isinstance(row.get("capabilities"), dict) else {}
+    if eats is True:
+        caps.setdefault("image_to_image", True)
+        caps.setdefault("maxRefs", max_r)
+        caps.setdefault("maxImages", max_r)
+        caps.setdefault("refImagesField", "image_url")
+        caps.setdefault("imageFields", ["image_url"])
+        if task == "image-to-image" and not row.get("needsSource"):
+            row["needsSource"] = True
+        sp = dict(row["supported_parameters"]) if isinstance(row.get("supported_parameters"), dict) else {}
+        sp.setdefault("max_input_images", int(caps.get("maxRefs") or max_r))
+        row["supported_parameters"] = sp
+    elif eats is False:
+        caps.setdefault("image_to_image", False)
+        caps.setdefault("maxRefs", 1)
+        caps.setdefault("maxImages", 1)
+        caps.setdefault("refImagesField", "image_url")
+        caps.setdefault("imageFields", [])
+    if caps:
+        row["capabilities"] = caps
+    if mid and not row.get("id"):
+        row["id"] = mid
+    return row
+
+
+def overlay_modelscope_catalog(body: dict | None) -> dict:
+    """HTTP-boundary overlay so /api/catalog items are never capabilities=None."""
+    if not isinstance(body, dict):
+        return {}
+    out = dict(body)
+    items = out.get("items")
+    if not isinstance(items, list):
+        return out
+    out["items"] = [overlay_modelscope_catalog_item(x) if isinstance(x, dict) else x for x in items]
+    return out
+
+
+def modelscope_t2i_refs_error(service_id: str | None, n_refs: int, item: dict | None = None) -> str | None:
+    """Chinese 400 when a 魔搭 t2i row is sent connected refs (same class as Nano Flare)."""
+    if n_refs <= 0:
+        return None
+    row = overlay_modelscope_catalog_item(item if isinstance(item, dict) else {"id": _modelscope_mid(service_id)})
+    if service_id and not row.get("id"):
+        row["id"] = _modelscope_mid(service_id)
+        row = overlay_modelscope_catalog_item(row)
+    caps = row.get("capabilities") if isinstance(row.get("capabilities"), dict) else {}
+    if caps.get("image_to_image") is False:
+        name = row.get("name") or row.get("id") or service_id or "当前模型"
+        return (
+            f"{name} 是文生图，不吃参考图（已连 {n_refs} 张）。"
+            "请改选 Qwen Image Edit 或断开参考连线，不能静默忽略"
+        )
+    return None
+

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from .base import Provider
@@ -154,6 +155,57 @@ def fal_supports_lora(item) -> bool:
     return False
 
 
+def _strict_int(raw, field: str) -> int:
+    if isinstance(raw, bool) or raw in (None, ""):
+        raise ValueError(f"{field} 必须是整数，收到 {raw!r}")
+    try:
+        value = int(raw)
+        if not isinstance(raw, str) and value != raw:
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{field} 必须是整数，收到 {raw!r}") from None
+    return value
+
+
+def _strict_float(raw, field: str) -> float:
+    if isinstance(raw, bool) or raw in (None, ""):
+        raise ValueError(f"{field} 必须是有限数值，收到 {raw!r}")
+    try:
+        value = float(raw)
+        if not math.isfinite(value):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{field} 必须是有限数值，收到 {raw!r}") from None
+    return value
+
+
+def _schema_keys(spec: dict) -> list[str]:
+    return [str(x) for x in list((spec or {}).get("required") or []) + list((spec or {}).get("optional") or [])]
+
+
+def _is_imagen4_unverified(eid: str) -> bool:
+    """fal-ai/imagen4/preview* OpenAPI 404. Do not invent fields."""
+    return "imagen4" in (eid or "").lower()
+
+
+def _unschematized(spec: dict) -> bool:
+    eid = (spec or {}).get("id") or ""
+    if _is_imagen4_unverified(eid):
+        return False
+    return not eid or not _schema_keys(spec)
+
+
+def _is_fal_trainer(eid: str, spec: dict | None = None) -> bool:
+    spec = spec if spec is not None else (find_model(eid) or {})
+    fcat = (spec.get("falCategory") or "").lower()
+    if fcat == "training":
+        return True
+    e = (eid or "").lower()
+    if "trainer" in e or "-training" in e or e.endswith("training") or "/training" in e or e.endswith("/train"):
+        return True
+    return False
+
+
 def overlay_image_fields(item: dict) -> dict:
     """Keep catalog imageFields; fill from infer_image_fields when missing.
 
@@ -261,11 +313,10 @@ def _fal_lora_path(item: dict) -> str:
 
 
 def _clip_lora_scale(v, default=1.0) -> float:
-    try:
-        x = float(v)
-    except (TypeError, ValueError):
-        x = default
-    return max(0.0, min(4.0, x))
+    """Keep the name for leftover callers. No silent clip and no default 1.0."""
+    if v in (None, ""):
+        raise ValueError(f"lora scale 必须是有限数值，收到 {v!r}，不能缺省为 {default}")
+    return _strict_float(v, "lora scale")
 
 
 def _lora_field_shape(spec: dict, eid: str):
@@ -350,20 +401,34 @@ def fal_lora_sibling(eid: str) -> str:
 
 
 def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
+    raw = payload.get("loras")
+    if raw in (None, [], {}):
+        return
+    if not isinstance(raw, list):
+        raise ValueError("Fal LoRA 必须是列表")
     shape = _lora_field_shape(spec, eid)
     if not shape:
-        return
+        raise ValueError(f"端点 {eid} 不接受 LoRA，不能静默换到其他 endpoint")
     cleaned = []
-    for it in payload.get("loras") or []:
+    for it in raw:
         if not isinstance(it, dict):
-            continue
+            raise ValueError(f"lora 必须是对象，收到 {it!r}")
         path = _fal_lora_path(it)
         if not path:
-            continue
-        scale_raw = it.get("scale")
-        if scale_raw in (None, ""):
+            air = (it.get("air") or "").strip()
+            raise ValueError(
+                "Fal LoRA 必须提供可下载 path/url，不能只用 air"
+                + (f"（{air}）" if air else "")
+            )
+        if "scale" in it:
+            scale_raw = it.get("scale")
+        elif "strength" in it:
             scale_raw = it.get("strength")
-        cleaned.append({"path": path, "scale": _clip_lora_scale(scale_raw, 1.0)})
+        else:
+            raise ValueError("lora scale/strength 必须是有限数值，不能缺省为 1.0")
+        if scale_raw in (None, ""):
+            raise ValueError(f"lora scale 必须是有限数值，收到 {scale_raw!r}，不能缺省为 1.0")
+        cleaned.append({"path": path, "scale": _strict_float(scale_raw, "lora scale")})
     if not cleaned:
         return
     if shape == "loras":
@@ -376,7 +441,7 @@ def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
         inp["lora_scale"] = cleaned[0]["scale"]
     elif shape == "lora":
         inp["lora"] = cleaned[0]["path"]
-        if "lora_scale" in [str(x).lower() for x in list(spec.get("required") or []) + list(spec.get("optional") or [])]:
+        if "lora_scale" in [str(x).lower() for x in _schema_keys(spec)]:
             inp["lora_scale"] = cleaned[0]["scale"]
 
 
@@ -478,8 +543,27 @@ def fal_output_error(obj) -> str | None:
     return None
 
 
+def _imagen4_invented_keys(payload: dict) -> list[str]:
+    extras = []
+    for k in (
+        "width", "height", "steps", "cfgScale", "quantity", "qty", "num_images",
+        "aspectRatio", "negativePrompt", "loras", "scheduler", "resolution",
+        "duration", "seed", "guidanceScale", "numInferenceSteps",
+        "firstFrame", "lastFrame", "image",
+    ):
+        if payload.get(k) not in (None, "", [], {}):
+            extras.append(k)
+    return extras
+
+
 def build_fal_input(payload: dict) -> dict:
     eid = (payload.get("serviceId") or payload.get("endpoint") or "").strip()
+    if _is_imagen4_unverified(eid):
+        extras = _imagen4_invented_keys(payload or {})
+        if extras:
+            raise ValueError(
+                f"端点 {eid} OpenAPI 未验证（404），不能编接口字段：{', '.join(extras)}"
+            )
     spec = find_model(eid) or {}
     fields = list(spec.get("imageFields") or infer_image_fields(eid))
     prompt_key = spec.get("promptField") or "prompt"
@@ -513,68 +597,108 @@ def build_fal_input(payload: dict) -> dict:
             inp[name] = img
         elif name in LAST and last:
             inp[name] = last
-    req_opt = list(spec.get("required") or []) + list(spec.get("optional") or [])
-    if audio and (not spec.get("id") or "audio_url" in req_opt or "audio-to-video" in eid):
+    req_opt = _schema_keys(spec)
+    open_schema = _unschematized(spec)
+    is_video = (
+        (spec.get("category") or "").lower() == "video"
+        or "video" in (spec.get("falCategory") or "").lower()
+    )
+
+    def has_field(*names):
+        if open_schema:
+            return True
+        return any(n in req_opt for n in names)
+
+    def reject_drop(studio_key: str, official: str):
+        raise ValueError(
+            f"端点 {eid} 官方 schema 没有 {official}，不能静默丢弃 {studio_key}"
+        )
+
+    if audio and (open_schema or "audio_url" in req_opt or "audio-to-video" in eid):
         inp["audio_url"] = audio
-    if payload.get("negativePrompt") and (not spec.get("optional") or "negative_prompt" in (spec.get("optional") or [])):
-        inp["negative_prompt"] = payload["negativePrompt"]
-    elif payload.get("negativePrompt") and not spec.get("optional"):
-        inp["negative_prompt"] = payload["negativePrompt"]
+    if payload.get("negativePrompt"):
+        if has_field("negative_prompt"):
+            inp["negative_prompt"] = payload["negativePrompt"]
+        else:
+            reject_drop("negativePrompt", "negative_prompt")
     if payload.get("seed") not in (None, "", "random"):
-        try:
-            inp["seed"] = int(payload["seed"])
-        except (TypeError, ValueError):
-            pass
-    if payload.get("steps") and (not spec.get("optional") or "num_inference_steps" in (spec.get("optional") or [])):
-        try:
-            inp["num_inference_steps"] = int(payload["steps"])
-        except (TypeError, ValueError):
-            pass
-    if payload.get("cfgScale") not in (None, "") and (not spec.get("optional") or "guidance_scale" in (spec.get("optional") or [])):
-        try:
-            inp["guidance_scale"] = float(payload["cfgScale"])
-        except (TypeError, ValueError):
-            pass
-    if payload.get("duration") not in (None, "") and (spec.get("durationField") or not spec.get("id")):
-        try:
-            dur = int(payload["duration"])
-            inp["duration"] = str(dur) if "kling" in eid else dur
-        except (TypeError, ValueError):
-            pass
+        if has_field("seed"):
+            inp["seed"] = _strict_int(payload["seed"], "seed")
+        else:
+            reject_drop("seed", "seed")
+    if payload.get("steps") not in (None, ""):
+        if has_field("num_inference_steps"):
+            inp["num_inference_steps"] = _strict_int(payload["steps"], "steps")
+        else:
+            reject_drop("steps", "num_inference_steps")
+    if payload.get("cfgScale") not in (None, ""):
+        if "cfg_scale" in req_opt and "guidance_scale" not in req_opt:
+            inp["cfg_scale"] = _strict_float(payload["cfgScale"], "cfgScale")
+        elif has_field("guidance_scale"):
+            inp["guidance_scale"] = _strict_float(payload["cfgScale"], "cfgScale")
+        elif "cfg_scale" in req_opt:
+            inp["cfg_scale"] = _strict_float(payload["cfgScale"], "cfgScale")
+        else:
+            reject_drop("cfgScale", "guidance_scale/cfg_scale")
+    dur_field = spec.get("durationField")
+    if not dur_field and (open_schema or "duration" in req_opt):
+        dur_field = "duration"
+    if payload.get("duration") not in (None, ""):
+        if dur_field:
+            dur = _strict_int(payload["duration"], "duration")
+            inp[dur_field] = str(dur) if "kling" in eid else dur
+        else:
+            reject_drop("duration", "duration")
     ar_field = spec.get("aspectRatioField")
-    req_opt_ar = list(spec.get("optional") or []) + list(spec.get("required") or [])
-    if not ar_field and "ratio" in req_opt_ar:
+    if not ar_field and "ratio" in req_opt:
         ar_field = "ratio"
-    if not ar_field and "aspect_ratio" in req_opt_ar:
+    if not ar_field and "aspect_ratio" in req_opt:
         ar_field = "aspect_ratio"
-    if ar_field and payload.get("aspectRatio"):
-        inp[ar_field] = payload["aspectRatio"]
-    elif payload.get("aspectRatio") and ("kontext" in eid or not req_opt_ar):
-        # kontext / unschematized endpoints: official field is aspect_ratio
-        inp["aspect_ratio"] = payload["aspectRatio"]
-    size_keys = set(req_opt) | set(fields)
-    if payload.get("width") and payload.get("height") and (
-        not size_keys or "image_size" in size_keys or spec.get("category") != "video"
-    ):
-        try:
-            inp["image_size"] = {"width": int(payload["width"]), "height": int(payload["height"])}
-        except (TypeError, ValueError):
-            pass
-    if payload.get("scheduler") and (not req_opt or "scheduler" in req_opt):
-        inp["scheduler"] = payload["scheduler"]
-    # qty / quantity → num_images when the endpoint lists that field
-    if "num_images" in size_keys or "num_images" in set(req_opt):
-        raw_q = payload.get("quantity")
-        if raw_q in (None, ""):
-            raw_q = payload.get("qty")
-        if raw_q in (None, ""):
-            raw_q = payload.get("num_images")
-        try:
-            n = int(raw_q)
-            if n > 0:
-                inp["num_images"] = max(1, min(12, n))
-        except (TypeError, ValueError):
-            pass
+    if payload.get("aspectRatio"):
+        if ar_field:
+            inp[ar_field] = payload["aspectRatio"]
+        elif "kontext" in eid or open_schema:
+            inp["aspect_ratio"] = payload["aspectRatio"]
+        else:
+            raise ValueError(
+                f"端点 {eid} 官方 schema 没有 aspect_ratio/ratio，"
+                f"不能静默丢弃 aspectRatio={payload.get('aspectRatio')!r}"
+            )
+    w_raw, h_raw = payload.get("width"), payload.get("height")
+    w_set = w_raw not in (None, "")
+    h_set = h_raw not in (None, "")
+    if w_set or h_set:
+        if not (w_set and h_set):
+            raise ValueError("width 和 height 必须同时提供，不能只给其中一个")
+        size = {"width": _strict_int(w_raw, "width"), "height": _strict_int(h_raw, "height")}
+        if "image_size" in req_opt or (open_schema and not is_video):
+            inp["image_size"] = size
+    if payload.get("scheduler"):
+        if has_field("scheduler"):
+            inp["scheduler"] = payload["scheduler"]
+        else:
+            reject_drop("scheduler", "scheduler")
+    if payload.get("resolution") not in (None, ""):
+        if has_field("resolution"):
+            inp["resolution"] = payload["resolution"]
+        else:
+            reject_drop("resolution", "resolution")
+    raw_q = payload.get("quantity")
+    if raw_q in (None, ""):
+        raw_q = payload.get("qty")
+    if raw_q in (None, ""):
+        raw_q = payload.get("num_images")
+    if raw_q not in (None, ""):
+        n = _strict_int(raw_q, "num_images")
+        if n < 1:
+            raise ValueError(f"num_images={n} 超出范围")
+        if "num_images" in req_opt or (open_schema and not is_video):
+            inp["num_images"] = n
+        elif n != 1:
+            raise ValueError(
+                f"端点 {eid} 官方 schema 没有 num_images，quantity={n} 不能静默丢弃"
+                "（仅 quantity=1 可省略）"
+            )
     apply_fal_loras(inp, payload, spec, eid)
     # Keep empty-string prompt: Fal minimax i2v 422s with "body.prompt: Field required"
     # if the key is omitted (v0821k / job 01a07e75). Other empty strings still drop.
@@ -703,18 +827,14 @@ def submit(payload: dict):
         return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Fal。请在 Fal 目录里选一个模型（例如 fal-ai/flux/schnell）。"}
     if not eid:
         return 400, {"error": "缺少 Fal 模型 id"}
-    if payload.get("loras") and not fal_supports_lora({"id": eid}):
-        sib = fal_lora_sibling(eid)
-        if sib:
-            eid = sib
-            payload = dict(payload)
-            payload["serviceId"] = eid
-            payload["endpoint"] = eid
-    inp = build_fal_input(payload)
+    spec = find_model(eid) or {}
+    if _is_fal_trainer(eid, spec):
+        return 400, {"error": f"端点 {eid} 是训练器，不能当作生成", "backend": "fal", "endpoint": eid}
     try:
+        inp = build_fal_input(payload)
         outbound = materialize_fal_media(inp)
     except ValueError as e:
-        return 400, {"error": str(e), "backend": "fal", "endpoint": eid, "submittedInput": inp}
+        return 400, {"error": str(e), "backend": "fal", "endpoint": eid}
     # v0821k: optional provider reject when catalog requires prompt and outbound is empty
     # (client gates first; this stops silent Fal 422 Field required for API callers)
     spec = find_model(eid) or {}

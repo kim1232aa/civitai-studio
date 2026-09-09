@@ -1,6 +1,6 @@
 # 各供应商 LoRA / 自定义参数 / 代表问题
 
-接线深挖（代码路径级）：[`lora-wiring-deep.md`](lora-wiring-deep.md)。
+接线深挖（代码路径级）：[`lora-wiring-deep.md`](lora-wiring-deep.md)。官方字段/范围/出处（没查到 ≠ 不支持）：[`provider-model-parameter-matrix.md`](provider-model-parameter-matrix.md)。
 
 调查截止 **v0753**（`0fac0ea`，2026-09-02）。只记官方字段和实测，不把「找替代 LoRA」写成产品对照表。
 
@@ -14,8 +14,8 @@
 | --- | --- | --- | --- | --- |
 | Civitai | AIR / versionId，进工作流 resources | 官方下载 | sampler、scheduler、denoise、turbo/raw、seed、步数、CFG、宽高 | 社区节点 Comfy 不能当本地跑；AIR 对不上就 unmatched，不编 URN |
 | Fal | `loras: [{path, scale}]`（部分端点是 `lora_url` / `lora_path`） | 可用。无 LoRA 字段时切到目录里的 `/lora` 兄弟端点 | prompt、negative_prompt、seed、steps→`num_inference_steps`、CFG→`guidance_scale`、宽高→`image_size`、scheduler、首帧/尾帧按 OpenAPI | 多填字段会 422；非 LoRA 端点不要硬塞 `loras` |
-| Hugging Face | 路由映射到 `fal-ai/…` 后，把 `loras[]` 附在 **mapped turbo** 上 | 会塞进 body。路由 **没有** `…/turbo/lora` | seed 钳到 `[-1, 2147483647]`、宽高、`scheduler`（仅 fal 风格通道） | 发出去 ≠ 上游一定用。OpenAI 通道忽略 LoRA/scheduler。replicate 不能 POST |
-| 魔搭 AI / CN | `loras` = Hub `owner/repo` 或 `{repo: weight}` | **不能用**。发了会 500「lora modelName 不能为空」 | model、prompt、negative_prompt、`size`=`WxH`、seed 钳 int32、steps、guidance、编辑模 `image_url` | 跳过 http LoRA 后仍出底模；warning 只在 API，UI 不显示。AI/CN 禁止互切 |
+| Hugging Face | Fal 路由 mapped turbo：`loras[{path,scale}]`。nscale 这类 `/v1/images/generations` **无此字段** | Fal 通道会塞进 body。路由 **没有** `…/turbo/lora` | seed 钳到 `[-1, 2147483647]`、宽高、`scheduler`（仅 fal 风格通道） | 发出去 ≠ 上游一定用。禁止项钉的是 nscale 兼容体，不是整家 HF。replicate 不能 POST |
+| 魔搭 AI / CN | Hub `owner/repo`，出站 `loras: [{model, weight}]`（单条也用数组对象；2026-09-08 实测） | **不能用**。发了会 500「lora modelName 不能为空」 | model、prompt、negative_prompt、`size`=`WxH`、seed 钳 int32、steps、guidance、编辑模 `image_url` | 跳过 http LoRA 后仍出底模；warning 只在 API，UI 不显示。AI/CN 禁止互切。字符串 / `{repo:w}` 会 500，不要再发 |
 | NanoGPT | `loras: [{path, scale}]`，另带 `lora_1_url` / `lora_1_scale` | 可用（`z-image-turbo-lora`、`wavespeed-ai/krea-v2/turbo-lora` 实测出片） | 目录里的 resolution token、`aspect_ratio`、seed、negative、`input_references` + `strength`（来自 denoise）、steps、guidance | 图生图不能混 `image`/`image_url`/`imageDataUrl`。分辨率必须是目录 token，不能自己拼 `256*256` |
 
 ## Civitai
@@ -63,7 +63,7 @@
 其它通道：
 
 - `hf-inference`：bytes，不带 LoRA。
-- OpenAI 兼容（nscale 等）：`/v1/images/generations`，忽略 LoRA / scheduler。
+- OpenAI 兼容（nscale 等）：`POST {ROUTER}/{provider}/v1/images/generations`，官方 schema 无 `loras` / `scheduler`，发出去也会被忽略。**TODO 禁止项钉的是这条兼容体，不是整家 HF。**
 - `replicate`：明确禁止 POST，代码跳过。
 
 自定义：seed 超 int32 会取模，不丢。宽高打成 `image_size: {width,height}`。
@@ -84,13 +84,17 @@
 
 官方 AIGC 字段：`model` `prompt` `negative_prompt` `size` `seed` `steps` `guidance` `image_url` `loras`。
 
-`loras` 只要 Hub `owner/repo`：
+`loras` 只要 Hub `owner/repo`，出站用数组对象（单条也如此；2026-09-08 实测）：
 
 ```json
-{ "model": "Tongyi-MAI/Z-Image-Turbo", "prompt": "…", "loras": "Qwen/some-lora" }
+{
+  "model": "Tongyi-MAI/Z-Image-Turbo",
+  "prompt": "…",
+  "loras": [{ "model": "DiffSynth-Studio/Z-Image-Turbo-DistillPatch", "weight": 0.8 }]
+}
 ```
 
-或多条 `{ "owner/repo": 0.8, "other/repo": 0.2 }`（权重会归一）。
+页面挂载步骤见 [`modelscope-hub-lora.md`](modelscope-hub-lora.md)。旧文档里的字符串 / `{repo:w}` 形状会 500，不要再发。
 
 Civitai `https://…` 路径：**跳过**，不提交，响应带
 
@@ -136,3 +140,4 @@ v0752 曾把 `3231694` 静默换成 `laonansheng/Asian-beauty-Z-Image-Turbo-Tong
 - 不要用「成片栏有图」证明 LoRA 生效。
 - 不要把魔搭 AI 失败切到 CN。
 - 不要把 HF 路由上的 `loras[]` 写成「官方 /lora 端点」。
+- 不要给 nscale 这类 `/v1/images/generations` 发明 `loras`。这不等于禁止 HF Fal 路由或魔搭 Hub LoRA。

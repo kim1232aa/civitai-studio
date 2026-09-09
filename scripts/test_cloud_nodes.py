@@ -143,6 +143,50 @@ def test_fal_keeps_empty_prompt_key():
     assert_true(inp.get("prompt") == "", inp)
     assert_true(bool(inp.get("image_url") or inp.get("start_image_url")), inp)
 
+
+def test_unknown_backend_is_blocked():
+    r = g(
+        backend="not-a-provider",
+        nodes=[
+            {"id": "p", "op": "prompt", "params": {"text": "x"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "x"}},
+        ],
+        edges=[{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    )
+    assert_true(r.get("ok") is False and r.get("blocked") is True, r)
+    assert_true("provider" in (r.get("error") or ""), r)
+
+
+def test_malformed_lora_is_blocked_instead_of_dropped():
+    r = g(
+        backend="modelscope-ai",
+        nodes=[
+            {"id": "p", "op": "prompt", "params": {"text": "x"}},
+            {"id": "l", "op": "lora_apply", "params": {"loras": "owner/repo"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "x"}},
+        ],
+        edges=[
+            {"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"},
+            {"from": "l", "fromPort": "loras", "to": "g", "toPort": "loras"},
+        ],
+    )
+    assert_true(r.get("ok") is False and r.get("blocked") is True, r)
+    assert_true("LoRA" in (r.get("error") or ""), r)
+
+
+def test_unsupported_provider_parameters_are_blocked():
+    r = g(
+        backend="huggingface",
+        nodes=[
+            {"id": "p", "op": "prompt", "params": {"text": "x"}},
+            {"id": "g", "op": "t2i", "params": {"serviceId": "x", "sampler": "euler"}},
+        ],
+        edges=[{"from": "p", "fromPort": "prompt", "to": "g", "toPort": "prompt"}],
+    )
+    assert_true(r.get("ok") is False and r.get("blocked") is True, r)
+    assert_true("sampler" in (r.get("error") or ""), r)
+
+
 def main():
     tests = [
         test_missing_image_blocked,
@@ -153,6 +197,9 @@ def main():
         test_unknown_op,
         test_i2v_empty_prompt_allowed,
         test_fal_keeps_empty_prompt_key,
+        test_unknown_backend_is_blocked,
+        test_malformed_lora_is_blocked_instead_of_dropped,
+        test_unsupported_provider_parameters_are_blocked,
     ]
     failed = 0
     for fn in tests:

@@ -47,7 +47,7 @@
 
 - `_maybe_lora_pid`：**不**切到 Fal `/lora`（路由 404「Model not supported」）。
 - fal 通道：先 `apply_fal_loras`（mapped id 多半无 lora 字段 → 空），再 `_force_loras` **硬塞** `loras[{path,scale}]` 最多 3 条（Civitai http 可用）。
-- OpenAI 兼容通道：忽略 LoRA。
+- OpenAI 兼容通道（nscale 等 `POST …/v1/images/generations`）：官方无 `loras`，忽略。禁止发明字段。**不是**整家 HF 不能 LoRA。
 - `hf-inference` bytes：无 LoRA。
 - replicate：禁止 POST。
 - 搜：`GET huggingface.co/api/models?search=&filter=lora` → 选中的是 Hub `owner/repo`，但 fal 通道实际更吃 http/Civitai 链。
@@ -56,8 +56,9 @@
 
 ## 魔搭 AI / CN
 
-- 官方：`loras` = Hub `owner/repo` 字符串，或多条 `{repo: weight}`（权重归一）。
-- `_modelscope_loras`：**丢弃**所有 `http(s)://`（Civitai 链会 500 空 modelName）；只要恰好 `owner/repo`。
+- 出站（2026-09-08 实测）：`loras: [{ "model": "owner/repo", "weight": 0.8 }, …]`（**单条也用数组对象**）。
+- 字符串 `"owner/repo"` 或 `{repo: weight}` 会 500「Model does not exist」。详见 [`modelscope-hub-lora.md`](modelscope-hub-lora.md)。
+- `_modelscope_loras`：**丢弃**所有 `http(s)://`（Civitai 链不能用）；只要恰好 `owner/repo`。
 - 全是 http / AIR → `loras` 不进 body，`warning` 写回 API；**UI 不显示**。
 - 搜：Hub `search={q} lora`，结果 id 即 repo。
 - AI/CN 分 token/base，禁止互切。不要做 Civitai→Hub 自动换模。

@@ -76,7 +76,9 @@ def main() -> int:
     assert ai._base == AI_BASE and cn._base == CN_BASE
     assert ai._token_path == AI_TOKEN_PATH and cn._token_path == CN_TOKEN_PATH
     assert ai.id == "modelscope-ai" and cn.id == "modelscope-cn"
-    assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == "Qwen/foo"
+    assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == [
+        {"model": "Qwen/foo", "weight": 1.0}
+    ]
     assert _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]}) is None
     assert _modelscope_loras({"loras": [{
         "name": "[Z Image Turbo] Asian Mix Lora - EOL",

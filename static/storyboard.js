@@ -1,8 +1,16 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821n5";
-  const STORE_OLDS = ["nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o7";
+  const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
+  // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
+  // v0821o6: Magao ② mount Tongyi-MAI/Z-Image-Turbo + Hub LoRA; skip Civitai http; no AI↔CN drift
+  // v0821o5: HF Z-Image turbo pins fal-ai; skip wavespeed; fal-ai error is final
+  // v0821o4: HF ② mount Tongyi-MAI/Z-Image-Turbo + http LoRA; never fal /lora sibling
+  // v0821o3: Fal import without loras[] clears stale chips (was wantCivitai-only)
+  // v0821o2: pin fal-ai/z-image/turbo/lora on fixture+generate — never flux-lora / 默认模型 drift
+  // v0821o: fal image+LoRA hardgate — pack requires http path; mount z-image/turbo/lora fixture 3231694
   // v0821n5: single Composer scrollbar (port from ui/seko-css-align dock-scroll)
   // v0821n4: cache-bust storyboard.js query to stamp
   // v0821n3: import air — chip subtitle prefers air URN (was path||downloadUrl hiding it); applyImport keeps air
@@ -22,8 +30,25 @@
   // v0821b: real i2v endpoint (plain video-01 is t2v and drops first frame)
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
+  const FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora";
+  const FAL_LORA_FIXTURE_VERSION = "3231694";
+  const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
+  const HF_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
+  const MS_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
+  const SERVICE_SYNC_BUDGET = 300;
+  const SERVICE_CHUNK_SIZE = 400;
+  const CATALOG_FETCH_TIMEOUT_MS = 20000;
+  const CATALOG_MODELSCOPE_TIMEOUT_MS = 60000;
+  const CATALOG_PAGE_SIZE = 50;
+  let _svcChunkHandle = 0;
+  let _svcChunkToken = 0;
+  let _catalogToken = 0;
+  let _catalogFlight = null;
+  let _importToken = 0;
+  let _composerShotId = null;
+  const SHOT_COMPOSER_FIELDS = ["prompt", "negative", "duration", "aspect", "res", "nanoRes"].concat(COMFY_PARAM_IDS);
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -74,6 +99,8 @@
     mode: "image",
     catalog: [],
     catalogById: {},
+    catalogPaging: { key: "", page: 0, pageSize: CATALOG_PAGE_SIZE, hasMore: false, nextPage: null,
+      partial: false, warning: "", retryPage: null, hubTotals: null, hubCoverage: null, loading: false },
     history: [],
     railTab: "assets",
     atFilter: "",
@@ -85,9 +112,12 @@
     skillCat: "官方精选",
     runningGroup: false,
     groupRunAbort: false,
+    uploading: 0,
     dockMode: "collapsed",
     lastComposerShot: null,
     loras: [],
+    _serviceItems: [],
+    _providerCaps: {},
   };
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
@@ -98,7 +128,13 @@
       .replace(/"/g, "&" + "quot;");
   }
   function isVideoUrl(u) { return /\.(mp4|webm|mov)(\?|$)/i.test(u || ""); }
-  function isImageSource(n) { return !!(n && n.url && !isVideoUrl(n.url)); }
+  function isImageSource(n) {
+    if (!n || !n.url) return false;
+    const u = String(n.url);
+    // Studio uploads are /out/<file>; treat as image unless the path is clearly video/audio.
+    if (u.indexOf("/out/") === 0 && !isVideoUrl(u) && !/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return true;
+    return mediaKindOf(u, n.kind === "shot" ? n.mode : (n.mediaKind || n.kind)) === "image";
+  }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
   function box(n) { return n.kind === "shot" ? { w: 640, h: 360 } : { w: 132, h: 208 }; }
   function assets() { return state.nodes.filter((n) => n.kind !== "shot"); }
@@ -108,6 +144,17 @@
   }
   function connectedAssets(shotId) {
     return connectedNodes(shotId).filter(isImageSource);
+  }
+  function connectedPending(shotId) {
+    // A blank shot is an upstream generation dependency, not an upload in flight.
+    return connectedNodes(shotId).filter((n) => n && n.kind !== "shot" && !n.url);
+  }
+  function refReadyMessage(shot) {
+    if ((state.uploading || 0) > 0) return "参考图上传中，请稍等";
+    if (!shot) return "";
+    const pending = connectedPending(shot.id);
+    if (pending.length) return "参考图上传中，请稍等";
+    return "";
   }
   function frameAsset(shot) {
     const linked = connectedAssets(shot.id);
@@ -306,6 +353,7 @@
 
   function persist() {
     try {
+      saveDisplayedComposer();
       sessionStorage.setItem(STORE, JSON.stringify({
         cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
         railTab: state.railTab,
@@ -322,6 +370,8 @@
         sampler: $("sampler") && $("sampler").value,
         scheduler: $("scheduler") && $("scheduler").value,
         seed: $("seed") && $("seed").value,
+        nanoRes: $("nanoRes") && $("nanoRes").value,
+        negative: $("negative") && $("negative").value,
         loras: Array.isArray(state.loras) ? state.loras : [],
       }));
     } catch (_) {}
@@ -363,6 +413,8 @@
         $("seed").value = p.seed;
         $("seed").title = String(p.seed);
       }
+      if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
+      if (p.negative != null && $("negative")) $("negative").value = p.negative;
       state._pendingService = p.service || "";
       state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
       if (isClassicRobotDemo(state.nodes)) {
@@ -404,8 +456,110 @@
   function canLink(src, dst) {
     if (!src || !dst || src.id === dst.id) return false;
     if (dst.kind !== "shot") return false;
-    if (src.kind === "shot" && !isImageSource(src)) return false;
+    // Blank image shots are real upstream dependencies, not fake image assets.
+    // Video/audio results cannot feed an image port.
+    if (!isImageSource(src) && !(src.kind === "shot" && !src.url &&
+        (src.mode || (src.composer && src.composer.mode) || "image") === "image")) return false;
+    const seen = new Set();
+    const todo = [dst.id];
+    while (todo.length) {
+      const id = todo.pop();
+      if (id === src.id) return false;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      state.edges.forEach((edge) => { if (edge.from === id) todo.push(edge.to); });
+    }
     return true;
+  }
+
+  function snapshotComposer() {
+    const fields = {};
+    SHOT_COMPOSER_FIELDS.forEach((id) => { if ($(id)) fields[id] = $(id).value; });
+    return {
+      backend: $("backend").value, service: state._pendingService != null ? state._pendingService : $("service").value,
+      mode: state.mode, fields: fields,
+      loras: JSON.parse(JSON.stringify(state.loras || [])),
+    };
+  }
+
+  function saveDisplayedComposer() {
+    const shot = nodeById(_composerShotId);
+    if (!shot || shot.kind !== "shot") return;
+    shot.composer = snapshotComposer();
+    shot.mode = state.mode;
+    shot.prompt = $("prompt").value;
+    shot.negativePrompt = $("negative") ? $("negative").value : "";
+    writeComfyParamsToShot(shot);
+  }
+
+  function activateShotComposer(shot) {
+    const id = shot && shot.kind === "shot" ? shot.id : null;
+    if (_composerShotId === id) return;
+    saveDisplayedComposer();
+    _composerShotId = id;
+    if (!id || !shot.composer) return;
+    const recipe = shot.composer;
+    const key = recipe.backend + ":" + recipe.mode;
+    state.mode = recipe.mode;
+    $("backend").value = recipe.backend;
+    state.loras = JSON.parse(JSON.stringify(recipe.loras || []));
+    Object.keys(recipe.fields || {}).forEach((field) => {
+      const el = $(field);
+      if (!el || SHOT_COMPOSER_FIELDS.indexOf(field) < 0) return;
+      if (el.tagName === "SELECT") ensureSelectOpt(el, recipe.fields[field]);
+      el.value = recipe.fields[field];
+    });
+    if (state._catalogKey !== key || _catalogFlight) {
+      state._pendingService = recipe.service || "";
+      loadCatalog();
+    } else {
+      $("service").value = "";
+      if (recipe.service && state.catalogById[recipe.service]) {
+        ensureSelectOpt($("service"), recipe.service);
+      }
+    }
+  }
+
+  function createLinkedShot(link, point) {
+    const origin = nodeById(link.from);
+    if (!origin || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+    const recipe = snapshotComposer();
+    const titleSet = new Set(shots().map((shot) => shot.title));
+    let number = 1;
+    while (titleSet.has("分镜" + number)) number++;
+    const shot = Object.assign({}, readComfyParamsFromUi(), {
+      id: uid("shot"), kind: "shot", title: "分镜" + number,
+      x: point.x - (link.side === "in" ? 640 : 0), y: point.y - 180,
+      url: "", firstFrameId: "", prompt: recipe.fields.prompt || "",
+      negativePrompt: recipe.fields.negative || "", mode: recipe.mode,
+      composer: recipe,
+    });
+    const src = link.side === "in" ? shot : origin;
+    const dst = link.side === "in" ? origin : shot;
+    if (!canLink(src, dst)) {
+      setMsg("无法建连线：图片输入只接受图片或待生成的图片分镜，不接受视频/音频", "bad");
+      return null;
+    }
+    // Commit node + edge together; no copied output, first frame, job or stage state.
+    state.nodes.push(shot);
+    if (!linkAssetToShot(src, dst)) {
+      state.nodes = state.nodes.filter((n) => n.id !== shot.id);
+      return null;
+    }
+    selectNode(shot.id);
+    persist();
+    setMsg("已创建 " + shot.title + " 并连线" + (!isImageSource(src) ? " · 上游分镜需先生成图片" : ""), "ok");
+    return shot;
+  }
+
+  function isBlankCanvasDrop(event, link) {
+    const r = vp.getBoundingClientRect();
+    if (event.clientX < r.left || event.clientX >= r.right ||
+        event.clientY < r.top || event.clientY >= r.bottom) return false;
+    if (Math.hypot(event.clientX - link.clientX, event.clientY - link.clientY) < 6) return false;
+    const el = document.elementFromPoint(event.clientX, event.clientY);
+    return !!(el && vp.contains(el) && !el.closest(
+      ".card,.dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar,.group-bound,path.edge"));
   }
 
   function nearestCompatiblePort(wx, wy, fromId, fromSide) {
@@ -622,46 +776,70 @@
     }
   }
 
+  function canvasArea() {
+    const r = vp.getBoundingClientRect();
+    const narrow = r.width <= 900;
+    const area = { left: 12, top: 48, right: r.width - 12, bottom: r.height - (narrow ? 68 : 16) };
+    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar").forEach((el) => {
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height) return;
+      if (el.classList.contains("selbar") || (narrow && !el.classList.contains("zoom"))) {
+        area.top = Math.max(area.top, b.bottom - r.top + 12);
+      } else if (!narrow) {
+        area.left = Math.max(area.left, b.right - r.left + 12);
+      }
+    });
+    return area;
+  }
+
   function positionDock() {
-    if (!dock) return;
-    const stage = dock.parentElement;
-    if (!stage) return;
-    const sr = stage.getBoundingClientRect();
-    // Leave minimap + zoom clear by real geometry (not z-index alone).
-    // minimap: left 14 / w 160 → right ~174; zoom: left 188 / ~270 wide → right ~458.
-    const gap = 12;
-    let clearL = 14;
-    const mm = $("minimap");
-    const zoomEl = stage.querySelector(".zoom");
-    if (mm) {
-      const r = mm.getBoundingClientRect();
-      if (r.width > 0) clearL = Math.max(clearL, r.right - sr.left + gap);
+    const n = nodeById(state.selected);
+    if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
+    const area = canvasArea(), b = box(n), gap = 18;
+    const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
+    const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
+    const width = Math.min(640, area.right - area.left);
+    const height = state.dockMode === "expanded" ? 520 : $("dockHd").offsetHeight + 2;
+    const above = y - 34 * state.cam.s - gap - area.top;
+    const below = area.bottom - y - nh - gap;
+    const right = area.right - x - nw - gap, leftRoom = x - gap - area.left;
+    const minHeight = Math.min(height, 260);
+    let dockW = width, maxH, left, top;
+    // Seko's input follows below the selected node; flip only at viewport edges.
+    if (below >= minHeight || (above < minHeight && Math.max(right, leftRoom) < 360 && below >= above)) {
+      maxH = Math.min(height, below);
+      left = x + (nw - dockW) / 2;
+      top = y + nh + gap;
+    } else if (above >= minHeight || Math.max(right, leftRoom) < 360) {
+      maxH = Math.min(height, above);
+      left = x + (nw - dockW) / 2;
+      top = y - 34 * state.cam.s - gap - maxH;
+    } else {
+      const onRight = right >= 360;
+      dockW = Math.min(400, onRight ? right : leftRoom);
+      maxH = Math.min(height, area.bottom - area.top);
+      left = onRight ? x + nw + gap : x - gap - dockW;
+      top = y;
     }
-    if (zoomEl) {
-      const r = zoomEl.getBoundingClientRect();
-      if (r.width > 0) clearL = Math.max(clearL, r.right - sr.left + gap);
-    }
-    // Fallback before layout: zoom right edge ~458 + gap
-    if (clearL < 100) clearL = 470;
-    const clearR = 24;
-    let dockW = Math.min(720, Math.max(280, sr.width - clearL - clearR));
-    let left = (sr.width - dockW) / 2;
-    if (left < clearL) left = Math.min(clearL, Math.max(12, sr.width - dockW - clearR));
-    if (left + dockW > sr.width - clearR) {
-      dockW = Math.max(280, sr.width - clearR - left);
-    }
-    dock.style.width = dockW + "px";
-    dock.style.left = left + "px";
-    dock.style.top = "auto";
-    dock.style.bottom = "14px";
-    dock.style.transform = "none";
-    dock.classList.remove("near");
-    const visible = dock.classList.contains("show");
-    const dh = visible ? (dock.offsetHeight || (state.dockMode === "expanded" ? 220 : 44)) : 0;
-    const lift = Math.max(210, dh + 28) + "px";
+    maxH = Math.min(area.bottom - area.top, Math.max(Math.min(height, 112), maxH));
+    left = Math.max(area.left, Math.min(left, area.right - dockW));
+    top = Math.max(area.top, Math.min(top, area.bottom - maxH));
+    Object.assign(dock.style, {
+      width: dockW + "px", maxHeight: maxH + "px", left: left + "px", top: top + "px",
+      right: "auto", bottom: "auto", transform: "none",
+      visibility: x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight ? "hidden" : "",
+    });
+    dock.classList.add("near");
     ["skillbox", "atbox", "picker"].forEach((id) => {
       const el = $(id);
-      if (el) el.style.bottom = lift;
+      if (!el) return;
+      const w = Math.min(400, dockW);
+      const px = left + dockW + gap + w <= area.right ? left + dockW + gap
+        : left - w - gap >= area.left ? left - w - gap : left;
+      Object.assign(el.style, {
+        left: px + "px", right: "auto", top: top + "px", bottom: "auto",
+        width: w + "px", maxHeight: Math.min(320, area.bottom - top) + "px", transform: "none",
+      });
     });
   }
 
@@ -737,6 +915,7 @@
 
   function renderDock() {
     const n = nodeById(state.selected);
+    activateShotComposer(n);
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
       dock.classList.remove("near");
@@ -775,8 +954,11 @@
       $("dockTitle").textContent = (n.title || "分镜") + (expanded ? " · Composer" : " · Composer（已折叠）");
     }
     $("prompt").value = n.prompt || "";
+    if ($("negative")) $("negative").value = n.negativePrompt || "";
     applyComfyParamsToUi(n);
-    syncParamSurface();
+    syncParamSurface._skipDock = true;
+    try { syncParamSurface(); }
+    finally { syncParamSurface._skipDock = false; }
     ["text", "image", "video", "audio"].forEach((m) => {
       const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
       if (el) el.classList.toggle("on", state.mode === m);
@@ -786,12 +968,22 @@
     const frame = frameAsset(n);
     const needFrame = state.mode === "video" && !frame;
     const stub = isStubMode();
+    const capMsg = refCapGateMessage(n);
+    const unusedMsg = refUnusedGateMessage(n);
     syncSendGate(needFrame, stub);
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
       // v0821g: missing-frame is hard stop (red), not yellow warn
       setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+    } else if (unusedMsg) {
+      setMsg(unusedMsg, "bad");
+    } else if (capMsg) {
+      setMsg(capMsg, "bad");
+    } else if (state.mode !== "video") {
+      const msgEl = $("msg");
+      const t = (msgEl && msgEl.textContent) || "";
+      if (t.indexOf("缺首帧") >= 0) setMsg("");
     } else if (state.mode === "video" && frame) {
       // v0821j: do NOT reset to 首帧已就绪 while generate/busy/group in-flight (wipes 校验连线/已点生成)
       // v0821k: also keep bad/warn (Fal job.error / 此模型需要提示词) — empty card must not be silent
@@ -821,10 +1013,12 @@
     const refCap = maxRefCount(catalogItemForService());
     // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink;
     // fill remaining slots with unlinked suggestions up to maxRefs.
+    // Hint numerator uses the same URL set as the send gate (countRefUrls), not a stale default cap.
+    const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - linked.length);
-    const refHint = linked.length > refCap
-      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + linked.length + '/' + refCap + ' · 超出，请减少连线</span>'
-      : '<span class="ref-cap-hint" title="参考图上限">参考 ' + linked.length + '/' + refCap +
+    const refHint = refCount > refCap
+      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出，请减少连线</span>'
+      : '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap +
           (remain ? (' · 还可 ' + remain) : '') + '</span>';
     const suggest = list.filter((a) => !linked.some((x) => x.id === a.id)).slice(0, remain);
     const chipNodes = linked.concat(suggest);
@@ -861,6 +1055,11 @@
     const n = nodeById(id);
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
+      if (state.cam.s >= 1) {
+        if (constrainShotsToViewport()) renderCards();
+        constrainCameraToShots(n);
+        applyCam();
+      }
       // v0819b-expand-prompt: boot/first paint stays collapsed (canvas = stage);
       // intentional shot click expands; {collapsed:true} keeps bottom bar; expand capsule still works.
       if (opts.keepClosed) {
@@ -925,14 +1124,14 @@
   }
 
   function linkAssetToShot(asset, shot) {
-    if (!asset || !shot || shot.kind !== "shot" || asset.id === shot.id) return;
-    if (asset.kind === "shot" && !isImageSource(asset)) return;
+    if (!canLink(asset, shot)) return false;
     if (!state.edges.some((e) => e.from === asset.id && e.to === shot.id)) {
       state.edges.push({ from: asset.id, to: shot.id });
       invalidateStageProgress(shot);
     }
     mention(asset, shot);
     if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    return true;
   }
   function unlinkAssetFromShot(asset, shot) {
     if (!asset || !shot) return;
@@ -1320,13 +1519,111 @@
   function setZoomScale(s) {
     const next = Math.min(1.5, Math.max(0.16, s));
     const r = vp.getBoundingClientRect();
-    const cx = r.width / 2, cy = r.height / 2;
+    const n = nodeById(state.selected), b = n && box(n);
+    // Toolbar zoom keeps the selection, not the unrelated viewport centre, in view.
+    const cx = n ? state.cam.x + (n.x + b.w / 2) * state.cam.s : r.width / 2;
+    const cy = n ? state.cam.y + (n.y + b.h / 2) * state.cam.s : r.height / 2;
     const w0 = clientToWorld(r.left + cx, r.top + cy);
     state.cam.s = next;
     state.cam.x = cx - w0.x * next;
     state.cam.y = cy - w0.y * next;
+    if (constrainShotsToViewport()) renderCards();
+    constrainCameraToShots(n);
     applyCam(); persist();
     syncZoomPresets();
+  }
+
+  function constrainCameraToShots(focus) {
+    const area = canvasArea();
+    const list = shots();
+    if (!list.length) return;
+    const pad = 12;
+    const left = area.left + pad, right = area.right - pad;
+    const top = area.top + pad, bottom = area.bottom - pad;
+    const scale = state.cam.s;
+    const bounds = list.reduce((out, item) => {
+      const b = box(item);
+      out.minX = Math.min(out.minX, item.x);
+      out.minY = Math.min(out.minY, item.y);
+      out.maxX = Math.max(out.maxX, item.x + b.w);
+      out.maxY = Math.max(out.maxY, item.y + b.h);
+      return out;
+    }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    const axis = (min, max, lo, hi, current, target, size) => {
+      const span = (max - min) * scale;
+      if (span <= hi - lo) return (lo + hi - span) / 2 - min * scale;
+      const targetPos = current + target * scale;
+      const targetSize = size * scale;
+      const kept = targetSize > hi - lo
+        ? (lo + hi - targetSize) / 2
+        : Math.max(lo, Math.min(targetPos, hi - targetSize));
+      return kept - target * scale;
+    };
+    const target = focus || list[0];
+    const tb = box(target);
+    state.cam.x = axis(bounds.minX, bounds.maxX, left, right, state.cam.x, target.x, tb.w);
+    state.cam.y = axis(bounds.minY, bounds.maxY, top, bottom, state.cam.y, target.y, tb.h);
+  }
+
+  function constrainShotsToViewport() {
+    if (state.cam.s < 1) return false;
+    const area = canvasArea(), pad = 12, scale = state.cam.s;
+    const minX = (area.left + pad - state.cam.x) / scale;
+    const maxX = (area.right - pad - state.cam.x) / scale - 640;
+    const minY = (area.top + pad - state.cam.y) / scale;
+    const maxY = (area.bottom - pad - state.cam.y) / scale - 360;
+    const list = shots();
+    if (!list.length) return false;
+    const bounds = list.reduce((out, n) => {
+      out.minX = Math.min(out.minX, n.x);
+      out.minY = Math.min(out.minY, n.y);
+      out.maxX = Math.max(out.maxX, n.x + 640);
+      out.maxY = Math.max(out.maxY, n.y + 360);
+      return out;
+    }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    const shift = (min, max, lo, hi) => {
+      if (hi < lo) return 0;
+      let d = min < lo ? lo - min : 0;
+      if (max + d > hi) d = hi - max;
+      return d;
+    };
+    const dx = shift(bounds.minX, bounds.maxX, minX, maxX + 640);
+    const dy = shift(bounds.minY, bounds.maxY, minY, maxY + 360);
+    let changed = false;
+    list.forEach((n) => {
+      const oldX = n.x, oldY = n.y;
+      n.x += dx;
+      n.y += dy;
+      // ponytail: if several cards exceed the 100% viewport, clamp individually;
+      // upgrade to a layout pass only when non-overlapping placement is required.
+      if (maxX >= minX) n.x = Math.max(minX, Math.min(n.x, maxX));
+      if (maxY >= minY) n.y = Math.max(minY, Math.min(n.y, maxY));
+      changed = changed || n.x !== oldX || n.y !== oldY;
+    });
+    return changed;
+  }
+
+  function newShotPosition(index) {
+    const area = canvasArea();
+    const scale = state.cam.s || 1;
+    const b = { w: 640, h: 360 };
+    const pad = 16;
+    const minX = (area.left + pad - state.cam.x) / scale;
+    const maxX = (area.right - pad - state.cam.x) / scale - b.w;
+    const minY = (area.top + pad - state.cam.y) / scale;
+    const maxY = (area.bottom - pad - state.cam.y) / scale - b.h;
+    const selected = nodeById(state.selected);
+    const baseX = selected && selected.kind === "shot"
+      ? selected.x + b.w + 24 / scale
+      : ((area.left + area.right) / 2 - state.cam.x) / scale - b.w / 2;
+    const baseY = selected && selected.kind === "shot"
+      ? selected.y
+      : ((area.top + area.bottom) / 2 - state.cam.y) / scale - b.h / 2;
+    const clamp = (v, lo, hi) => hi < lo ? (lo + hi) / 2 : Math.max(lo, Math.min(v, hi));
+    return {
+      x: clamp(baseX + (index % 2) * (24 / scale), minX, maxX),
+      y: clamp(baseY + Math.floor(index / 2) * (24 / scale), minY, maxY),
+    };
   }
   function fitCam() {
     state.cam = { x: 90, y: 36, s: 0.5 };
@@ -1399,6 +1696,7 @@
   }
 
   vp.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.isPrimary === false) return;
     if (e.target.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop")) return;
     if (e.target.closest("path.edge")) return;
     const gchrome = e.target.closest(".group-bound");
@@ -1415,7 +1713,9 @@
     if (port && card) {
       const n = nodeById(card.dataset.id);
       const p = portPos(n, port.dataset.side === "in" ? "in" : "out");
-      state.link = { from: n.id, side: port.dataset.side, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+      saveDisplayedComposer();
+      state.link = { from: n.id, side: port.dataset.side, x1: p.x, y1: p.y, x2: p.x, y2: p.y,
+        pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY };
       state.snapTarget = null;
       vp.setPointerCapture(e.pointerId);
       return;
@@ -1450,6 +1750,7 @@
   });
   vp.addEventListener("pointermove", (e) => {
     if (state.link) {
+      if (e.pointerId !== state.link.pointerId) return;
       const w = clientToWorld(e.clientX, e.clientY);
       state.snapTarget = nearestCompatiblePort(w.x, w.y, state.link.from, state.link.side);
       state.link.x2 = w.x;
@@ -1471,20 +1772,28 @@
   });
   vp.addEventListener("pointerup", (e) => {
     if (state.link) {
+      if (e.pointerId !== state.link.pointerId) return;
+      const link = state.link;
       const w = clientToWorld(e.clientX, e.clientY);
-      const snap = state.snapTarget || nearestCompatiblePort(w.x, w.y, state.link.from, state.link.side);
-      let target = snap ? nodeById(snap.id) : hitNode(w.x, w.y);
-      if (target && target.id !== state.link.from) {
-        const a = nodeById(state.link.from);
-        const dst = target.kind === "shot" ? target : (a.kind === "shot" ? a : null);
-        const src = dst === target ? a : target;
-        if (src && dst && canLink(src, dst)) {
-          linkAssetToShot(src, dst);
-          selectNode(dst.id);
-        }
-      }
+      const snap = nearestCompatiblePort(w.x, w.y, link.from, link.side);
+      const target = snap ? nodeById(snap.id) : hitNode(w.x, w.y);
       state.link = null;
       state.snapTarget = null;
+      const releaseEl = document.elementFromPoint(e.clientX, e.clientY);
+      const onCanvas = releaseEl && vp.contains(releaseEl) && !releaseEl.closest(
+        ".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar");
+      if (onCanvas && target && target.id !== link.from) {
+        const a = nodeById(link.from);
+        const src = link.side === "in" ? target : a;
+        const dst = link.side === "in" ? a : target;
+        if (linkAssetToShot(src, dst)) {
+          selectNode(dst.id);
+        } else {
+          setMsg("连线被拒绝：需连接图片输出到分镜输入，且不能形成循环", "bad");
+        }
+      } else if (!target && !snap && isBlankCanvasDrop(e, link)) {
+        createLinkedShot(link, w);
+      }
       drawWires(); persist();
     }
     if (state.pan && state.pan.collapse) {
@@ -1503,6 +1812,17 @@
     state.drag = null; state.pan = null;
     vp.classList.remove("grabbing");
   });
+  function cancelCanvasGesture(e) {
+    if (state.link && e && e.pointerId != null && e.pointerId !== state.link.pointerId) return;
+    const pointerId = state.link && state.link.pointerId;
+    state.link = null; state.snapTarget = null; state.drag = null; state.pan = null;
+    vp.classList.remove("grabbing");
+    if (pointerId != null && vp.hasPointerCapture(pointerId)) vp.releasePointerCapture(pointerId);
+    drawWires();
+  }
+  vp.addEventListener("pointercancel", cancelCanvasGesture);
+  vp.addEventListener("lostpointercapture", (e) => { if (state.link) cancelCanvasGesture(e); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.link) cancelCanvasGesture(); });
   vp.addEventListener("wheel", (e) => {
     e.preventDefault();
     const w0 = clientToWorld(e.clientX, e.clientY);
@@ -1637,26 +1957,45 @@
   }
 
   $("file").addEventListener("change", async () => {
-    const f = $("file").files && $("file").files[0];
-    if (!f) return;
-    setMsg("正在上传…");
-    const url = await uploadOut(f);
-    if (!url || String(url).indexOf("/out/") !== 0) {
-      $("file").value = "";
-      return;
-    }
-    const id = uid("asset");
-    const n = assets().length;
-    const node = { id: id, kind: "character", title: f.name.replace(/\.[^.]+$/, ""), x: 220, y: 24 + n * 40, url: url };
-    state.nodes.push(node);
-    const shot = nodeById(state.selected);
-    if (shot && shot.kind === "shot") linkAssetToShot(node, shot);
-    else selectNode(id);
-    renderCards(); drawWires(); renderDock(); persist();
-    if (url.indexOf("/out/") === 0) setMsg("已上传到资产库", "ok");
-    $("file").value = "";
-    if ($("importModal") && $("importModal").classList.contains("show")) {
-      refreshImportLibrary().then(() => renderImportModal());
+    const input = $("file");
+    const files = input && input.files;
+    if (!files || !files.length) return;
+    const list = [];
+    for (let i = 0; i < files.length; i++) list.push(files[i]);
+    input.value = "";
+    state.uploading = (state.uploading || 0) + list.length;
+    setMsg(list.length > 1 ? ("正在上传 " + list.length + " 个文件…") : "正在上传…");
+    const created = [];
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        try {
+          const url = await uploadOut(f);
+          if (!url || String(url).indexOf("/out/") !== 0) continue;
+          const id = uid("asset");
+          const n = assets().length;
+          const node = { id: id, kind: "character", title: f.name.replace(/\.[^.]+$/, ""), x: 220, y: 24 + n * 40, url: url };
+          state.nodes.push(node);
+          created.push(node);
+        } finally {
+          state.uploading = Math.max(0, (state.uploading || 1) - 1);
+        }
+      }
+      const shot = nodeById(state.selected);
+      if (shot && shot.kind === "shot") {
+        created.forEach(function (node) { linkAssetToShot(node, shot); });
+      } else if (created.length) {
+        selectNode(created[created.length - 1].id);
+      }
+      renderCards(); drawWires(); renderDock(); persist();
+      if (created.length) {
+        setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
+      }
+      if ($("importModal") && $("importModal").classList.contains("show")) {
+        refreshImportLibrary().then(() => renderImportModal());
+      }
+    } catch (e) {
+      setMsg("上传失败：" + ((e && e.message) || e), "bad");
     }
   });
 
@@ -1812,6 +2151,12 @@
 
   function setMode(mode) {
     state.mode = mode;
+    // video→image/text/audio: withdraw leftover 缺首帧 (renderDock would otherwise keep it).
+    if (mode !== "video") {
+      const msgEl = $("msg");
+      const t = (msgEl && msgEl.textContent) || "";
+      if (t.indexOf("缺首帧") >= 0) setMsg("");
+    }
     // v0821: refresh service list for image vs i2v; drop silent t2i/flux when video.
     const be = ($("backend") && $("backend").value) || "fal";
     const sid = ($("service") && $("service").value) || "";
@@ -1846,6 +2191,7 @@
   ["backend", "service", "duration", "aspect", "res"].concat(COMFY_PARAM_IDS).forEach((id) => {
     if ($(id)) $(id).addEventListener("change", () => {
       if (COMFY_PARAM_IDS.indexOf(id) >= 0) writeComfyParamsToShot(nodeById(state.selected));
+      if (id === "aspect" || id === "res") applyAspectToSize();
       persist();
       if (id === "duration" && state.mode === "video") {
         renderCards(); drawWires(); positionDock();
@@ -1933,9 +2279,10 @@
     return currentBackend() === "nano-gpt";
   }
   function clampLoraScale(v, fallback) {
+    if (v == null || v === "") return (fallback === undefined ? null : fallback);
     const n = parseFloat(v);
-    const x = Number.isFinite(n) ? n : (fallback == null ? 0.8 : fallback);
-    return Math.max(0, Math.min(4, x));
+    if (!Number.isFinite(n)) return (fallback === undefined ? null : fallback);
+    return Math.max(0, Math.min(4, n));
   }
   function isHttpUrl(s) { return /^https?:\/\//i.test(String(s || "")); }
   function isHfRepo(s) { return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(s || "").trim()); }
@@ -1996,7 +2343,9 @@
     const air = v.air || "";
     const path = (v.path && !looksAir(v.path) ? v.path : "") || loraDownloadUrl(v) || "";
     const name = loraDisplayName(v);
-    const strength = clampLoraScale(v.strength != null ? v.strength : v.scale, 0.8);
+    const rawStr = (v.strength != null ? v.strength : v.scale);
+    const strengthMissing = (rawStr == null || rawStr === "");
+    const strength = strengthMissing ? null : clampLoraScale(rawStr, null);
     return {
       air: air,
       path: path,
@@ -2004,6 +2353,7 @@
       versionId: v.versionId || loraVersionId(v) || (v.id && /^\d+$/.test(String(v.id)) ? String(v.id) : ""),
       strength: strength,
       scale: strength,
+      strengthMissing: strengthMissing,
       name: name,
       status: v.status || "",
     };
@@ -2051,6 +2401,11 @@
     if (air) return air;
     return l.path || l.downloadUrl || l.url || "";
   }
+  function loraStrengthInputValue(l) {
+    if (!l || l.strengthMissing || (l.strength == null && l.scale == null)) return "";
+    const s = clampLoraScale(l.strength != null ? l.strength : l.scale, null);
+    return s == null ? "" : String(s);
+  }
   function renderLoras() {
     const box = $("loras");
     if (!box) return;
@@ -2059,16 +2414,18 @@
     box.innerHTML = list.map(function (l, i) {
       const sub = loraChipSubtitle(l);
       const tip = String(l.air || sub || "");
-      const needUrl = (be === "fal" || isNanogptBe()) && !loraHasDirectPath(l);
+      const needUrl = ((be === "fal" || be === "huggingface" || isNanogptBe()) && !loraHasDirectPath(l))
+        || ((be === "modelscope-ai" || be === "modelscope-cn") && !isHfRepo(String(l.path || "").trim()));
       const st = needUrl ? (l.status || "无直链") : (l.status || "");
       const stCls = needUrl || st === "无直链" ? "lora-status bad" : "lora-status";
+      const strVal = l.strengthMissing ? "" : loraStrengthInputValue(l);
       return '<div class="lora' + (needUrl ? " need-url" : "") + '" data-lora-i="' + i + '"><div class="top">' +
         '<div class="lora-info"><div class="lora-name">' + esc(l.name || "LoRA") + '</div>' +
         '<div class="lora-air" title="' + esc(tip) + '">' + esc(sub) + '</div>' +
         (st ? '<div class="' + stCls + '">' + esc(st) + '</div>' : '') +
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
-          clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8) +
+          esc(strVal) +
           '" data-lora-str="' + i + '" title="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
@@ -2150,12 +2507,160 @@
   function usesCivitaiComfyParams() {
     return currentBackend() === "civitai";
   }
+  function providerCaps() {
+    const be = currentBackend();
+    const fromProv = state._providerCaps && state._providerCaps[be];
+    if (fromProv && typeof fromProv === "object") return fromProv;
+    return PROVIDER_REF_CAPS[be] || {};
+  }
+  function catalogCaps() {
+    const it = catalogItemForService();
+    const caps = (it && it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const paramCaps = (it && it.parameterCapabilities && typeof it.parameterCapabilities === "object")
+      ? it.parameterCapabilities
+      : ((caps.parameterCapabilities && typeof caps.parameterCapabilities === "object") ? caps.parameterCapabilities : {});
+    const merged = Object.assign({}, providerCaps(), caps, paramCaps);
+    if (it) {
+      if (it.resolutions && !merged.resolutionTokens) merged.resolutionTokens = it.resolutions;
+      if (it.supported_parameters && it.supported_parameters.resolutions && !merged.resolutionTokens) {
+        merged.resolutionTokens = it.supported_parameters.resolutions;
+      }
+    }
+    return merged;
+  }
+  function markOver(el, on) {
+    if (!el) return;
+    el.classList.toggle("is-over", !!on);
+  }
+  function setParamWarn(text, bad) {
+    const el = $("paramWarn");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "param-warn" + (bad && text ? " bad" : "");
+  }
+  function paramGateMessage() {
+    const caps = catalogCaps();
+    const msgs = [];
+    if ($("service") && $("service").getAttribute("aria-busy") === "true") msgs.push("模型目录加载中，请稍候");
+    const selectedShot = nodeById(state.selected);
+    const dependency = upstreamImageBlock(selectedShot);
+    if (dependency) msgs.push(dependency);
+    const needRef = requiredRefMessage(selectedShot);
+    if (needRef) msgs.push(needRef);
+    const unusedMsg = refUnusedGateMessage(selectedShot);
+    if (unusedMsg) msgs.push(unusedMsg);
+    const capMsg = refCapGateMessage(selectedShot);
+    if (capMsg) msgs.push(capMsg);
+    const promptEl = $("prompt");
+    const prompt = promptEl ? String(promptEl.value || "") : "";
+    const pmax = caps.promptMax;
+    if (pmax != null && Number(pmax) > 0 && prompt.length > Number(pmax)) {
+      msgs.push("提示词 " + prompt.length + "/" + pmax + " · 超过上限，请缩短后再生成");
+      markOver(promptEl, true);
+    } else {
+      markOver(promptEl, false);
+    }
+    const seedEl = $("seed");
+    const seedRaw = seedEl ? String(seedEl.value || "").trim() : "";
+    const seedSpec = caps.seed || {};
+    if (seedRaw && seedRaw !== "random" && seedSpec && (seedSpec.min != null || seedSpec.max != null)) {
+      const n = Number(seedRaw);
+      if (Number.isFinite(n)) {
+        const lo = seedSpec.min;
+        const hi = seedSpec.max;
+        const over = (lo != null && n < lo) || (hi != null && n > hi);
+        markOver(seedEl, over);
+        if (over) {
+          if (seedSpec.clamp === "reject" || seedSpec.clamp === "none") {
+            msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
+          } else {
+            msgs.push("种子 " + n + " 超出范围，发送前会按官方规则处理");
+          }
+        }
+      }
+    } else {
+      markOver(seedEl, false);
+    }
+    ["width", "height", "steps", "cfg"].forEach(function (id) {
+      const el = $(id);
+      if (!el || !el.value) { markOver(el, false); return; }
+      const n = Number(el.value);
+      const lo = el.min !== "" ? Number(el.min) : NaN;
+      const hi = el.max !== "" ? Number(el.max) : NaN;
+      const over = Number.isFinite(n) && ((Number.isFinite(lo) && n < lo) || (Number.isFinite(hi) && n > hi));
+      markOver(el, over);
+      if (over) msgs.push(id + " " + n + " 超出 " + (Number.isFinite(lo) ? lo : "") + "…" + (Number.isFinite(hi) ? hi : ""));
+    });
+    const nano = $("nanoRes");
+    if (isNanogptBe() && nano && !nano.value) {
+      msgs.push("Nano 需要目录分辨率 token，不能自拼宽高");
+      markOver(nano, true);
+    } else {
+      markOver(nano, false);
+    }
+    setParamWarn(msgs[0] || "", !!msgs.length);
+    return msgs[0] || "";
+  }
+  function fillNanoResOptions() {
+    const sel = $("nanoRes");
+    if (!sel) return;
+    const caps = catalogCaps();
+    const tokens = [].concat(caps.resolutionTokens || caps.resolutions || []);
+    const keep = sel.value || "";
+    if (!tokens.length) {
+      if (keep) ensureSelectOpt(sel, keep);
+      return;
+    }
+    fillSelectOpts(sel, tokens, keep);
+  }
   function syncParamSurface() {
-    const civ = usesCivitaiComfyParams();
+    const be = currentBackend();
+    const civ = be === "civitai";
+    const nano = be === "nano-gpt";
+    const vid = state.mode === "video";
+    const caps = catalogCaps();
     const falBox = $("falParams");
     const comfyBox = $("comfyParams");
-    if (falBox) falBox.classList.toggle("hidden", !!civ);
-    if (comfyBox) comfyBox.classList.toggle("hidden", !civ);
+    const nanoBox = $("nanoParams");
+    if (falBox) falBox.classList.toggle("hidden", !!civ || !!nano);
+    if (comfyBox) comfyBox.classList.toggle("hidden", be === "fal");
+    if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
+    const sampler = $("sampler");
+    const scheduler = $("scheduler");
+    const steps = $("steps");
+    const cfg = $("cfg");
+    const width = $("width");
+    const height = $("height");
+    const seed = $("seed");
+    const neg = $("negative");
+    const duration = $("duration");
+    const aspect = $("aspect");
+    const res = $("res");
+    if (sampler) sampler.classList.toggle("hidden", !civ && !caps.sampler);
+    if (scheduler) scheduler.classList.toggle("hidden", !civ);
+    if (steps) steps.classList.toggle("hidden", !civ);
+    if (cfg) cfg.classList.toggle("hidden", !civ);
+    if (width) {
+      width.disabled = !!nano;
+      width.title = nano ? "Nano 提交用目录 resolution token" : "宽";
+      width.classList.toggle("hidden", !!nano && !civ);
+    }
+    if (height) {
+      height.disabled = !!nano;
+      height.title = nano ? "Nano 提交用目录 resolution token" : "高";
+      height.classList.toggle("hidden", !!nano && !civ);
+    }
+    if (seed) seed.classList.toggle("hidden", false);
+    if (neg) {
+      const showNeg = caps.negative !== false;
+      neg.classList.toggle("hidden", !showNeg);
+    }
+    if (duration) duration.classList.toggle("hidden", !vid || caps.videoDuration === false);
+    if (aspect) aspect.classList.toggle("hidden", caps.videoAspect === false && !vid);
+    if (res) res.classList.toggle("hidden", !!nano);
+    if (nano) fillNanoResOptions();
+    paramGateMessage();
+    if (!syncParamSurface._skipDock) renderDock();
   }
   function readComfyParamsFromUi() {
     const width = $("width") ? parseInt($("width").value, 10) : NaN;
@@ -2203,10 +2708,31 @@
       $("seed").title = String(src.seed);
     }
   }
-  // Pack civitai comfy params onto generate payload — never silently drop.
+  // Pack UI params onto generate payload — never silently drop. Civitai keeps
+  // sampler/steps/cfg; other backends still ship seed / size / token.
   function packComfyParamsForPayload() {
-    if (!usesCivitaiComfyParams()) return null;
     const p = readComfyParamsFromUi();
+    const be = currentBackend();
+    if (be === "nano-gpt") {
+      delete p.width;
+      delete p.height;
+      const token = $("nanoRes") && $("nanoRes").value;
+      if (token) p.resolution = token;
+    } else if (be === "fal") {
+      delete p.sampler;
+      delete p.scheduler;
+      delete p.steps;
+      delete p.cfg;
+      delete p.cfgScale;
+      delete p.width;
+      delete p.height;
+    } else if (be !== "civitai") {
+      delete p.sampler;
+      delete p.scheduler;
+      delete p.steps;
+      delete p.cfg;
+      delete p.cfgScale;
+    }
     if (!Object.keys(p).length) return null;
     return p;
   }
@@ -2251,8 +2777,11 @@
       if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
         path = "https://civitai.com/api/download/models/" + versionId;
       }
-      const scale = clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8);
-      const strength = clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8);
+      const rawScale = (l.scale != null ? l.scale : l.strength);
+      const rawStrength = (l.strength != null ? l.strength : l.scale);
+      const missing = !!(l.strengthMissing) || (rawScale == null && rawStrength == null) || rawScale === "" || rawStrength === "";
+      const scale = missing ? null : clampLoraScale(rawScale, null);
+      const strength = missing ? null : clampLoraScale(rawStrength, null);
       return {
         air: l.air || "",
         path: path,
@@ -2261,20 +2790,42 @@
         versionId: versionId,
         scale: scale,
         strength: strength,
+        strengthMissing: missing,
         name: l.name || "LoRA",
       };
     }).filter(function (row) {
       if (be === "civitai") return !!(row.air && String(row.air).trim());
+      // v0821o: fal outbound needs http path (AIR-only chips would silent-drop in providers/fal.py)
+      // v0821o4: huggingface same — _fal_lora_path / _force_loras drop AIR-only
+      if (be === "fal" || be === "huggingface") {
+        const p = String(row.path || "").trim();
+        return !!(p && isHttpUrl(p) && !looksAir(p));
+      }
+      // v0821o6: Magao outbound is Hub owner/repo only — skip Civitai http / 3231694 / AIR
+      if (be === "modelscope-ai" || be === "modelscope-cn") {
+        const p = String(row.path || "").trim();
+        if (isHttpUrl(p) || looksAir(p) || p.indexOf("3231694") >= 0) return false;
+        return isHfRepo(p);
+      }
       return true;
     });
     return mapped.length ? mapped : null;
   }
   // v0821n2: UI chips present but pack empty (all lack air on civitai) → must not POST without loras[]
+  // v0821o: same helper for fal — chips present but no http path → pack empty → red block
   function chipsLackAirForOutbound() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return false;
     const packed = packLorasForPayload();
     return !packed || !packed.length;
+  }
+  function outboundLoraBlockMsg() {
+    const be = currentBackend();
+    if (be === "modelscope-ai" || be === "modelscope-cn") {
+      return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
+    }
+    if (be === "fal" || be === "huggingface") return "LoRA 缺 http path，无法出站";
+    return "LoRA 缺 air，无法出站";
   }
   async function searchLoras() {
     const qEl = $("loraQ");
@@ -2284,7 +2835,12 @@
     if (!q) return;
     const be = currentBackend();
     hits.textContent = "搜…";
-    if ((be === "fal" || be === "huggingface" || isModelscopeBe() || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
+    if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
+      addLora({ path: q, name: q, strength: 0.8 });
+      hits.textContent = "";
+      return;
+    }
+    if ((be === "fal" || be === "huggingface" || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
       addLora({ path: q, name: q, strength: 0.8 });
       hits.textContent = "";
       return;
@@ -2369,19 +2925,288 @@
         if (!inp) return;
         const i = +inp.getAttribute("data-lora-str");
         if (!Number.isFinite(i) || !state.loras[i]) return;
-        const s = clampLoraScale(inp.value, 0.8);
+        const s = clampLoraScale(inp.value, null);
         state.loras[i].strength = s;
         state.loras[i].scale = s;
+        state.loras[i].strengthMissing = (s == null);
         persist();
       });
     }
+  }
+
+  function svcOptionText(it) {
+    const id = (it && (it.id || it.name)) || "";
+    const name = (it && it.name) || id;
+    if (id === FAL_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo LoRA · " + id);
+    if (id === HF_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : id);
+    if (id === MS_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo · " + id);
+    return name || id;
+  }
+  function isModelScopeCatalog() {
+    const be = $("backend") && $("backend").value;
+    return be === "modelscope-ai" || be === "modelscope-cn";
+  }
+  function isPagedCatalog() {
+    const be = $("backend") && $("backend").value;
+    return isModelScopeCatalog() || be === "huggingface";
+  }
+  function catalogFetchTimeoutMs() {
+    return isModelScopeCatalog() ? CATALOG_MODELSCOPE_TIMEOUT_MS : CATALOG_FETCH_TIMEOUT_MS;
+  }
+  function modelScopeCatalogKey(be, mode, q) {
+    return be + ":" + mode + ":" + (q || "");
+  }
+  function modelScopePageItemId(it) {
+    return String((it && (it.id || it.name)) || "");
+  }
+  function modelScopeWarning(j) {
+    const warning = String((j && j.warning) || "").trim();
+    const totals = j && j.hubTotals;
+    const errors = totals && Number(totals.errors);
+    if (warning) return warning;
+    if (errors > 0) return "部分 Hub 目录暂时不可用，请重试本页；收录不代表可调用。";
+    if (j && j.partial) return "Hub 目录尚未加载完；收录不代表可调用。";
+    return "Hub 目录仅表示收录，调用能力以模型契约为准。";
+  }
+  function syncCatalogPagingUi() {
+    const status = $("catalogStatus");
+    const hint = $("catalogHint");
+    const more = $("catalogMore");
+    const retry = $("catalogRetry");
+    const p = state.catalogPaging || {};
+    if (!status) return;
+    const visible = isPagedCatalog() && (p.key || p.loading || p.warning || p.page > 0);
+    status.hidden = !visible;
+    if (!visible) return;
+    const totals = p.hubTotals || {};
+    const counts = Number.isFinite(Number(totals.fetched)) ? " · 已取 " + Number(totals.fetched) : "";
+    if (hint) {
+      hint.textContent = p.loading
+        ? "正在加载目录…"
+        : (p.warning || "目录已加载 · Hub 收录仅表示目录收录，调用能力以模型契约为准。") + counts;
+    }
+    if (more) {
+      more.hidden = !!p.loading || p.retryPage != null || !p.hasMore;
+      more.disabled = !!p.loading;
+      more.textContent = p.loading && p.page > 1 ? "加载中…" : "加载更多";
+    }
+    if (retry) {
+      retry.hidden = !!p.loading || p.retryPage == null;
+      retry.disabled = !!p.loading;
+    }
+  }
+  function mergeModelScopeItems(items, append) {
+    const incoming = filterCatalogForMode(Array.isArray(items) ? items : []);
+    const existing = append && Array.isArray(state.catalog) ? state.catalog.slice() : [];
+    const seen = {};
+    existing.forEach(function (it) { const id = modelScopePageItemId(it); if (id) seen[id] = true; });
+    incoming.forEach(function (it) {
+      const id = modelScopePageItemId(it);
+      // The existing select is ID-valued; collapse same-ID Hub rows even when task differs.
+      if (id && !seen[id]) { existing.push(it); seen[id] = true; }
+    });
+    state.catalog = existing;
+    state.catalogById = {};
+    existing.forEach(function (it) {
+      const id = modelScopePageItemId(it);
+      if (id && !state.catalogById[id]) state.catalogById[id] = it;
+    });
+  }
+  function promotePagedCatalogPref(items) {
+    const be = $("backend") && $("backend").value;
+    const pinId = be === "huggingface"
+      ? (state._pinHfLoraService || HF_LORA_PREF_SERVICE)
+      : (be === "modelscope-ai" || be === "modelscope-cn")
+        ? (state._pinMsLoraService || MS_LORA_PREF_SERVICE)
+        : "";
+    const list = Array.isArray(items) ? items : [];
+    if (!pinId) return list;
+    const pinItem = list.find(function (it) { return modelScopePageItemId(it) === pinId; });
+    if (!pinItem) return list;
+    return [pinItem].concat(list.filter(function (it) { return modelScopePageItemId(it) !== pinId; }));
+  }
+  function loadPagedCatalog(page, append) {
+    const be = $("backend").value;
+    const mode = state.mode;
+    const category = mode === "video" ? "video" : "image";
+    const q = (( $("serviceFilter") && $("serviceFilter").value) || "").trim();
+    const baseKey = be + ":" + mode;
+    const key = modelScopeCatalogKey(be, mode, q);
+    page = Number.isInteger(page) && page > 0 ? page : 1;
+    append = !!append;
+    const flightKey = key + ":page=" + page;
+    if (_catalogFlight && _catalogFlight.key === flightKey) return _catalogFlight.promise;
+    const token = ++_catalogToken;
+    if (_catalogFlight) _catalogFlight.controller.abort();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), catalogFetchTimeoutMs());
+    const sel = $("service");
+    const contextSame = state.catalogPaging && state.catalogPaging.key === key;
+    const retrying = contextSame && state.catalogPaging.retryPage === page;
+    if (!contextSame || (!append && !retrying)) {
+      state.catalog = [];
+      state.catalogById = {};
+      state._serviceItems = [];
+      state.catalogPaging = Object.assign({}, state.catalogPaging, {
+        key: key, page: 0, pageSize: CATALOG_PAGE_SIZE, hasMore: false, nextPage: null,
+        partial: false, warning: "", retryPage: null, hubTotals: null, hubCoverage: null,
+      });
+      sel.innerHTML = '<option value="">加载模型目录…</option>';
+    }
+    state.catalogPaging.key = key;
+    state.catalogPaging.loading = true;
+    // Keep already loaded rows selectable while a continuation is in flight.
+    sel.disabled = !state.catalog.length;
+    sel.setAttribute("aria-busy", "true");
+    syncCatalogPagingUi();
+    const current = () => token === _catalogToken && $("backend").value === be && state.mode === mode &&
+      ((($("serviceFilter") && $("serviceFilter").value) || "").trim() === q);
+    const params = new URLSearchParams({
+      backend: be, category: category, q: q, page: String(page), pageSize: String(CATALOG_PAGE_SIZE),
+    });
+    const flight = { key: flightKey, promise: null, controller: controller };
+    _catalogFlight = flight;
+    flight.promise = (async function () {
+      try {
+        const r = await fetch("/api/catalog?" + params.toString(), { signal: controller.signal });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (!current()) return false;
+        const rows = Array.isArray(j.items) ? j.items : [];
+        mergeModelScopeItems(rows, append || contextSame);
+        state.catalog = promotePagedCatalogPref(state.catalog);
+        const byId = {};
+        state.catalog.forEach(function (it) {
+          const id = modelScopePageItemId(it);
+          if (id && !byId[id]) byId[id] = it;
+        });
+        state.catalogById = byId;
+        const next = Number.isInteger(j.nextPage) ? j.nextPage : null;
+        const retryPage = Number.isInteger(j.retryPage) ? j.retryPage : null;
+        state._catalogKey = baseKey;
+        state.catalogPaging = Object.assign({}, state.catalogPaging, {
+          key: key, page: Number.isInteger(j.page) ? j.page : page,
+          pageSize: Number.isInteger(j.pageSize) ? j.pageSize : CATALOG_PAGE_SIZE,
+          hasMore: retryPage == null && !!j.hasMore, nextPage: next,
+          partial: !!j.partial, warning: modelScopeWarning(j), retryPage: retryPage,
+          hubTotals: j.hubTotals || null, hubCoverage: j.hubCoverage || null, loading: false,
+        });
+        if (!append) {
+          const pending = state._pendingService;
+          if (pending && byId[pending]) {
+            appendServiceOption(sel, byId[pending]);
+            sel.value = pending;
+          }
+          delete state._pendingService;
+        }
+        renderServiceOptions(state.catalog, "选择模型");
+        syncCatalogPagingUi();
+        syncParamSurface();
+        syncLoraUi();
+        return true;
+      } catch (e) {
+        if (!current()) return false;
+        state.catalogPaging = Object.assign({}, state.catalogPaging, {
+          loading: false, hasMore: false, nextPage: null, retryPage: page,
+          warning: "目录第 " + page + " 页加载失败 · 请重试本页。",
+        });
+        if (!state.catalog.length) sel.innerHTML = '<option value="">目录加载失败 · 请重试</option>';
+        renderServiceOptions(state.catalog, "选择模型");
+        syncCatalogPagingUi();
+        setMsg("目录加载失败 · " + (e.name === "AbortError" ? "请求超时，请重试本页" : formatErr(e)), "bad");
+        return false;
+      } finally {
+        clearTimeout(timeout);
+        if (current()) {
+          state.catalogPaging.loading = false;
+          sel.disabled = false;
+          sel.setAttribute("aria-busy", "false");
+          syncCatalogPagingUi();
+          paramGateMessage();
+        }
+        if (_catalogFlight === flight) _catalogFlight = null;
+      }
+    })();
+    return flight.promise;
+  }
+  function svcMatchBlob(it) {
+    const parts = [
+      it && it.name, it && it.id, it && it.engine, it && it.operation,
+      Array.isArray(it && it.tags) ? it.tags.join(" ") : (it && it.tags),
+    ];
+    return String(parts.filter(Boolean).join(" ")).toLowerCase();
+  }
+  function svcAlnum(s) {
+    return String(s || "").toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+  }
+  function appendServiceOption(sel, it) {
+    const o = document.createElement("option");
+    o.value = (it && (it.id || it.name)) || "";
+    o.textContent = svcOptionText(it);
+    sel.appendChild(o);
+  }
+  function renderServiceOptions(items, placeholder) {
+    const sel = $("service");
+    if (!sel) return;
+    const roster = Array.isArray(items) ? items : [];
+    state._serviceItems = roster;
+    // Hub search is server-paged; filtering a page again hides valid hits.
+    const q = isPagedCatalog() ? "" : (($("serviceFilter") && $("serviceFilter").value) || "").trim().toLowerCase();
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+    const alnumQ = tokens.map(svcAlnum).filter(function (t) { return t.length >= 2; });
+    let shown = roster;
+    if (tokens.length) {
+      shown = roster.filter(function (it) {
+        const blob = svcMatchBlob(it);
+        const alnum = svcAlnum(blob);
+        return tokens.every(function (t) { return blob.indexOf(t) >= 0; })
+          || (alnumQ.length && alnumQ.every(function (t) { return alnum.indexOf(t) >= 0; }));
+      });
+    }
+    const keep = sel.value || "";
+    if (_svcChunkHandle) {
+      try { cancelAnimationFrame(_svcChunkHandle); } catch (_) {}
+      _svcChunkHandle = 0;
+    }
+    const token = ++_svcChunkToken;
+    sel.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = placeholder || "选择模型";
+    sel.appendChild(ph);
+    if (!shown.length && tokens.length) {
+      const none = document.createElement("option");
+      none.value = "";
+      none.disabled = true;
+      none.textContent = "无匹配模型：清空搜索后可见全量";
+      sel.appendChild(none);
+    }
+    // Put a real selected row in the synchronous batch, even if it is row 100000.
+    // Later rAF chunks must not restore an old selection over an import/user change.
+    const pinned = keep && roster.find(function (it) { return (it.id || it.name) === keep; });
+    if (pinned) {
+      appendServiceOption(sel, pinned);
+      shown = shown.filter(function (it) { return (it.id || it.name) !== keep; });
+      sel.value = keep;
+    }
+    function pump(start) {
+      if (token !== _svcChunkToken) return;
+      const end = Math.min(shown.length, start + (start === 0 ? SERVICE_SYNC_BUDGET : SERVICE_CHUNK_SIZE));
+      for (let i = start; i < end; i++) appendServiceOption(sel, shown[i]);
+      if (end < shown.length) {
+        _svcChunkHandle = requestAnimationFrame(function () { pump(end); });
+      } else {
+        _svcChunkHandle = 0;
+      }
+    }
+    pump(0);
   }
 
   function catalogItemForService() {
     const sid = $("service") && $("service").value;
     if (!sid) return null;
     if (state.catalogById && state.catalogById[sid]) return state.catalogById[sid];
-    const list = state.catalog || [];
+    const list = state.catalog || state._serviceItems || [];
     for (let i = 0; i < list.length; i++) {
       const it = list[i];
       if ((it.id || it.name) === sid) return it;
@@ -2437,8 +3262,10 @@
   }
   function filterCatalogForMode(items) {
     const list = Array.isArray(items) ? items : [];
+    // text/audio are stub modes — do not list image models (looks like they work).
+    if (state.mode === "text" || state.mode === "audio") return [];
     if (state.mode === "video") return list.filter(catalogItemSupportsI2v);
-    if (state.mode === "image" || state.mode === "text" || state.mode === "audio") {
+    if (state.mode === "image") {
       return list.filter(catalogItemSupportsImage);
     }
     return list;
@@ -2498,6 +3325,27 @@
     return resolveRefCaps(it).maxRefs;
   }
 
+  function catalogMinInputImages(it) {
+    if (!it) return 0;
+    if (it.needsSource) return 1;
+    const sp = it.supported_parameters || {};
+    const maxIn = Number(sp.max_input_images);
+    if (!(maxIn > 0)) return 0;
+    const id = String(it.id || "").toLowerCase();
+    const name = String(it.name || "").toLowerCase();
+    if (/(^|\/|-)edit(\/|$)/.test(id) || /(^|[\s\-])edit(\s|$)/.test(name)) return 1;
+    return 0;
+  }
+  function requiredRefMessage(shot) {
+    const it = catalogItemForService();
+    const minIn = catalogMinInputImages(it);
+    if (!minIn) return "";
+    const n = countRefUrls(null, shot).length;
+    if (n >= minIn) return "";
+    const maxIn = Number((it && it.supported_parameters && it.supported_parameters.max_input_images) || 0);
+    return "此模型需要 " + minIn + (maxIn ? ("–" + maxIn) : "") + " 张参考图，当前 " + n + " 张。请先连线或上传，不能静默发 0 张";
+  }
+
   // Deduped linked+primary URLs (same order as attachExtraImages) for over-cap hard gate.
   function countRefUrls(payload, shot) {
     if (!shot) return [];
@@ -2509,7 +3357,62 @@
     linked.forEach((a) => {
       if (a && a.url && urls.indexOf(a.url) < 0) urls.push(a.url);
     });
+    connectedNodes(shot.id).forEach((n) => {
+      if (n && n.url && urls.indexOf(n.url) < 0 && !isVideoUrl(n.url)) urls.push(n.url);
+    });
     return urls;
+  }
+
+  function refCapGateMessage(shot) {
+    if (!shot || shot.kind !== "shot") return "";
+    // t2i-with-refs is a different failure (unused), not "cap=1".
+    if (refUnusedGateMessage(shot)) return "";
+    const nRefs = countRefUrls(null, shot).length;
+    const cap = maxRefCount(catalogItemForService());
+    if (nRefs > cap) {
+      return "参考图 " + nRefs + "/" + cap + " · 超过上限，请减少连线后再生成（不静默丢弃）";
+    }
+    return "";
+  }
+
+  // Explicit catalog.image_to_image === false (Flare/Sunburst t2i): connected
+  // refs must hard-block. Never attach them onto a text-to-image body and
+  // write back a green "此镜完成" that ignored the product photos.
+  // 魔搭 pins ship task/tags even when capabilities is null — Krea-2-Raw is
+  // text-to-image. Treating that as maxRefs=1 made「参考图 5/1」look like a
+  // provider-wide one-image cut.
+  function catalogEatsRefs(it) {
+    if (!it) return true;
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    if (caps.image_to_image === true || caps.inpainting === true) return true;
+    if (it.needsSource) return true;
+    if (caps.image_to_image === false) return false;
+    const backend = String(it.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
+    if (backend === "modelscope-ai" || backend === "modelscope-cn" || backend === "modelscope") {
+      const task = String(it.task || it.hubTask || "").toLowerCase();
+      const tags = Array.isArray(it.tags) ? it.tags.map((t) => String(t).toLowerCase()) : [];
+      if (task === "image-to-image" || task === "image-to-video" || tags.indexOf("i2i") >= 0 || tags.indexOf("i2v") >= 0) return true;
+      if (task === "text-to-image" || task === "text-to-video" || tags.indexOf("t2i") >= 0 || tags.indexOf("t2v") >= 0) return false;
+    }
+    return true;
+  }
+  function editSiblingHint(it) {
+    const id = String((it && it.id) || "");
+    const editId = id.replace(/\/text-to-image$/, "/edit");
+    if (editId !== id && state.catalogById && state.catalogById[editId]) {
+      const sib = state.catalogById[editId];
+      return "请改选 " + (sib.name || editId) + "，或断开参考连线";
+    }
+    return "请改选带 Edit 的图生图模型，或断开参考连线";
+  }
+  function refUnusedGateMessage(shot) {
+    if (!shot || shot.kind !== "shot") return "";
+    const nRefs = countRefUrls(null, shot).length;
+    if (!nRefs) return "";
+    const it = catalogItemForService();
+    if (catalogEatsRefs(it)) return "";
+    const name = (it && (it.name || it.id)) || "当前模型";
+    return name + " 是文生图，不吃已连的 " + nRefs + " 张参考图。" + editSiblingHint(it) + "（不静默忽略）";
   }
 
   // After compile: pack [primary, ...other linked] onto studio-inbound images[]
@@ -2526,6 +3429,10 @@
     if (primary) urls.push(primary);
     linked.forEach((a) => {
       if (a && a.url && urls.indexOf(a.url) < 0) urls.push(a.url);
+    });
+    // Also pick up connected nodes that isImageSource missed (empty kind, odd path).
+    connectedNodes(shot.id).forEach((n) => {
+      if (n && n.url && urls.indexOf(n.url) < 0 && !isVideoUrl(n.url)) urls.push(n.url);
     });
     if (!urls.length) return payload;
     const resolved = resolveRefCaps(catalogItemForService());
@@ -2579,6 +3486,25 @@
     if (card) card.classList.toggle("busy", !!on);
   }
 
+  function sizeFromAspectRes(aspect, resLevel) {
+    const p1080 = String(resLevel || "") === "1080P";
+    const a = String(aspect || "16:9").replace(/\s/g, "");
+    if (a === "1:1") return p1080 ? { width: 1080, height: 1080 } : { width: 720, height: 720 };
+    if (a === "9:16") return p1080 ? { width: 1080, height: 1920 } : { width: 720, height: 1280 };
+    if (a === "21:9") return p1080 ? { width: 2016, height: 864 } : { width: 1680, height: 720 };
+    return p1080 ? { width: 1920, height: 1080 } : { width: 1280, height: 720 };
+  }
+
+  function applyAspectToSize() {
+    const aspectEl = $("aspect");
+    const resEl = $("res");
+    if (!aspectEl || !resEl) return;
+    const size = sizeFromAspectRes(aspectEl.value, resEl.value);
+    if ($("width")) $("width").value = String(size.width);
+    if ($("height")) $("height").value = String(size.height);
+    writeComfyParamsToShot(nodeById(state.selected));
+  }
+
   function buildGraph(shot) {
     const frame = frameAsset(shot);
     const linked = connectedAssets(shot.id);
@@ -2589,29 +3515,73 @@
     if (state.mode === "video") op = "i2v";
     else if (linked[0]) op = "i2i";
     const aspect = ($("aspect") && $("aspect").value) || "16:9";
-    const res = ($("res") && $("res").value === "1080P") ? (aspect === "9:16" ? "1080x1920" : "1920x1080") : (aspect === "9:16" ? "720x1280" : "1280x720");
+    const size = sizeFromAspectRes(aspect, ($("res") && $("res").value) || "720P");
+    const comfy = readComfyParamsFromUi();
+    const w = Number.isFinite(comfy.width) ? comfy.width : size.width;
+    const h = Number.isFinite(comfy.height) ? comfy.height : size.height;
+    const res = w + "x" + h;
     const be = ($("backend") && $("backend").value) || "fal";
     // v0820c-hard-service: civitai must not invent Krea2 when #service is empty.
     // Fal empty-service defaults stay for fal backends only.
     const pickedService = ($("service") && $("service").value) || "";
     let serviceId = pickedService;
-    if (!serviceId && be !== "civitai") {
+    if (!serviceId && be === "huggingface") {
+      // v0821o4: HF empty → Hub turbo; never fal-ai/.../turbo/lora sibling
+      serviceId = HF_LORA_PREF_SERVICE;
+    } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
+      // v0821o6: Magao empty → Hub turbo; never fal sibling / 默认模型
+      serviceId = MS_LORA_PREF_SERVICE;
+    } else if (!serviceId && be !== "civitai") {
       // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
-      serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+      // v0821o2: LoRAs present → pin turbo/lora (never empty→flux/schnell→flux-lora sibling)
+      if (op !== "i2v" && falHasLoras()) serviceId = FAL_LORA_PREF_SERVICE;
+      else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+    }
+    if (be === "huggingface") {
+      serviceId = pinHfLoraServiceId(serviceId);
+    }
+    if (be === "modelscope-ai" || be === "modelscope-cn") {
+      serviceId = pinMsLoraServiceId(serviceId);
+    }
+    if (be === "fal" && op !== "i2v") {
+      serviceId = pinFalLoraServiceId(serviceId);
     }
     const genParams = {
       serviceId: serviceId,
     };
     if (be === "civitai") {
       // width/height/steps/cfgScale/sampler/scheduler — seed packed in runShotStep (wire-only compile rule)
-      const comfy = readComfyParamsFromUi();
       ["width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler"].forEach(function (k) {
         if (comfy[k] != null) genParams[k] = comfy[k];
       });
+      if (genParams.width == null) genParams.width = w;
+      if (genParams.height == null) genParams.height = h;
+    } else if (be === "nano-gpt") {
+      const token = ($("nanoRes") && $("nanoRes").value) || "";
+      if (token) genParams.resolution = token;
+      else {
+        genParams.resolution = res;
+        genParams.aspectRatio = aspect;
+      }
     } else {
-      genParams.resolution = res;
-      genParams.duration = parseInt(($("duration") && $("duration").value) || "5", 10) || 5;
-      genParams.aspectRatio = aspect;
+      // Image APIs take width/height. Do not pack canvas duration/aspect/resolution
+      // into Fal/HF/MS t2i — those keys 400 when the endpoint schema has no such field.
+      if (be === "modelscope-ai" || be === "modelscope-cn" || be === "fal" || be === "huggingface") {
+        genParams.width = w;
+        genParams.height = h;
+      } else {
+        genParams.resolution = res;
+      }
+      if (op === "i2v" || state.mode === "video") {
+        const durEl = $("duration");
+        if (durEl && !durEl.classList.contains("hidden")) {
+          genParams.duration = parseInt(durEl.value || "5", 10) || 5;
+        }
+        const aspectEl = $("aspect");
+        if (aspectEl && !aspectEl.classList.contains("hidden")) {
+          genParams.aspectRatio = aspect;
+        }
+      }
     }
     nodes.push({
       id: shot.id, op: op,
@@ -2718,6 +3688,14 @@
   // Per-shot step runner — same path as Composer send (compile → nextRunnableStage → fillStageRefs → /api/generate).
   // Never one-shot a multi-step graph. Returns { status, stageOp } where status is:
   // done | more | blocked | error | aborted
+  function upstreamImageBlock(shot) {
+    const ready = refReadyMessage(shot);
+    if (ready) return ready;
+    if (!shot || shot.kind !== "shot") return "";
+    const pending = connectedNodes(shot.id).filter((n) => !isImageSource(n) && (n.kind === "shot" || n.url));
+    return pending.length ? ("上游尚无可用图片：" + pending.map((n) => n.title || n.id).join("、") + "，请先生成图片或断开连线") : "";
+  }
+
   async function runShotStep(shotId, opts) {
     opts = opts || {};
     const shot = nodeById(shotId);
@@ -2730,6 +3708,11 @@
     if (state.groupRunAbort) {
       setMsg(prefix + "已中止", "warn");
       return { status: "aborted" };
+    }
+    const dependency = upstreamImageBlock(shot);
+    if (dependency) {
+      setMsg(prefix + dependency, "bad");
+      return { status: "blocked", error: dependency };
     }
     if (isStubMode()) {
       setMsg(prefix + (state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
@@ -2763,7 +3746,12 @@
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
-      setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+      setMsg(prefix + outboundLoraBlockMsg(), "bad");
+      return { status: "blocked" };
+    }
+    const gate = paramGateMessage();
+    if (gate) {
+      setMsg(prefix + gate, "bad");
       return { status: "blocked" };
     }
     if (!opts.keepSend) markSendBusy(true);
@@ -2823,6 +3811,12 @@
     // Hard gate: over-cap refs must block — never silent-drop N-1 on single-slot endpoints.
     const refUrls = countRefUrls(payload, shot);
     const refCap = maxRefCount(catalogItemForService());
+    const unusedMsg = refUnusedGateMessage(shot);
+    if (unusedMsg) {
+      setMsg(prefix + unusedMsg, "bad");
+      if (!opts.keepSend) markSendBusy(false);
+      return { status: "blocked", stageOp: stageOp };
+    }
     if (refUrls.length > refCap) {
       setMsg(prefix + "参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "bad");
       if (!opts.keepSend) markSendBusy(false);
@@ -2835,11 +3829,30 @@
       const packedLoras = packLorasForPayload();
       const list = Array.isArray(state.loras) ? state.loras : [];
       if (list.length && (!packedLoras || !packedLoras.length)) {
-        setMsg(prefix + "LoRA 缺 air，无法出站", "bad");
+        setMsg(prefix + outboundLoraBlockMsg(), "bad");
         if (!opts.keepSend) markSendBusy(false);
         return { status: "blocked", stageOp: stageOp };
       }
-      if (packedLoras && packedLoras.length) payload.loras = packedLoras;
+      if (packedLoras && packedLoras.length) {
+        payload.loras = packedLoras;
+        // v0821o2: outbound serviceId must stay turbo/lora — block flux-lora swap
+        if (currentBackend() === "fal") {
+          const pinned = pinFalLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          payload.serviceId = pinned;
+          payload.endpoint = pinned;
+          ensureFalLoraServiceSelected();
+        } else if (currentBackend() === "huggingface") {
+          const pinned = pinHfLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          payload.serviceId = pinned;
+          payload.endpoint = pinned;
+          ensureHfLoraServiceSelected();
+        } else if (currentBackend() === "modelscope-ai" || currentBackend() === "modelscope-cn") {
+          const pinned = pinMsLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          payload.serviceId = pinned;
+          payload.endpoint = pinned;
+          ensureMsLoraServiceSelected();
+        }
+      }
     }
     // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
     {
@@ -2858,11 +3871,15 @@
           return { status: "blocked", stageOp: stageOp };
         }
         payload.serviceId = sid;
-        // v0821n: Composer has no negative wire — attach import/shot negativePrompt (may be "")
-        if (shot && shot.negativePrompt != null) payload.negativePrompt = shot.negativePrompt;
-        else if (payload.negativePrompt == null) payload.negativePrompt = "";
         // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
       }
+      // Composer has no negative wire — attach #negative / shot.negativePrompt for every backend.
+      const negEl = $("negative");
+      const negVal = negEl ? String(negEl.value || "") : "";
+      if (shot) shot.negativePrompt = negVal;
+      if (negVal) payload.negativePrompt = negVal;
+      else if (shot && shot.negativePrompt != null) payload.negativePrompt = shot.negativePrompt;
+      else if (payload.negativePrompt == null) payload.negativePrompt = "";
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
@@ -2877,8 +3894,14 @@
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
         // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
-        const pollMax = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 180 : 40;
-        const pollMs = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 3000 : 2500;
+        // Hub image (魔搭 AI) routinely exceeds 100s — keep "? 180 : 40" then extend Hub ticks.
+        const isVideoPoll = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v"));
+        let pollMax = isVideoPoll ? 180 : 40;
+        const pollMs = isVideoPoll ? 3000 : 2500;
+        const bePoll = currentBackend() || (payload && payload.backend) || "";
+        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface")) {
+          pollMax = 120;
+        }
         for (let i = 0; i < pollMax; i++) {
           if (state.groupRunAbort) {
             setShotBusy(shot, false);
@@ -2887,7 +3910,10 @@
           }
           await new Promise((res) => setTimeout(res, pollMs));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
-          if (st.error || st.status === "failed") {
+          const stStatus = String((st && st.status) || "").toUpperCase();
+          const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
+            || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING";
+          if ((st.error || st.status === "failed") && !inFlight) {
             const detail = formatErr(st.error || (st.wait && st.wait.log) || st.message || "任务失败");
             throw new Error(detail);
           }
@@ -2930,10 +3956,12 @@
         setShotBusy(shot, false);
         // v0821m: poll budget exhausted while Fal still IN_PROGRESS ≠ 「已返回无媒体」
         const stillGoing = !!(j && (
-          j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status
+          /^(pending|processing|running|in_queue|in_progress)$/i.test(String(j.status || ""))
+          || j.status === "IN_QUEUE" || j.status === "IN_PROGRESS"
+          || !j.status
         ));
         if (stillGoing) {
-          setMsg(prefix + "等待超时，云端任务仍在进行中（视频约需数分钟，可稍后用任务 id 再查）", "warn");
+          setMsg(prefix + "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）", "warn");
         } else {
           setMsg(prefix + "云端已返回，没有可预览地址", "warn");
         }
@@ -2947,7 +3975,7 @@
       setMsg(prefix + formatErr(e), "bad");
       if (!opts.keepSend) markSendBusy(false);
       renderDock();
-      return { status: "error", stageOp: stageOp };
+      return { status: "error", stageOp: stageOp, error: formatErr(e) };
     }
     setShotBusy(shot, false);
     if (!opts.keepSend) markSendBusy(false);
@@ -3002,10 +4030,15 @@
       setSendVisual(true, "group-running");
       return;
     }
-    const blocked = !!(needFrame || stub);
+    const shot = nodeById(state.selected);
+    const unusedMsg = refUnusedGateMessage(shot);
+    const capMsg = refCapGateMessage(shot);
+    const blocked = !!(needFrame || stub || unusedMsg || capMsg);
     let reason = "enabled";
     if (stub) reason = "stub-mode";
     else if (needFrame) reason = "need-frame";
+    else if (unusedMsg) reason = "ref-unused";
+    else if (capMsg) reason = "ref-over-cap";
     setSendVisual(blocked, reason);
   }
 
@@ -3056,7 +4089,12 @@
     }
     // v0821n2: LoRA chips without air → red before 已点生成 / generate
     if (chipsLackAirForOutbound()) {
-      setMsg("LoRA 缺 air，无法出站", "bad");
+      setMsg(outboundLoraBlockMsg(), "bad");
+      return;
+    }
+    const gate = paramGateMessage();
+    if (gate) {
+      setMsg(gate, "bad");
       return;
     }
     // v0821l: only ack when proceeding to generate()
@@ -3166,7 +4204,8 @@
         break;
       }
       if (r.status === "blocked" || r.status === "error") {
-        setMsg(prefix + " · 已停在此镜" + (r.stageOp ? (" · " + r.stageOp) : ""), r.status === "error" ? "bad" : "warn");
+        const errTxt = r.error || r.message || "";
+        setMsg(prefix + " · 已停在此镜" + (r.stageOp ? (" · " + r.stageOp) : "") + (errTxt ? (" · " + errTxt) : ""), r.status === "error" ? "bad" : "warn");
         stopped = true;
         break;
       }
@@ -3245,12 +4284,14 @@
   $("btnAdd").onclick = () => {
     const n = shots().length;
     const id = uid("shot");
+    const pos = newShotPosition(n);
     state.nodes.push({
       id: id, kind: "shot", title: "分镜" + (n + 1),
-      x: 560 + (n % 2) * 720, y: 80 + Math.floor(n / 2) * 430,
+      x: pos.x, y: pos.y,
       url: "", firstFrameId: "",
       prompt: "",
     });
+    constrainShotsToViewport();
     selectNode(id); persist();
   };
   function resolveLayoutScope(fromSelBar) {
@@ -3442,6 +4483,174 @@
     const s = String(id || "");
     return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
   }
+  function looksFalServiceId(id) {
+    const s = String(id || "").trim();
+    return /^fal-ai\//i.test(s) || /^fal\.ai\//i.test(s);
+  }
+  function looksHfServiceId(id) {
+    const s = String(id || "").trim();
+    if (!s) return false;
+    if (looksCivitaiServiceId(s) || looksFalServiceId(s)) return false;
+    if (/^hf\//i.test(s) || /^huggingface\//i.test(s)) return true;
+    return isHfRepo(s);
+  }
+  function pinHfLoraServiceId(sid) {
+    const s = String(sid || "").trim();
+    // Empty / Fal sibling / Civitai image/… → Hub turbo. Never rewrite Hub → fal-ai/.../lora.
+    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return HF_LORA_PREF_SERVICE;
+    return s;
+  }
+  function ensureHfLoraServiceSelected() {
+    const be = ($("backend") && $("backend").value) || "";
+    if (be !== "huggingface") return;
+    const sel = $("service");
+    if (!sel) return;
+    const want = pinHfLoraServiceId(sel.value || state._pinHfLoraService || "");
+    ensureSelectOpt(sel, want);
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) {
+        const t = sel.options[i].textContent || "";
+        if (!t || t === want || t === "默认模型" || t.indexOf(want) < 0) {
+          sel.options[i].textContent = "Krea 2 Turbo · " + want;
+        }
+        break;
+      }
+    }
+    sel.value = want;
+    // Do not fabricate a fake catalog row — only pin a real / already-listed id.
+    if (state.catalogById && state.catalogById[want]) return;
+  }
+  function hfLoraFixtureImport() {
+    return {
+      backend: "huggingface",
+      serviceId: "krea/Krea-2-Turbo",
+      serviceName: "Krea 2 Turbo",
+      kind: "image",
+      prompt: "portrait, soft light, detailed face, cinematic",
+      loras: [{
+        versionId: 3231694,
+        path: "https://civitai.com/api/download/models/3231694",
+        downloadUrl: "https://civitai.com/api/download/models/3231694",
+        url: "https://civitai.com/api/download/models/3231694",
+        scale: 0.8,
+        strength: 0.8,
+        name: "Asian Mix fixture 3231694",
+      }],
+    };
+  }
+  async function mountHfLoraFixture() {
+    closeImportModal();
+    return applyImport(hfLoraFixtureImport());
+  }
+
+  function pinMsLoraServiceId(sid) {
+    const s = String(sid || "").trim();
+    // Empty / Fal sibling / Civitai image/… → Hub turbo. Never rewrite Hub → fal-ai/.../lora.
+    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return MS_LORA_PREF_SERVICE;
+    return s;
+  }
+  function ensureMsLoraServiceSelected() {
+    const be = ($("backend") && $("backend").value) || "";
+    if (be !== "modelscope-ai" && be !== "modelscope-cn") return;
+    const sel = $("service");
+    if (!sel) return;
+    const want = pinMsLoraServiceId(sel.value || state._pinMsLoraService || "");
+    ensureSelectOpt(sel, want);
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) {
+        const t = sel.options[i].textContent || "";
+        if (!t || t === want || t === "默认模型" || t.indexOf(want) < 0) {
+          sel.options[i].textContent = "Krea 2 Turbo · " + want;
+        }
+        break;
+      }
+    }
+    sel.value = want;
+    // Do not fabricate a fake catalog row — only pin a real / already-listed id.
+    if (state.catalogById && state.catalogById[want]) return;
+  }
+  function msLoraFixtureImport() {
+    // No verified Krea-compatible Hub LoRA is provided by this fixture.
+    // Never replace it with an unrelated Z-Image patch or invent a weight.
+    return {
+      backend: "modelscope-ai",
+      serviceId: "krea/Krea-2-Turbo",
+      serviceName: "Krea 2 Turbo",
+      kind: "image",
+      prompt: ($("prompt") && $("prompt").value) || "",
+      loras: [],
+    };
+  }
+  async function mountMsLoraFixture() {
+    closeImportModal();
+    if (!await applyImport(msLoraFixtureImport())) return;
+    setMsg("已选择魔搭 Krea 2 Turbo · 未预置 LoRA，请填写与底模兼容的真实 Hub 仓库和权重", "warn");
+  }
+
+  // v0821o2: when LoRAs ship, keep z-image/turbo/lora — never empty→flux/schnell→sibling flux-lora
+  function falHasLoras() {
+    return Array.isArray(state.loras) && state.loras.length > 0;
+  }
+  function isFalFluxLoraDrift(sid) {
+    const s = String(sid || "").trim();
+    return s === "fal-ai/flux-lora" || s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT;
+  }
+  function pinFalLoraServiceId(sid) {
+    const s = String(sid || "").trim();
+    if (!falHasLoras()) return s;
+    // Explicit turbo → turbo/lora sibling only; never fuzzy to flux-lora
+    if (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora") return FAL_LORA_PREF_SERVICE;
+    if (s === FAL_LORA_PREF_SERVICE) return s;
+    if (!s || isFalFluxLoraDrift(s)) return FAL_LORA_PREF_SERVICE;
+    return s;
+  }
+  function ensureFalLoraServiceSelected() {
+    if (!falHasLoras()) return;
+    const be = ($("backend") && $("backend").value) || "";
+    if (be !== "fal") return;
+    const sel = $("service");
+    if (!sel) return;
+    const want = pinFalLoraServiceId(sel.value);
+    // Visible label: never leave 「默认模型」 when LoRAs mounted
+    ensureSelectOpt(sel, want);
+    // Prefer a clear option label for the pinned id
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === want) {
+        const t = sel.options[i].textContent || "";
+        if (!t || t === want || t === "默认模型") {
+          sel.options[i].textContent = "Krea 2 Turbo LoRA · " + want;
+        }
+        break;
+      }
+    }
+    sel.value = want;
+    // Do not fabricate a fake catalog row for a missing Krea / Z-Image id.
+    if (state.catalogById && state.catalogById[want]) return;
+  }
+
+  function falLoraFixtureImport() {
+    // Hard-pin — never omit / never fal-ai/flux-lora
+    return {
+      backend: "fal",
+      serviceId: "fal-ai/krea-2/turbo/lora",
+      serviceName: "Krea 2 Turbo LoRA",
+      kind: "image",
+      prompt: "portrait, soft light, detailed face, cinematic",
+      loras: [{
+        versionId: Number(FAL_LORA_FIXTURE_VERSION),
+        path: FAL_LORA_FIXTURE_PATH,
+        downloadUrl: FAL_LORA_FIXTURE_PATH,
+        url: FAL_LORA_FIXTURE_PATH,
+        scale: 0.8,
+        strength: 0.8,
+        name: "Asian Mix fixture " + FAL_LORA_FIXTURE_VERSION,
+      }],
+    };
+  }
+  async function mountFalLoraFixture() {
+    closeImportModal();
+    return applyImport(falLoraFixtureImport());
+  }
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
     if (shot && shot.kind === "shot") return shot;
@@ -3451,9 +4660,10 @@
       return nodeById(list[0].id);
     }
     const id = uid("shot");
+    const pos = newShotPosition(shots().length);
     const n = {
       id: id, kind: "shot", title: "分镜1",
-      x: 560, y: 80, url: "", firstFrameId: "",
+      x: pos.x, y: pos.y, url: "", firstFrameId: "",
       prompt: "",
     };
     state.nodes.push(n);
@@ -3464,17 +4674,33 @@
   // Never silent-fall back to fal/flux/schnell after a civitai import.
   async function applyImport(j) {
     j = j || {};
+    const importToken = ++_importToken;
     const civitaiSid = looksCivitaiServiceId(j.serviceId);
-    const wantCivitai = (j.backend === "civitai") || civitaiSid;
+    const falSid = looksFalServiceId(j.serviceId);
+    const hfSid = looksHfServiceId(j.serviceId);
+    const msBe = String(j.backend || "").trim();
+    const wantMs = j.backend === "modelscope-ai" || j.backend === "modelscope-cn"
+      || msBe === "modelscope" || msBe === "ms" || msBe === "魔搭" || msBe === "魔搭ai" || msBe === "魔搭cn";
+    // Explicit backend wins; Magao Hub ids must not steal HF; HF must not fall through to Fal.
+    const wantHf = !wantMs && ((j.backend === "huggingface" || j.backend === "hf")
+      || (hfSid && j.backend !== "fal" && j.backend !== "civitai"));
+    const wantCivitai = !wantMs && !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
+    const wantFal = !wantMs && !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
     const shot = ensureActiveShotForImport();
     let hardErr = "";
+    let heightAligned = false;
+    setDockMode("expanded");
+    setMsg("正在加载模型目录，目录就绪后才会完成参数导入…");
+    // Filter this fetch using the imported mode, not the previous video Composer.
+    if (j.kind === "image" || j.kind === "video") state.mode = j.kind;
 
     if (wantCivitai) {
       if ($("backend")) $("backend").value = "civitai";
       syncParamSurface();
       const sid = String(j.serviceId || "").trim();
       state._pendingService = sid || "";
-      await loadCatalog();
+      if (!await loadCatalog() || importToken !== _importToken) return false;
+      if (sid && !importServiceAvailable(sid)) return false;
       if (!sid) {
         if ($("service")) $("service").value = "";
         hardErr = "Civitai 导入缺少 serviceId，无法挂载（不会回退 fal/flux/schnell）";
@@ -3489,6 +4715,121 @@
           state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
         }
       }
+    } else if (wantFal) {
+      if ($("backend")) $("backend").value = "fal";
+      syncParamSurface();
+      let sid = String(j.serviceId || "").trim() || FAL_LORA_PREF_SERVICE;
+      // Pin fal-ai/z-image/turbo(/lora) — never drift to Civitai image/comfy/…
+      if (looksCivitaiServiceId(sid)) {
+        hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
+      } else {
+        // v0821o2: pin turbo/lora; reject flux-lora drift on fixture/import
+        if (Array.isArray(j.loras) && j.loras.length && isFalFluxLoraDrift(sid)) {
+          sid = FAL_LORA_PREF_SERVICE;
+        }
+        if (Array.isArray(j.loras) && j.loras.length && (sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo" || !sid)) {
+          sid = FAL_LORA_PREF_SERVICE;
+        }
+        state._pendingService = sid;
+        state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid : (state._pinFalLoraService || "");
+        if (!await loadCatalog() || importToken !== _importToken) return false;
+        if (!importServiceAvailable(sid)) return false;
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) {
+          // Clear visible label for pinned turbo/lora
+          for (let oi = 0; oi < $("service").options.length; oi++) {
+            if ($("service").options[oi].value === sid) {
+              $("service").options[oi].textContent = (j.serviceName || sid) + " · " + sid;
+              break;
+            }
+          }
+          $("service").value = sid;
+        }
+        if (!$("service") || $("service").value !== sid) {
+          hardErr = "无法挂载 Fal 服务 " + sid;
+        }
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) {
+          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+        }
+        ensureFalLoraServiceSelected();
+      }
+    } else if (wantHf) {
+      if ($("backend")) $("backend").value = "huggingface";
+      syncParamSurface();
+      let sid = String(j.serviceId || "").trim() || HF_LORA_PREF_SERVICE;
+      // Forbid drift to Civitai image/… or fal-ai/… (Router has no /lora sibling)
+      if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
+        hardErr = "Hugging Face 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
+        sid = "";
+        state._pinHfLoraService = "";
+      }
+      state._pendingService = sid;
+      if (sid) state._pinHfLoraService = sid;
+      if (!await loadCatalog() || importToken !== _importToken) return false;
+      if (sid && !importServiceAvailable(sid)) return false;
+      if (sid) {
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) {
+          for (let oi = 0; oi < $("service").options.length; oi++) {
+            if ($("service").options[oi].value === sid) {
+              $("service").options[oi].textContent = (j.serviceName || sid) + " · " + sid;
+              break;
+            }
+          }
+          $("service").value = sid;
+        }
+        if (!$("service") || $("service").value !== sid) {
+          hardErr = hardErr || ("无法挂载 Hugging Face 服务 " + sid);
+        }
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) {
+          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+        }
+        ensureHfLoraServiceSelected();
+      } else if ($("service")) {
+        $("service").value = "";
+      }
+    } else if (wantMs) {
+      // AI and CN are separate products — never cross (token/base).
+      if (msBe === "modelscope-cn" || msBe === "魔搭cn") {
+        if ($("backend")) $("backend").value = "modelscope-cn";
+      } else {
+        if ($("backend")) $("backend").value = "modelscope-ai";
+      }
+      syncParamSurface();
+      let sid = String(j.serviceId || "").trim() || MS_LORA_PREF_SERVICE;
+      if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
+        hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
+        sid = "";
+        state._pinMsLoraService = "";
+      }
+      state._pendingService = sid;
+      if (sid) state._pinMsLoraService = sid;
+      if (!await loadCatalog() || importToken !== _importToken) return false;
+      if (sid && !importServiceAvailable(sid)) return false;
+      if (sid) {
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) {
+          for (let oi = 0; oi < $("service").options.length; oi++) {
+            if ($("service").options[oi].value === sid) {
+              $("service").options[oi].textContent = (j.serviceName || sid) + " · " + sid;
+              break;
+            }
+          }
+          $("service").value = sid;
+        }
+        if (!$("service") || $("service").value !== sid) {
+          hardErr = hardErr || ("无法挂载 魔搭 服务 " + sid);
+        }
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) {
+          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+        }
+        ensureMsLoraServiceSelected();
+      } else if ($("service")) {
+        $("service").value = "";
+      }
     }
 
     // Prompt only — never inject @filename from import media (v0817c)
@@ -3498,6 +4839,7 @@
       if (shot) shot.prompt = p;
     }
     if (shot && j.negativePrompt != null) shot.negativePrompt = j.negativePrompt || "";
+    if ($("negative")) $("negative").value = (j.negativePrompt != null ? j.negativePrompt : (shot && shot.negativePrompt) || "") || "";
 
     applyComfyParamsToUi(j);
     if (shot) {
@@ -3509,7 +4851,28 @@
       if (cfgVal != null) { shot.cfg = cfgVal; shot.cfgScale = cfgVal; }
       else { delete shot.cfg; delete shot.cfgScale; }
     }
+    // Backend may silently align 1672→1664 ((h//16)*16). Surface it; never treat as success-ok.
+    {
+      const srcH = j.originalHeight != null ? Number(j.originalHeight)
+        : (j.sourceHeight != null ? Number(j.sourceHeight)
+        : (j.meta && j.meta.height != null ? Number(j.meta.height) : NaN));
+      const uiH = ($("height") && $("height").value !== "") ? Number($("height").value)
+        : (j.height != null ? Number(j.height) : NaN);
+      const alignedH = (j.alignedHeight != null) ? Number(j.alignedHeight)
+        : ((Number.isFinite(srcH) && srcH % 16 !== 0) ? Math.floor(srcH / 16) * 16 : NaN);
+      const aligned = (j.aligned === true)
+        || (Number.isFinite(srcH) && Number.isFinite(uiH) && srcH !== uiH)
+        || (Number.isFinite(srcH) && Number.isFinite(alignedH) && alignedH !== srcH)
+        || (Number.isFinite(uiH) && uiH === 1664 && Number.isFinite(srcH) && srcH === 1672);
+      if (aligned) {
+        const fromH = Number.isFinite(srcH) ? srcH : 1672;
+        const toH = Number.isFinite(uiH) ? uiH : (Number.isFinite(alignedH) ? alignedH : 1664);
+        heightAligned = true;
+        setParamWarn("导入高 " + fromH + " 已按 /16 对齐成 " + toH + "，不是原值成功", true);
+      }
+    }
 
+    // v0821o3: missing loras[] clears chips for Fal and all backends (was wantCivitai-only; reviewer ~3589)
     if (Array.isArray(j.loras)) {
       // v0821n3-import-air: copy air/name/strength/versionId/path onto chips (normalizeLora + reaffirm air)
       state.loras = j.loras.map(function (row) {
@@ -3524,7 +4887,7 @@
         }
         return n;
       });
-    } else if (wantCivitai) {
+    } else {
       state.loras = [];
     }
     syncLoraUi();
@@ -3551,7 +4914,8 @@
     if (j.comfyNodeCount) extra.push(j.comfyNodeCount + " 节点 Comfy");
     if (j.importSource) extra.push(j.importSource);
     const extraTxt = extra.length ? " · " + extra.join(" · ") : "";
-    setMsg("已导入参数" + (nLora ? (" · " + nLora + " 个 LoRA") : " · 未识别 LoRA") + extraTxt + "，自己点生成。", "ok");
+    setMsg("已导入参数" + (nLora ? (" · " + nLora + " 个 LoRA") : " · 未识别 LoRA") + extraTxt + "，自己点生成。", heightAligned ? "warn" : "ok");
+    return true;
   }
   async function runImportFromUrl(raw) {
     raw = String(raw || "").trim();
@@ -3600,6 +4964,15 @@
         const v = ($("importUrl") && $("importUrl").value) || "";
         runImportFromUrl(v);
       };
+    }
+    if ($("btnFalLoraFix")) {
+      $("btnFalLoraFix").onclick = function () { mountFalLoraFixture(); };
+    }
+    if ($("btnHfLoraFix")) {
+      $("btnHfLoraFix").onclick = function () { mountHfLoraFixture(); };
+    }
+    if ($("btnMsLoraFix")) {
+      $("btnMsLoraFix").onclick = function () { mountMsLoraFixture(); };
     }
     if ($("importUrl")) {
       $("importUrl").addEventListener("keydown", (e) => {
@@ -3654,63 +5027,148 @@
   }
   bindImportModal();
 
-  async function loadCatalog() {
-    $("service").innerHTML = '<option value="">默认模型</option>';
-    state.catalogById = state.catalogById || {};
-    try {
-      const be = $("backend").value;
-      const r = await fetch("/api/catalog?backend=" + encodeURIComponent(be));
-      const j = await r.json();
-      let items = (j.items || j.models || []).slice();
+  function importServiceAvailable(sid) {
+    if (state.catalogById && state.catalogById[sid]) return true;
+    setMsg("导入未完成：当前真实目录没有模型 " + sid + "（不会伪造模型行）", "bad");
+    return false;
+  }
+
+  function loadCatalog() {
+    if (isPagedCatalog()) return loadPagedCatalog(1, false);
+    const be = $("backend").value;
+    const mode = state.mode;
+    const key = be + ":" + mode;
+    // Boot/import calling the same catalog share the fetch and its completion.
+    if (_catalogFlight && _catalogFlight.key === key) return _catalogFlight.promise;
+    const token = ++_catalogToken;
+    if (_catalogFlight) _catalogFlight.controller.abort();
+    const controller = new AbortController();
+    // One-shot backends are local/fast; still bound a hung request (same 20s as Hub pages).
+    const timeout = setTimeout(() => controller.abort(), catalogFetchTimeoutMs());
+    const sel = $("service");
+    const sameCatalog = state._catalogKey === key;
+    const prevService = sameCatalog ? sel.value : "";
+    const current = () => token === _catalogToken && $("backend").value === be && state.mode === mode;
+    if (_svcChunkHandle) cancelAnimationFrame(_svcChunkHandle);
+    _svcChunkHandle = 0;
+    ++_svcChunkToken;
+    if (state._catalogKey !== key) {
+      state._catalogKey = "";
+      state.catalog = [];
+      state.catalogById = {};
+      state._serviceItems = [];
+      sel.innerHTML = '<option value="">加载模型目录…</option>';
+      if ($("serviceFilter")) $("serviceFilter").value = "";
+    }
+    sel.disabled = true;
+    sel.setAttribute("aria-busy", "true");
+    if (state.catalogPaging) {
+      state.catalogPaging.loading = false;
+      state.catalogPaging.hasMore = false;
+      state.catalogPaging.retryPage = null;
+      state.catalogPaging.key = "";
+    }
+    syncCatalogPagingUi();
+    const flight = { key: key, promise: null, controller: controller };
+    _catalogFlight = flight;
+    flight.promise = (async function () {
+      try {
+        const r = await fetch("/api/catalog?backend=" + encodeURIComponent(be), { signal: controller.signal });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (!current()) return false;
+        const roster = j.items || j.models;
+        if (!Array.isArray(roster)) throw new Error("目录响应缺少模型列表");
+        let items = roster.slice();
       // v0821: mode-filter so video Composer lists i2v services (not silent t2i flux).
       items = filterCatalogForMode(items);
       // CIVITAI_PREF / _civitaiDefaultService = catalog ordering hint only (not generate fallback).
       const pref = (be === "civitai" && state.mode !== "video")
         ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
         : "";
-      // Keep preferred service in the option list even when catalog is capped.
-      const CAP = 60;
       if (pref) {
         const prefItem = items.find(function (it) { return (it.id || it.name) === pref; });
-        let head = items.slice(0, CAP);
-        if (prefItem && !head.some(function (it) { return (it.id || it.name) === pref; })) {
-          head = [prefItem].concat(head.filter(function (it) { return (it.id || it.name) !== pref; })).slice(0, CAP);
+        if (prefItem) {
+          items = [prefItem].concat(items.filter(function (it) { return (it.id || it.name) !== pref; }));
         }
-        items = head;
-      } else {
-        items = items.slice(0, CAP);
       }
-      // Fal video empty-service: ensure i2v default is listed (never plain video-01 t2v).
-      if (be === "fal" && state.mode === "video") {
-        const hasI2v = items.some(function (it) { return (it.id || it.name) === FAL_I2V_DEFAULT; });
-        if (!hasI2v) {
-          items = [{ id: FAL_I2V_DEFAULT, name: "MiniMax Video-01 Image to Video", category: "video",
-            needsFirstFrame: true, imageFields: ["image_url"] }].concat(items).slice(0, CAP);
+      // Fixture / pending pin stays visible in the FULL roster (no slice(0,60)).
+      const providerPin = mode === "video" ? "" : (
+        be === "fal" ? state._pinFalLoraService :
+        be === "huggingface" ? state._pinHfLoraService :
+        (be === "modelscope-ai" || be === "modelscope-cn") ? state._pinMsLoraService : "");
+      const pinWant = state._pendingService != null ? state._pendingService
+        : (sameCatalog ? prevService : (providerPin || ""));
+      const needLoraPin = (be === "fal" && state.mode !== "video" && (
+        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === "fal-ai/krea-2/turbo"
+      ));
+      if (needLoraPin) {
+        const pinId = FAL_LORA_PREF_SERVICE;
+        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+        if (pinItem) {
+          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+        }
+      }
+      const needHfPin = (be === "huggingface" && mode !== "video" && (
+        (Array.isArray(state.loras) && state.loras.length)
+        || pinWant === HF_LORA_PREF_SERVICE
+        || state._pinHfLoraService
+      ));
+      if (needHfPin) {
+        const pinId = state._pinHfLoraService || HF_LORA_PREF_SERVICE;
+        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+        if (pinItem) {
+          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+        }
+      }
+      const needMsPin = (mode !== "video" && (be === "modelscope-ai" || be === "modelscope-cn") && (
+        (Array.isArray(state.loras) && state.loras.length)
+        || pinWant === MS_LORA_PREF_SERVICE
+        || state._pinMsLoraService
+      ));
+      if (needMsPin) {
+        const pinId = state._pinMsLoraService || MS_LORA_PREF_SERVICE;
+        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+        if (pinItem) {
+          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
         }
       }
       state.catalog = items;
-      // Preserve catalog fields used by multi-ref packing (capabilities.maxRefs/maxImages/refImagesField, imageFields).
       const byId = {};
       items.forEach((it) => {
         const id = it.id || it.name || "";
-        if (id) {
-          byId[id] = it;
-          // keep maxImages / maxRefs / imageFields on the catalog row when present
-        }
-        const o = document.createElement("option");
-        o.value = id; o.textContent = it.name || id;
-        $("service").appendChild(o);
+        if (id) byId[id] = it;
       });
       state.catalogById = byId;
-      if (state._pendingService) {
-        // applyImport may SELECT an explicit j.serviceId (intentional, not soft-fill).
-        $("service").value = state._pendingService;
-        state._pendingService = "";
-      }
+      state._catalogKey = key;
+      // Select only an actual row, before chunk rendering captures the selection.
+      // A missing model is not a one-row synthetic catalog.
+      sel.innerHTML = '<option value="">选择模型</option>';
+      if (pinWant && byId[pinWant]) appendServiceOption(sel, byId[pinWant]);
+      sel.value = byId[pinWant] ? pinWant : "";
+      renderServiceOptions(items, "选择模型");
+      delete state._pendingService;
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       syncParamSurface();
       syncLoraUi();
-    } catch (_) {}
+      if (pinWant && !byId[pinWant]) setMsg("当前目录/模式没有模型 " + pinWant + "，请重新选择（不会替换模型）", "warn");
+      return true;
+      } catch (e) {
+        if (!current()) return false;
+        if (state._catalogKey !== key) sel.innerHTML = '<option value="">目录加载失败 · 请重试</option>';
+        setMsg("目录加载失败 · " + (e.name === "AbortError" ? "请求超时，请切换 Provider 后重试" : formatErr(e)), "bad");
+        return false;
+      } finally {
+        clearTimeout(timeout);
+        if (current()) {
+          sel.disabled = false;
+          sel.setAttribute("aria-busy", "false");
+          paramGateMessage();
+        }
+        if (_catalogFlight === flight) _catalogFlight = null;
+      }
+    })();
+    return flight.promise;
   }
   async function loadOuts() {
     try {
@@ -3732,17 +5190,87 @@
     } catch (_) {}
   }
   $("backend").onchange = function () {
+    delete state._pendingService;
+    if ($("serviceFilter")) $("serviceFilter").value = "";
     syncParamSurface();
     loadCatalog();
     syncLoraUi();
   };
+  if ($("catalogMore")) {
+    $("catalogMore").addEventListener("click", function () {
+      const p = state.catalogPaging || {};
+      if (!isPagedCatalog() || p.loading || p.retryPage != null || !p.hasMore) return;
+      loadPagedCatalog(p.nextPage || (p.page + 1), true);
+    });
+  }
+  if ($("catalogRetry")) {
+    $("catalogRetry").addEventListener("click", function () {
+      const p = state.catalogPaging || {};
+      if (!isPagedCatalog() || p.loading || p.retryPage == null) return;
+      loadPagedCatalog(p.retryPage, p.retryPage > 1);
+    });
+  }
   if ($("service")) {
-    $("service").addEventListener("change", function () { syncLoraUi(); });
+    $("service").addEventListener("change", function () {
+      syncLoraUi();
+      syncParamSurface();
+    });
+  }
+  if ($("serviceFilter")) {
+    let _svcFilterTimer = 0;
+    $("serviceFilter").addEventListener("input", function () {
+      clearTimeout(_svcFilterTimer);
+      _svcFilterTimer = setTimeout(function () {
+        if (isPagedCatalog()) loadCatalog();
+        else renderServiceOptions(state._serviceItems || state.catalog || [], "选择模型");
+      }, 120);
+    });
+  }
+  if ($("negative")) {
+    $("negative").addEventListener("input", function () {
+      const n = nodeById(state.selected);
+      if (n && n.kind === "shot") n.negativePrompt = $("negative").value;
+      persist();
+    });
+  }
+  if ($("prompt")) {
+    $("prompt").addEventListener("input", function () { paramGateMessage(); });
+  }
+  if ($("nanoRes")) {
+    $("nanoRes").addEventListener("change", function () { persist(); paramGateMessage(); });
+  }
+  async function loadProviderCaps() {
+    try {
+      const r = await fetch("/api/providers");
+      const j = await r.json();
+      const map = {};
+      (j.items || []).forEach(function (it) {
+        if (it && it.id) map[it.id] = it.capabilities || {};
+      });
+      state._providerCaps = map;
+    } catch (_) {}
   }
 
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
+  // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
+  let _wantFalLoraFixture = false;
+  let _wantHfLoraFixture = false;
+  let _wantMsLoraFixture = false;
+  try {
+    const q = String(location.search || "");
+    const h = String(location.hash || "");
+    if (/[?&]fixture=fal-lora\b/.test(q) || h === "#fal-lora" || h === "#fal-lora-fixture") {
+      _wantFalLoraFixture = true;
+    }
+    if (/[?&]fixture=hf-lora\b/.test(q) || h === "#hf-lora" || h === "#hf-lora-fixture") {
+      _wantHfLoraFixture = true;
+    }
+    if (/[?&]fixture=ms-lora\b/.test(q) || h === "#ms-lora" || h === "#modelscope-lora") {
+      _wantMsLoraFixture = true;
+    }
+  } catch (_) {}
   applyCam();
   syncZoomPresets();
   renderCards();
@@ -3750,7 +5278,33 @@
   bindLoraUi();
   syncLoraUi();
   syncParamSurface();
-  loadComfyDefaults().then(function () { return loadCatalog(); });
+  loadProviderCaps().then(function () { return loadComfyDefaults(); }).then(function () { return loadCatalog(); }).then(function () {
+    if (_wantFalLoraFixture) return mountFalLoraFixture();
+    if (_wantHfLoraFixture) return mountHfLoraFixture();
+    if (_wantMsLoraFixture) return mountMsLoraFixture();
+  }).then(function () {
+    // Imports select after their own catalog completion; no late boot re-pinning.
+  });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
+  if (/[?&]probe=1\b/.test(String(location.search || ""))) {
+    window.__sbProbe = {
+      buildGraph: function () {
+        const n = nodeById(state.selected);
+        return (n && n.kind === "shot") ? buildGraph(n) : null;
+      },
+      paramGate: paramGateMessage,
+      refCap: function () {
+        const n = nodeById(state.selected);
+        const hint = document.querySelector(".ref-cap-hint");
+        return {
+          n: countRefUrls(null, n).length,
+          cap: maxRefCount(catalogItemForService()),
+          msg: refCapGateMessage(n),
+          hint: hint ? String(hint.textContent || "") : "",
+          sendReason: $("send") ? $("send").getAttribute("data-reason") : "",
+        };
+      },
+    };
+  }
 })();

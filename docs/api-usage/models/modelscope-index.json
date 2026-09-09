@@ -1,4 +1,7 @@
 {
+  "source": "docs/ms-models.json (pinned) + Hub openapi live search",
+  "generatedAt": "2026-09-08",
+  "pinnedTotal": 7,
   "items": [
     {
       "id": "Qwen/Qwen-Image",
@@ -9,14 +12,7 @@
       "task": "text-to-image",
       "tags": [
         "t2i"
-      ],
-      "capabilities": {
-        "image_to_image": false,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": []
-      }
+      ]
     },
     {
       "id": "Qwen/Qwen-Image-Edit",
@@ -28,19 +24,7 @@
       "needsSource": true,
       "tags": [
         "i2i"
-      ],
-      "capabilities": {
-        "image_to_image": true,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": [
-          "image_url"
-        ]
-      },
-      "supported_parameters": {
-        "max_input_images": 1
-      }
+      ]
     },
     {
       "id": "MusePublic/Qwen-Image-Edit",
@@ -52,19 +36,7 @@
       "needsSource": true,
       "tags": [
         "i2i"
-      ],
-      "capabilities": {
-        "image_to_image": true,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": [
-          "image_url"
-        ]
-      },
-      "supported_parameters": {
-        "max_input_images": 1
-      }
+      ]
     },
     {
       "id": "Tongyi-MAI/Z-Image-Turbo",
@@ -75,14 +47,7 @@
       "task": "text-to-image",
       "tags": [
         "t2i"
-      ],
-      "capabilities": {
-        "image_to_image": false,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": []
-      }
+      ]
     },
     {
       "id": "krea/Krea-2-Turbo",
@@ -94,14 +59,7 @@
       "tags": [
         "t2i",
         "krea2"
-      ],
-      "capabilities": {
-        "image_to_image": false,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": []
-      }
+      ]
     },
     {
       "id": "krea/Krea-2-Raw",
@@ -113,14 +71,7 @@
       "tags": [
         "t2i",
         "krea2"
-      ],
-      "capabilities": {
-        "image_to_image": false,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": []
-      }
+      ]
     },
     {
       "id": "krea/krea-realtime-video",
@@ -132,14 +83,23 @@
       "tags": [
         "t2v",
         "krea"
-      ],
-      "capabilities": {
-        "image_to_image": false,
-        "maxRefs": 1,
-        "maxImages": 1,
-        "refImagesField": "image_url",
-        "imageFields": []
-      }
+      ]
     }
-  ]
+  ],
+  "discovery": {
+    "hub": "https://www.modelscope.cn/openapi/v1/models",
+    "tasks": [
+      "text-to-image-synthesis",
+      "image-to-image",
+      "text-to-video-synthesis",
+      "image-to-video"
+    ],
+    "pageSize": 50,
+    "pages": 2,
+    "note": "task slug text-to-image-synthesis NOT text-to-image (0 results)",
+    "generateBases": {
+      "modelscope-ai": "https://api-inference.modelscope.ai/v1",
+      "modelscope-cn": "https://api-inference.modelscope.cn/v1"
+    }
+  }
 }
