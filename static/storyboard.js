@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o9: LoRA D/E — versionId→AIR, Checkpoint type gate, syncParamChrome, duration gate
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
   // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
@@ -3075,7 +3076,8 @@
       if (id === "aspect" || id === "res" || id === "width" || id === "height") {
         renderCards(); drawWires(); positionDock();
       }
-      if (id === "backend" || id === "service") syncParamSurface();
+      if (id === "backend" || id === "service") applyServiceConstraints();
+      if (id === "duration") paramGateMessage();
     });
     if ($(id) && COMFY_PARAM_IDS.indexOf(id) >= 0) {
       $(id).addEventListener("input", () => {
@@ -3288,6 +3290,27 @@
     if (l.versionId && /^\d+$/.test(String(l.versionId))) return true;
     return false;
   }
+  // Keep in lockstep with providers/civitai.py _LORA_TYPES. Checkpoint is not here.
+  const LORA_TYPES = new Set([
+    "LORA",
+    "LORAS",
+    "LOCON",
+    "LOHA",
+    "LOKR",
+    "DORA",
+    "LYCORIS",
+    "TEXTUALINVERSION",
+  ]);
+  function normalizeLoraType(value) {
+    return String(value == null ? "" : value)
+      .toUpperCase()
+      .replace(/[\s_]/g, "");
+  }
+  // Missing type (URL / bare AIR / hub repo) is not blocked. Named non-LoRA is.
+  function loraTypeUsable(type) {
+    const t = normalizeLoraType(type);
+    return !t || LORA_TYPES.has(t);
+  }
   function loraDisplayName(v) {
     // Prefer human model name over raw AIR / version id crumbs (v0821).
     v = v || {};
@@ -3315,11 +3338,22 @@
     const rawStr = (v.strength != null ? v.strength : v.scale);
     const strengthMissing = (rawStr == null || rawStr === "");
     const strength = strengthMissing ? null : clampLoraScale(rawStr, null);
+    // modelId only from the explicit field — search-hit `id` is a modelId and
+    // collides with versionId space (122359 is both). type comes from
+    // /api/model-version (model.type = LORA / Checkpoint / …).
+    const modelId = String(v.modelId || "");
+    const type = String(
+      v.type ||
+        (v.model && typeof v.model === "object" && v.model.type) ||
+        ""
+    );
     return {
       air: air,
       path: path,
       downloadUrl: v.downloadUrl || path,
       versionId: v.versionId || loraVersionId(v) || (v.id && /^\d+$/.test(String(v.id)) ? String(v.id) : ""),
+      modelId: modelId,
+      type: type,
       strength: strength,
       scale: strength,
       strengthMissing: strengthMissing,
@@ -3415,17 +3449,103 @@
     syncLoraPlaceholders();
     renderLoras();
   }
-  function addLora(v) {
-    const row = normalizeLora(v);
-    if (!row.air && !row.path && !row.versionId) return;
+  function setLoraNote(text, bad) {
+    const el = $("loraHint");
+    if (!el) return;
+    if (!text) {
+      el.classList.remove("bad");
+      syncLoraPlaceholders();
+      return;
+    }
+    el.textContent = text;
+    el.classList.add("show");
+    el.classList.toggle("bad", !!bad);
+  }
+  async function fetchLoraVersion(versionId) {
+    const response = await fetch("/api/model-version/" + encodeURIComponent(versionId));
+    const payload = await response.json();
+    if (!response.ok || payload.error)
+      throw new Error(payload.error || "HTTP " + response.status);
+    return payload;
+  }
+  // Civitai generate only accepts air. Rows that only have versionId must
+  // resolve before they enter the list; failure is a visible reject, not a drop.
+  async function resolveLoraAir(row) {
+    if (!row || row.air || !row.versionId) return row;
+    if (currentBackend() !== "civitai") return row;
+    try {
+      const data = await fetchLoraVersion(row.versionId);
+      const air = String((data && data.air) || "");
+      const type = String((data && data.type) || row.type || "");
+      const modelId = String((data && data.modelId) || row.modelId || "");
+      const name = row.name && row.name !== "LoRA"
+        ? row.name
+        : (data && (data.model || data.name)) || row.name;
+      return Object.assign({}, row, {
+        air: air || row.air,
+        type: type,
+        modelId: modelId,
+        name: name,
+        airError: (data && data.airError) || "",
+      });
+    } catch (_) {
+      return row;
+    }
+  }
+  async function addLora(v) {
+    const draft = normalizeLora(v);
+    if (!loraTypeUsable(draft.type)) {
+      setLoraNote(
+        "version " +
+          (draft.versionId || draft.name) +
+          " 是 " +
+          draft.type +
+          "（" +
+          (draft.name || "无名") +
+          "），不是 LoRA，没加进来",
+        true
+      );
+      return false;
+    }
+    const row = await resolveLoraAir(draft);
+    if (!loraTypeUsable(row.type)) {
+      setLoraNote(
+        "version " +
+          (row.versionId || row.name) +
+          " 是 " +
+          row.type +
+          "（" +
+          (row.name || "无名") +
+          "），不是 LoRA，没加进来",
+        true
+      );
+      return false;
+    }
+    if (currentBackend() === "civitai" && row.versionId && !row.air) {
+      setLoraNote(
+        "version " +
+          row.versionId +
+          " 换不出 air，civitai 生成链带不走这条，没加进来",
+        true
+      );
+      return false;
+    }
+    if (!row.air && !row.path && !row.versionId) return false;
     const be = currentBackend();
     if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
     if (!Array.isArray(state.loras)) state.loras = [];
+    const key = row.air || row.path || row.versionId;
+    if (state.loras.some(function (it) { return (it.air || it.path || it.versionId) === key; })) {
+      setLoraNote("已经加过这条 LoRA 了", true);
+      return false;
+    }
     state.loras.push(row);
+    setLoraNote("");
     renderLoras();
     if ($("loraHits")) $("loraHits").innerHTML = "";
     persist();
     if ((be === "fal" || isNanogptBe()) && row.air && !row.path) resolveLorasForBackend();
+    return true;
   }
   async function resolveOneLora(i) {
     const l = state.loras[i];
@@ -3504,6 +3624,89 @@
     }
     return merged;
   }
+  function capabilityForCatalogItem(item) {
+    const list = state._capabilities || [];
+    if (!item) return null;
+    const sid = String(item.id || item.name || "");
+    if (!sid) return null;
+    for (let i = 0; i < list.length; i++) {
+      const cap = list[i];
+      const rid = cap && cap.raw && cap.raw.id;
+      if (rid && String(rid) === sid) return cap;
+    }
+    return null;
+  }
+  function modelConstraint(item, name) {
+    const cap = capabilityForCatalogItem(item) || (item && item.capability) || null;
+    const c = (cap && cap.constraints) || {};
+    if (c[name] != null && typeof c[name] === "object") return c[name];
+    const extra = cap && cap.extraFlags && cap.extraFlags[name];
+    if (extra && typeof extra === "object") return extra;
+    return null;
+  }
+  function durationConstraint() {
+    const sid = $("service") && $("service").value;
+    const it = catalogItemForService() || (sid ? { id: sid } : null);
+    const fromModel = modelConstraint(it, "duration");
+    if (fromModel) return fromModel;
+    const sp = (it && it.supported_parameters) || {};
+    const param = (sp.parameters && sp.parameters.duration) || sp.duration;
+    if (param && typeof param === "object") return param;
+    if (Array.isArray(param) && param.length) return { enum: param };
+    const caps = catalogCaps();
+    if (caps.duration && typeof caps.duration === "object") return caps.duration;
+    const pc = (it && it.parameterCapabilities) || {};
+    if (pc.duration && typeof pc.duration === "object") return pc.duration;
+    return null;
+  }
+  function parseDurationSeconds(raw) {
+    return Number.parseInt(String(raw == null ? "" : raw).replace(/s$/i, "").trim(), 10);
+  }
+  function durationGateMessage() {
+    const el = $("duration");
+    if (!el || el.classList.contains("hidden")) {
+      markOver(el, false);
+      return "";
+    }
+    if (state.mode !== "video") {
+      markOver(el, false);
+      return "";
+    }
+    const rule = durationConstraint();
+    if (!rule) {
+      markOver(el, false);
+      return "";
+    }
+    const raw = String(el.value || "").trim();
+    const n = parseDurationSeconds(raw);
+    let enumVals = null;
+    if (Array.isArray(rule.enum) && rule.enum.length) {
+      enumVals = rule.enum.map(parseDurationSeconds).filter(Number.isFinite);
+    } else if (Array.isArray(rule.options) && rule.options.length) {
+      enumVals = rule.options.map(function (x) {
+        const v = (x && typeof x === "object") ? (x.value != null ? x.value : x) : x;
+        return parseDurationSeconds(v);
+      }).filter(Number.isFinite);
+    }
+    const lo = rule.min != null ? Number(rule.min) : null;
+    const hi = rule.max != null ? Number(rule.max) : null;
+    const hasBound = (enumVals && enumVals.length) || Number.isFinite(lo) || Number.isFinite(hi);
+    if (!hasBound) {
+      markOver(el, false);
+      return "";
+    }
+    const ok = Number.isFinite(n) && (
+      enumVals && enumVals.length
+        ? enumVals.indexOf(n) >= 0
+        : (lo == null || !Number.isFinite(lo) || n >= lo) && (hi == null || !Number.isFinite(hi) || n <= hi)
+    );
+    markOver(el, !ok);
+    if (ok) return "";
+    const allowText = enumVals && enumVals.length
+      ? "只收 " + enumVals.join("/") + "s"
+      : "范围 " + (Number.isFinite(lo) ? lo : "") + "…" + (Number.isFinite(hi) ? hi : "") + "s";
+    return "该模型不支持 " + (raw || "空") + " 时长（" + allowText + "），不替你静默改数";
+  }
   function markOver(el, on) {
     if (!el) return;
     el.classList.toggle("is-over", !!on);
@@ -3570,6 +3773,8 @@
     } else {
       markOver(nano, false);
     }
+    const durMsg = durationGateMessage();
+    if (durMsg) msgs.push(durMsg);
     setParamWarn(msgs[0] || "", !!msgs.length);
     return msgs[0] || "";
   }
@@ -3594,7 +3799,9 @@
     const falBox = $("falParams");
     const comfyBox = $("comfyParams");
     const nanoBox = $("nanoParams");
-    if (falBox) falBox.classList.toggle("hidden", !!civ || !!nano);
+    // Duration lives in #falParams. Civitai video still has duration constraints,
+    // so do not hide the whole group in video mode — individual fields keep their own hidden flags.
+    if (falBox) falBox.classList.toggle("hidden", (!!civ || !!nano) && !vid);
     if (comfyBox) comfyBox.classList.toggle("hidden", be === "fal");
     if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
     const sampler = $("sampler");
@@ -3633,6 +3840,15 @@
     if (nano) fillNanoResOptions();
     paramGateMessage();
     if (!syncParamSurface._skipDock) renderDock();
+  }
+  function syncParamChrome() {
+    // Model/backend switch must refresh LoRA visibility and param gates
+    // without requiring a second click on the shot card.
+    syncLoraUi();
+    syncParamSurface();
+  }
+  function applyServiceConstraints() {
+    syncParamChrome();
   }
   function readComfyParamsFromUi() {
     const width = $("width") ? parseInt($("width").value, 10) : NaN;
@@ -3824,8 +4040,10 @@
       try {
         const r = await fetch("/api/model-version/" + encodeURIComponent(q));
         const v = await r.json();
-        if (v && !v.error) addLora(v);
-        else hits.textContent = "没找到这个 version";
+        if (v && !v.error) {
+          const ok = await addLora(v);
+          if (!ok) hits.textContent = "";
+        } else hits.textContent = "没找到这个 version";
       } catch (_) { hits.textContent = "没找到这个 version"; }
       return;
     }
@@ -3843,7 +4061,9 @@
         const v = (it.versions || [])[0] || {};
         const path = it.path || "";
         const extra = v.baseModel || v.name || path || "";
-        return '<div data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") + '" data-name="' + esc(it.name || "") + '"><b>' +
+        return '<div data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") +
+          '" data-mid="' + esc(it.id || "") + '" data-type="' + esc(it.type || "") +
+          '" data-name="' + esc(it.name || "") + '"><b>' +
           esc(it.name) + '</b>' + (extra ? (" · " + esc(extra)) : "") + "</div>";
       }).join("");
       Array.prototype.forEach.call(hits.children, function (el) {
@@ -3851,14 +4071,19 @@
           const path = el.getAttribute("data-path");
           const name = el.getAttribute("data-name") || "";
           const vid = el.getAttribute("data-vid");
+          const mid = el.getAttribute("data-mid") || "";
+          const typ = el.getAttribute("data-type") || "";
           if (path && (isHttpUrl(path) || isHfRepo(path))) {
-            addLora({ path: path, name: name || path, strength: 0.8 });
+            addLora({ path: path, name: name || path, strength: 0.8, type: typ, modelId: mid });
             return;
           }
           if (be === "civitai" && vid) {
             try {
               const rr = await fetch("/api/model-version/" + encodeURIComponent(vid));
-              addLora(await rr.json());
+              const data = await rr.json();
+              if (!data.modelId && mid) data.modelId = mid;
+              if (!data.type && typ) data.type = typ;
+              await addLora(data);
             } catch (_) {}
             return;
           }
@@ -3866,12 +4091,14 @@
             addLora({
               path: "https://civitai.com/api/download/models/" + vid,
               versionId: String(vid),
+              modelId: mid,
+              type: typ,
               name: name || ("LoRA " + vid),
               strength: 0.8,
             });
             return;
           }
-          if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8 });
+          if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8, type: typ, modelId: mid });
         };
       });
     } catch (_) {
@@ -4076,8 +4303,7 @@
         }
         renderServiceOptions(state.catalog, "选择模型");
         syncCatalogPagingUi();
-        syncParamSurface();
-        syncLoraUi();
+        applyServiceConstraints();
         return true;
       } catch (e) {
         if (!current()) return false;
@@ -4596,8 +4822,9 @@
       }
       if (op === "i2v" || state.mode === "video") {
         const durEl = $("duration");
-        if (durEl && !durEl.classList.contains("hidden")) {
-          genParams.duration = parseInt(durEl.value || "5", 10) || 5;
+        if (durEl && !durEl.classList.contains("hidden") && !durationGateMessage()) {
+          const durN = parseDurationSeconds(durEl.value);
+          if (Number.isFinite(durN)) genParams.duration = durN;
         }
         const aspectEl = $("aspect");
         if (aspectEl && !aspectEl.classList.contains("hidden")) {
@@ -6230,8 +6457,7 @@
       if (be === "huggingface") ensureHfLoraServiceSelected();
       if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
-      syncParamSurface();
-      syncLoraUi();
+      applyServiceConstraints();
       if (pinWant && !byId[pinWant]) setMsg("当前目录/模式没有模型 " + pinWant + "，请重新选择（不会替换模型）", "warn");
       return true;
       } catch (e) {
@@ -6275,9 +6501,8 @@
   $("backend").onchange = function () {
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
-    syncParamSurface();
-    loadCatalog();
-    syncLoraUi();
+    applyServiceConstraints();
+    loadCatalog().then(function () { applyServiceConstraints(); });
   };
   if ($("catalogMore")) {
     $("catalogMore").addEventListener("click", function () {
@@ -6295,8 +6520,7 @@
   }
   if ($("service")) {
     $("service").addEventListener("change", function () {
-      syncLoraUi();
-      syncParamSurface();
+      applyServiceConstraints();
     });
   }
   if ($("serviceFilter")) {
@@ -6332,6 +6556,14 @@
       });
       state._providerCaps = map;
     } catch (_) {}
+    try {
+      const r = await fetch("/api/capabilities");
+      const j = await r.json();
+      state._capabilities = Array.isArray(j.capabilities) ? j.capabilities : [];
+    } catch (_) {
+      state._capabilities = state._capabilities || [];
+    }
+    applyServiceConstraints();
   }
 
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
@@ -6362,7 +6594,7 @@
   drawWires();
   bindLoraUi();
   syncLoraUi();
-  syncParamSurface();
+  syncParamChrome();
   loadProviderCaps().then(function () { return loadComfyDefaults(); }).then(function () { return loadCatalog(); }).then(function () {
     if (_wantFalLoraFixture) return mountFalLoraFixture();
     if (_wantHfLoraFixture) return mountHfLoraFixture();

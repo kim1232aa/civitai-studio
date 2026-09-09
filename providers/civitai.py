@@ -281,6 +281,47 @@ def _unsupported_field(sid: str, field: str) -> ValueError:
     return ValueError(f"{sid} 官方 recipe 不接受 {field}，不会静默丢掉")
 
 
+class LoraResolveError(ValueError):
+    def __init__(self, message, row_name="", code="lora_unresolved"):
+        super().__init__(message)
+        self.row_name = row_name
+        self.code = code
+
+
+def _row_air(item: dict) -> str:
+    """Use air as-is; otherwise versionId → AIR via fetch_version_air.
+
+    fetch_version_air already does public → mini → auth, synthesizes air from
+    modelId@versionId when missing, and caches. modelId / versionId live in
+    different id spaces (122359 is both a LoRA modelId and a Checkpoint
+    versionId) — if the row carries modelId, mismatch means this digit is not
+    the version we think it is. Checkpoint / non-LoRA types fail closed.
+    """
+    air = (item.get("air") or "").strip()
+    if air:
+        return air
+    vid = str(item.get("versionId") or item.get("modelVersionId") or "").strip()
+    if not vid.isdigit():
+        return ""
+    ver = fetch_version_air(vid) or {}
+    want_mid = str(item.get("modelId") or "").strip()
+    got_mid = str(ver.get("modelId") or "").strip()
+    if want_mid and got_mid and want_mid != got_mid:
+        return ""
+    model = ver.get("model") if isinstance(ver.get("model"), dict) else {}
+    typ = str(model.get("type") or ver.get("type") or item.get("type") or "")
+    name = str(
+        item.get("name")
+        or model.get("name")
+        or ver.get("name")
+        or ""
+    )
+    air = (ver.get("air") or "").strip()
+    if air and not _is_lora_resource(typ, air, name):
+        return ""
+    return air
+
+
 def lora_map(payload: dict) -> dict:
     out = {}
     items = payload.get("loras") or []
@@ -291,12 +332,19 @@ def lora_map(payload: dict) -> dict:
     for item in items:
         if not isinstance(item, dict):
             raise ValueError("lora 必须是对象")
-        air = (item.get("air") or "").strip()
+        air = _row_air(item)
         if not air:
             path = (item.get("path") or item.get("url") or "").strip()
-            raise ValueError(
-                "Civitai LoRA 必须提供 air，不能只用 path"
-                + (f"（{path}）" if path else "")
+            name = str(
+                item.get("name") or item.get("versionId") or path or ""
+            ).strip()
+            raise LoraResolveError(
+                "LoRA「"
+                + (name or "未命名")
+                + "」换不出 civitai air（version id 查不到、撞号或不是 LoRA），"
+                + "这条带不走，请删掉或换一条再生成"
+                + (("（" + path + "）") if path else ""),
+                row_name=name,
             )
         if "strength" in item:
             raw = item.get("strength")
