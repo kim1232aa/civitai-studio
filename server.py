@@ -401,16 +401,7 @@ def match_service(engine=None, operation=None, ecosystem=None, model=None, categ
 
 
 def lora_map(payload: dict) -> dict:
-    out = {}
-    for item in payload.get("loras") or []:
-        air = (item.get("air") or "").strip()
-        if not air:
-            continue
-        try:
-            out[air] = float(item.get("strength", 1))
-        except (TypeError, ValueError):
-            out[air] = 1.0
-    return out
+    return civitai_prov.lora_map(payload)
 
 
 def _set_int(inp, payload, key, lo=None, hi=None):
@@ -1316,7 +1307,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": str(e)})
         if path.startswith("/api/model-version/"):
             vid = urllib.parse.unquote(path.split("/api/model-version/", 1)[1])
-            code, data = civitai(f"{SITE}/model-versions/{vid}")
+            # air is the only LoRA id Civitai generate accepts. The public
+            # model-versions endpoint often omits it — use fetch_version_air
+            # (public → mini → auth, synthesize from modelId@versionId, cached).
+            data = civitai_prov.fetch_version_air(vid)
+            code = 200 if (isinstance(data, dict) and (data.get("id") or data.get("air"))) else 502
+            if code != 200:
+                return self._json(
+                    502,
+                    {"error": f"取不到 version {vid}：civitai 公开/mini/鉴权三个端点都没回可用数据"},
+                )
             if isinstance(data, dict):
                 files = []
                 for f in (data.get("files") or []):
@@ -1329,16 +1329,22 @@ class Handler(BaseHTTPRequestHandler):
                         "downloadUrl": f.get("downloadUrl") or f.get("download_url"),
                     })
                 download = next((x.get("downloadUrl") for x in files if x.get("downloadUrl")), None)
-                vid = data.get("id")
-                if not download and vid:
-                    download = f"https://civitai.com/api/download/models/{vid}"
+                resolved_id = data.get("id")
+                if not download and resolved_id:
+                    download = f"https://civitai.com/api/download/models/{resolved_id}"
+                model_obj = data.get("model") if isinstance(data.get("model"), dict) else {}
+                air = (data.get("air") or "").strip()
                 return self._json(code, {
                     "id": data.get("id"),
+                    "modelId": data.get("modelId"),
                     "name": data.get("name"),
-                    "air": data.get("air"),
+                    "air": air,
+                    "airError": "" if air else "这条版本换不出 air，civitai 生成链带不走它",
                     "baseModel": data.get("baseModel"),
-                    "model": (data.get("model") or {}).get("name"),
-                    "type": (data.get("model") or {}).get("type"),
+                    "model": model_obj.get("name") if model_obj else (
+                        data.get("model") if isinstance(data.get("model"), str) else None
+                    ),
+                    "type": model_obj.get("type") or data.get("type"),
                     "trainedWords": data.get("trainedWords") or [],
                     "files": files,
                     "downloadUrl": download,
