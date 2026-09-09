@@ -15,8 +15,12 @@ class Provider(ABC):
         ...
 
     @abstractmethod
-    def catalog(self, q: str, category: str, status: str) -> dict:
-        """Return {total, count, items, backend, ...} with UI catalog keys."""
+    def catalog(self, q: str, category: str, status: str, page: int = 1, pageSize: int = 50) -> dict:
+        """Return {total, count, items, backend, page, pageSize, hasMore, nextPage, ...}.
+
+        page/pageSize are optional. Providers that only implement (q, category, status)
+        still work; the HTTP handler slices that full filtered list.
+        """
         ...
 
     @abstractmethod

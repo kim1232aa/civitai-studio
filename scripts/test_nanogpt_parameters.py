@@ -14,16 +14,34 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = (ROOT / "providers" / "nanogpt.py").read_text(encoding="utf-8")
 
 
-def _pick_resolution_source() -> str:
+def _fn_source(name: str) -> str:
     tree = ast.parse(SRC)
     for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == "pick_resolution":
+        if isinstance(node, ast.FunctionDef) and node.name == name:
             return ast.get_source_segment(SRC, node) or ""
-    raise AssertionError("pick_resolution not found")
+    raise AssertionError(f"{name} not found")
+
+
+def _raises_zh(fn, *args, must=(), **kwargs):
+    try:
+        fn(*args, **kwargs)
+    except ValueError as exc:
+        msg = str(exc)
+        for token in must:
+            assert token in msg, (token, msg)
+        return msg
+    raise AssertionError(f"expected ValueError from {fn.__name__} args={args!r}")
 
 
 def main() -> int:
-    src = _pick_resolution_source()
+    n = 0
+
+    def check(cond):
+        nonlocal n
+        assert cond
+        n += 1
+
+    src = _fn_source("pick_resolution")
     for banned in (
         'if "1k" in low or "2k" in low',
         "closest_aspect",
@@ -152,7 +170,135 @@ def main() -> int:
     assert code == 400, (code, body)
     assert "resolution" in body["error"].lower() or "分辨率" in body["error"], body
 
-    print("OK nanogpt-parameters")
+    # --- seed: official Nano int32, fail-closed, never modulo ---
+    clamp_src = _fn_source("_clamp_seed")
+    check("%" not in clamp_src)
+    check("2147483647" in clamp_src)
+    check("n % " not in SRC)
+    meta_src = _fn_source("_seed_clamp_meta")
+    check("seedOriginal" not in meta_src)
+    check("True" not in meta_src)
+
+    check(nanogpt._clamp_seed(None) is None)
+    check(nanogpt._clamp_seed("") is None)
+    check(nanogpt._clamp_seed("random") is None)
+    check(nanogpt._clamp_seed(-1) == -1)
+    check(nanogpt._clamp_seed(0) == 0)
+    check(nanogpt._clamp_seed(42) == 42)
+    check(nanogpt._clamp_seed("7") == 7)
+    check(nanogpt._clamp_seed(2147483647) == 2147483647)
+    check(nanogpt._seed_clamp_meta(42) == {})
+    check(nanogpt._seed_clamp_meta(None) == {})
+    check(nanogpt._seed_clamp_meta(-1) == {})
+    for bad in (2147483648, 891104780613135, -2, -3, 1.5, True, False, "abc", [], {}, 4.2):
+        msg = _raises_zh(nanogpt._clamp_seed, bad, must=("种子", "静默"))
+        check("取模" in msg or "改值" in msg)
+    msg = _raises_zh(nanogpt._seed_clamp_meta, 891104780613135, must=("种子",))
+    check("取模" in msg)
+    check(nanogpt._response_seed({"seed": 42}) == 42)
+    check(nanogpt._response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99)
+    check(nanogpt._response_seed({"seed": 891104780613135}) is None)
+
+    img_seed_spec = {
+        "id": "z-image-turbo",
+        "category": "image",
+        "supported_parameters": {"resolutions": ["1024x1024"], "max_output_images": 4},
+        "capabilities": {},
+    }
+    with patch.object(nanogpt, "nano_key", return_value="offline-key"), patch.object(
+        nanogpt, "find_spec", return_value=img_seed_spec
+    ), patch.object(
+        nanogpt, "json_call", side_effect=AssertionError("oversized seed must not POST")
+    ):
+        code, body = nanogpt.NanoGptProvider().generate({
+            "serviceId": "z-image-turbo",
+            "prompt": "hi",
+            "resolution": "1024x1024",
+            "seed": 891104780613135,
+        })
+    check(code == 400)
+    check("种子" in body["error"])
+    check("seedClamped" not in body)
+    check(body.get("seedOriginal") is None)
+
+    with patch.object(nanogpt, "nano_key", return_value="offline-key"), patch.object(
+        nanogpt, "find_spec", return_value=img_seed_spec
+    ), patch.object(
+        nanogpt, "json_call", side_effect=AssertionError("non-int seed must not POST")
+    ):
+        code, body = nanogpt.NanoGptProvider().generate({
+            "serviceId": "z-image-turbo",
+            "prompt": "hi",
+            "resolution": "1024x1024",
+            "seed": "abc",
+        })
+    check(code == 400)
+    check("种子" in body["error"])
+
+    # --- strength: omit official default; never invent 0.65 ---
+    body_src = _fn_source("_image_body")
+    check("0.65" not in body_src)
+    check("except (TypeError, ValueError):\n        pass" not in body_src)
+    i2i_spec = {
+        "id": "edit-model",
+        "supported_parameters": {"resolutions": ["1k"], "max_output_images": 4},
+        "capabilities": {"image_generation": True, "image_to_image": True},
+    }
+    ref = "https://example.invalid/ref.png"
+    omitted = nanogpt._image_body({
+        "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+    }, i2i_spec)
+    check("strength" not in omitted)
+    check(omitted.get("input_references") == [ref])
+    explicit = nanogpt._image_body({
+        "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+        "denoise": 0.4,
+    }, i2i_spec)
+    check(explicit["strength"] == 0.4)
+    user_065 = nanogpt._image_body({
+        "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+        "strength": 0.65,
+    }, i2i_spec)
+    check(user_065["strength"] == 0.65)
+    msg = _raises_zh(
+        nanogpt._image_body,
+        {"prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref], "strength": None},
+        i2i_spec,
+        must=("0.65",),
+    )
+    check("null" in msg or "strength" in msg)
+    _raises_zh(
+        nanogpt._image_body,
+        {"prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref], "strength": "oops"},
+        i2i_spec,
+        must=("strength",),
+    )
+    _raises_zh(
+        nanogpt._image_body,
+        {"prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref], "strength": True},
+        i2i_spec,
+        must=("strength",),
+    )
+    _raises_zh(
+        nanogpt._image_body,
+        {"prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref], "denoise": 0.3, "strength": 0.9},
+        i2i_spec,
+        must=("冲突",),
+    )
+
+    # --- steps / cfgScale: invalid supplied values raise, not omit ---
+    t2i = {"id": "t2i", "supported_parameters": {"resolutions": ["1k"], "max_output_images": 4}}
+    stepped = nanogpt._image_body({"prompt": "x", "resolution": "1k", "steps": 20, "cfgScale": 7.5}, t2i)
+    check(stepped["steps"] == 20 and stepped["num_inference_steps"] == 20)
+    check(stepped["guidance_scale"] == 7.5)
+    bare = nanogpt._image_body({"prompt": "x", "resolution": "1k"}, t2i)
+    check("steps" not in bare and "num_inference_steps" not in bare and "guidance_scale" not in bare)
+    for raw in ("many", True, 1.5, [], {}):
+        _raises_zh(nanogpt._image_body, {"prompt": "x", "resolution": "1k", "steps": raw}, t2i, must=("steps",))
+    for raw in ("high", True, float("inf"), float("nan"), []):
+        _raises_zh(nanogpt._image_body, {"prompt": "x", "resolution": "1k", "cfgScale": raw}, t2i, must=("cfgScale",))
+
+    print(f"OK nanogpt-parameters {n}")
     return 0
 
 

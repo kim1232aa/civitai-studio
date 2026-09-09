@@ -39,6 +39,9 @@
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
   const SERVICE_SYNC_BUDGET = 300;
   const SERVICE_CHUNK_SIZE = 400;
+  const CATALOG_FETCH_TIMEOUT_MS = 20000;
+  const CATALOG_MODELSCOPE_TIMEOUT_MS = 60000;
+  const CATALOG_PAGE_SIZE = 50;
   let _svcChunkHandle = 0;
   let _svcChunkToken = 0;
   let _catalogToken = 0;
@@ -96,6 +99,8 @@
     mode: "image",
     catalog: [],
     catalogById: {},
+    catalogPaging: { key: "", page: 0, pageSize: CATALOG_PAGE_SIZE, hasMore: false, nextPage: null,
+      partial: false, warning: "", retryPage: null, hubTotals: null, hubCoverage: null, loading: false },
     history: [],
     railTab: "assets",
     atFilter: "",
@@ -2937,6 +2942,193 @@
     if (id === MS_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo · " + id);
     return name || id;
   }
+  function isModelScopeCatalog() {
+    const be = $("backend") && $("backend").value;
+    return be === "modelscope-ai" || be === "modelscope-cn";
+  }
+  function isPagedCatalog() {
+    const be = $("backend") && $("backend").value;
+    return isModelScopeCatalog() || be === "huggingface";
+  }
+  function catalogFetchTimeoutMs() {
+    return isModelScopeCatalog() ? CATALOG_MODELSCOPE_TIMEOUT_MS : CATALOG_FETCH_TIMEOUT_MS;
+  }
+  function modelScopeCatalogKey(be, mode, q) {
+    return be + ":" + mode + ":" + (q || "");
+  }
+  function modelScopePageItemId(it) {
+    return String((it && (it.id || it.name)) || "");
+  }
+  function modelScopeWarning(j) {
+    const warning = String((j && j.warning) || "").trim();
+    const totals = j && j.hubTotals;
+    const errors = totals && Number(totals.errors);
+    if (warning) return warning;
+    if (errors > 0) return "部分 Hub 目录暂时不可用，请重试本页；收录不代表可调用。";
+    if (j && j.partial) return "Hub 目录尚未加载完；收录不代表可调用。";
+    return "Hub 目录仅表示收录，调用能力以模型契约为准。";
+  }
+  function syncCatalogPagingUi() {
+    const status = $("catalogStatus");
+    const hint = $("catalogHint");
+    const more = $("catalogMore");
+    const retry = $("catalogRetry");
+    const p = state.catalogPaging || {};
+    if (!status) return;
+    const visible = isPagedCatalog() && (p.key || p.loading || p.warning || p.page > 0);
+    status.hidden = !visible;
+    if (!visible) return;
+    const totals = p.hubTotals || {};
+    const counts = Number.isFinite(Number(totals.fetched)) ? " · 已取 " + Number(totals.fetched) : "";
+    if (hint) {
+      hint.textContent = p.loading
+        ? "正在加载目录…"
+        : (p.warning || "目录已加载 · Hub 收录仅表示目录收录，调用能力以模型契约为准。") + counts;
+    }
+    if (more) {
+      more.hidden = !!p.loading || p.retryPage != null || !p.hasMore;
+      more.disabled = !!p.loading;
+      more.textContent = p.loading && p.page > 1 ? "加载中…" : "加载更多";
+    }
+    if (retry) {
+      retry.hidden = !!p.loading || p.retryPage == null;
+      retry.disabled = !!p.loading;
+    }
+  }
+  function mergeModelScopeItems(items, append) {
+    const incoming = filterCatalogForMode(Array.isArray(items) ? items : []);
+    const existing = append && Array.isArray(state.catalog) ? state.catalog.slice() : [];
+    const seen = {};
+    existing.forEach(function (it) { const id = modelScopePageItemId(it); if (id) seen[id] = true; });
+    incoming.forEach(function (it) {
+      const id = modelScopePageItemId(it);
+      // The existing select is ID-valued; collapse same-ID Hub rows even when task differs.
+      if (id && !seen[id]) { existing.push(it); seen[id] = true; }
+    });
+    state.catalog = existing;
+    state.catalogById = {};
+    existing.forEach(function (it) {
+      const id = modelScopePageItemId(it);
+      if (id && !state.catalogById[id]) state.catalogById[id] = it;
+    });
+  }
+  function promotePagedCatalogPref(items) {
+    const be = $("backend") && $("backend").value;
+    const pinId = be === "huggingface"
+      ? (state._pinHfLoraService || HF_LORA_PREF_SERVICE)
+      : (be === "modelscope-ai" || be === "modelscope-cn")
+        ? (state._pinMsLoraService || MS_LORA_PREF_SERVICE)
+        : "";
+    const list = Array.isArray(items) ? items : [];
+    if (!pinId) return list;
+    const pinItem = list.find(function (it) { return modelScopePageItemId(it) === pinId; });
+    if (!pinItem) return list;
+    return [pinItem].concat(list.filter(function (it) { return modelScopePageItemId(it) !== pinId; }));
+  }
+  function loadPagedCatalog(page, append) {
+    const be = $("backend").value;
+    const mode = state.mode;
+    const category = mode === "video" ? "video" : "image";
+    const q = (( $("serviceFilter") && $("serviceFilter").value) || "").trim();
+    const baseKey = be + ":" + mode;
+    const key = modelScopeCatalogKey(be, mode, q);
+    page = Number.isInteger(page) && page > 0 ? page : 1;
+    append = !!append;
+    const flightKey = key + ":page=" + page;
+    if (_catalogFlight && _catalogFlight.key === flightKey) return _catalogFlight.promise;
+    const token = ++_catalogToken;
+    if (_catalogFlight) _catalogFlight.controller.abort();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), catalogFetchTimeoutMs());
+    const sel = $("service");
+    const contextSame = state.catalogPaging && state.catalogPaging.key === key;
+    const retrying = contextSame && state.catalogPaging.retryPage === page;
+    if (!contextSame || (!append && !retrying)) {
+      state.catalog = [];
+      state.catalogById = {};
+      state._serviceItems = [];
+      state.catalogPaging = Object.assign({}, state.catalogPaging, {
+        key: key, page: 0, pageSize: CATALOG_PAGE_SIZE, hasMore: false, nextPage: null,
+        partial: false, warning: "", retryPage: null, hubTotals: null, hubCoverage: null,
+      });
+      sel.innerHTML = '<option value="">加载模型目录…</option>';
+    }
+    state.catalogPaging.key = key;
+    state.catalogPaging.loading = true;
+    // Keep already loaded rows selectable while a continuation is in flight.
+    sel.disabled = !state.catalog.length;
+    sel.setAttribute("aria-busy", "true");
+    syncCatalogPagingUi();
+    const current = () => token === _catalogToken && $("backend").value === be && state.mode === mode &&
+      ((($("serviceFilter") && $("serviceFilter").value) || "").trim() === q);
+    const params = new URLSearchParams({
+      backend: be, category: category, q: q, page: String(page), pageSize: String(CATALOG_PAGE_SIZE),
+    });
+    const flight = { key: flightKey, promise: null, controller: controller };
+    _catalogFlight = flight;
+    flight.promise = (async function () {
+      try {
+        const r = await fetch("/api/catalog?" + params.toString(), { signal: controller.signal });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        if (!current()) return false;
+        const rows = Array.isArray(j.items) ? j.items : [];
+        mergeModelScopeItems(rows, append || contextSame);
+        state.catalog = promotePagedCatalogPref(state.catalog);
+        const byId = {};
+        state.catalog.forEach(function (it) {
+          const id = modelScopePageItemId(it);
+          if (id && !byId[id]) byId[id] = it;
+        });
+        state.catalogById = byId;
+        const next = Number.isInteger(j.nextPage) ? j.nextPage : null;
+        const retryPage = Number.isInteger(j.retryPage) ? j.retryPage : null;
+        state._catalogKey = baseKey;
+        state.catalogPaging = Object.assign({}, state.catalogPaging, {
+          key: key, page: Number.isInteger(j.page) ? j.page : page,
+          pageSize: Number.isInteger(j.pageSize) ? j.pageSize : CATALOG_PAGE_SIZE,
+          hasMore: retryPage == null && !!j.hasMore, nextPage: next,
+          partial: !!j.partial, warning: modelScopeWarning(j), retryPage: retryPage,
+          hubTotals: j.hubTotals || null, hubCoverage: j.hubCoverage || null, loading: false,
+        });
+        if (!append) {
+          const pending = state._pendingService;
+          if (pending && byId[pending]) {
+            appendServiceOption(sel, byId[pending]);
+            sel.value = pending;
+          }
+          delete state._pendingService;
+        }
+        renderServiceOptions(state.catalog, "选择模型");
+        syncCatalogPagingUi();
+        syncParamSurface();
+        syncLoraUi();
+        return true;
+      } catch (e) {
+        if (!current()) return false;
+        state.catalogPaging = Object.assign({}, state.catalogPaging, {
+          loading: false, hasMore: false, nextPage: null, retryPage: page,
+          warning: "目录第 " + page + " 页加载失败 · 请重试本页。",
+        });
+        if (!state.catalog.length) sel.innerHTML = '<option value="">目录加载失败 · 请重试</option>';
+        renderServiceOptions(state.catalog, "选择模型");
+        syncCatalogPagingUi();
+        setMsg("目录加载失败 · " + (e.name === "AbortError" ? "请求超时，请重试本页" : formatErr(e)), "bad");
+        return false;
+      } finally {
+        clearTimeout(timeout);
+        if (current()) {
+          state.catalogPaging.loading = false;
+          sel.disabled = false;
+          sel.setAttribute("aria-busy", "false");
+          syncCatalogPagingUi();
+          paramGateMessage();
+        }
+        if (_catalogFlight === flight) _catalogFlight = null;
+      }
+    })();
+    return flight.promise;
+  }
   function svcMatchBlob(it) {
     const parts = [
       it && it.name, it && it.id, it && it.engine, it && it.operation,
@@ -2958,7 +3150,8 @@
     if (!sel) return;
     const roster = Array.isArray(items) ? items : [];
     state._serviceItems = roster;
-    const q = (($("serviceFilter") && $("serviceFilter").value) || "").trim().toLowerCase();
+    // Hub search is server-paged; filtering a page again hides valid hits.
+    const q = isPagedCatalog() ? "" : (($("serviceFilter") && $("serviceFilter").value) || "").trim().toLowerCase();
     const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     const alnumQ = tokens.map(svcAlnum).filter(function (t) { return t.length >= 2; });
     let shown = roster;
@@ -3371,12 +3564,23 @@
         genParams.aspectRatio = aspect;
       }
     } else {
-      genParams.resolution = res;
-      genParams.duration = parseInt(($("duration") && $("duration").value) || "5", 10) || 5;
-      genParams.aspectRatio = aspect;
+      // Image APIs take width/height. Do not pack canvas duration/aspect/resolution
+      // into Fal/HF/MS t2i — those keys 400 when the endpoint schema has no such field.
       if (be === "modelscope-ai" || be === "modelscope-cn" || be === "fal" || be === "huggingface") {
         genParams.width = w;
         genParams.height = h;
+      } else {
+        genParams.resolution = res;
+      }
+      if (op === "i2v" || state.mode === "video") {
+        const durEl = $("duration");
+        if (durEl && !durEl.classList.contains("hidden")) {
+          genParams.duration = parseInt(durEl.value || "5", 10) || 5;
+        }
+        const aspectEl = $("aspect");
+        if (aspectEl && !aspectEl.classList.contains("hidden")) {
+          genParams.aspectRatio = aspect;
+        }
       }
     }
     nodes.push({
@@ -4824,6 +5028,7 @@
   }
 
   function loadCatalog() {
+    if (isPagedCatalog()) return loadPagedCatalog(1, false);
     const be = $("backend").value;
     const mode = state.mode;
     const key = be + ":" + mode;
@@ -4832,8 +5037,8 @@
     const token = ++_catalogToken;
     if (_catalogFlight) _catalogFlight.controller.abort();
     const controller = new AbortController();
-    // Full HF rosters can be large; still bound a failed/hung request.
-    const timeout = setTimeout(() => controller.abort(), 180000);
+    // One-shot backends are local/fast; still bound a hung request (same 20s as Hub pages).
+    const timeout = setTimeout(() => controller.abort(), catalogFetchTimeoutMs());
     const sel = $("service");
     const sameCatalog = state._catalogKey === key;
     const prevService = sameCatalog ? sel.value : "";
@@ -4851,6 +5056,13 @@
     }
     sel.disabled = true;
     sel.setAttribute("aria-busy", "true");
+    if (state.catalogPaging) {
+      state.catalogPaging.loading = false;
+      state.catalogPaging.hasMore = false;
+      state.catalogPaging.retryPage = null;
+      state.catalogPaging.key = "";
+    }
+    syncCatalogPagingUi();
     const flight = { key: key, promise: null, controller: controller };
     _catalogFlight = flight;
     flight.promise = (async function () {
@@ -4978,6 +5190,20 @@
     loadCatalog();
     syncLoraUi();
   };
+  if ($("catalogMore")) {
+    $("catalogMore").addEventListener("click", function () {
+      const p = state.catalogPaging || {};
+      if (!isPagedCatalog() || p.loading || p.retryPage != null || !p.hasMore) return;
+      loadPagedCatalog(p.nextPage || (p.page + 1), true);
+    });
+  }
+  if ($("catalogRetry")) {
+    $("catalogRetry").addEventListener("click", function () {
+      const p = state.catalogPaging || {};
+      if (!isPagedCatalog() || p.loading || p.retryPage == null) return;
+      loadPagedCatalog(p.retryPage, p.retryPage > 1);
+    });
+  }
   if ($("service")) {
     $("service").addEventListener("change", function () {
       syncLoraUi();
@@ -4989,7 +5215,8 @@
     $("serviceFilter").addEventListener("input", function () {
       clearTimeout(_svcFilterTimer);
       _svcFilterTimer = setTimeout(function () {
-        renderServiceOptions(state._serviceItems || state.catalog || [], "选择模型");
+        if (isPagedCatalog()) loadCatalog();
+        else renderServiceOptions(state._serviceItems || state.catalog || [], "选择模型");
       }, 120);
     });
   }

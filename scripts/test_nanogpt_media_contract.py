@@ -174,6 +174,63 @@ def main():
             "serviceId": flare_t2i["id"],
         }, flare_t2i)
 
+        ref = "https://example.invalid/ref.png"
+        i2i_spec = {
+            "id": "image-i2i",
+            "supported_parameters": {"resolutions": ["1k"], "max_output_images": 4},
+            "capabilities": {"image_generation": True, "image_to_image": True},
+        }
+        no_str = nano._image_body({
+            "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+        }, i2i_spec)
+        check("strength" not in no_str)
+        check(no_str.get("strength") != 0.65)
+        check(no_str.get("input_references") == [ref])
+        with_str = nano._image_body({
+            "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+            "denoise": 0.4,
+        }, i2i_spec)
+        check(with_str["strength"] == 0.4)
+        user_065 = nano._image_body({
+            "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref],
+            "strength": 0.65,
+        }, i2i_spec)
+        check(user_065["strength"] == 0.65)
+        for extra in (
+            {"strength": None},
+            {"denoise": None},
+            {"strength": "oops"},
+            {"strength": True},
+            {"strength": float("inf")},
+            {"denoise": 0.3, "strength": 0.9},
+        ):
+            rejects(nano._image_body, {
+                "prompt": "x", "resolution": "1k", "sourceImage": ref, "images": [ref], **extra,
+            }, i2i_spec)
+        packed_no_default = nano._image_body({
+            "prompt": "淘宝主图",
+            "resolution": "1024x1024",
+            "sourceImage": "https://example.invalid/ref.png",
+            "images": ["https://example.invalid/ref.png"],
+            "serviceId": flare["id"],
+        }, flare)
+        check("strength" not in packed_no_default)
+
+        stepped = nano._image_body(
+            {"quantity": 1, "resolution": "1k", "steps": 20, "cfgScale": 7.5, "seed": 42}, image
+        )
+        check(stepped["steps"] == 20 and stepped["num_inference_steps"] == 20)
+        check(stepped["guidance_scale"] == 7.5 and stepped["seed"] == 42)
+        bare = nano._image_body({"quantity": 1, "resolution": "1k"}, image)
+        check("steps" not in bare and "guidance_scale" not in bare and "seed" not in bare)
+        for extra in (
+            {"steps": "many"}, {"steps": True}, {"steps": 1.5}, {"steps": []},
+            {"cfgScale": "high"}, {"cfgScale": True}, {"cfgScale": float("nan")},
+            {"seed": 891104780613135}, {"seed": -2}, {"seed": "abc"}, {"seed": True},
+        ):
+            rejects(nano._image_body, {"quantity": 1, "resolution": "1k", **extra}, image)
+        rejects(nano._video_body, {**BASE, "mode": "text-to-video", "seed": 891104780613135}, VIDEO)
+
         provider = nano.NanoGptProvider()
         code, data = provider._generate_video({**BASE, "mode": "text-to-video"}, VIDEO, VIDEO["id"])
         check(code == 422 and data["error"] == "OFFLINE transport sentinel")
@@ -188,6 +245,26 @@ def main():
         check(code == 400 and not calls)
         code, _ = provider._generate_image({"quantity": 8, "resolution": "1k"}, image, image["id"])
         check(code == 422 and all(call["body"]["nImages"] == 8 for call in calls))
+        n_calls = len(calls)
+        code, data = provider._generate_image(
+            {"quantity": 1, "resolution": "1k", "seed": 891104780613135}, image, image["id"]
+        )
+        check(code == 400 and "种子" in data["error"] and "seedClamped" not in data)
+        check(len(calls) == n_calls)
+        code, data = provider._generate_image(
+            {"quantity": 1, "resolution": "1k", "steps": "many"}, image, image["id"]
+        )
+        check(code == 400 and "steps" in data["error"] and len(calls) == n_calls)
+        code, data = provider._generate_image({
+            "quantity": 1, "resolution": "1k",
+            "sourceImage": ref, "images": [ref], "strength": "oops",
+        }, i2i_spec, i2i_spec["id"])
+        check(code == 400 and "strength" in data["error"] and len(calls) == n_calls)
+        code, data = provider._generate_image({
+            "quantity": 1, "resolution": "1k",
+            "sourceImage": ref, "images": [ref], "strength": None,
+        }, i2i_spec, i2i_spec["id"])
+        check(code == 400 and "0.65" in data["error"] and len(calls) == n_calls)
         with patch.object(nano, "find_spec", return_value=image):
             code, _ = provider.whatif({"quantity": 9})
             check(code == 400)

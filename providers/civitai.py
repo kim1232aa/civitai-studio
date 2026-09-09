@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -172,40 +173,175 @@ def match_service(engine=None, operation=None, ecosystem=None, model=None, categ
     return scored[0][1] if scored else None
 
 
+def _norm_name(s) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(s or "").lower())
+
+
+def _strict_int(raw, field: str) -> int:
+    if isinstance(raw, bool) or raw in (None, ""):
+        raise ValueError(f"{field} 必须是整数，收到 {raw!r}")
+    try:
+        value = int(raw)
+        if not isinstance(raw, str) and value != raw:
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{field} 必须是整数，收到 {raw!r}") from None
+    return value
+
+
+def _strict_float(raw, field: str) -> float:
+    if isinstance(raw, bool) or raw in (None, ""):
+        raise ValueError(f"{field} 必须是有限数值，收到 {raw!r}")
+    try:
+        value = float(raw)
+        if not math.isfinite(value):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{field} 必须是有限数值，收到 {raw!r}") from None
+    return value
+
+
+def _constraint(cap, key: str) -> dict:
+    cons = ((cap or {}).get("constraints") or {}).get(key)
+    return cons if isinstance(cons, dict) else {}
+
+
+def _check_range(field: str, value, cons: dict):
+    if not cons:
+        return
+    lo, hi = cons.get("min"), cons.get("max")
+    if lo is not None and value < lo:
+        raise ValueError(f"{field}={value} 超出范围 [{lo}, {hi}]")
+    if hi is not None and value > hi:
+        raise ValueError(f"{field}={value} 超出范围 [{lo}, {hi}]")
+    enum = cons.get("enum")
+    if enum is not None and value not in enum:
+        raise ValueError(f"{field}={value} 不在允许列表")
+
+
+def _schema_fields(cap: dict | None) -> set:
+    """Official recipe keys only. extraFlags nulls (duration/resolution/turbo) are not fields."""
+    fields = {
+        "engine", "operation", "ecosystem", "model", "modelVersion",
+        "version", "provider", "prompt",
+    }
+    if not cap:
+        fields.update({
+            "negativePrompt", "loras", "diffusionModel", "seed", "steps",
+            "width", "height", "cfgScale", "quantity", "duration",
+            "sampler", "scheduler", "denoise",
+        })
+        return fields
+    for lst in (
+        cap.get("required"),
+        cap.get("optional"),
+        cap.get("frameFields"),
+        list((cap.get("constraints") or {}).keys()),
+    ):
+        if lst:
+            fields.update(x for x in lst if x)
+    return fields
+
+
+def _official_field(cap: dict | None, *aliases: str) -> str | None:
+    if not aliases:
+        return None
+    if not cap:
+        return aliases[-1]
+    schema = _schema_fields(cap)
+    for name in aliases:
+        if name in schema:
+            return name
+    return None
+
+
+def _present(payload: dict, key: str) -> bool:
+    if key not in payload:
+        return False
+    val = payload.get(key)
+    if val is None or val == "":
+        return False
+    if val == [] or val == {}:
+        return False
+    return True
+
+
+def _alias_value(payload: dict, *names: str):
+    found = [(name, payload[name]) for name in names if _present(payload, name)]
+    if not found:
+        return None
+    first = found[0][1]
+    for name, value in found[1:]:
+        if value != first:
+            raise ValueError(f"{'/'.join(names)} 的值冲突，拒绝覆盖")
+    return first
+
+
+def _unsupported_field(sid: str, field: str) -> ValueError:
+    return ValueError(f"{sid} 官方 recipe 不接受 {field}，不会静默丢掉")
+
+
 def lora_map(payload: dict) -> dict:
     out = {}
-    for item in payload.get("loras") or []:
+    items = payload.get("loras") or []
+    if isinstance(items, dict):
+        items = [{"air": k, "strength": v} for k, v in items.items()]
+    if items and not isinstance(items, list):
+        raise ValueError("loras 必须是列表")
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("lora 必须是对象")
         air = (item.get("air") or "").strip()
         if not air:
-            continue
+            path = (item.get("path") or item.get("url") or "").strip()
+            raise ValueError(
+                "Civitai LoRA 必须提供 air，不能只用 path"
+                + (f"（{path}）" if path else "")
+            )
+        if "strength" in item:
+            raw = item.get("strength")
+        elif "scale" in item:
+            raw = item.get("scale")
+        else:
+            raise ValueError(f"lora strength 缺失，不能默认为 1（{air}）")
+        if raw in (None, ""):
+            raise ValueError(f"lora strength 必须是数值，收到 {raw!r}（{air}）")
+        if isinstance(raw, bool):
+            raise ValueError(f"lora strength 必须是数值，收到 {raw!r}")
         try:
-            out[air] = float(item.get("strength", 1))
-        except (TypeError, ValueError):
-            out[air] = 1.0
+            strength = float(raw)
+            if not math.isfinite(strength):
+                raise ValueError()
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError(f"lora strength 必须是数值，收到 {raw!r}") from None
+        out[air] = strength
     return out
 
 
-def _set_int(inp, payload, key, lo=None, hi=None):
+def _set_int(inp, payload, key, lo=None, hi=None, cap=None):
     if payload.get(key) in (None, ""):
         return
-    from .io_meta import coerce_int
-    v = coerce_int(payload.get(key), None)
-    if v is None:
-        return
-    if lo is not None:
-        v = max(lo, v)
-    if hi is not None:
-        v = min(hi, v)
+    v = _strict_int(payload.get(key), key)
+    cons = _constraint(cap, key)
+    if lo is None and cons.get("min") is not None:
+        lo = cons["min"]
+    if hi is None and cons.get("max") is not None:
+        hi = cons["max"]
+    if lo is not None and v < lo:
+        raise ValueError(f"{key}={v} 超出范围 [{lo}, {hi}]")
+    if hi is not None and v > hi:
+        raise ValueError(f"{key}={v} 超出范围 [{lo}, {hi}]")
     inp[key] = v
 
 
-def _set_float(inp, payload, key):
+def _set_float(inp, payload, key, cap=None, dest=None):
     if payload.get(key) in (None, ""):
         return
-    try:
-        inp[key] = float(payload[key])
-    except (TypeError, ValueError):
-        pass
+    field = dest or key
+    v = _strict_float(payload.get(key), field)
+    cons = _constraint(cap, field) or _constraint(cap, key)
+    _check_range(field, v, cons)
+    inp[field] = v
 
 
 def load_caps():
@@ -245,20 +381,108 @@ def find_cap(engine=None, operation=None, version=None, provider=None):
     return best
 
 
+def cap_for_service(svc: dict | None, inp: dict | None = None) -> dict | None:
+    """Match capability to the catalog service, not the first engine+operation hit.
+
+    Klein 9B/4B share a buggy defaults.modelVersion='4b'; prefer catalog
+    parameters.modelVersion plus the capability name.
+    """
+    inp = inp or {}
+    svc = svc or {}
+    params = svc.get("parameters") or {}
+    engine = inp.get("engine") or svc.get("engine") or params.get("engine")
+    operation = inp.get("operation") or svc.get("operation") or params.get("operation")
+    ecosystem = inp.get("ecosystem") or svc.get("ecosystem") or params.get("ecosystem")
+    model = inp.get("model") or svc.get("model") or params.get("model")
+    model_version = (
+        inp.get("modelVersion")
+        or params.get("modelVersion")
+        or inp.get("version")
+        or svc.get("version")
+        or params.get("version")
+    )
+    provider = inp.get("provider") or svc.get("provider") or params.get("provider")
+    name = svc.get("name") or ""
+    name_n = _norm_name(name)
+    mvn = _norm_name(model_version)
+    svc_id = svc.get("id") or ""
+    best, score = None, -1
+    for c in load_caps():
+        if engine and c.get("engine") and c.get("engine") != engine:
+            continue
+        s = 0
+        raw = c.get("raw") if isinstance(c.get("raw"), dict) else {}
+        raw_id = raw.get("id") or ""
+        if svc_id and raw_id and svc_id == raw_id:
+            s += 100
+        cname = c.get("name") or ""
+        cn = _norm_name(cname)
+        if name and cname == name:
+            s += 50
+        elif name_n and cn == name_n:
+            s += 40
+        elif mvn and mvn in cn:
+            s += 12
+        elif name_n and (name_n in cn or cn in name_n):
+            s += 4
+        if engine and c.get("engine") == engine:
+            s += 20
+        if operation:
+            if c.get("operation") == operation:
+                s += 10
+            elif c.get("operation") in (None, "videoGen", "imageGen"):
+                s += 1
+        d = c.get("defaults") or {}
+        if ecosystem and (d.get("ecosystem") == ecosystem or c.get("ecosystem") == ecosystem):
+            s += 8
+        if model and d.get("model") == model:
+            s += 8
+        if mvn and mvn in cn:
+            s += 15
+        elif model_version and d.get("modelVersion") == model_version:
+            s += 2
+        if provider and c.get("provider") == provider:
+            s += 1
+        if s > score:
+            best, score = c, s
+    if best is None:
+        return find_cap(engine, operation, inp.get("version") or svc.get("version"), provider)
+    return best
+
+
 def apply_frames(inp: dict, payload: dict, svc: dict | None):
     engine = (inp.get("engine") or (svc or {}).get("engine") or "")
-    op = (inp.get("operation") or (svc or {}).get("operation") or "")
-    cap = find_cap(engine, op, inp.get("version") or (svc or {}).get("version"), inp.get("provider") or (svc or {}).get("provider"))
+    cap = cap_for_service(svc, inp)
+    sid = (svc or {}).get("id") or ""
+    for key in ("last_image", "image_url", "image_urls", "end_image", "imageUrl", "imageDataUrl"):
+        if payload.get(key) not in (None, "", []):
+            raise ValueError(
+                f"Civitai 不接受 Fal 字段 {key}，请用官方首尾帧字段，不会静默改名或丢掉"
+            )
     frames = list((cap or {}).get("frameFields") or [])
-    from .ref_images import payload_ref_images, primary_frame, max_refs
+    from .ref_images import payload_ref_images, max_refs
     from .capabilities import get_provider_capabilities
     caps = get_provider_capabilities("civitai")
-    first = primary_frame(payload) or (payload.get("startImage") or "").strip()
-    last = (payload.get("lastFrame") or payload.get("endImage") or payload.get("endSourceImage") or "").strip()
+    first = ""
+    for key in ("firstFrame", "sourceImage", "startImage", "sourceImageUrl", "firstFrameImage", "image"):
+        val = payload.get(key)
+        if isinstance(val, str) and val.strip():
+            cur = val.strip()
+            if first and first != cur:
+                raise ValueError("首帧字段值冲突，拒绝覆盖")
+            first = cur
+    last = ""
+    for key in ("lastFrame", "endImage", "endSourceImage", "lastFrameImage"):
+        val = payload.get(key)
+        if isinstance(val, str) and val.strip():
+            cur = val.strip()
+            if last and last != cur:
+                raise ValueError("尾帧字段值冲突，拒绝覆盖")
+            last = cur
     extra = payload_ref_images(payload, backend="civitai", caps=caps, item=cap if isinstance(cap, dict) else None)
     ref_cap = max_refs(backend="civitai", caps=caps, item=cap if isinstance(cap, dict) else None, payload=payload)
-    FIRST_NAMES = {"firstFrame", "sourceImage", "image", "sourceImageUrl"}
-    LAST_NAMES = {"lastFrame", "endImage", "endSourceImage"}
+    FIRST_NAMES = {"firstFrame", "sourceImage", "image", "sourceImageUrl", "firstFrameImage"}
+    LAST_NAMES = {"lastFrame", "endImage", "endSourceImage", "lastFrameImage"}
     ver = str(inp.get("version") or (svc or {}).get("version") or "")
     if engine == "wan":
         # v2.2 / v2.5 / v2.6: sourceImage + images; do NOT send startImage
@@ -276,10 +500,19 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
     if "firstFrame" in frames and "endImage" in frames and "lastFrame" in frames:
         frames = [f for f in frames if f != "endImage"]
     if not frames:
-        if extra and ("edit" in str(op).lower() or "variant" in str(op).lower()):
-            frames = ["images"]
-        elif first:
-            frames = ["firstFrame", "image"]
+        if first or last or _present(payload, "images") or _present(payload, "referenceImages"):
+            raise _unsupported_field(sid, "首尾帧")
+    else:
+        has_first = any(name in FIRST_NAMES or name == "startImage" for name in frames)
+        has_last = any(name in LAST_NAMES for name in frames)
+        if first and not has_first and "images" not in frames and "referenceImages" not in frames:
+            raise _unsupported_field(sid, "首帧")
+        if last and not has_last:
+            raise _unsupported_field(sid, "尾帧")
+        if _present(payload, "images") and "images" not in frames:
+            raise _unsupported_field(sid, "images")
+        if _present(payload, "referenceImages") and "referenceImages" not in frames:
+            raise _unsupported_field(sid, "referenceImages")
     for name in frames:
         if name in FIRST_NAMES and first:
             inp[name] = first
@@ -299,13 +532,11 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
             inp[name] = payload["videoUrl"]
         elif name == "maskImage" and payload.get("maskImage"):
             inp[name] = payload["maskImage"]
-    flags = (cap or {}).get("extraFlags") or {}
-    if flags.get("turbo") is not None or engine == "minimax-h3-comfy":
-        if payload.get("turbo") is not None:
-            inp["turbo"] = bool(payload.get("turbo"))
-    if flags.get("fast") is not None or engine == "minimax-h3-comfy":
-        if payload.get("fast") is not None:
-            inp["fast"] = bool(payload.get("fast"))
+    schema = _schema_fields(cap)
+    if payload.get("turbo") is not None and "turbo" in schema:
+        inp["turbo"] = bool(payload.get("turbo"))
+    if payload.get("fast") is not None and "fast" in schema:
+        inp["fast"] = bool(payload.get("fast"))
     if engine == "wan":
         if ver == "v2.2":
             if payload.get("turbo"):
@@ -360,86 +591,215 @@ def fill_required(inp: dict, payload: dict, cap: dict | None):
             inp["resolution"] = payload.get("resolution") or "720p"
 
 
+def _assign_int(inp, raw, field, cap=None, aliases=()):
+    v = _strict_int(raw, field)
+    cons = _constraint(cap, field)
+    if not cons:
+        for alt in aliases:
+            cons = _constraint(cap, alt)
+            if cons:
+                break
+    _check_range(field, v, cons)
+    inp[field] = v
+
+
+def _assign_float(inp, raw, field, cap=None, aliases=()):
+    v = _strict_float(raw, field)
+    cons = _constraint(cap, field)
+    if not cons:
+        for alt in aliases:
+            cons = _constraint(cap, alt)
+            if cons:
+                break
+    _check_range(field, v, cons)
+    inp[field] = v
+
+
+def _assign_choice(inp, raw, field, cap=None, aliases=()):
+    cons = _constraint(cap, field)
+    if not cons:
+        for alt in aliases:
+            cons = _constraint(cap, alt)
+            if cons:
+                break
+    _check_range(field, raw, cons)
+    inp[field] = raw
+
+
+def _duration_is_string(cap, field="duration") -> bool:
+    cons = _constraint(cap, field)
+    if (cons.get("type") or "").lower() == "string":
+        return True
+    enum = cons.get("enum")
+    return bool(enum) and all(isinstance(x, str) for x in enum)
+
+
+def _assign_by_constraint(inp, raw, field, cap=None, aliases=()):
+    cons = _constraint(cap, field)
+    if not cons:
+        for alt in aliases:
+            cons = _constraint(cap, alt)
+            if cons:
+                break
+    typ = (cons.get("type") or "").lower()
+    if field == "duration" and _duration_is_string(cap, field):
+        if isinstance(raw, bool) or raw is None:
+            raise ValueError(f"{field} 必须是官方枚举字符串，收到 {raw!r}")
+        value = str(raw).strip()
+        _check_range(field, value, cons)
+        inp[field] = value
+        return
+    if field == "seed" or typ == "integer":
+        _assign_int(inp, raw, field, cap, aliases)
+        return
+    if typ == "number":
+        _assign_float(inp, raw, field, cap, aliases)
+        return
+    if typ == "boolean":
+        if not isinstance(raw, bool):
+            raise ValueError(f"{field} 必须是布尔值，收到 {raw!r}")
+        inp[field] = raw
+        return
+    if typ in ("array", "object"):
+        inp[field] = raw
+        return
+    if cons.get("enum") is not None:
+        _assign_choice(inp, raw, field, cap, aliases)
+        return
+    if isinstance(raw, bool):
+        raise ValueError(f"{field} 类型无效，收到 {raw!r}")
+    inp[field] = raw
+
+
+def _lora_payload(loras: dict, cap: dict | None, engine: str | None):
+    """Official Civitai LoRA shapes from constraints.loras.type:
+    - object `{air: strength}` (Comfy / sdcpp / Flux2 Klein)
+    - array `[{air, strength}]` (Flux2 Dev, Hunyuan, Wan)
+    Hunyuan has no type in some dumps; engine==hunyuan still uses the list.
+    """
+    cons = _constraint(cap, "loras")
+    kind = (cons.get("type") or "").lower()
+    if kind == "array" or (not kind and engine == "hunyuan"):
+        return [{"air": k, "strength": v} for k, v in loras.items()]
+    return loras
+
+
+_STUDIO_ALIASES = (
+    ("numInferenceSteps", "steps"),
+    ("guidanceScale", "cfgScale"),
+    ("sampleMethod", "sampler"),
+    ("schedule", "scheduler"),
+    ("denoiseStrength", "denoise"),
+    ("useTurbo", "turbo"),
+)
+
+_KNOWN_UI_FIELDS = {
+    "prompt", "negativePrompt", "width", "height", "steps", "numInferenceSteps",
+    "cfgScale", "guidanceScale", "seed", "sampler", "sampleMethod", "scheduler",
+    "schedule", "denoise", "denoiseStrength", "quantity", "diffusionModel",
+    "duration", "resolution", "aspectRatio", "creativity", "size",
+    "imageStyleReferences", "intensity", "complexity", "movement", "strength",
+    "outputFormat", "enablePromptExpansion", "turbo", "useTurbo", "fast",
+    "shift", "interpolatorModel", "generateAudio", "frameRate", "clipSkip",
+    "vaeModel", "diffuserModel", "mode", "watermark", "imageMetadata",
+}
+
+_META_KEYS = {
+    "serviceId", "kind", "allowMatureContent", "backend", "recipe", "step",
+    "comfyWorkflow", "workflow", "promptEdits", "resources", "whatif", "wait",
+    "hideMatureContent", "trace", "comfyImage", "token", "jobId", "id",
+    "session", "nodeId", "graph", "customComfy", "checkpointName", "modelName",
+    "name", "loras", "engine", "operation", "ecosystem", "model", "version",
+    "provider", "modelVersion", "serviceName", "mediaUrl", "mediaType",
+    "unmatched", "comfyNodeCount", "importSource", "empty", "paramWarn",
+    "dimensionAlign", "sourceWidth", "sourceHeight",
+}
+
+_FRAME_KEYS = {
+    "firstFrame", "sourceImage", "startImage", "sourceImageUrl", "image",
+    "firstFrameImage", "lastFrame", "endImage", "endSourceImage", "lastFrameImage",
+    "images", "referenceImages", "sourceVideo", "sourceAudio", "videoUrl",
+    "maskImage", "audioUrl", "referenceVideos", "referenceAudios",
+    "last_image", "image_url", "image_urls", "end_image", "imageUrl", "imageDataUrl",
+    "input_references",
+}
+
+
 def build_workflow(payload: dict) -> dict:
-    svc = None
+    payload = payload or {}
     sid = (payload.get("serviceId") or "").strip()
-    if sid:
-        svc = find_service(sid)
-    kind = payload.get("kind") or (svc or {}).get("category") or "image"
+    if not sid:
+        raise ValueError("缺少 serviceId，不能静默换成默认模型")
+    svc = find_service(sid)
     if not svc:
-        if kind == "video":
-            svc = match_service(
-                engine=payload.get("engine"),
-                operation=payload.get("operation"),
-                category="video",
-            ) or find_service(DEFAULTS["videoServiceId"])
-        else:
-            svc = match_service(
-                engine=payload.get("engine") or "comfy",
-                operation=payload.get("operation") or "createImage",
-                ecosystem=payload.get("ecosystem") or "krea2",
-                model=payload.get("model"),
-                category="image",
-            ) or find_service(DEFAULTS["serviceId"])
-    inp = dict((svc or {}).get("parameters") or {})
-    for k in ("engine", "operation", "ecosystem", "model", "version", "provider"):
-        if payload.get(k):
+        raise ValueError(f"未知服务 {sid}，不会替换为其他模型")
+    kind = payload.get("kind") or svc.get("category") or "image"
+    inp = dict(svc.get("parameters") or {})
+    for k in ("engine", "operation", "ecosystem", "model", "version", "provider", "modelVersion"):
+        if payload.get(k) not in (None, ""):
             inp[k] = payload[k]
-    if payload.get("prompt"):
+    cap = cap_for_service(svc, inp)
+    schema = _schema_fields(cap)
+    handled = set()
+    if payload.get("prompt") is not None:
         inp["prompt"] = payload["prompt"]
-    if payload.get("negativePrompt"):
-        inp["negativePrompt"] = payload["negativePrompt"]
-    _set_int(inp, payload, "width", 16, 2048)
-    _set_int(inp, payload, "height", 16, 2048)
-    _set_int(inp, payload, "steps", 1, 150)
-    _set_int(inp, payload, "quantity", 1, 12)
-    _set_int(inp, payload, "duration", 1, 30)
-    _set_float(inp, payload, "cfgScale")
-    if payload.get("sampler"):
-        inp["sampler"] = payload["sampler"]
-    if payload.get("scheduler"):
-        inp["scheduler"] = payload["scheduler"]
-    if payload.get("denoise") not in (None, ""):
-        try:
-            inp["denoise"] = float(payload["denoise"])
-        except (TypeError, ValueError):
-            pass
-    if payload.get("resolution"):
-        inp["resolution"] = payload["resolution"]
-    if payload.get("aspectRatio"):
-        inp["aspectRatio"] = payload["aspectRatio"]
-    if payload.get("outputFormat") in ("jpeg", "png", "webP"):
-        inp["outputFormat"] = payload["outputFormat"]
+        handled.add("prompt")
     seed = payload.get("seed")
     if seed not in (None, "", "random"):
-        try:
-            inp["seed"] = int(seed)
-        except (TypeError, ValueError):
-            pass
-    dm = (payload.get("diffusionModel") or "").strip()
-    if dm:
-        inp["diffusionModel"] = dm
-    loras = lora_map(payload)
-    if loras:
-        inp["loras"] = loras
-    cap = apply_frames(inp, payload, svc)
+        if "seed" not in schema:
+            raise _unsupported_field(sid, "seed")
+        _assign_int(inp, seed, "seed", cap)
+        handled.add("seed")
+    elif seed == "random":
+        handled.add("seed")
+    for group in _STUDIO_ALIASES:
+        if any(_present(payload, name) for name in group):
+            value = _alias_value(payload, *group)
+            dest = _official_field(cap, *group)
+            if not dest:
+                raise _unsupported_field(sid, group[-1])
+            _assign_by_constraint(inp, value, dest, cap, group)
+            handled.update(group)
+    raw_loras = payload.get("loras") or []
+    if isinstance(raw_loras, dict):
+        raw_loras = list(raw_loras.items())
+    if raw_loras:
+        if "loras" not in schema:
+            raise ValueError(
+                f"{sid} 官方 recipe 不接受 LoRAs，不会静默丢掉或改打其他模型"
+            )
+        inp["loras"] = _lora_payload(lora_map(payload), cap, inp.get("engine"))
+    handled.add("loras")
+    for key, value in list(payload.items()):
+        if key in handled or key in _META_KEYS or key in _FRAME_KEYS:
+            continue
+        if value is None or value == [] or value == {}:
+            continue
+        dest = _official_field(cap, key)
+        if dest:
+            _assign_by_constraint(inp, value, dest, cap, (key,))
+            continue
+        if key in _KNOWN_UI_FIELDS:
+            raise _unsupported_field(sid, key)
+    cap = apply_frames(inp, payload, svc) or cap
     fill_required(inp, payload, cap)
+    if cap and "imageStyleReferences" in (cap.get("required") or []) and "imageStyleReferences" not in inp:
+        raise ValueError(f"{sid} 官方必填 imageStyleReferences，不能编造空引用")
     if cap:
-        allowed = {"engine", "operation", "ecosystem", "model", "version", "provider",
-                   "prompt", "negativePrompt", "loras", "diffusionModel", "seed",
-                   "steps", "width", "height", "cfgScale", "quantity", "duration",
-                   "sampler", "scheduler", "denoise"}
-        for lst in (cap.get("required"), cap.get("optional"), cap.get("frameFields"), list((cap.get("constraints") or {}).keys()), list((cap.get("extraFlags") or {}).keys())):
-            if lst:
-                allowed.update(lst)
+        allowed = _schema_fields(cap)
+        allowed.update({"modelVersion", "version", "provider"})
+        leaked = [k for k in inp if k not in allowed]
+        ui_leaked = [k for k in leaked if k in _KNOWN_UI_FIELDS or k in _FRAME_KEYS]
+        if ui_leaked:
+            raise _unsupported_field(sid, ui_leaked[0])
         inp = {k: v for k, v in inp.items() if k in allowed}
-        if inp.get("engine") == "hunyuan" and isinstance(inp.get("loras"), dict):
-            inp["loras"] = [{"air": k, "strength": v} for k, v in inp["loras"].items()]
-    step = (svc or {}).get("step") or ("videoGen" if kind == "video" else "imageGen")
+        if isinstance(inp.get("loras"), dict):
+            inp["loras"] = _lora_payload(inp["loras"], cap, inp.get("engine"))
+    step = svc.get("step") or ("videoGen" if kind == "video" else "imageGen")
     return {
         "allowMatureContent": bool(payload.get("allowMatureContent", True)),
         "steps": [{"$type": step, "input": inp}],
-        "_meta": {"serviceId": (svc or {}).get("id"), "serviceName": (svc or {}).get("name")},
+        "_meta": {"serviceId": svc.get("id"), "serviceName": svc.get("name")},
     }
 
 
@@ -612,6 +972,40 @@ def _is_lora_resource(typ: str, air: str, name: str = "") -> bool:
     return False
 
 
+def _optional_strength(raw):
+    """Parse a LoRA weight. Missing / null / empty / non-numeric → None. Never invent 0.8."""
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, bool):
+        return None
+    try:
+        strength = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(strength):
+        return None
+    return strength
+
+
+def _resource_strength_raw(r: dict):
+    """Page `strength: null` stays null even if `weight` is present. Missing key may fall back to weight."""
+    if not isinstance(r, dict):
+        return None
+    if "strength" in r:
+        return r.get("strength")
+    if "weight" in r:
+        return r.get("weight")
+    return None
+
+
+def _strength_fields(raw):
+    strength = _optional_strength(raw)
+    out = {"strength": strength}
+    if strength is None:
+        out["strengthMissing"] = True
+    return out
+
+
 def _prompt_lora_tags(prompt: str) -> list:
     out = []
     seen = set()
@@ -620,11 +1014,9 @@ def _prompt_lora_tags(prompt: str) -> list:
         if not key or key in seen:
             continue
         seen.add(key)
-        try:
-            strength = float(weight) if weight else 0.8
-        except (TypeError, ValueError):
-            strength = 0.8
-        out.append({"name": name.strip(), "strength": strength})
+        row = {"name": name.strip()}
+        row.update(_strength_fields(weight))
+        out.append(row)
     return out
 
 
@@ -660,6 +1052,85 @@ def fetch_version_air(vid, timeout=20):
                 ver["air"] = _air_from_ids(mid, vid, typ, base, (ver.get("model") or {}).get("name") if isinstance(ver.get("model"), dict) else "")
         return _store_version(vid, ver)
     return ver if isinstance(ver, dict) else {}
+
+
+def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict | None = None) -> list:
+    """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8."""
+    loras = []
+    seen_lora = set()
+    versions = versions or {}
+    for r in resources or []:
+        if not isinstance(r, dict):
+            continue
+        vid = r.get("modelVersionId") or r.get("versionId") or r.get("id")
+        if vid and not (isinstance(vid, int) or str(vid).isdigit()):
+            vid = r.get("modelVersionId") or r.get("versionId")
+        ver = versions.get(vid) or _version_from_cache(vid) or {}
+        air = (r.get("air") or ver.get("air") or "").strip()
+        typ = r.get("modelType") or r.get("type") or (ver.get("model") or {}).get("type") or ""
+        name = r.get("modelName") or r.get("name") or (ver.get("model") or {}).get("name") or ver.get("name") or ""
+        if not air:
+            mid = r.get("modelId") or ver.get("modelId")
+            air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
+        if not _is_lora_resource(typ, air, name):
+            continue
+        key = str(vid or air or name).lower()
+        if key in seen_lora:
+            continue
+        seen_lora.add(key)
+        item = {
+            "air": air,
+            "name": name or "LoRA",
+        }
+        item.update(_strength_fields(_resource_strength_raw(r)))
+        if vid:
+            item["versionId"] = vid
+        path = ""
+        for f in (ver.get("files") or []):
+            if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
+                path = f.get("downloadUrl") or f.get("download_url")
+                break
+        if not path and vid:
+            path = f"https://civitai.com/api/download/models/{vid}"
+        if path:
+            item["path"] = path
+            item["downloadUrl"] = path
+        loras.append(item)
+    for tag in _prompt_lora_tags(prompt or ""):
+        key = tag["name"].lower()
+        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
+            continue
+        row = {
+            "air": "",
+            "name": tag["name"],
+        }
+        row.update(_strength_fields(tag.get("strength")))
+        if tag.get("strengthMissing"):
+            row["strengthMissing"] = True
+        loras.append(row)
+    return loras
+
+
+_COMFY_IMPORT_DIM_MIN = 64
+_COMFY_IMPORT_DIM_MAX = 2048
+
+
+def _clamp_import_comfy_dim(n, field="height"):
+    """Keep source pixels. Comfy 64–2048 is a range, not a /16 grid.
+
+    Page 134923572 is 944×1672. 1672 is legal; snapping to 1664 is a bug.
+    Returns (value, source, warn_or_none).
+    """
+    source = int(n)
+    value = max(_COMFY_IMPORT_DIM_MIN, min(_COMFY_IMPORT_DIM_MAX, source))
+    warn = None
+    if value != source:
+        warn = (
+            f"{field} {source} 超出 Comfy "
+            f"{_COMFY_IMPORT_DIM_MIN}–{_COMFY_IMPORT_DIM_MAX}，已截到 {value}"
+            "（不是 /16 对齐）"
+        )
+    return value, source, warn
 
 
 def import_image(image_id: str) -> dict:
@@ -756,8 +1227,8 @@ def import_image(image_id: str) -> dict:
             futs = {ex.submit(fetch_version_air, vid): vid for vid in need}
             for f in as_completed(futs):
                 fetched[futs[f]] = f.result() or {}
-    loras, checkpoint_air, checkpoint_name = [], "", ""
-    seen_lora = set()
+    loras = _loras_from_import_sources(resources, meta.get("prompt") or "", fetched)
+    checkpoint_air, checkpoint_name = "", ""
     for r in resources:
         vid = r.get("modelVersionId") or r.get("versionId") or r.get("id")
         if vid and not (isinstance(vid, int) or str(vid).isdigit()):
@@ -769,49 +1240,14 @@ def import_image(image_id: str) -> dict:
         if not air:
             mid = r.get("modelId") or ver.get("modelId")
             air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
-        strength_raw = r.get("strength") if r.get("strength") is not None else r.get("weight")
-        try:
-            strength = float(strength_raw) if strength_raw is not None else 0.8
-        except (TypeError, ValueError):
-            strength = 0.8
         if _is_lora_resource(typ, air, name):
-            key = str(vid or air or name).lower()
-            if key in seen_lora:
-                continue
-            seen_lora.add(key)
-            item = {
-                "air": air,
-                "strength": strength,
-                "name": name or "LoRA",
-            }
-            if vid:
-                item["versionId"] = vid
-            path = ""
-            for f in (ver.get("files") or []):
-                if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
-                    path = f.get("downloadUrl") or f.get("download_url")
-                    break
-            if not path and vid:
-                path = f"https://civitai.com/api/download/models/{vid}"
-            if path:
-                item["path"] = path
-                item["downloadUrl"] = path
-            loras.append(item)
-        elif air or str(typ).upper() in ("CHECKPOINT", "CHECKPOINTTRC", ""):
-            if air and (":lora:" in air.lower()):
-                continue
+            continue
+        if air and (":lora:" in air.lower()):
+            continue
+        if air or str(typ).upper() in ("CHECKPOINT", "CHECKPOINTTRC", ""):
             if air:
                 checkpoint_air = air
                 checkpoint_name = name or ""
-    for tag in _prompt_lora_tags(meta.get("prompt") or ""):
-        key = tag["name"].lower()
-        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
-            continue
-        loras.append({
-            "air": "",
-            "strength": tag["strength"],
-            "name": tag["name"],
-        })
     if not checkpoint_air:
         guessed = enrich_local_parse({
             "checkpointName": checkpoint_name or meta.get("Model") or meta.get("checkpointName") or "",
@@ -846,8 +1282,9 @@ def import_image(image_id: str) -> dict:
     )
     w = coerce_int(w, 960) or 960
     h = coerce_int(h, 1440) or 1440
-    w = max(64, min(2048, (w // 16) * 16 or 16))
-    h = max(64, min(2048, (h // 16) * 16 or 16))
+    w, source_w, w_warn = _clamp_import_comfy_dim(w, "width")
+    h, source_h, h_warn = _clamp_import_comfy_dim(h, "height")
+    dim_warns = [x for x in (w_warn, h_warn) if x]
     kind = "video" if str(media_type) == "video" or "minimax" in (checkpoint_air or "").lower() else "image"
     engine = None
     operation = None
@@ -915,6 +1352,8 @@ def import_image(image_id: str) -> dict:
         "negativePrompt": meta.get("negativePrompt") or file_parsed.get("negativePrompt") or "",
         "width": w,
         "height": h,
+        "sourceWidth": source_w,
+        "sourceHeight": source_h,
         "steps": int(meta.get("steps") or file_parsed.get("steps") or (20 if kind == "video" else 8)),
         "cfgScale": float(meta.get("cfgScale") if meta.get("cfgScale") is not None else (file_parsed.get("cfgScale") if file_parsed.get("cfgScale") is not None else 1)),
         "sampler": sampler,
@@ -939,6 +1378,9 @@ def import_image(image_id: str) -> dict:
         # Storyboard must land on this backend after import — never leave fal default.
         "backend": "civitai",
     }
+    if dim_warns:
+        out["paramWarn"] = "；".join(dim_warns)
+        out["dimensionAlign"] = True
     return out
 
 
@@ -1109,12 +1551,18 @@ class CivitaiProvider(Provider):
     def generate(self, payload: dict):
         if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=False)
-        body = build_workflow(payload or {})
+        try:
+            body = build_workflow(payload or {})
+        except ValueError as e:
+            return 400, {"error": str(e)}
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=False)
         if isinstance(data, dict):
             data["service"] = meta
-            data["submittedInput"] = {"serviceId": meta.get("serviceId")}
+            inp = body["steps"][0]["input"] if body.get("steps") else {}
+            submitted = dict(inp)
+            submitted["serviceId"] = meta.get("serviceId")
+            data["submittedInput"] = submitted
             data["backend"] = "civitai"
             if not data.get("id"):
                 data["id"] = data.get("workflowId") or data.get("token")
@@ -1123,12 +1571,18 @@ class CivitaiProvider(Provider):
     def whatif(self, payload: dict):
         if _wants_custom_comfy(payload):
             return self.run_custom_comfy(payload, whatif=True)
-        body = build_workflow(payload or {})
+        try:
+            body = build_workflow(payload or {})
+        except ValueError as e:
+            return 400, {"error": str(e)}
         meta = body.pop("_meta", {})
         code, data = submit(body, whatif=True)
         if isinstance(data, dict):
             data["service"] = meta
-            data["submittedInput"] = body["steps"][0]["input"] if body.get("steps") else {"serviceId": meta.get("serviceId")}
+            inp = body["steps"][0]["input"] if body.get("steps") else {}
+            submitted = dict(inp)
+            submitted["serviceId"] = meta.get("serviceId")
+            data["submittedInput"] = submitted
             data["backend"] = "civitai"
         return code, data
 

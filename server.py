@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import mimetypes
@@ -165,6 +166,196 @@ def catalog_items():
         if not _catalog["items"]:
             load_catalog_disk()
         return list(_catalog["items"]), _catalog.get("fetchedAt"), _catalog.get("total") or 0
+
+
+_CATALOG_PAGE_DEFAULT = 1
+_CATALOG_PAGE_SIZE_DEFAULT = 50
+_CATALOG_PAGE_SIZE_MAX = 100
+
+
+def _catalog_qs_one(qs, name):
+    vals = qs.get(name) if isinstance(qs, dict) else None
+    if not vals:
+        return None
+    if isinstance(vals, list):
+        return vals[0]
+    return vals
+
+
+def _catalog_int(raw, default, lo, hi=None):
+    if raw is None or raw == "":
+        return default
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    if n < lo:
+        return lo
+    if hi is not None and n > hi:
+        return hi
+    return n
+
+
+def catalog_paging_requested(qs) -> bool:
+    """Slice only when the client sent page, pageSize, or limit.
+
+    One-shot callers (Civitai/Fal storyboard loadCatalog) omit these and must
+    still receive the full filtered roster. HuggingFace/ModelScope send page.
+    """
+    for name in ("page", "pageSize", "limit"):
+        raw = _catalog_qs_one(qs, name)
+        if raw not in (None, ""):
+            return True
+    return False
+
+
+def parse_catalog_page(qs, default_page=_CATALOG_PAGE_DEFAULT, default_size=_CATALOG_PAGE_SIZE_DEFAULT, max_size=_CATALOG_PAGE_SIZE_MAX):
+    """page default 1; pageSize/limit default 50, cap 100."""
+    page = _catalog_int(_catalog_qs_one(qs, "page"), default_page, 1)
+    size_raw = _catalog_qs_one(qs, "pageSize")
+    if size_raw is None or size_raw == "":
+        size_raw = _catalog_qs_one(qs, "limit")
+    page_size = _catalog_int(size_raw, default_size, 1, max_size)
+    return page, page_size
+
+
+def slice_catalog_items(items, page, page_size):
+    """Page window over a fully held filtered list. total is that list's length."""
+    items = list(items or [])
+    total = len(items)
+    start = (max(1, int(page)) - 1) * int(page_size)
+    if start < 0:
+        start = 0
+    sliced = items[start:start + int(page_size)]
+    has_more = start + len(sliced) < total
+    return {
+        "items": sliced,
+        "count": len(sliced),
+        "total": total,
+        "page": int(page),
+        "pageSize": int(page_size),
+        "hasMore": has_more,
+        "nextPage": (int(page) + 1) if has_more else None,
+    }
+
+
+def apply_catalog_paging(body, page, page_size, already_paged=False):
+    """Always emit paging keys. Re-slice only when the provider returned the full list."""
+    body = dict(body or {})
+    items = list(body["items"]) if isinstance(body.get("items"), list) else []
+    provider_total = body.get("total")
+    looks_paged = (
+        already_paged
+        and isinstance(provider_total, int)
+        and len(items) <= page_size
+        and (body.get("page") in (None, page))
+        and (body.get("pageSize") in (None, page_size))
+    )
+    if looks_paged:
+        total = provider_total
+        sliced = items
+        has_more = body.get("hasMore")
+        if not isinstance(has_more, bool):
+            has_more = (page * page_size) < total
+        next_page = body.get("nextPage")
+        if has_more:
+            next_page = next_page if isinstance(next_page, int) else page + 1
+        else:
+            next_page = None
+    else:
+        window = slice_catalog_items(items, page, page_size)
+        sliced = window["items"]
+        total = window["total"]
+        has_more = window["hasMore"]
+        next_page = window["nextPage"]
+    body["items"] = sliced
+    body["count"] = len(sliced)
+    body["total"] = total
+    body["page"] = page
+    body["pageSize"] = page_size
+    body["hasMore"] = bool(has_more)
+    body["nextPage"] = next_page if body["hasMore"] else None
+    if body.get("complete") is None:
+        hub = body.get("hubTotals") if isinstance(body.get("hubTotals"), dict) else {}
+        if isinstance(hub.get("complete"), bool):
+            body["complete"] = hub["complete"]
+        else:
+            body["complete"] = True
+    else:
+        body["complete"] = bool(body.get("complete"))
+    if body.get("partial") is None:
+        body["partial"] = not body["complete"]
+    else:
+        body["partial"] = bool(body.get("partial"))
+    return body
+
+
+def catalog_accepts_paging(prov) -> bool:
+    try:
+        params = inspect.signature(prov.catalog).parameters
+    except (TypeError, ValueError):
+        return False
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return True
+    return "page" in params and ("pageSize" in params or "page_size" in params or "limit" in params)
+
+
+def invoke_provider_catalog(prov, q, category, status, page, page_size):
+    kwargs = {}
+    already = False
+    pass_page = page is not None and page_size is not None
+    try:
+        params = inspect.signature(prov.catalog).parameters
+        names = set(params)
+        var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+        if pass_page and (var_kw or "page" in names):
+            kwargs["page"] = page
+            already = True
+        if pass_page and (var_kw or "pageSize" in names):
+            kwargs["pageSize"] = page_size
+            already = True
+        elif pass_page and "page_size" in names:
+            kwargs["page_size"] = page_size
+            already = True
+        if pass_page and "limit" in names:
+            kwargs["limit"] = page_size
+            already = True
+    except (TypeError, ValueError):
+        kwargs = {}
+        already = False
+    try:
+        if kwargs:
+            body = prov.catalog(q, category, status, **kwargs)
+        else:
+            body = prov.catalog(q, category, status)
+            already = False
+    except TypeError:
+        body = prov.catalog(q, category, status)
+        already = False
+    if not isinstance(body, dict):
+        body = {"items": [], "error": "catalog 返回值不是对象"}
+    return body, already
+
+
+def build_catalog_response(prov, q, category, status, page, page_size, backend="", paging_requested=True):
+    if paging_requested:
+        body, already = invoke_provider_catalog(prov, q, category, status, page, page_size)
+    else:
+        body, already = invoke_provider_catalog(prov, q, category, status, None, None)
+        items = list(body["items"]) if isinstance(body.get("items"), list) else []
+        native = body.get("hasMore") is not None and body.get("page") is not None
+        if native:
+            page = int(body.get("page") or 1)
+            page_size = int(body.get("pageSize") or max(len(items), 1))
+            already = True
+        else:
+            page = 1
+            page_size = max(len(items), 1)
+            already = False
+    if backend in ("modelscope-ai", "modelscope-cn", "modelscope"):
+        from providers.capabilities import overlay_modelscope_catalog
+        body = overlay_modelscope_catalog(body)
+    return apply_catalog_paging(body, page, page_size, already_paged=already)
 
 
 def find_service(service_id: str):
@@ -849,10 +1040,18 @@ class Handler(BaseHTTPRequestHandler):
                     prov.refresh_catalog()
                 except Exception as e:
                     print("catalog refresh", e, flush=True)
-            body = prov.catalog((qs.get("q") or [""])[0], (qs.get("category") or [""])[0], (qs.get("status") or [""])[0])
-            if backend in ("modelscope-ai", "modelscope-cn", "modelscope"):
-                from providers.capabilities import overlay_modelscope_catalog
-                body = overlay_modelscope_catalog(body)
+            paging_requested = catalog_paging_requested(qs)
+            page, page_size = parse_catalog_page(qs)
+            body = build_catalog_response(
+                prov,
+                (qs.get("q") or [""])[0],
+                (qs.get("category") or [""])[0],
+                (qs.get("status") or [""])[0],
+                page,
+                page_size,
+                backend=backend,
+                paging_requested=paging_requested,
+            )
             return self._json(200, body)
         if path == "/api/defaults":
             civ = providers.get("civitai")

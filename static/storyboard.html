@@ -133,6 +133,11 @@
   .bar input[type=number],.bar input[type=text]{width:72px}
   .bar input#serviceFilter{width:110px;flex:0 0 110px}
   .bar input#serviceFilter::-webkit-search-cancel-button{cursor:pointer}
+  .catalog-status{display:flex;align-items:center;gap:6px;flex:1 0 100%;min-width:0;color:var(--muted);font-size:11px;line-height:1.35}
+  .catalog-status .catalog-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .catalog-status button{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;padding:4px 9px;font-size:11px;white-space:nowrap}
+  .catalog-status button:hover{border-color:#4a4a54;color:#fff}
+  .catalog-status button:disabled{opacity:.55;cursor:wait}
   .bar #seed{width:auto;min-width:168px;flex:1 1 168px;max-width:240px}
   .bar #sampler,.bar #scheduler,.bar #nanoRes{max-width:140px}
   .bar .param-group{display:contents}
@@ -452,7 +457,12 @@
           <option value="huggingface">huggingface</option>
         </select>
         <input id="serviceFilter" type="search" placeholder="搜索模型" autocomplete="off" />
-        <select id="service"></select>
+        <select id="service" aria-describedby="catalogHint"></select>
+        <div class="catalog-status" id="catalogStatus" hidden>
+          <span class="catalog-hint" id="catalogHint" role="status" aria-live="polite"></span>
+          <button type="button" id="catalogMore" hidden>加载更多</button>
+          <button type="button" id="catalogRetry" hidden>重试本页</button>
+        </div>
         <span class="param-group" id="falParams">
           <select id="duration">
             <option selected>5s</option><option>12s</option><option>16s</option>

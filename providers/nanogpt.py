@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import re
 import time
@@ -92,13 +93,53 @@ def _alnum(s):
 
 
 
+_INT32_MAX = 2147483647
+
+
+def _finite_number(raw, field, *, integer=False, minimum=None, maximum=None):
+    """Validate before encoding; never truncate, wrap, default, or drop."""
+    try:
+        if isinstance(raw, bool):
+            raise ValueError()
+        if integer:
+            value = int(raw)
+            if not isinstance(raw, str) and value != raw:
+                raise ValueError()
+        else:
+            value = float(raw)
+        if not math.isfinite(value) or (minimum is not None and value < minimum) or (
+                maximum is not None and value > maximum):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        if minimum is not None and maximum is not None:
+            bounds = f"（{minimum} ≤ 原值 ≤ {maximum}）"
+        elif minimum is not None:
+            bounds = f"（原值 ≥ {minimum}）"
+        elif maximum is not None:
+            bounds = f"（原值 ≤ {maximum}）"
+        else:
+            bounds = ""
+        raise ValueError(
+            f"NanoGPT {field} 必须是{'整数' if integer else '有限数值'}{bounds}，拒绝静默改值"
+        ) from None
+    return value
+
+
+def _response_seed_value(raw):
+    """Parse a vendor-echoed seed. Never modulo; never fail the whole job."""
+    try:
+        return _clamp_seed(raw)
+    except ValueError:
+        return None
+
+
 def _response_seed(data):
     """Prefer seed echoed by Nano API response (truth); None if absent."""
     if not isinstance(data, dict):
         return None
     for key in ("seed", "noise_seed", "noiseSeed"):
         if data.get(key) not in (None, ""):
-            return _clamp_seed(data.get(key))
+            return _response_seed_value(data.get(key))
     for nest_key in ("data", "result", "output", "images", "meta", "metadata"):
         nest = data.get(nest_key)
         if isinstance(nest, list) and nest:
@@ -106,43 +147,61 @@ def _response_seed(data):
             if isinstance(item, dict):
                 for key in ("seed", "noise_seed", "noiseSeed"):
                     if item.get(key) not in (None, ""):
-                        return _clamp_seed(item.get(key))
+                        return _response_seed_value(item.get(key))
         elif isinstance(nest, dict):
             for key in ("seed", "noise_seed", "noiseSeed"):
                 if nest.get(key) not in (None, ""):
-                    return _clamp_seed(nest.get(key))
+                    return _response_seed_value(nest.get(key))
     return None
 
 
 def _clamp_seed(raw):
+    """Parse Nano seed as signed int32. Never modulo, clip, or drop.
+
+    None/''/'random' → omit. Non-int, < -1, or > 2147483647 → ValueError 中文.
+    """
     if raw in (None, "", "random"):
         return None
     try:
-        n = int(raw)
-    except (TypeError, ValueError):
-        return None
-    if n < -1:
-        return -1
-    limit = 2147483647
-    if n > limit:
-        n = n % limit or limit
-    return n
+        return _finite_number(raw, "seed", integer=True, minimum=-1, maximum=_INT32_MAX)
+    except ValueError:
+        raise ValueError(
+            f"NanoGPT 种子必须是整数（-1～{_INT32_MAX}），收到 {raw!r}，拒绝静默取模"
+        ) from None
 
 
 def _seed_clamp_meta(raw):
-    """Return dict with seedOriginal/seedClamped when _clamp_seed changes the value."""
-    clamped = _clamp_seed(raw)
-    if clamped is None:
+    """No silent int32 wrap. Valid/omitted seed never sets seedClamped; invalid raises."""
+    if raw in (None, "", "random"):
         return {}
-    try:
-        if raw in (None, "", "random"):
-            return {}
-        orig = int(raw)
-    except (TypeError, ValueError):
-        return {}
-    if orig != clamped:
-        return {"seedOriginal": orig, "seedClamped": True}
+    _clamp_seed(raw)
     return {}
+
+
+def _i2i_strength(payload):
+    """Map denoise/strength for input_references. Never invent 0.65.
+
+    Both omitted → None (omit key, official default). Explicit null or
+    non-finite/non-numeric → ValueError. Conflicting denoise vs strength → ValueError.
+    """
+    payload = payload or {}
+    found = []
+    for key in ("denoise", "strength"):
+        if key not in payload:
+            continue
+        val = payload.get(key)
+        if val == "":
+            continue
+        found.append((key, val))
+    if not found:
+        return None
+    non_null = [(k, v) for k, v in found if v is not None]
+    if not non_null:
+        raise ValueError("NanoGPT 图生图 strength 为 null，拒绝默认 0.65")
+    values = [_finite_number(v, "strength") for _, v in non_null]
+    if any(x != values[0] for x in values[1:]):
+        raise ValueError("denoise 与 strength 冲突，拒绝覆盖")
+    return values[0]
 
 
 def closest_aspect(w, h) -> str:
@@ -854,26 +913,17 @@ def _image_body(payload: dict, spec: dict) -> dict:
     if imgs:
         # NanoGPT rejects mixing input_references with image / imageDataUrl / image_url.
         body["input_references"] = imgs
-        denoise = payload.get("denoise")
-        if denoise in (None, ""):
-            denoise = payload.get("strength")
-        try:
-            body["strength"] = float(denoise) if denoise not in (None, "") else 0.65
-        except (TypeError, ValueError):
-            body["strength"] = 0.65
+        strength = _i2i_strength(payload)
+        if strength is not None:
+            body["strength"] = strength
     steps = payload.get("steps")
-    try:
-        if steps:
-            body["num_inference_steps"] = int(steps)
-            body["steps"] = int(steps)
-    except (TypeError, ValueError):
-        pass
+    if steps not in (None, ""):
+        n_steps = _finite_number(steps, "steps", integer=True)
+        body["num_inference_steps"] = n_steps
+        body["steps"] = n_steps
     cfg = payload.get("cfgScale")
-    try:
-        if cfg not in (None, ""):
-            body["guidance_scale"] = float(cfg)
-    except (TypeError, ValueError):
-        pass
+    if cfg not in (None, ""):
+        body["guidance_scale"] = _finite_number(cfg, "cfgScale")
     loras = _loras(payload)
     if loras:
         body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
@@ -1145,10 +1195,9 @@ class NanoGptProvider(Provider):
         # Persist download API URL / versionId — never long-lived B2 signed query.
         persist_body = sanitize_submitted_for_persist(full, lora_meta)
         jid = f"nano-gpt|img|{uuid.uuid4().hex[:12]}"
-        # v0774: when int32 clamp changes seed, expose seedOriginal + seedClamped.
-        # v0773: meta.seed prefers API response seed; fallback submitted.
+        # Seed is fail-closed in _image_body (no int32 modulo). meta.seed prefers
+        # API response seed; fallback submitted.
         submitted_seed = full.get("seed")
-        seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         meta = {
             "backend": self.id,
             "serviceId": mid,
@@ -1158,8 +1207,6 @@ class NanoGptProvider(Provider):
             "jobId": jid,
             "submittedInput": persist_body,
         }
-        if seed_extra:
-            meta.update(seed_extra)
         headers = _auth()
         last = (502, {"error": "NanoGPT 出图失败"})
         for url, body in (
@@ -1189,8 +1236,6 @@ class NanoGptProvider(Provider):
                     "seed": used_seed,
                     "cost": data.get("cost"),
                 }
-                if seed_extra:
-                    out.update(seed_extra)
                 return 200, out
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})
         return last
@@ -1230,7 +1275,6 @@ class NanoGptProvider(Provider):
         if raw_loras:
             body = _video_body(pl, spec)
         persist_body = sanitize_submitted_for_persist(body, lora_meta)
-        seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         code, data = json_call(GEN_VIDEO, method="POST", headers=_auth(), body=body, timeout=90)
         if not isinstance(data, dict) or code >= 400:
             if isinstance(data, dict):
@@ -1252,8 +1296,6 @@ class NanoGptProvider(Provider):
                     "submittedInput": persist_body,
                     "seed": used_seed,
                 }
-                if seed_extra:
-                    out.update(seed_extra)
                 return 200, out
             return 502, {"error": "NanoGPT 视频没返回任务 id", "raw": json.dumps(data)[:400]}
         jid = f"nano-gpt|vid|{run}"
@@ -1268,8 +1310,6 @@ class NanoGptProvider(Provider):
             "seed": used_seed,
             "wait": {"progress": None, "precedingJobs": None, "etaSeconds": None, "completeAt": None, "log": None},
         }
-        if seed_extra:
-            out.update(seed_extra)
         return 200, out
 
     def job_status(self, job_id: str):

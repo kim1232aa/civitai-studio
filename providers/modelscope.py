@@ -711,6 +711,25 @@ def is_edit(mid: str) -> bool:
     return "image-edit" in low or "image-to-image" in low or "/edit" in low
 
 
+def _catalog_page_args(page=1, pageSize=50, max_size=100):
+    """View paging over the already-fetched AIGC Checkpoint list. Does not change fetch_hub."""
+    try:
+        page = int(page)
+    except (TypeError, ValueError):
+        page = 1
+    if page < 1:
+        page = 1
+    try:
+        size = int(pageSize)
+    except (TypeError, ValueError):
+        size = 50
+    if size < 1:
+        size = 1
+    if size > max_size:
+        size = max_size
+    return page, size
+
+
 class ModelScopeProvider(Provider):
     def __init__(self, flavor: str):
         flavor = "cn" if flavor == "cn" else "ai"
@@ -756,7 +775,7 @@ class ModelScopeProvider(Provider):
     def categories(self) -> list:
         return ["image", "video", "upscale", "utility"]
 
-    def catalog(self, q, category, status) -> dict:
+    def catalog(self, q, category, status, page=1, pageSize=50) -> dict:
         qn = (q or "").strip()
         now = time.time()
         totals = {}
@@ -802,11 +821,18 @@ class ModelScopeProvider(Provider):
             row = dict(x)
             row["backend"] = self.id
             tagged.append(overlay_modelscope_catalog_item(row))
-        return {
-            "total": len(tagged),
-            "count": len(tagged),
+        page, page_size = _catalog_page_args(page, pageSize)
+        total = len(tagged)
+        start = (page - 1) * page_size
+        sliced = tagged[start:start + page_size]
+        has_more = start + len(sliced) < total
+        hub_complete = bool((totals or {}).get("complete"))
+        partial = (not hub_complete) or bool((totals or {}).get("pinFallback"))
+        body = {
+            "total": total,
+            "count": len(sliced),
             "backend": self.id,
-            "items": tagged,
+            "items": sliced,
             "hasKey": self.has_key(),
             "baseUrl": self._base,
             "hub": HUB,
@@ -814,11 +840,23 @@ class ModelScopeProvider(Provider):
             "hubCoverage": {
                 "source": (totals or {}).get("source") or "ModelScope AIGC Checkpoint + template + pins",
                 "channel": self.id,
-                "callability": "generatable" if (totals or {}).get("complete") else "unknown",
+                "callability": "generatable" if hub_complete else "unknown",
                 "fetchedUnique": len({x.get("id") for x in tagged}),
                 "hubTotals": totals,
             },
+            "page": page,
+            "pageSize": page_size,
+            "hasMore": has_more,
+            "nextPage": (page + 1) if has_more else None,
+            "complete": hub_complete,
+            "partial": partial,
         }
+        warning = None
+        if isinstance(totals, dict):
+            warning = totals.get("error") or totals.get("aigcCheckpointError")
+        if warning:
+            body["warning"] = warning
+        return body
 
     def owns_service(self, service_id: str) -> bool:
         sid = (service_id or "").strip()
