@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import os
 import socket
 from pathlib import Path
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse, quote
 
 from .base import Provider
@@ -69,93 +71,142 @@ def load_disk():
 
 def model_id(service_id: str) -> str:
     s = (service_id or "").strip().lstrip("/")
-    for pfx in ("ms/", "modelscope/", "魔搭/"):
+    for pfx in ("modelscope-ai/", "modelscope-cn/", "ms/", "modelscope/", "魔搭/"):
         if s.startswith(pfx):
             s = s[len(pfx):]
     return s
 
 
-def _clamp_seed(raw):
-    """ModelScope AIGC: seed in [-1, 2147483647]. Huge Civitai seeds wrap, not drop."""
+def _number(raw, field, *, integer=False, minimum=None, maximum=None):
     try:
-        n = int(raw)
-    except (TypeError, ValueError):
-        return None
-    if n < -1:
-        return -1
-    limit = 2147483647
-    if n > limit:
-        n = n % limit
-        if n == 0:
-            n = limit
-    return n
+        if isinstance(raw, bool):
+            raise ValueError()
+        value = int(raw) if integer else float(raw)
+        if integer and not isinstance(raw, str) and value != raw:
+            raise ValueError()
+        if not math.isfinite(value) or (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        bounds = f"（{minimum} ≤ 原值 ≤ {maximum}）" if maximum is not None else (
+            f"（原值 ≥ {minimum}）" if minimum is not None else "")
+        raise ValueError(f"{field} 必须是{'整数' if integer else '有限数值'}{bounds}，拒绝静默改值") from None
+    return value
+
+
+def _clamp_seed(raw):
+    """Historical name retained for callers; now rejects, never wraps int32."""
+    return _number(raw, "seed", integer=True, minimum=-1, maximum=2147483647)
+
+
+def _value(payload, *names):
+    values = [payload[key] for key in names if payload.get(key) not in (None, "")]
+    if values and any(value != values[0] for value in values[1:]):
+        raise ValueError(f"{'/'.join(names)} 的值冲突，拒绝覆盖")
+    return values[0] if values else None
 
 
 def _modelscope_loras(payload: dict):
-    """Official AIGC field: list of `{model, weight}` even for one. Skip Civitai http.
-
-    Live 2026-09-08: string `owner/repo` or `{repo: weight}` → 500 Model does not exist.
-    `[{model, weight}]` → HTTP 200 + task_id.
-    """
-    raw = payload.get("loras") or []
-    pairs = {}
-
-    def _add(repo, weight):
-        repo = (repo or "").strip()
-        if not repo or repo.lower().startswith("urn:"):
-            return
-        if repo.startswith("http"):
-            # AIGC wants Hub owner/repo; Civitai download URLs 500 with 空 modelName.
-            return
-        if repo.count("/") != 1:
-            return
-        try:
-            w = float(weight) if weight not in (None, "") else 1.0
-        except (TypeError, ValueError):
-            w = 1.0
-        pairs[repo] = max(0.0, w)
-
-    if isinstance(raw, str):
-        _add(raw, 1.0)
-    elif isinstance(raw, dict):
-        for k, v in raw.items():
-            _add(str(k), v)
-    elif isinstance(raw, list):
-        for it in raw:
-            if isinstance(it, str):
-                _add(it, 1.0)
-                continue
-            if not isinstance(it, dict):
-                continue
-            path = (it.get("path") or it.get("url") or it.get("downloadUrl") or it.get("download_url") or "").strip()
-            model_id = (it.get("model") or "").strip()
-            name = (it.get("name") or it.get("id") or "").strip()
-            if (
-                model_id.count("/") == 1
-                and not model_id.startswith("http")
-                and not model_id.lower().startswith("urn:")
-            ):
-                repo = model_id
-            elif path.startswith("http"):
-                repo = path
-            elif path.count("/") == 1:
-                repo = path
-            elif name.count("/") == 1 and not name.lower().startswith("urn:"):
-                repo = name
-            else:
-                repo = model_id or path or name
-            raw_w = it.get("weight")
-            if raw_w is None:
-                raw_w = it.get("scale")
-            if raw_w is None:
-                raw_w = it.get("strength")
-            _add(repo, raw_w)
-    if not pairs:
+    """Encode all requested Hub LoRAs as [{model, weight}], or reject all."""
+    raw = payload.get("loras")
+    if raw in (None, [], {}):
         return None
-    return [{"model": k, "weight": v} for k, v in pairs.items()]
+    if isinstance(raw, str):
+        raw = [{"model": raw}]
+    elif isinstance(raw, dict):
+        raw = [{"model": key, "weight": value} for key, value in raw.items()]
+    if not isinstance(raw, list):
+        raise ValueError("魔搭 LoRA 必须是 Hub 条目数组")
+    out = []
+    for item in raw:
+        if isinstance(item, str):
+            item = {"model": item}
+        if not isinstance(item, dict):
+            raise ValueError("魔搭 LoRA 条目必须有 model 和 weight")
+        repo = item.get("model") or item.get("path") or item.get("url") or item.get("downloadUrl") or item.get("download_url") or item.get("name") or item.get("id")
+        if not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo.strip()):
+            raise ValueError("魔搭 LoRA 必须是 Hub owner/repo，不能跳过下载链或 AIR 后只生成底模")
+        weight = _value(item, "weight", "scale", "strength")
+        out.append({"model": repo.strip(), "weight": _number(1.0 if weight is None else weight, "LoRA weight")})
+    return out
+
+
+def _image_body(payload, mid, backend):
+    if payload.get("prompt") is not None and not isinstance(payload["prompt"], str):
+        raise ValueError("prompt 必须是文本")
+    body = {"model": mid, "prompt": payload.get("prompt") or ""}
+    negative = _value(payload, "negativePrompt", "negative_prompt")
+    if negative is not None:
+        if not isinstance(negative, str):
+            raise ValueError("negativePrompt 必须是文本")
+        body["negative_prompt"] = negative
+    seed = _value(payload, "seed")
+    if seed is not None and seed != "random":
+        body["seed"] = _clamp_seed(seed)
+    for names, field, integer in (
+        (("steps", "num_inference_steps"), "steps", True),
+        (("cfgScale", "guidance", "guidance_scale", "cfg"), "guidance", False),
+    ):
+        value = _value(payload, *names)
+        if value is not None:
+            body[field] = _number(value, "/".join(names), integer=integer, minimum=1 if integer else None)
+    width, height = _value(payload, "width"), _value(payload, "height")
+    if (width is None) != (height is None):
+        raise ValueError("width/height 必须一起填写")
+    if width is not None:
+        width = _number(width, "width", integer=True, minimum=1)
+        height = _number(height, "height", integer=True, minimum=1)
+        body["size"] = f"{width}x{height}"
+    size = _value(payload, "resolution", "size")
+    if size is not None:
+        match = re.fullmatch(r"(\d+)\s*[x×*]\s*(\d+)", size.strip()) if isinstance(size, str) else None
+        if not match:
+            raise ValueError("resolution/size 必须是明确的宽x高；拒绝近似尺寸")
+        w = _number(match[1], "width", integer=True, minimum=1)
+        h = _number(match[2], "height", integer=True, minimum=1)
+        if "size" in body and body["size"] != f"{w}x{h}":
+            raise ValueError("resolution/size 与 width/height 冲突")
+        body["size"] = f"{w}x{h}"
+    for field in ("sampler", "scheduler", "duration", "aspectRatio", "aspect_ratio",
+                  "denoise", "strength", "lastFrame", "end_image_url"):
+        if payload.get(field) not in (None, ""):
+            raise ValueError(f"{backend} 当前图片适配器未接入 {field}；拒绝丢参生成，不能据此认定 API 不支持")
+    quantity = _value(payload, "quantity", "qty", "n", "num_images")
+    if quantity is not None and _number(quantity, "quantity", integer=True, minimum=1) != 1:
+        raise ValueError(f"{backend} 当前适配器未接入 quantity 多图；不会只生成一张")
+    loras = _modelscope_loras(payload)
+    if loras is not None:
+        body["loras"] = loras
+    from .ref_images import max_refs
+    from .capabilities import get_provider_capabilities
+    from .fal import materialize_fal_media
+    # Reuse local-media materialization, not Fal's parameter mapper or transport.
+    values = []
+    for field in ("firstFrame", "sourceImage", "startImage", "image_url", "imageUrl", "imageDataUrl",
+                  "image", "images", "referenceImages", "input_references", "image_urls"):
+        value = payload.get(field)
+        if value not in (None, ""):
+            values.extend(value if isinstance(value, list) else [value])
+    refs = materialize_fal_media({"image_urls": values})["image_urls"]
+    if any(not isinstance(value, str) or not value.startswith(("https://", "http://", "data:")) for value in refs):
+        raise ValueError("参考图必须是有效 URL、data URL 或可读取的 /out 文件，拒绝跳过")
+    refs = list(dict.fromkeys(refs))
+    from .capabilities import modelscope_t2i_refs_error, overlay_modelscope_catalog_item
+    item = overlay_modelscope_catalog_item({"id": mid})
+    t2i_err = modelscope_t2i_refs_error(mid, len(refs), item)
+    if t2i_err:
+        raise ValueError(t2i_err)
+    limit = max_refs(backend=backend, caps=get_provider_capabilities(backend), item=item, payload=payload)
+    if len(refs) > limit:
+        raise ValueError(f"{backend} 当前参考图接线最多 {limit} 张，收到 {len(refs)} 张；拒绝截断")
+    if refs:
+        body["image_url"] = refs[0] if len(refs) == 1 else refs
+    return body
 
 
 HUB = "https://www.modelscope.cn/openapi/v1/models"
+# Website catalog (PUT). OpenAPI GET has no working inference_type filter.
+MODELS_PUT = "https://www.modelscope.cn/api/v1/models"
+AIGC_TEMPLATE = "https://www.modelscope.cn/api/v1/muse/predict/unauth/defaultTemplateV2"
 # Hub slug, studio category, task, tags, needsSource, needsFirstFrame
 HUB_TASKS = (
     ("text-to-image-synthesis", "image", "text-to-image", ["t2i"], False, False),
@@ -165,8 +216,43 @@ HUB_TASKS = (
 )
 _HUB_CACHE = {"at": 0.0, "items": None, "totals": {}}
 _HUB_TTL = 300
+# Official OpenAPI: page_size maximum 50; page_number * page_size <= 3000.
 _HUB_PAGE = 50
-_HUB_PAGES = 2
+_HUB_OPENAPI_OFFSET_MAX = 3000
+_HUB_SEARCH_PAGES = 3
+# PUT /api/v1/models allows PageSize 200; 100 keeps payloads smaller.
+_HUB_PUT_PAGE = 100
+_HUB_WORKERS = 8
+# Website filter=inference_type is not on OpenAPI. PUT tags=Checkpoint is the
+# generatable AIGC base-model slice (SupportInference txt2img/img2img).
+# LoRA tag is ~88k adapters — those stay on search_loras, not the model dropdown.
+_AIGC_LIST_TAGS = ("Checkpoint",)
+_AIGC_SKIP_TYPES = {"VAE", "TextualInversion"}
+_INFER_CLASS = {
+    "txt2img": ("image", "text-to-image", ["t2i"], False, False),
+    "img2img": ("image", "image-to-image", ["i2i"], True, False),
+    "txt2vid": ("video", "text-to-video", ["t2v"], False, False),
+    "img2vid": ("video", "image-to-video", ["i2v"], False, True),
+}
+
+
+def _parameter_capabilities(mid, task, *, channel):
+    endpoint_fields = {
+        "prompt", "negative_prompt", "size", "seed", "steps",
+        "guidance", "image_url", "loras",
+    }
+    if task not in ("image-to-image", "image-to-video"):
+        endpoint_fields.discard("image_url")
+    return {
+        "model": mid,
+        "task": task,
+        "channel": channel,
+        "callability": "unknown",
+        "source": "ModelScope Hub task metadata; Hub inclusion does not prove inference availability",
+        "supported": ["prompt"],
+        "unknown": sorted(endpoint_fields - {"prompt"}),
+        "endpointFields": sorted(endpoint_fields),
+    }
 
 
 def _alnum(s):
@@ -182,9 +268,19 @@ from .hub_classify import (  # noqa: E402
 
 
 
-def _hub_row(it, cat, task, tags, needs_src, needs_ff):
+def _hub_row(it, cat, task, tags, needs_src, needs_ff, *, callability="unknown", source=None):
     mid = (it.get("id") or it.get("name") or "").strip()
-    name = (it.get("chinese_name") or it.get("name") or (mid.split("/")[-1] if mid else "")).strip()
+    name = (it.get("chinese_name") or it.get("ChineseName") or it.get("name") or (mid.split("/")[-1] if mid else "")).strip()
+    cap_source = source or (
+        "Hub task metadata identifies a task, not AI/CN inference availability or model schema"
+    )
+    channels = {
+        "modelscope-ai": _parameter_capabilities(mid, task, channel="modelscope-ai"),
+        "modelscope-cn": _parameter_capabilities(mid, task, channel="modelscope-cn"),
+    }
+    for caps in channels.values():
+        caps["callability"] = callability
+        caps["source"] = cap_source
     row = {
         "id": mid,
         "name": name or (mid.split("/")[-1] if mid else mid),
@@ -193,8 +289,15 @@ def _hub_row(it, cat, task, tags, needs_src, needs_ff):
         "status": "available",
         "task": task,
         "tags": list(tags),
-        "downloads": it.get("downloads"),
+        "downloads": it.get("downloads") or it.get("Downloads"),
         "hubTask": task,
+        "callability": callability,
+        "parameterCapabilities": {
+            "model": mid,
+            "task": task,
+            "channels": channels,
+            "source": cap_source,
+        },
     }
     if needs_src:
         row["needsSource"] = True
@@ -203,18 +306,86 @@ def _hub_row(it, cat, task, tags, needs_src, needs_ff):
     return _apply_upscale_category(row)
 
 
+def _task_name_list(it):
+    raw = it.get("tasks") or it.get("Tasks") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    names = []
+    for item in raw:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, dict):
+            name = item.get("Name") or item.get("name") or item.get("task")
+            if isinstance(name, str) and name.strip():
+                names.append(name.strip())
+    return names
+
+
 def _classify_hub(it):
-    tasks = it.get("tasks") or it.get("Tasks") or []
-    if isinstance(tasks, str):
-        tasks = [tasks]
+    tasks = _task_name_list(it)
     for hub_task, cat, task, tags, needs_src, needs_ff in HUB_TASKS:
         if hub_task in tasks:
             return cat, task, tags, needs_src, needs_ff
     return None
 
 
+def _classify_hub_all(it):
+    tasks = _task_name_list(it)
+    return [
+        (cat, task, tags, needs_src, needs_ff)
+        for hub_task, cat, task, tags, needs_src, needs_ff in HUB_TASKS
+        if hub_task in tasks
+    ]
+
+
+def _classes_for_item(it):
+    classes = _classify_hub_all(it)
+    if classes:
+        return classes
+    infer = str(it.get("SupportInference") or it.get("supportInference") or "").strip().lower()
+    mapped = _INFER_CLASS.get(infer)
+    return [mapped] if mapped else []
+
+
+def _put_mid(it):
+    path = str(it.get("Path") or "").strip().strip("/")
+    name = str(it.get("Name") or "").strip()
+    if path and name:
+        return f"{path}/{name}"
+    mid = it.get("id") or it.get("Id") or ""
+    if isinstance(mid, str) and mid.count("/") == 1:
+        return mid.strip()
+    return ""
+
+
+def _mid_from_modelscope_url(url):
+    text = str(url or "").strip()
+    if "modelscope://" in text:
+        text = text.split("modelscope://", 1)[1]
+    text = text.split("?", 1)[0].strip().strip("/")
+    if text.count("/") == 1:
+        return text
+    return ""
+
+
+def _append_row(items, seen, it, cls, *, callability, source, extra=None):
+    row = _hub_row(it, *cls, callability=callability, source=source)
+    if extra:
+        row.update(extra)
+    key = (row["id"], row["task"])
+    if not row["id"] or key in seen:
+        return False
+    seen.add(key)
+    items.append(row)
+    return True
+
+
+def _openapi_max_page():
+    return max(1, _HUB_OPENAPI_OFFSET_MAX // _HUB_PAGE)
+
+
 def fetch_hub_search(search):
-    """One Hub search= call. Do not loop 4 tasks x 2 pages."""
+    """OpenAPI search. page_size max 50. Typeahead stops at 3 pages."""
     items, seen, totals = [], set(), {}
     q = (search or "").strip()
     if not q:
@@ -224,31 +395,222 @@ def fetch_hub_search(search):
         block = data.get("data") or data.get("Data") if isinstance(data, dict) else None
         if code == 200 and isinstance(block, dict):
             block.setdefault("id", q)
-            cls = _classify_hub(block) or ("image", "text-to-image", ["t2i"], False, False)
-            row = _hub_row(block, *cls)
-            if row["id"] and row["id"] not in seen:
-                seen.add(row["id"])
-                items.append(row)
-    qs = f"search={quote(q)}&sort=downloads&page_size={_HUB_PAGE}&page_number=1"
-    code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=25)
+            classes = _classify_hub_all(block) or [("image", "text-to-image", ["t2i"], False, False)]
+            for cls in classes:
+                _append_row(items, seen, block, cls, callability="unknown", source="OpenAPI model detail")
+    last_allowed = min(_HUB_SEARCH_PAGES, _openapi_max_page())
+    page = 1
+    pages_fetched = 0
+    while page <= last_allowed:
+        qs = f"search={quote(q)}&sort=downloads&page_size={_HUB_PAGE}&page_number={page}"
+        code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=30)
+        block = data.get("data") if isinstance(data, dict) else None
+        models = (block.get("models") or []) if isinstance(block, dict) else []
+        if code != 200 or not isinstance(block, dict):
+            totals["searchComplete"] = False
+            totals["searchHttp"] = code
+            break
+        pages_fetched += 1
+        try:
+            totals["search"] = int(block.get("total_count") or 0)
+        except (TypeError, ValueError):
+            totals["search"] = 0
+        for it in models:
+            if not isinstance(it, dict):
+                continue
+            classes = _classify_hub_all(it)
+            if not classes:
+                continue
+            for cls in classes:
+                _append_row(items, seen, it, cls, callability="unknown", source="OpenAPI search")
+        covered = page * _HUB_PAGE
+        if not models or (totals.get("search") and covered >= totals["search"]):
+            break
+        page += 1
+    totals["searchPages"] = pages_fetched
+    totals["searchFetched"] = len(items)
+    totals["pageSize"] = _HUB_PAGE
+    totals.setdefault(
+        "searchComplete",
+        bool(totals.get("search") and pages_fetched * _HUB_PAGE >= int(totals["search"])),
+    )
+    return items, totals
+
+
+def _openapi_task_total(hub_task):
+    qs = f"filter.task={quote(hub_task, safe='')}&sort=downloads&page_size=1&page_number=1"
+    code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=20)
     block = data.get("data") if isinstance(data, dict) else None
-    models = (block.get("models") or []) if isinstance(block, dict) else []
-    try:
-        totals["search"] = int((block or {}).get("total_count") or 0)
-    except (TypeError, ValueError):
-        totals["search"] = len(models)
-    for it in models:
+    total = 0
+    if code == 200 and isinstance(block, dict):
+        try:
+            total = int(block.get("total_count") or 0)
+        except (TypeError, ValueError):
+            total = 0
+    return code, total, None if code == 200 else (
+        (data.get("error") if isinstance(data, dict) else None) or f"HTTP {code}"
+    )
+
+
+def _put_models_page(tag, page, page_size=_HUB_PUT_PAGE):
+    body = {
+        "PageNumber": int(page),
+        "PageSize": int(page_size),
+        "Criterion": [{"category": "tags", "predicate": "contains", "values": [tag]}],
+    }
+    code, data = json_call(MODELS_PUT, method="PUT", headers=auth_headers(), body=body, timeout=30)
+    block = data.get("Data") if isinstance(data, dict) and isinstance(data.get("Data"), dict) else None
+    if code != 200 or not block:
+        err = None
+        if isinstance(data, dict):
+            err = data.get("Message") or data.get("error") or data.get("message")
+        return code, None, err or f"HTTP {code}"
+    return code, block, None
+
+
+def _ingest_put_models(models, items, seen, totals):
+    kept = 0
+    skipped = 0
+    source = "PUT /api/v1/models tags=Checkpoint (AIGC generatable, not Hub weights)"
+    for it in models or []:
         if not isinstance(it, dict):
             continue
-        cls = _classify_hub(it)
-        if not cls:
+        aigc_type = str(it.get("AigcType") or "").strip()
+        if aigc_type in _AIGC_SKIP_TYPES:
+            skipped += 1
             continue
-        row = _hub_row(it, *cls)
-        if not row["id"] or row["id"] in seen:
+        infer = str(it.get("SupportInference") or "").strip().lower()
+        if infer not in _INFER_CLASS and not it.get("SupportExperience"):
+            skipped += 1
             continue
-        seen.add(row["id"])
-        items.append(row)
-    return items, totals
+        mid = _put_mid(it)
+        if not mid:
+            skipped += 1
+            continue
+        payload = {
+            "id": mid,
+            "name": it.get("ChineseName") or it.get("Name") or mid.split("/")[-1],
+            "chinese_name": it.get("ChineseName") or it.get("Name"),
+            "downloads": it.get("Downloads"),
+            "Tasks": it.get("Tasks") or [],
+            "SupportInference": infer,
+        }
+        classes = _classes_for_item(payload)
+        if not classes:
+            skipped += 1
+            continue
+        extra = {
+            "aigcType": aigc_type or None,
+            "supportInference": infer or None,
+            "supportExperience": bool(it.get("SupportExperience")),
+        }
+        added = False
+        for cls in classes:
+            if _append_row(items, seen, payload, cls, callability="generatable", source=source, extra=extra):
+                added = True
+        if added:
+            kept += 1
+        else:
+            skipped += 1
+    totals["aigcKept"] = int(totals.get("aigcKept") or 0) + kept
+    totals["aigcSkipped"] = int(totals.get("aigcSkipped") or 0) + skipped
+    return kept
+
+
+def _ingest_aigc_template(items, seen, totals):
+    # This endpoint 401s with Bearer ("用户未登录") and 200s anonymously.
+    code, data = json_call(AIGC_TEMPLATE, timeout=25)
+    totals["aigcTemplateHttp"] = code
+    inner = None
+    if isinstance(data, dict):
+        block = data.get("Data") if isinstance(data.get("Data"), dict) else data.get("data")
+        if isinstance(block, dict):
+            inner = block.get("data") if isinstance(block.get("data"), dict) else block
+            if isinstance(inner, dict) and "IMAGE" not in inner and isinstance(inner.get("data"), dict):
+                inner = inner["data"]
+    if code != 200 or not isinstance(inner, dict):
+        totals["aigcTemplateError"] = (
+            (data.get("Message") if isinstance(data, dict) else None)
+            or (data.get("error") if isinstance(data, dict) else None)
+            or f"HTTP {code}"
+        )
+        totals["aigcTemplateAdded"] = 0
+        return 0
+    added = 0
+    source = "GET /api/v1/muse/predict/unauth/defaultTemplateV2 supportSDVersionList"
+    buckets = []
+    for key in ("IMAGE", "VIDEO", "AUDIO"):
+        bucket = inner.get(key)
+        if isinstance(bucket, dict):
+            buckets.append((key, bucket))
+    for key, bucket in buckets:
+        for item in bucket.get("supportSDVersionList") or []:
+            if not isinstance(item, dict):
+                continue
+            mid = ""
+            model_id = item.get("model_id")
+            if isinstance(model_id, dict):
+                mid = str(model_id.get("path") or "").strip()
+            if not mid:
+                mid = _mid_from_modelscope_url(item.get("modelUrl") or item.get("model_url"))
+            if not mid:
+                continue
+            label = item.get("label") or item.get("sub_label") or mid.split("/")[-1]
+            chinese = ""
+            if isinstance(model_id, dict):
+                chinese = model_id.get("ChineseName") or model_id.get("Name") or ""
+            support_types = item.get("supportType") or []
+            if not isinstance(support_types, list):
+                support_types = [support_types] if support_types else []
+            gen_type = str(item.get("gen_type") or "").upper()
+            is_video = str(item.get("is_video_model") or "").lower() == "true" or key == "VIDEO"
+            classes = []
+            type_blob = " ".join(str(x) for x in support_types) + " " + gen_type
+            if is_video:
+                if "TXT_2_VIDEO" in type_blob or gen_type == "T2V":
+                    classes.append(("video", "text-to-video", ["t2v"], False, False))
+                if "IMG_2_VIDEO" in type_blob or "FLF_2_VIDEO" in type_blob or gen_type in ("I2V", "IT2V", "FLF2V"):
+                    classes.append(("video", "image-to-video", ["i2v"], False, True))
+                if not classes:
+                    classes.append(("video", "text-to-video", ["t2v"], False, False))
+            else:
+                low = (mid + " " + str(label)).lower()
+                if "edit" in low or "kontext" in low:
+                    classes.append(("image", "image-to-image", ["i2i"], True, False))
+                else:
+                    classes.append(("image", "text-to-image", ["t2i"], False, False))
+            payload = {"id": mid, "name": chinese or label, "chinese_name": chinese or label}
+            extra = {"aigcType": "Checkpoint", "supportInference": "template", "supportExperience": True}
+            for cls in classes:
+                if _append_row(items, seen, payload, cls, callability="generatable", source=source, extra=extra):
+                    added += 1
+        for field in ("qwenImageEditModelUrl", "fluxHighResModelUrl", "fluxKontextModelUrl"):
+            raw = bucket.get(field)
+            values = raw if isinstance(raw, list) else ([raw] if raw else [])
+            for url in values:
+                mid = _mid_from_modelscope_url(url)
+                if not mid:
+                    continue
+                payload = {"id": mid, "name": mid.split("/")[-1]}
+                cls = ("image", "image-to-image", ["i2i"], True, False) if "edit" in mid.lower() or "kontext" in mid.lower() else (
+                    "image", "text-to-image", ["t2i"], False, False
+                )
+                extra = {"aigcType": "Checkpoint", "supportInference": "template", "supportExperience": True}
+                if _append_row(items, seen, payload, cls, callability="generatable", source=source, extra=extra):
+                    added += 1
+    extra_list = inner.get("qwenImageEditModelUrlList") or []
+    if isinstance(extra_list, list):
+        for url in extra_list:
+            mid = _mid_from_modelscope_url(url)
+            if not mid:
+                continue
+            payload = {"id": mid, "name": mid.split("/")[-1]}
+            cls = ("image", "image-to-image", ["i2i"], True, False)
+            extra = {"aigcType": "Checkpoint", "supportInference": "template", "supportExperience": True}
+            if _append_row(items, seen, payload, cls, callability="generatable", source=source, extra=extra):
+                added += 1
+    totals["aigcTemplateAdded"] = added
+    return added
 
 
 def fetch_hub(search=""):
@@ -256,37 +618,65 @@ def fetch_hub(search=""):
         return fetch_hub_search(search)
     items = []
     seen = set()
-    totals = {}
-    for hub_task, cat, task, tags, needs_src, needs_ff in HUB_TASKS:
-        total = 0
-        for page in range(1, _HUB_PAGES + 1):
-            qs = (
-                f"filter.task={quote(hub_task, safe='')}&sort=downloads"
-                f"&page_size={_HUB_PAGE}&page_number={page}"
-            )
-            if search:
-                qs += f"&search={quote(search)}"
-            code, data = json_call(f"{HUB}?{qs}", headers=auth_headers(), timeout=30)
-            block = data.get("data") if isinstance(data, dict) else None
-            if code != 200 or not isinstance(block, dict):
-                break
-            models = block.get("models") or []
-            try:
-                total = int(block.get("total_count") or 0)
-            except (TypeError, ValueError):
-                total = 0
-            totals[hub_task] = total
-            for it in models:
-                if not isinstance(it, dict):
-                    continue
-                row = _hub_row(it, cat, task, tags, needs_src, needs_ff)
-                row["hubTask"] = hub_task
-                if not row["id"] or row["id"] in seen:
-                    continue
-                seen.add(row["id"])
-                items.append(row)
-            if not models or page * _HUB_PAGE >= total:
-                break
+    totals = {
+        "source": "PUT /api/v1/models tags=Checkpoint + AIGC template",
+        "filter": "generatable AIGC (SupportInference txt2img/img2img), not Hub weight dump",
+        "pageSizeOpenAPI": _HUB_PAGE,
+        "pageSizePut": _HUB_PUT_PAGE,
+        "loraInCatalog": 0,
+        "loraHubNote": "AIGC LoRA (~88k) stays on search_loras; model dropdown is Checkpoints + official bases + pins",
+    }
+    for hub_task, *_rest in HUB_TASKS:
+        code, total, err = _openapi_task_total(hub_task)
+        totals[hub_task] = total
+        totals[f"{hub_task}Http"] = code
+        if err:
+            totals[f"{hub_task}Error"] = err
+    reachable = False
+    pages_fetched = 0
+    for tag in _AIGC_LIST_TAGS:
+        code, block, err = _put_models_page(tag, 1)
+        pages_fetched += 1
+        if code != 200 or not block:
+            totals["aigcCheckpointError"] = err or f"HTTP {code}"
+            totals["complete"] = False
+            continue
+        reachable = True
+        try:
+            tag_total = int(block.get("TotalCount") or 0)
+        except (TypeError, ValueError):
+            tag_total = len(block.get("Models") or [])
+        totals["aigcCheckpoint"] = tag_total
+        _ingest_put_models(block.get("Models") or [], items, seen, totals)
+        last_page = max(1, (tag_total + _HUB_PUT_PAGE - 1) // _HUB_PUT_PAGE) if tag_total else 1
+        if last_page > 1:
+            with ThreadPoolExecutor(max_workers=_HUB_WORKERS) as pool:
+                futs = {
+                    pool.submit(_put_models_page, tag, page): page
+                    for page in range(2, last_page + 1)
+                }
+                for fut in as_completed(futs):
+                    pages_fetched += 1
+                    try:
+                        pcode, pblock, perr = fut.result()
+                    except Exception as exc:
+                        totals.setdefault("aigcPageErrors", []).append(str(exc))
+                        continue
+                    if pcode != 200 or not pblock:
+                        totals.setdefault("aigcPageErrors", []).append(perr or f"HTTP {pcode}")
+                        continue
+                    _ingest_put_models(pblock.get("Models") or [], items, seen, totals)
+    _ingest_aigc_template(items, seen, totals)
+    totals["_pagesFetched"] = pages_fetched
+    totals["_reachable"] = reachable
+    totals["unique"] = len(seen)
+    totals["fetched"] = len(items)
+    totals["complete"] = bool(
+        reachable
+        and totals.get("aigcCheckpoint")
+        and not totals.get("aigcCheckpointError")
+        and int(totals.get("aigcKept") or 0) > 0
+    )
     return items, totals
 
 
@@ -386,6 +776,13 @@ class ModelScopeProvider(Provider):
                     seen.add(pid)
             if not hub:
                 items = list(pins)
+                totals = dict(totals or {})
+                totals["pinFallback"] = True
+                totals["complete"] = False
+                totals.setdefault(
+                    "error",
+                    "AIGC Checkpoint 目录拉取失败，已回退 pin 短名单；不是官网只有这些",
+                )
             if not qn:
                 _HUB_CACHE["items"] = list(items)
                 _HUB_CACHE["at"] = now
@@ -400,10 +797,11 @@ class ModelScopeProvider(Provider):
             needle = _alnum(qnl)
             items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
         tagged = []
+        from .capabilities import overlay_modelscope_catalog_item
         for x in items:
             row = dict(x)
             row["backend"] = self.id
-            tagged.append(row)
+            tagged.append(overlay_modelscope_catalog_item(row))
         return {
             "total": len(tagged),
             "count": len(tagged),
@@ -413,6 +811,13 @@ class ModelScopeProvider(Provider):
             "baseUrl": self._base,
             "hub": HUB,
             "hubTotals": totals,
+            "hubCoverage": {
+                "source": (totals or {}).get("source") or "ModelScope AIGC Checkpoint + template + pins",
+                "channel": self.id,
+                "callability": "generatable" if (totals or {}).get("complete") else "unknown",
+                "fetchedUnique": len({x.get("id") for x in tagged}),
+                "hubTotals": totals,
+            },
         }
 
     def owns_service(self, service_id: str) -> bool:
@@ -440,6 +845,8 @@ class ModelScopeProvider(Provider):
         }
 
     def generate(self, payload: dict):
+        if not isinstance(payload, dict) or not isinstance(payload.get("serviceId", ""), str):
+            return 400, {"error": "请求必须是对象，serviceId 必须是文本", "backend": self.id}
         err = self._reach_error()
         if err:
             return 502, {"error": err, "backend": self.id, "baseUrl": self._base}
@@ -447,6 +854,9 @@ class ModelScopeProvider(Provider):
         if not key:
             return 401, {"error": f"没有{self.label} API Key，放在 {self._token_path}", "backend": self.id}
         sid = (payload or {}).get("serviceId") or ""
+        other = "modelscope-ai/" if self.flavor == "cn" else "modelscope-cn/"
+        if sid.startswith(other):
+            return 400, {"error": "模型前缀与所选魔搭 AI/CN 不一致，拒绝跨家发送", "backend": self.id}
         if looks_like_civitai_service(sid):
             return 400, {"error": f"当前选中的是 Civitai 服务，不能发给{self.label}。请选 Tongyi-MAI/Z-Image-Turbo 或 Qwen/Qwen-Image。"}
         mid = model_id(sid)
@@ -461,71 +871,20 @@ class ModelScopeProvider(Provider):
                     "error": f"模型 id 不一致：serviceId={mid} model={want_m}（拒绝 remap）",
                     "backend": self.id,
                 }
-        body = {"model": mid, "prompt": payload.get("prompt") or ""}
-        if payload.get("negativePrompt"):
-            body["negative_prompt"] = payload["negativePrompt"]
-        if payload.get("seed") not in (None, "", "random"):
-            seed = _clamp_seed(payload.get("seed"))
-            if seed is not None:
-                body["seed"] = seed
-        if payload.get("steps"):
-            try:
-                body["steps"] = int(payload["steps"])
-            except (TypeError, ValueError):
-                pass
-        if payload.get("cfgScale") not in (None, ""):
-            try:
-                body["guidance"] = float(payload["cfgScale"])
-            except (TypeError, ValueError):
-                pass
-        if payload.get("width") and payload.get("height"):
-            try:
-                body["size"] = f"{int(payload['width'])}x{int(payload['height'])}"
-            except (TypeError, ValueError):
-                pass
-        if "size" not in body:
-            res = payload.get("resolution") or payload.get("size")
-            if isinstance(res, str):
-                m = re.match(r"^(\d+)\s*[x×*]\s*(\d+)$", res.strip(), re.I)
-                if m:
-                    body["size"] = f"{int(m.group(1))}x{int(m.group(2))}"
-        ms_loras = _modelscope_loras(payload)
-        lora_skip = None
-        if ms_loras is not None:
-            body["loras"] = ms_loras
-        elif payload.get("loras"):
-            lora_skip = "魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用"
-        from .ref_images import payload_ref_images, primary_frame, max_refs
-        from .capabilities import get_provider_capabilities
-        caps = get_provider_capabilities(self.id)
-        img = primary_frame(payload)
-        extra = payload_ref_images(payload, backend=self.id, caps=caps)
-        ref_cap = max_refs(backend=self.id, caps=caps, payload=payload)
-        kind = str((payload or {}).get("kind") or (payload or {}).get("recipe") or "").lower()
-        task = str((payload or {}).get("task") or "").lower()
-        is_video = kind == "video" or "image-to-video" in task or "i2v" in task
-        # i2v: always land first frame into official image_url (string)
-        if is_video and img:
-            body["image_url"] = img
-        elif (is_edit(mid) or img) and extra:
-            # i2i / edit: list when multi, else string — Hub accepts either
-            body["image_url"] = extra[:ref_cap] if len(extra) > 1 else extra[0]
+        try:
+            body = _image_body(payload, mid, self.id)
+        except ValueError as exc:
+            return 400, {"error": str(exc), "backend": self.id}
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
         url = f"{self._base}/images/generations"
         code, data = json_call(url, method="POST", headers=headers, body=body, timeout=90)
-        official = {"model", "prompt", "negative_prompt", "size", "seed", "steps", "guidance", "image_url", "loras"}
-        extra_keys = set(body) - official
-        if code >= 400 and extra_keys:
-            slim = {k: v for k, v in body.items() if k in official}
-            code, data = json_call(url, method="POST", headers=headers, body=slim, timeout=90)
-            body = slim
         if not isinstance(data, dict):
-            return code, {"error": f"{self.label} 响应无效", "backend": self.id, "baseUrl": self._base}
-        if code >= 400:
+            return code if code >= 400 else 502, {"error": f"{self.label} 响应无效", "backend": self.id, "baseUrl": self._base}
+        if code >= 400 or data.get("error"):
             data.setdefault("error", extract_error(data, f"HTTP {code}"))
             data["backend"] = self.id
             data["baseUrl"] = self._base
-            return code, data
+            return code if code >= 400 else 502, data
         nested = data.get("data") if isinstance(data.get("data"), dict) else {}
         tid = data.get("task_id") or data.get("taskId") or nested.get("task_id") or data.get("id")
         if not tid:
@@ -538,8 +897,6 @@ class ModelScopeProvider(Provider):
         data["backend"] = self.id
         data["endpoint"] = mid
         data["submittedInput"] = body
-        if lora_skip:
-            data["warning"] = lora_skip
         remember_job(jid, {
             "backend": self.id,
             "serviceId": mid,
