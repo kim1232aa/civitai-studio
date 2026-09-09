@@ -3894,8 +3894,14 @@
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
         // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
-        const pollMax = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 180 : 40;
-        const pollMs = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v")) ? 3000 : 2500;
+        // Hub image (魔搭 AI) routinely exceeds 100s — keep "? 180 : 40" then extend Hub ticks.
+        const isVideoPoll = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v"));
+        let pollMax = isVideoPoll ? 180 : 40;
+        const pollMs = isVideoPoll ? 3000 : 2500;
+        const bePoll = currentBackend() || (payload && payload.backend) || "";
+        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface")) {
+          pollMax = 120;
+        }
         for (let i = 0; i < pollMax; i++) {
           if (state.groupRunAbort) {
             setShotBusy(shot, false);
@@ -3955,7 +3961,7 @@
           || !j.status
         ));
         if (stillGoing) {
-          setMsg(prefix + "等待超时，云端任务仍在进行中（视频约需数分钟，可稍后用任务 id 再查）", "warn");
+          setMsg(prefix + "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）", "warn");
         } else {
           setMsg(prefix + "云端已返回，没有可预览地址", "warn");
         }

@@ -942,6 +942,32 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(n).decode())
 
+    def _audit_generate(self, payload, prov, code, data):
+        """Record real POST /api/generate — keys only, no tokens, no image bytes."""
+        payload = payload if isinstance(payload, dict) else {}
+        data = data if isinstance(data, dict) else {}
+        rec = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "backend": getattr(prov, "id", None),
+            "serviceId": payload.get("serviceId") or payload.get("endpoint"),
+            "promptLen": len(str(payload.get("prompt") or "")),
+            "keys": sorted(str(k) for k in payload.keys()),
+            "nLoras": len(payload["loras"]) if isinstance(payload.get("loras"), list) else 0,
+            "code": code,
+            "jobId": data.get("id") or data.get("jobId") or data.get("workflowId"),
+            "status": data.get("status"),
+            "saved": data.get("saved"),
+            "error": data.get("error") if code >= 400 else None,
+        }
+        line = json.dumps(rec, ensure_ascii=False)
+        print("[web] GENERATE", line[:2000], flush=True)
+        try:
+            fp = OUT / "generate-audit.jsonl"
+            with fp.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception as e:
+            print("[web] generate-audit skip", e, flush=True)
+
     def _cancel_job(self, path):
         rest = urllib.parse.unquote(path.split("/api/jobs/", 1)[1])
         job_id = rest[:-7] if rest.endswith("/cancel") else rest
@@ -1108,6 +1134,16 @@ class Handler(BaseHTTPRequestHandler):
             wf_id = urllib.parse.unquote(path.split("/api/jobs/", 1)[1])
             prov = providers.resolve_from_job(wf_id)
             code, data = prov.job_status(wf_id)
+            if isinstance(data, dict):
+                st = str(data.get("status") or "").lower()
+                if data.get("saved") or st in ("succeeded", "failed", "done", "completed", "error"):
+                    print("[web] JOB", json.dumps({
+                        "id": wf_id,
+                        "backend": data.get("backend") or getattr(prov, "id", None),
+                        "status": data.get("status"),
+                        "saved": data.get("saved"),
+                        "error": data.get("error"),
+                    }, ensure_ascii=False)[:1500], flush=True)
             return self._json(code, data)
         if path == "/api/import":
             backend = (qs.get("backend") or ["civitai"])[0]
@@ -1255,6 +1291,7 @@ class Handler(BaseHTTPRequestHandler):
                 code, data = prov.whatif(payload)
             else:
                 code, data = prov.generate(payload)
+                self._audit_generate(payload, prov, code, data)
             return self._json(code, data)
         if path == "/api/catalog/refresh":
             try:
