@@ -71,6 +71,18 @@ _KREA_PIN = {
     "tags": ["t2i"],
 }
 
+_I2I_PIN = {
+    "id": "Qwen/Qwen-Image-Edit",
+    "name": "Qwen Image Edit",
+    "category": "image",
+    "backend": "huggingface",
+    "status": "available",
+    "task": "image-to-image",
+    "tags": ["i2i"],
+    "needsSource": True,
+    "pipelineTag": "image-to-image",
+}
+
 
 def load_items():
     fp = DOCS / "hf-models.json"
@@ -82,9 +94,13 @@ def load_items():
                 items = [x for x in raw if isinstance(x, dict)]
         except Exception:
             items = []
-    if not any(x.get("id") == "krea/Krea-2-Turbo" for x in items):
-        items = [dict(_KREA_PIN), *items]
-    return items
+    extra = []
+    ids = {x.get("id") for x in items}
+    if "krea/Krea-2-Turbo" not in ids:
+        extra.append(dict(_KREA_PIN))
+    if "Qwen/Qwen-Image-Edit" not in ids:
+        extra.append(dict(_I2I_PIN))
+    return extra + items
 
 
 def model_id(service_id: str) -> str:
@@ -463,6 +479,9 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
             body["image_urls"] = refs
         else:
             body["image_url"] = refs[0]
+        if mapping_task == "image-to-image" and not fields:
+            body["image_url"] = refs[0]
+            body["image_urls"] = refs
     _force_loras(body, payload or {})
     # Pass endpoint-specific input fields through; never silently discard a supplied field.
     for field in fields.intersection(payload):
@@ -512,7 +531,13 @@ def _call_bytes(mid: str, payload: dict, spec: dict, key: str, timeout: int):
 
 
 def _queue_url(value):
-    """Re-route only official Fal queue paths; never send the HF key elsewhere."""
+    """Re-route only official Fal queue paths; never send the HF key elsewhere.
+
+    HF official FalAiQueueTask builds status/result as
+    `https://router.huggingface.co/fal-ai` + response_url.pathname.
+    queue.fal.run pathnames already start with `/fal-ai/`, so the router
+    URL is `/fal-ai/fal-ai/...`. Do not collapse that prefix.
+    """
     parsed = urlsplit(value) if isinstance(value, str) else None
     if not parsed or parsed.scheme != "https" or parsed.netloc not in ("queue.fal.run", "fal.run", "router.huggingface.co"):
         raise ValueError("HF 队列响应包含无效地址")
@@ -520,7 +545,8 @@ def _queue_url(value):
     if parsed.netloc == "router.huggingface.co":
         if not path.startswith("/fal-ai/"):
             raise ValueError("HF 队列地址不是 Fal 路由")
-        path = path[len("/fal-ai"):]
+        if path.startswith("/fal-ai/fal-ai/"):
+            path = path[len("/fal-ai"):]
     if not path.startswith("/fal-ai/") or "/requests/" not in path or ".." in path.split("/"):
         raise ValueError("HF 队列响应缺少合法请求路径")
     return f"{ROUTER}/fal-ai{path}?_subdomain=queue"
@@ -618,6 +644,17 @@ def _hf_row(mid, name, pipe, *, raw=None, mapping=None):
         row["needsSource"] = True
     if needs_ff:
         row["needsFirstFrame"] = True
+    if cat == "image":
+        eats = bool(needs_src)
+        row["capabilities"] = {
+            "image_to_image": eats,
+            "maxRefs": 1,
+            "maxImages": 1,
+            "refImagesField": "image_url",
+            "imageFields": ["image_url"] if eats else [],
+        }
+        if eats:
+            row["supported_parameters"] = {"max_input_images": 1}
     return _apply_upscale_category(row)
 
 
@@ -701,7 +738,23 @@ def _pipeline_for_category(category):
     return "text-to-image"
 
 
-def _hub_browse_url(q="", category="", page_size=_HF_PAGE_SIZE):
+def _pipelines_for_category(category, q=""):
+    """Official Hub filters for one Studio catalog request.
+
+    Search keeps a single untagged Hub page. Image browse is t2i + i2i,
+    one page each (limit≤50), not a Hub crawl.
+    """
+    if (q or "").strip():
+        return [None]
+    cat = (category or "").strip().lower()
+    if cat == "video":
+        return ["text-to-video"]
+    if cat in HF_PIPES:
+        return [cat]
+    return ["text-to-image", "image-to-image"]
+
+
+def _hub_browse_url(q="", category="", page_size=_HF_PAGE_SIZE, pipeline=None):
     """One official Hub list page. Filters: inference_provider=all, optional pipeline_tag/search.
 
     Docs: https://huggingface.co/docs/inference-providers/hub-api
@@ -717,7 +770,8 @@ def _hub_browse_url(q="", category="", page_size=_HF_PAGE_SIZE):
     if qn:
         parts.insert(0, f"search={quote(qn)}")
     else:
-        parts.insert(0, f"pipeline_tag={quote(_pipeline_for_category(category))}")
+        pipe = pipeline or _pipeline_for_category(category)
+        parts.insert(0, f"pipeline_tag={quote(pipe)}")
     return f"{HUB}?{'&'.join(parts)}"
 
 
@@ -725,17 +779,31 @@ def _catalog_key(q, category, page, page_size):
     return ((q or "").strip(), (category or "").strip().lower(), int(page), int(page_size))
 
 
-def _store_next(key, url):
-    trusted = _trusted_hub_list_url(url)
+def _store_next(key, urls):
+    if isinstance(urls, str):
+        urls = [urls]
+    trusted = []
+    for url in urls or []:
+        item = _trusted_hub_list_url(url)
+        if item:
+            trusted.append(item)
     if trusted:
-        _HF_NEXT_BY_KEY[key] = {"at": time.time(), "url": trusted}
+        _HF_NEXT_BY_KEY[key] = {"at": time.time(), "urls": trusted, "url": trusted[0]}
 
 
 def _load_next(q, category, page, page_size):
     hit = _HF_NEXT_BY_KEY.get(_catalog_key(q, category, page, page_size))
     if not hit or (time.time() - (hit.get("at") or 0)) >= _HF_CATALOG_TTL:
-        return None
-    return _trusted_hub_list_url(hit.get("url"))
+        return []
+    raw = hit.get("urls")
+    if not raw and hit.get("url"):
+        raw = [hit["url"]]
+    out = []
+    for url in raw or []:
+        item = _trusted_hub_list_url(url)
+        if item:
+            out.append(item)
+    return out
 
 
 def _pipe_from_item(it):
@@ -766,8 +834,20 @@ def _ingest_hub_row(items, seen, it):
     return True
 
 
+def _pin_row(pin):
+    pid = (pin.get("id") or "").strip()
+    pipe = pin.get("pipelineTag") or pin.get("task") or "text-to-image"
+    if pipe not in HF_PIPES:
+        pipe = "text-to-image"
+    return _hf_row(pid, pin.get("name") or pid, pipe, raw=pin)
+
+
 def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, category="", cursor=None):
-    """Pins plus at most one Hub list page. Never follows Link rel=next on this call."""
+    """Pins plus one Hub page per official pipeline. Never follows Link rel=next on this call.
+
+    Image browse hits text-to-image and image-to-image (limit≤50 each). Search is
+    still a single untagged Hub page.
+    """
     q = (q or "").strip()
     page, page_size = _normalize_page(page, page_size)
     items, seen = [], set()
@@ -776,7 +856,7 @@ def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, categ
     for p in pins:
         pid = p.get("id")
         if pid and (needle in _alnum(p.get("name")) or needle in _alnum(pid)):
-            items.append(dict(p))
+            items.append(_pin_row(p))
             seen.add(pid)
     stats = {
         "pages": 0,
@@ -790,6 +870,8 @@ def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, categ
         "errors": [],
         "filter": "inference_provider=all",
         "pagination": "Hub RFC 5988 Link rel=next cursor; Studio exposes integer nextPage",
+        "pipelines": [p for p in _pipelines_for_category(category, q) if p],
+        "hubUrls": [],
     }
     if q.count("/") == 1 and " " not in q and q not in seen:
         code, data = json_call(
@@ -800,14 +882,16 @@ def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, categ
             _ingest_hub_row(items, seen, data)
         elif code != 200:
             stats["errors"].append({"url": f"{HUB}/{q}", "status": code})
-    url = None
+    urls = []
     if cursor:
         url = _trusted_hub_list_url(cursor)
         if not url:
             stats["errors"].append({"url": cursor, "error": "分页地址不是 Hub /api/models"})
+        else:
+            urls = [url]
     elif page > 1:
-        url = _load_next(q, category, page - 1, page_size)
-        if not url:
+        urls = _load_next(q, category, page - 1, page_size)
+        if not urls:
             stats["errors"].append({
                 "page": page,
                 "error": "没有上一页的 Hub cursor，拒绝盲走下一页",
@@ -817,27 +901,35 @@ def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, categ
             stats["coverage"] = "partial"
             return items, stats
     else:
-        url = _hub_browse_url(q=q, category=category, page_size=page_size)
-    if url:
+        pipes = _pipelines_for_category(category, q)
+        each = page_size if pipes == [None] or len(pipes) <= 1 else max(1, page_size // len(pipes))
+        stats["pageSizeEach"] = each
+        for pipe in pipes:
+            urls.append(_hub_browse_url(q=q, category=category, page_size=each, pipeline=pipe))
+    next_urls = []
+    for url in urls:
         code, data, next_url = _hf_list_page(url)
-        stats["pages"] = 1
+        stats["pages"] += 1
         stats["hubUrl"] = url
+        stats["hubUrls"].append(url)
         if code != 200 or not isinstance(data, list):
             stats["errors"].append({"url": url, "status": code})
-        else:
-            added = 0
-            for it in data:
-                if _ingest_hub_row(items, seen, it):
-                    added += 1
-            stats["hubFetched"] = added
-            next_url = _trusted_hub_list_url(next_url)
-            if next_url:
-                stats["hasMore"] = True
-                stats["nextPage"] = page + 1
-                stats["nextCursor"] = _cursor_from_url(next_url)
-                _store_next(_catalog_key(q, category, page, page_size), next_url)
-            else:
-                stats["complete"] = not stats["errors"]
+            continue
+        added = 0
+        for it in data:
+            if _ingest_hub_row(items, seen, it):
+                added += 1
+        stats["hubFetched"] = stats.get("hubFetched", 0) + added
+        next_url = _trusted_hub_list_url(next_url)
+        if next_url:
+            next_urls.append(next_url)
+    if next_urls:
+        stats["hasMore"] = True
+        stats["nextPage"] = page + 1
+        stats["nextCursor"] = _cursor_from_url(next_urls[0])
+        _store_next(_catalog_key(q, category, page, page_size), next_urls)
+    else:
+        stats["complete"] = not stats["errors"]
     stats["unique"] = len(items)
     stats["coverage"] = "Hub list complete for this filter" if stats["complete"] else "partial"
     return items, stats
@@ -1147,7 +1239,11 @@ class HuggingFaceProvider(Provider):
             return 200, {**out, "status": "failed", "error": extract_error(data, f"HF 队列状态异常：{state}")}
         code, result = json_call(meta["queueResultUrl"], headers=headers, timeout=60)
         if code >= 400 or not isinstance(result, dict) or result.get("error"):
-            return code if code >= 400 else 502, {**out, "error": extract_error(result, "HF 获取结果失败")}
+            return 200, {
+                **out,
+                "status": "failed",
+                "error": extract_error(result, "HF 获取结果失败"),
+            }
         try:
             saved = _save_json_images(result, job_id, meta=meta)
         except Exception as exc:

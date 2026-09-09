@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
   // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
   // v0821o6: Magao ② mount Tongyi-MAI/Z-Image-Turbo + Hub LoRA; skip Civitai http; no AI↔CN drift
@@ -136,8 +137,12 @@
     return mediaKindOf(u, n.kind === "shot" ? n.mode : (n.mediaKind || n.kind)) === "image";
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
-  function box(n) { return n.kind === "shot" ? { w: 640, h: 360 } : { w: 132, h: 208 }; }
-  function assets() { return state.nodes.filter((n) => n.kind !== "shot"); }
+  function box(n) {
+    if (n.kind === "shot") return { w: 640, h: 360 };
+    if (n.kind === "text") return { w: 320, h: 280 };
+    return { w: 132, h: 208 };
+  }
+  function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
   function connectedNodes(shotId) {
     return state.edges.filter((e) => e.to === shotId).map((e) => nodeById(e.from)).filter(Boolean);
@@ -147,7 +152,7 @@
   }
   function connectedPending(shotId) {
     // A blank shot is an upstream generation dependency, not an upload in flight.
-    return connectedNodes(shotId).filter((n) => n && n.kind !== "shot" && !n.url);
+    return connectedNodes(shotId).filter((n) => n && n.kind !== "shot" && n.kind !== "text" && !n.url);
   }
   function refReadyMessage(shot) {
     if ((state.uploading || 0) > 0) return "参考图上传中，请稍等";
@@ -169,7 +174,134 @@
   function sourceTitle(n) {
     if (!n) return "";
     if (n.kind === "shot") return (n.title || "分镜") + "成片";
+    if (n.kind === "text") return n.title || "提示词";
     return n.title || "资产";
+  }
+
+  function describePrompt(asset, caption) {
+    if (!asset || !asset.url) return "";
+    return String(caption || "")
+      .split("\n")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  async function captionFromAsset(asset) {
+    if (!asset || !asset.url) return "";
+    try {
+      const r = await fetch("/api/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: asset.url }),
+      });
+      let j = null;
+      try { j = await r.json(); } catch (_) { j = null; }
+      if (r.ok) {
+        const cap = j && (j.caption || j.text || j.prompt);
+        if (cap) return String(cap);
+      }
+      const err = (j && (j.error || j.message)) || ("视觉打标失败 HTTP " + r.status);
+      setMsg(err, "warn");
+    } catch (e) {
+      setMsg("视觉打标失败：" + ((e && e.message) || e), "warn");
+    }
+    try {
+      const sidecar = asset.url.replace(/\.[a-zA-Z0-9]+(\?|$)/, ".json$1");
+      if (sidecar !== asset.url) {
+        const r2 = await fetch(sidecar);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          const cap2 = j2 && (j2.caption || j2.text || j2.prompt);
+          if (cap2) return String(cap2);
+        }
+      }
+    } catch (_) {}
+    return "";
+  }
+
+  async function reverseFromImage(asset) {
+    if (!asset || !asset.url) return null;
+    let node = state.nodes.find(
+      (n) => n.kind === "text" && state.edges.some((e) => e.from === asset.id && e.to === n.id),
+    );
+    const userCaption = node ? String(node.text || "").trim() : "";
+    let visualCaption = "";
+    try {
+      visualCaption = await captionFromAsset(asset);
+    } catch (_) {
+      visualCaption = "";
+    }
+    const text = describePrompt(asset, [userCaption, visualCaption].filter(Boolean).join("\n"));
+    if (!text) {
+      setMsg("未能从真实资产取得描述，请先填写提示词", "warn");
+      return null;
+    }
+    if (node) {
+      node.text = text;
+    } else {
+      node = {
+        id: uid("text"),
+        kind: "text",
+        title: "反推·" + sourceTitle(asset),
+        x: asset.x + 220,
+        y: asset.y,
+        text: text,
+      };
+      state.nodes.push(node);
+      state.edges.push({ from: asset.id, to: node.id });
+    }
+    selectNode(node.id);
+    persist();
+    return node;
+  }
+
+  async function generateFromText(node) {
+    if (!node || node.kind !== "text") return;
+    let shot = shots().find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id));
+    if (!shot) {
+      const i = shots().length;
+      const pos = typeof newShotPosition === "function" ? newShotPosition(i) : { x: node.x + 420, y: node.y };
+      shot = {
+        id: uid("shot"),
+        kind: "shot",
+        title: "分镜" + (i + 1),
+        x: pos.x,
+        y: pos.y,
+        url: "",
+        firstFrameId: "",
+        prompt: "",
+      };
+      state.nodes.push(shot);
+      state.edges.push({ from: node.id, to: shot.id });
+    }
+    shot.prompt = node.text || "";
+    connectedNodes(node.id).filter(isImageSource).forEach((img) => {
+      if (!state.edges.some((e) => e.from === img.id && e.to === shot.id)) {
+        state.edges.push({ from: img.id, to: shot.id });
+      }
+      if (!shot.firstFrameId) shot.firstFrameId = img.id;
+    });
+    state.mode = "image";
+    selectNode(shot.id);
+    if ($("prompt")) $("prompt").value = shot.prompt || "";
+    persist();
+    if (!$("service") || !$("service").value) {
+      await loadCatalog();
+    }
+    if (!$("service") || !$("service").value) {
+      setMsg("生图必须显式选择图片模型，不会用默认假值", "bad");
+      renderDock();
+      return;
+    }
+    const item = catalogItemForService();
+    const category = String((item && item.category) || "").toLowerCase();
+    if (category === "text" || category === "chat") {
+      setMsg("当前选中的是文本模型，不能拿去生图。请先切到图片模型", "bad");
+      renderDock();
+      return;
+    }
+    await generate();
   }
   /** Raw outs / provider file ids — must never land in the prompt textarea. */
   function isRawFileTitle(t) {
@@ -455,7 +587,9 @@
 
   function canLink(src, dst) {
     if (!src || !dst || src.id === dst.id) return false;
+    if (dst.kind === "text") return isImageSource(src);
     if (dst.kind !== "shot") return false;
+    if (src.kind === "text") return true;
     // Blank image shots are real upstream dependencies, not fake image assets.
     // Video/audio results cannot feed an image port.
     if (!isImageSource(src) && !(src.kind === "shot" && !src.url &&
@@ -573,11 +707,12 @@
       let src = null;
       let dst = null;
       if (fromSide === "out") {
-        if (n.kind !== "shot") return;
+        if (n.kind !== "shot" && n.kind !== "text") return;
         side = "in";
         src = from;
         dst = n;
       } else {
+        if (from.kind !== "shot" && from.kind !== "text") return;
         side = "out";
         src = n;
         dst = from;
@@ -629,6 +764,18 @@
     const sel = state.selected === n.id ? " sel" : "";
     const multi = isMulti(n.id) ? " multi" : "";
     const badge = mediaBadge(n);
+    if (n.kind === "text") {
+      return '<div class="card text' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+        '<div class="label">✎ ' + esc(n.title || "提示词") + "</div>" +
+        '<textarea class="editor" data-text data-id="' + esc(n.id) + '" placeholder="反推或手写提示词…">' +
+        esc(n.text || "") + "</textarea>" +
+        '<div class="acts">' +
+        '<button type="button" data-textact="rev" data-id="' + esc(n.id) + '">反推</button>' +
+        '<button type="button" data-textact="gen" data-id="' + esc(n.id) + '">生图</button>' +
+        "</div>" +
+        '<button class="port in" data-side="in" type="button" aria-label="输入"></button>' +
+        '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
+    }
     if (n.kind === "shot") {
       const media = n.url
         ? (isVideoUrl(n.url)
@@ -1130,7 +1277,7 @@
       invalidateStageProgress(shot);
     }
     mention(asset, shot);
-    if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
     return true;
   }
   function unlinkAssetFromShot(asset, shot) {
@@ -1722,6 +1869,12 @@
     }
     if (card) {
       const n = nodeById(card.dataset.id);
+      if (e.target.closest("textarea,[data-textact],.acts")) {
+        if (state.selected !== n.id || e.shiftKey) {
+          selectNode(n.id, { shift: !!(e.shiftKey) });
+        }
+        return;
+      }
       selectNode(n.id, { shift: !!(e.shiftKey) });
       if (e.shiftKey) {
         // multi-toggle only — skip drag start to avoid accidental moves
@@ -1789,7 +1942,7 @@
         if (linkAssetToShot(src, dst)) {
           selectNode(dst.id);
         } else {
-          setMsg("连线被拒绝：需连接图片输出到分镜输入，且不能形成循环", "bad");
+          setMsg("连线被拒绝：需连接图片到分镜或提示词卡，且不能形成循环", "bad");
         }
       } else if (!target && !snap && isBlankCanvasDrop(e, link)) {
         createLinkedShot(link, w);
@@ -1834,6 +1987,35 @@
     applyCam(); persist();
   }, { passive: false });
 
+  world.addEventListener("input", (e) => {
+    const ta = e.target.closest("textarea[data-text]");
+    if (!ta) return;
+    const n = nodeById(ta.dataset.id);
+    if (n && n.kind === "text") {
+      n.text = ta.value;
+      persist();
+    }
+  });
+  world.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-textact]");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const n = nodeById(btn.dataset.id);
+    if (!n) return;
+    if (btn.dataset.textact === "gen") {
+      generateFromText(n);
+    } else if (btn.dataset.textact === "rev") {
+      const src = connectedNodes(n.id).find(isImageSource);
+      if (src) {
+        setMsg("正在反推…");
+        reverseFromImage(src).then((node) => {
+          if (node) setMsg("反推完成，提示词已更新", "ok");
+        });
+      } else setMsg("这张提示词卡还没连图片", "warn");
+    }
+  });
+
   $("refs").addEventListener("click", (e) => {
     const frameBtn = e.target.closest("[data-frame]");
     if (frameBtn) {
@@ -1869,11 +2051,11 @@
     const hit = hitNode(w.x, w.y);
     let node = payload.node || null;
     if (!node && payload.item) node = spawnHistoryAt(payload.item, w.x - 66, w.y - 40);
-    if (node && (!hit || hit.kind !== "shot")) {
+    if (node && (!hit || (hit.kind !== "shot" && hit.kind !== "text"))) {
       node.x = w.x - 66;
       node.y = w.y - 40;
     }
-    if (node && hit && hit.kind === "shot") {
+    if (node && hit && (hit.kind === "shot" || hit.kind === "text")) {
       linkAssetToShot(node, hit);
       selectNode(hit.id);
     } else if (node) {
@@ -4294,6 +4476,43 @@
     constrainShotsToViewport();
     selectNode(id); persist();
   };
+  if ($("btnText")) {
+    $("btnText").onclick = () => {
+      const base = nodeById(state.selected);
+      const id = uid("text");
+      state.nodes.push({
+        id: id,
+        kind: "text",
+        title: "提示词",
+        x: base ? base.x + 200 : 220,
+        y: base ? base.y : 24,
+        text: "",
+      });
+      selectNode(id);
+      persist();
+    };
+  }
+  if ($("btnRev")) {
+    $("btnRev").onclick = () => {
+      const n = nodeById(state.selected);
+      const src =
+        n && isImageSource(n)
+          ? n
+          : n && n.kind === "shot"
+            ? frameAsset(n)
+            : n && n.kind === "text"
+              ? connectedNodes(n.id).find(isImageSource)
+              : null;
+      if (!src) {
+        setMsg("先选中一张图片资产再反推", "warn");
+        return;
+      }
+      setMsg("正在反推…");
+      reverseFromImage(src).then((node) => {
+        if (node) setMsg("反推完成，提示词已写入文本节点", "ok");
+      });
+    };
+  }
   function resolveLayoutScope(fromSelBar) {
     pruneGroups();
     const multiIds = (state.multi || []).filter((id) => !!nodeById(id));

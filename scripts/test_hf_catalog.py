@@ -20,6 +20,13 @@ HUB_ROW = {
         {"provider": "fal-ai", "status": "live", "providerId": "fal-ai/x", "task": "text-to-image"},
     ],
 }
+I2I_ROW = {
+    "id": "org/hub-edit",
+    "pipeline_tag": "image-to-image",
+    "inferenceProviderMapping": [
+        {"provider": "fal-ai", "status": "live", "providerId": "fal-ai/x/edit", "task": "image-to-image"},
+    ],
+}
 
 
 def _reset_cache():
@@ -39,22 +46,31 @@ class HFCatalogTests(unittest.TestCase):
             self.calls.append(url)
             if "cursor=" in url:
                 raise AssertionError("request-path catalog must not follow Link rel=next")
+            query = parse_qs(urlsplit(url).query)
+            tags = query.get("pipeline_tag") or []
+            if tags == ["image-to-image"]:
+                return 200, [dict(I2I_ROW)], None
             return 200, [dict(HUB_ROW)], NEXT
 
         self.list_page = self.enterContext(patch.object(hf, "_hf_list_page", side_effect=one_page))
 
     def test_empty_catalog_is_one_hub_page_with_krea_pin(self):
         body = hf.HuggingFaceProvider().catalog("", "image", "")
-        self.assertEqual(len(self.calls), 1)
-        query = parse_qs(urlsplit(self.calls[0]).query)
-        self.assertEqual(query.get("inference_provider"), ["all"])
-        self.assertEqual(query.get("pipeline_tag"), ["text-to-image"])
-        self.assertEqual(query.get("limit"), ["50"])
-        self.assertNotEqual(query.get("limit"), ["1000"])
+        self.assertEqual(len(self.calls), 2)
+        pipes = []
+        for url in self.calls:
+            query = parse_qs(urlsplit(url).query)
+            self.assertEqual(query.get("inference_provider"), ["all"])
+            self.assertEqual(query.get("limit"), ["25"])
+            self.assertNotEqual(query.get("limit"), ["1000"])
+            pipes.extend(query.get("pipeline_tag") or [])
+        self.assertEqual(sorted(pipes), ["image-to-image", "text-to-image"])
         ids = [x["id"] for x in body["items"]]
         self.assertIn("krea/Krea-2-Turbo", ids)
+        self.assertIn("Qwen/Qwen-Image-Edit", ids)
         self.assertIn("org/hub-one", ids)
-        self.assertLessEqual(len(body["items"]), 50 + 20)
+        self.assertIn("org/hub-edit", ids)
+        self.assertLessEqual(len(body["items"]), 50 + 50 + 20)
         self.assertTrue(body["hasMore"])
         self.assertEqual(body["nextPage"], 2)
         self.assertFalse(body["complete"])
@@ -66,11 +82,17 @@ class HFCatalogTests(unittest.TestCase):
         self.assertEqual(body["count"], len(body["items"]))
         self.assertEqual(body["total"], len(body["items"]))
         self.assertTrue(all(x.get("category") == "image" for x in body["items"]))
+        by_id = {x["id"]: x for x in body["items"]}
+        self.assertIs(by_id["org/hub-one"]["capabilities"]["image_to_image"], False)
+        self.assertIs(by_id["org/hub-edit"]["capabilities"]["image_to_image"], True)
+        self.assertTrue(by_id["org/hub-edit"].get("needsSource"))
+        self.assertIs(by_id["krea/Krea-2-Turbo"]["capabilities"]["image_to_image"], False)
+        self.assertIs(by_id["Qwen/Qwen-Image-Edit"]["capabilities"]["image_to_image"], True)
 
     def test_empty_catalog_uses_ttl_cache(self):
         hf.HuggingFaceProvider().catalog("", "image", "")
         hf.HuggingFaceProvider().catalog("", "image", "")
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)
 
     def test_video_category_requests_official_t2v_filter(self):
         hf.HuggingFaceProvider().catalog("", "video", "")
@@ -94,7 +116,7 @@ class HFCatalogTests(unittest.TestCase):
 
     def test_page_two_uses_stored_cursor_not_a_walk(self):
         hf.HuggingFaceProvider().catalog("", "image", "")
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)
 
         def page_two(url):
             self.calls.append(url)
@@ -109,9 +131,10 @@ class HFCatalogTests(unittest.TestCase):
 
         self.list_page.side_effect = page_two
         body = hf.HuggingFaceProvider().catalog("", "image", "", page=2)
-        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(len(self.calls), 3)
         ids = [x["id"] for x in body["items"]]
         self.assertIn("krea/Krea-2-Turbo", ids)
+        self.assertIn("Qwen/Qwen-Image-Edit", ids)
         self.assertIn("org/hub-two", ids)
         self.assertNotIn("org/hub-one", ids)
         self.assertFalse(body["hasMore"])
@@ -141,6 +164,10 @@ class HFCatalogTests(unittest.TestCase):
         row = hf._hf_row("org/hub-one", "hub-one", "text-to-image", raw=HUB_ROW)
         self.assertIn("fal-ai", row["parameterCapabilities"]["channels"])
         self.assertEqual(row["parameterCapabilities"]["channels"]["fal-ai"]["status"], "live")
+        self.assertIs(row["capabilities"]["image_to_image"], False)
+        edit = hf._hf_row("org/hub-edit", "hub-edit", "image-to-image", raw=I2I_ROW)
+        self.assertIs(edit["capabilities"]["image_to_image"], True)
+        self.assertTrue(edit.get("needsSource"))
 
     def test_hub_failure_keeps_pins_and_is_partial(self):
         def fail(url):
@@ -155,7 +182,7 @@ class HFCatalogTests(unittest.TestCase):
         self.assertFalse(body["complete"])
         self.assertTrue(body["hubCoverage"]["errors"])
         hf.HuggingFaceProvider().catalog("", "image", "")
-        self.assertEqual(len(self.calls), 2, "failed first page must not be cached as success")
+        self.assertEqual(len(self.calls), 4, "failed first page must not be cached as success")
 
 
 if __name__ == "__main__":
