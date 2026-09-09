@@ -938,9 +938,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def _bytes(self, code, data, ctype):
         self.send_response(code)
+        ctype = ctype or "application/octet-stream"
+        # Browsers decode JS/CSS string literals from Content-Type charset.
+        # Without utf-8, Chinese card titles/prompts in storyboard.js mojibake.
+        lower = ctype.lower()
+        if "charset=" not in lower and (
+            "javascript" in lower or "css" in lower or "html" in lower or lower.startswith("text/")
+        ):
+            ctype = f"{ctype}; charset=utf-8"
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        if "html" in (ctype or "") or "javascript" in (ctype or ""):
+        if "html" in lower or "javascript" in lower:
             self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
             self.send_header("Pragma", "no-cache")
         self.end_headers()
