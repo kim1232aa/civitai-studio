@@ -59,8 +59,8 @@
     check(Math.abs(parseFloat(s.width) - (shot ? 640 : 132)) < .1 &&
       Math.abs(parseFloat(s.height) - (shot ? 360 : 208)) < .1, "node geometry matches graph " + card.dataset.id);
   }
-  for (const media of document.querySelectorAll(".card img, .card video"))
-    check(getComputedStyle(media).objectFit === "contain", "full media frame preserved");
+  for (const media of document.querySelectorAll(".card.shot .face img, .card.shot .face video, .card.asset img.thumb, .card.asset video.thumb"))
+    check(getComputedStyle(media).objectFit === "cover", "card media fills face without letterbox bars");
   for (const edge of document.querySelectorAll("path.edge"))
     check(getComputedStyle(edge).vectorEffect === "non-scaling-stroke", "wire remains legible on zoom");
   for (const group of document.querySelectorAll(".param-group.hidden"))

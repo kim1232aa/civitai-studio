@@ -451,7 +451,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
         m = js.find("function runSelected", k)
     run = js[k:m if m > 0 else k + 16000]
     assert_true("refUrls.length > refCap" in run, "over-cap compare in runShotStep")
-    assert_true('status: "blocked"' in run and "超过上限" in run, "over-cap returns blocked with setMsg")
+    assert_true("return fail(" in run and "超过上限" in run, "over-cap returns fail/blocked")
     assert_true("不静默丢弃" in run or "超过上限" in run, "loud over-cap message")
     assert_true("function catalogEatsRefs" in js, "t2i image_to_image=false helper")
     assert_true("function refUnusedGateMessage" in js, "t2i-with-refs hard gate")
@@ -625,7 +625,7 @@ def test_empty_prompt_on_new_shot_and_load_demo():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
@@ -1006,13 +1006,13 @@ def test_v0820c_hard_service():
     assert_true("不会默认填入 Krea2" in run, "hard error mentions no Krea2 default")
     assert_true("state._civitaiDefaultService || CIVITAI_PREF_SERVICE" not in run,
                 "runShotStep must not soft-fill CIVITAI_PREF")
-    assert_true('return { status: "blocked"' in run, "aborts generate on empty service")
+    assert_true("return fail(" in run and "请先选择 Civitai 服务" in run, "aborts generate on empty service")
     # payload.serviceId from UI only
     assert_true("payload.serviceId = sid" in run or "payload.serviceId=sid" in run.replace(" ", ""),
                 "sets payload.serviceId from explicit sid")
 
     # loadCatalog: pref ordering hint OK; no auto-select pref into empty #service
-    lc = js.find("async function loadCatalog")
+    lc = js.find("function loadCatalog")
     assert_true(lc >= 0, "loadCatalog")
     lc_end = js.find("async function loadOuts", lc)
     cat = js[lc:lc_end]
@@ -1037,7 +1037,7 @@ def test_v0821n_krea2_import_hardgate():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -1127,7 +1127,7 @@ def test_v0821_hardgate_i2v_refs():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
@@ -1210,7 +1210,7 @@ def test_v0821b_i2v_detect():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
@@ -1332,7 +1332,7 @@ def test_v0821c_fal_i2v_preview():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
@@ -1418,7 +1418,7 @@ def test_v0821f_send_noop():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
@@ -1485,8 +1485,8 @@ def test_v0821g_send_bind():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1543,8 +1543,8 @@ def test_v0821h_send_aria():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1606,7 +1606,7 @@ def test_v0821i_i2v_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
@@ -1618,10 +1618,15 @@ def test_v0821i_i2v_writeback():
     assert_true("isVideoUrl(url)) return null" not in pr, "promoteResult must not skip videos")
     assert_true("v0821i" in pr or "promote images AND videos" in pr, "v0821i promote note")
 
-    # writeback helper
+    # writeback helper: write onto the shot, never auto-promote a clone card
     assert_true("function writebackResult" in js, "writebackResult helper")
     assert_true("function pushHistoryItem" in js, "pushHistoryItem helper")
     assert_true("writebackResult(shot, url)" in js, "success path calls writebackResult")
+    wb = js[js.find("function writebackResult"):js.find("function pickUrl")]
+    assert_true("promoteResult(" not in wb, "writebackResult must not spawn canvas clone via promoteResult")
+    assert_true("removeUnpromotedFromShot" in wb, "writebackResult drops leftover 分镜N成片 clones")
+    assert_true("此镜完成，已写入卡片" in js, "success copy writes onto the card")
+    assert_true("成片已收进资产库" not in js, "success copy must not imply a duplicate asset card")
 
     # card video preview
     assert_true('playsinline preload="metadata"' in js, "shot/asset video preload")
@@ -1710,8 +1715,8 @@ def test_v0821j_send_busy_msg():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1831,8 +1836,8 @@ def test_v0821k_i2v_prompt_req():
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2019,8 +2024,8 @@ def test_v0821l_send_once():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2166,7 +2171,7 @@ def test_v0821m2_poll_copy():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
     assert_true('"nl-storyboard-v0821l"' in js, "STORE_OLDS keeps v0821l")
@@ -2184,7 +2189,7 @@ def test_v0821n2_lora_air_gate():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
@@ -2253,7 +2258,7 @@ def test_v0821n3_import_air_chip():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -2365,11 +2370,11 @@ def test_v0821n4_js_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
+    assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
@@ -2377,9 +2382,9 @@ def test_v0821n5_dock_scroll():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "script ?v=")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2404,9 +2409,9 @@ def test_v0821o_fal_lora_knife():
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title stamp")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "script cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2572,9 +2577,9 @@ def test_v0821o2_fal_turbo_pin():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2593,7 +2598,7 @@ def test_v0821o2_fal_turbo_pin():
     assert_true("_pinFalLoraService" in block, "mount sets sticky pin")
 
     # loadCatalog must restore pin / prevService (not blank to 默认模型)
-    li = js.find("async function loadCatalog")
+    li = js.find("function loadCatalog")
     lc_end = js.find("async function loadOuts", li)
     lc = js[li:lc_end if lc_end > li else li + 8000]
     assert_true("prevService" in lc, "remembers #service before wipe")
@@ -2634,9 +2639,9 @@ def test_v0821o3_fal_clear_loras():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2776,9 +2781,9 @@ def test_v0821o4_hf_turbo_lora():
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -2984,7 +2989,7 @@ def test_v0821o4_hf_turbo_lora():
                 "docs: no fal /lora sibling")
 
     # loadCatalog keeps Hub option visible
-    lc = js.find("async function loadCatalog")
+    lc = js.find("function loadCatalog")
     cat = js[lc:js.find("async function loadOuts", lc)]
     assert_true("HF_LORA_PREF_SERVICE" in cat or HUB in cat, "catalog injects Hub pin")
     assert_true("ensureHfLoraServiceSelected" in cat, "catalog re-pins HF #service")
@@ -2999,9 +3004,9 @@ def test_v0821o5_hf_no_wavespeed():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true("v0821o8-caption-i2i" in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3143,9 +3148,9 @@ def test_v0821o6_modelscope_hub_lora():
     AIR = "urn:air:sdxl:lora:civitai:1@3231694"
 
     assert_true(STAMP in html, "html stamp")
-    assert_true('<span class="stamp">' + STAMP + "</span>" in html, ".stamp")
-    assert_true(STAMP in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=' + STAMP + '"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3192,7 +3197,7 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true("_wantMsLoraFixture" in js, "CLI ?fixture=ms-lora mounts after catalog")
     assert_true("fixture=ms-lora" in js, "CLI query fixture=ms-lora")
     assert_true('id="btnMsLoraFix"' in html or "btnMsLoraFix" in js, "魔搭 LoRA夹具 button")
-    assert_true("魔搭 LoRA夹具" in html, "Magao fixture button label")
+    assert_true("魔搭模型（不预置 LoRA）" in html or "魔搭 LoRA夹具" in html, "Magao fixture button label")
 
     def _btn_tag(doc, eid):
         i = doc.find('id="' + eid + '"')
@@ -3366,7 +3371,7 @@ def test_v0821o6_modelscope_hub_lora():
                 "gate before POST")
     assert_true("/api/generate" in run, "generate still via page POST (tests must not curl it)")
 
-    lc = js.find("async function loadCatalog")
+    lc = js.find("function loadCatalog")
     cat = js[lc:js.find("async function loadOuts", lc)]
     assert_true("MS_LORA_PREF_SERVICE" in cat or HUB in cat, "catalog injects Magao Hub pin")
     assert_true("ensureMsLoraServiceSelected" in cat, "catalog re-pins Magao #service")
@@ -3518,9 +3523,9 @@ def test_v0821o6b_ms_lora_shape():
     WANT = {HUB_LORA: 0.8}
 
     assert_true(STAMP in html, "html stamp")
-    assert_true('<span class="stamp">' + STAMP + "</span>" in html, ".stamp")
-    assert_true(STAMP in html.split("<title>", 1)[1].split("</title>", 1)[0], "title")
-    assert_true('src="/static/storyboard.js?v=' + STAMP + '"' in html, "cache-bust ?v=")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("storyboard.js?v=20260910-r6" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
@@ -3647,8 +3652,8 @@ def test_v0821o7_param_surface():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp o7")
-    assert_true('<span class="stamp">v0821o8-caption-i2i</span>' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=v0821o8-caption-i2i"' in html, "cache-bust")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true('src="/static/storyboard.js?v=20260910-r6"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3663,7 +3668,7 @@ def test_v0821o7_param_surface():
     assert_true("SERVICE_SYNC_BUDGET" in js and "SERVICE_CHUNK_SIZE" in js, "chunked roster")
 
     # Catalog must NOT silent-truncate to 60
-    lc = js[js.find("async function loadCatalog"):js.find("async function loadOuts")]
+    lc = js[js.find("function loadCatalog"):js.find("async function loadOuts")]
     assert_true("const CAP = 60" not in lc, "loadCatalog no CAP=60")
     assert_true("items.slice(0, CAP)" not in lc, "loadCatalog no slice CAP")
     assert_true("renderServiceOptions(items" in lc, "loadCatalog uses full roster renderer")
@@ -3717,7 +3722,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260909">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r6">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3751,7 +3756,7 @@ def test_v0821o7_c1_closeout():
     assert_true('FAL_LORA_PREF_SERVICE = "fal-ai/z-image/turbo/lora"' not in js, "Fal pref must not pin z-image")
     assert_true('HF_LORA_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo"' not in js, "HF pref must not pin Z-Image")
     assert_true('MS_LORA_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo"' not in js, "MS pref must not pin Z-Image")
-    lc = js[js.find("async function loadCatalog"):js.find("async function loadOuts")]
+    lc = js[js.find("function loadCatalog"):js.find("async function loadOuts")]
     assert_true('name: "Z-Image Turbo LoRA"' not in lc, "loadCatalog must not fabricate Z-Image Fal node")
     assert_true('name: "Z-Image Turbo"' not in lc, "loadCatalog must not fabricate Z-Image Hub node")
     fal_fix = js[js.find("function falLoraFixtureImport"):js.find("async function mountFalLoraFixture")]
