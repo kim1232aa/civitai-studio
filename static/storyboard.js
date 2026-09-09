@@ -53,6 +53,7 @@
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
+  const stage = document.querySelector(".stage");
   const wires = $("wires");
   const dock = $("dock");
   const ROBOT_DEMO_IDS = { "a-bot": 1, "a-home": 1, "a-work": 1, "a-vac": 1, "s-bed": 1, "s-bath": 1 };
@@ -115,6 +116,9 @@
     groupRunAbort: false,
     uploading: 0,
     dockMode: "collapsed",
+    workspace: "canvas",
+    script: { title: "未命名故事", logline: "", scenes: [] },
+    editor: { activeShotId: null, playing: false, playIndex: 0, timer: null },
     lastComposerShot: null,
     loras: [],
     _serviceItems: [],
@@ -144,6 +148,439 @@
   }
   function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
+  function sceneById(id) {
+    return (state.script && Array.isArray(state.script.scenes))
+      ? state.script.scenes.find((scene) => scene.id === id) || null
+      : null;
+  }
+  function shotScene(shotId) {
+    const shot = nodeById(shotId);
+    return sceneById(shot && shot.sceneId) ||
+      ((state.script && state.script.scenes || []).find((scene) => (scene.shotIds || []).indexOf(shotId) >= 0)) ||
+      null;
+  }
+  function createScriptScene(index) {
+    return {
+      id: uid("scene"),
+      title: "场次 " + (index + 1),
+      location: "",
+      time: "",
+      beat: "",
+      shotIds: [],
+    };
+  }
+  function ensureWorkspaceModel() {
+    if (!state.script || typeof state.script !== "object") {
+      state.script = { title: "未命名故事", logline: "", scenes: [] };
+    }
+    if (!Array.isArray(state.script.scenes)) state.script.scenes = [];
+    state.script.title = state.script.title || "未命名故事";
+    state.script.logline = state.script.logline || "";
+    const live = new Set(shots().map((shot) => shot.id));
+    const claimed = new Set();
+    state.script.scenes = state.script.scenes.map((scene, i) => {
+      const next = Object.assign(createScriptScene(i), scene || {});
+      next.id = scene && scene.id ? String(scene.id) : uid("scene");
+      next.title = next.title || ("场次 " + (i + 1));
+      next.shotIds = (Array.isArray(scene && scene.shotIds) ? scene.shotIds : [])
+        .filter((id) => live.has(id) && !claimed.has(id));
+      next.shotIds.forEach((id) => claimed.add(id));
+      next.location = next.location || "";
+      next.time = next.time || "";
+      next.beat = next.beat || "";
+      return next;
+    });
+    if (!state.script.scenes.length) state.script.scenes.push(createScriptScene(0));
+    const first = state.script.scenes[0];
+    shots().forEach((shot) => {
+      if (claimed.has(shot.id)) {
+        shot.sceneId = state.script.scenes.find((scene) => scene.shotIds.indexOf(shot.id) >= 0).id;
+        return;
+      }
+      // Existing canvases had no script model; keep every shot editable in the first scene.
+      first.shotIds.push(shot.id);
+      shot.sceneId = first.id;
+    });
+    state.script.scenes.forEach((scene) => {
+      scene.shotIds.forEach((id) => {
+        const shot = nodeById(id);
+        if (shot) shot.sceneId = scene.id;
+      });
+    });
+    if (!state.editor || typeof state.editor !== "object") state.editor = {};
+    if (!state.editor.activeShotId || !nodeById(state.editor.activeShotId)) {
+      state.editor.activeShotId = shots()[0] ? shots()[0].id : null;
+    }
+    return state.script;
+  }
+  function assignShotToScene(shotId, sceneId) {
+    ensureWorkspaceModel();
+    const shot = nodeById(shotId);
+    const target = sceneById(sceneId);
+    if (!shot || shot.kind !== "shot" || !target) return false;
+    state.script.scenes.forEach((scene) => {
+      scene.shotIds = (scene.shotIds || []).filter((id) => id !== shotId);
+    });
+    target.shotIds.push(shotId);
+    shot.sceneId = target.id;
+    return true;
+  }
+  function shotDurationSeconds(shot) {
+    const n = Number(String(shot && shot.duration != null ? shot.duration : "").replace(/s$/i, ""));
+    return Number.isFinite(n) && n > 0 ? n : 5;
+  }
+  function formatDuration(seconds) {
+    const n = Math.max(0, Number(seconds) || 0);
+    const mins = Math.floor(n / 60);
+    const secs = Math.round((n - mins * 60) * 10) / 10;
+    return mins ? (mins + "m " + String(secs).padStart(4, "0") + "s") : (secs + "s");
+  }
+  function workspaceMedia(n) {
+    if (!n || !n.url) return '<div class="placeholder"><strong>尚未生成</strong><span>打开画布编辑提示词并生成</span></div>';
+    return isVideoUrl(n.url)
+      ? '<video src="' + esc(n.url) + '" controls muted playsinline></video>'
+      : '<img src="' + esc(n.url) + '" alt="">';
+  }
+  function workspaceShotRow(shot, extra) {
+    const cls = state.selected === shot.id || (state.editor && state.editor.activeShotId === shot.id) ? " on" : "";
+    return '<div class="script-shot-row' + cls + '">' +
+      '<button type="button" class="script-shot-main" data-workspace-shot="' + esc(shot.id) + '">' +
+      (shot.url ? '<img src="' + esc(shot.url) + '" alt="">' : '<span class="workspace-shot-empty">＋</span>') +
+      '<span class="script-shot-copy"><strong>' + esc(shot.title || "分镜") + '</strong><small>' +
+      esc(shot.prompt ? shot.prompt.slice(0, 80) : "还没有画面提示词") + '</small></span></button>' +
+      (extra || "") + '</div>';
+  }
+  function renderScriptWorkspace() {
+    const panel = $("scriptWorkspace");
+    if (!panel) return;
+    const script = ensureWorkspaceModel();
+    const scenes = script.scenes;
+    if (!state._scriptSceneId || !sceneById(state._scriptSceneId)) state._scriptSceneId = scenes[0] && scenes[0].id;
+    const active = sceneById(state._scriptSceneId) || scenes[0];
+    const allShots = shots();
+    if (!state._scriptShotId || !nodeById(state._scriptShotId)) {
+      state._scriptShotId = active && active.shotIds[0] || allShots[0] && allShots[0].id || "";
+    }
+    const activeShot = nodeById(state._scriptShotId);
+    panel.innerHTML =
+      '<div class="workspace-shell">' +
+      '<div class="workspace-top"><div>' +
+      '<div class="workspace-kicker">SCRIPT PLANNER</div>' +
+      '<h1 class="workspace-title" id="scriptWorkspaceTitle">剧本策划</h1>' +
+      '<p class="workspace-subtitle">把故事目标、场次节拍和画布分镜放在同一份可持续编辑的工作稿里。</p>' +
+      '</div><div class="workspace-actions">' +
+      '<button type="button" class="workspace-btn primary" data-script-act="add-scene">＋ 新建场次</button>' +
+      '<button type="button" class="workspace-btn" data-script-act="add-shot">＋ 新建分镜</button>' +
+      '<button type="button" class="workspace-btn" data-script-act="open-canvas">打开画布</button>' +
+      '</div></div>' +
+      '<div class="workspace-grid">' +
+      '<section class="workspace-card"><div class="workspace-card-hd"><h2>场次结构</h2><span class="muted">' + scenes.length + ' 场</span></div>' +
+      '<div class="script-scenes">' + scenes.map((scene, i) =>
+        '<div class="script-scene' + (scene.id === active.id ? ' on' : '') + '">' +
+        '<button type="button" class="script-scene-main" data-script-scene="' + esc(scene.id) + '">' +
+        '<strong>' + esc(scene.title || ("场次 " + (i + 1))) + '</strong><small>' +
+        esc((scene.location || "未定地点") + " · " + (scene.time || "未定时间") + " · " + scene.shotIds.length + " 镜头") +
+        '</small></button><span class="script-scene-actions">' +
+        '<button type="button" class="workspace-icon-btn" data-script-act="delete-scene" data-scene-id="' + esc(scene.id) + '" title="删除场次"' +
+        (scenes.length <= 1 ? ' disabled' : '') + '>×</button></span></div>'
+      ).join("") + '</div></section>' +
+      '<section class="workspace-card"><div class="workspace-card-hd"><h2>故事工作稿</h2><span class="muted">自动保存到当前浏览器</span></div>' +
+      '<div class="workspace-card-body">' +
+      '<div class="workspace-form">' +
+      '<div class="workspace-field full"><label for="scriptTitle">项目标题</label><input id="scriptTitle" data-script-field="title" value="' + esc(script.title) + '" placeholder="例如：雨夜回声"></div>' +
+      '<div class="workspace-field full"><label for="scriptLogline">一句话梗概</label><textarea id="scriptLogline" data-script-field="logline" placeholder="主角想要什么，什么阻止了他？">' + esc(script.logline) + '</textarea></div>' +
+      '<div class="workspace-field"><label for="sceneTitle">当前场次标题</label><input id="sceneTitle" data-scene-field="title" value="' + esc(active.title) + '"></div>' +
+      '<div class="workspace-field"><label for="sceneLocation">地点</label><input id="sceneLocation" data-scene-field="location" value="' + esc(active.location) + '" placeholder="室内 / 外景"></div>' +
+      '<div class="workspace-field"><label for="sceneTime">时间</label><input id="sceneTime" data-scene-field="time" value="' + esc(active.time) + '" placeholder="清晨 / 夜"></div>' +
+      '<div class="workspace-field"><label for="sceneBeat">本场目标</label><input id="sceneBeat" data-scene-field="beat" value="' + esc(active.beat) + '" placeholder="这一场必须发生什么"></div>' +
+      '</div>' +
+      '<div class="workspace-section"><h3>场次分镜</h3><span class="muted">' + active.shotIds.length + ' 个分镜</span></div>' +
+      '<div class="script-shot-list">' +
+      (active.shotIds.length ? active.shotIds.map((id) => {
+        const shot = nodeById(id);
+        if (!shot) return "";
+        return workspaceShotRow(shot,
+          '<input class="workspace-shot-title" data-shot-title="' + esc(shot.id) + '" value="' + esc(shot.title || "分镜") + '" aria-label="分镜标题">');
+      }).join("") : '<div class="workspace-empty">这场还没有分镜。可以新建分镜，或把已有分镜加入这里。</div>') +
+      '</div>' +
+      '<div class="workspace-inline"><select data-script-shot-select aria-label="选择已有分镜"><option value="">选择已有分镜</option>' +
+      allShots.map((shot) => '<option value="' + esc(shot.id) + '"' + (shot.id === state._scriptShotId ? ' selected' : '') + '>' + esc(shot.title || "分镜") + '</option>').join("") +
+      '</select><button type="button" class="workspace-btn" data-script-act="assign-shot"' + (activeShot ? '' : ' disabled') + '>加入当前场次</button></div>' +
+      '<div class="workspace-note">选择已有分镜后加入当前场次；点分镜卡会回到画布并保留当前故事结构。删除场次只会把镜头转移到其他场次，不会删除画布内容。</div>' +
+      '</div></section></div></div>';
+  }
+  function editorSequence() {
+    ensureWorkspaceModel();
+    const result = [];
+    state.script.scenes.forEach((scene) => {
+      (scene.shotIds || []).forEach((id) => {
+        const shot = nodeById(id);
+        if (shot) result.push({ scene: scene, shot: shot });
+      });
+    });
+    return result;
+  }
+  function renderEditorWorkspace() {
+    const panel = $("editorWorkspace");
+    if (!panel) return;
+    const sequence = editorSequence();
+    if (!state.editor.activeShotId && sequence[0]) state.editor.activeShotId = sequence[0].shot.id;
+    if (state.editor.activeShotId && !nodeById(state.editor.activeShotId)) state.editor.activeShotId = sequence[0] ? sequence[0].shot.id : null;
+    const active = nodeById(state.editor.activeShotId);
+    const total = sequence.reduce((n, item) => n + shotDurationSeconds(item.shot), 0);
+    const grouped = state.script.scenes.map((scene) => {
+      const rows = (scene.shotIds || []).map((id, i) => {
+        const shot = nodeById(id);
+        if (!shot) return "";
+        const pos = sequence.findIndex((item) => item.shot.id === id);
+        const selected = active && active.id === shot.id ? " on" : "";
+        return '<div class="editor-row' + selected + '">' +
+          '<span class="editor-index">' + String(pos + 1).padStart(2, "0") + '</span>' +
+          '<button type="button" class="editor-shot-btn" data-editor-shot="' + esc(shot.id) + '">' +
+          (shot.url ? '<img src="' + esc(shot.url) + '" alt="">' : '<span class="workspace-shot-empty">＋</span>') +
+          '<span class="editor-shot-copy"><strong>' + esc(shot.title || "分镜") + '</strong><small>' + esc(scene.title) + '</small></span></button>' +
+          '<select data-editor-scene="' + esc(shot.id) + '" aria-label="所属场次">' +
+          state.script.scenes.map((target) => '<option value="' + esc(target.id) + '"' + (target.id === scene.id ? ' selected' : '') + '>' + esc(target.title) + '</option>').join("") +
+          '</select><input type="number" min="1" max="999" step="1" data-editor-duration="' + esc(shot.id) + '" value="' + esc(shotDurationSeconds(shot)) + '" aria-label="时长秒数">' +
+          '<span class="editor-row-actions">' +
+          '<button type="button" class="workspace-icon-btn" data-editor-move="up" data-shot-id="' + esc(shot.id) + '" title="上移"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+          '<button type="button" class="workspace-icon-btn" data-editor-move="down" data-shot-id="' + esc(shot.id) + '" title="下移"' + (i === scene.shotIds.length - 1 ? ' disabled' : '') + '>↓</button>' +
+          '</span></div>';
+      }).join("");
+      return '<div class="workspace-section"><h3>' + esc(scene.title) + '</h3><span class="muted">' + scene.shotIds.length + ' 镜头</span></div>' +
+        (rows || '<div class="editor-empty">本场暂无分镜</div>');
+    }).join("");
+    panel.innerHTML =
+      '<div class="workspace-shell"><div class="workspace-top"><div>' +
+      '<div class="workspace-kicker">EDIT TIMELINE</div><h1 class="workspace-title" id="editorWorkspaceTitle">编辑器</h1>' +
+      '<p class="workspace-subtitle">把已生成的分镜按场次编排，调整顺序与时长；这里不会偷偷触发生成。</p></div>' +
+      '<div class="workspace-actions"><button type="button" class="workspace-btn primary" data-editor-act="play">' + (state.editor.playing ? '暂停播放' : '播放序列') + '</button>' +
+      '<button type="button" class="workspace-btn" data-editor-act="next">下一镜</button><button type="button" class="workspace-btn" data-editor-act="open-canvas">打开画布</button></div></div>' +
+      '<div class="editor-layout"><div class="workspace-card editor-timeline"><div class="workspace-card-hd"><h2>时间线</h2><span class="muted">' + sequence.length + ' 镜头</span></div>' +
+      '<div class="workspace-card-body"><div class="editor-stats"><span>总时长 <strong>' + esc(formatDuration(total)) + '</strong></span><span>已生成 <strong>' + sequence.filter((item) => !!item.shot.url).length + '/' + sequence.length + '</strong></span></div>' +
+      '<div class="editor-rows">' + (grouped || '<div class="editor-empty">先在剧本策划中创建分镜。</div>') + '</div></div></div>' +
+      '<div class="editor-preview"><div class="editor-preview-head"><strong>' + esc(active ? active.title : "未选择分镜") + '</strong><span class="muted">' + (active ? formatDuration(shotDurationSeconds(active)) : "") + '</span></div>' +
+      '<div class="editor-preview-media">' + workspaceMedia(active) + '</div>' +
+      '<div class="workspace-note">' + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
+  }
+  function renderWorkspace() {
+    ensureWorkspaceModel();
+    const script = $("scriptWorkspace");
+    const editor = $("editorWorkspace");
+    if (script) script.hidden = state.workspace !== "script";
+    if (editor) editor.hidden = state.workspace !== "editor";
+    document.querySelectorAll("[data-workspace]").forEach((btn) => {
+      const on = btn.dataset.workspace === state.workspace;
+      btn.classList.toggle("on", on);
+      if (on) btn.setAttribute("aria-current", "page");
+      else btn.removeAttribute("aria-current");
+    });
+    if (stage) stage.classList.toggle("workspace-mode", state.workspace !== "canvas");
+    if (state.workspace === "script") renderScriptWorkspace();
+    if (state.workspace === "editor") renderEditorWorkspace();
+  }
+  function setWorkspace(next) {
+    if (next !== "canvas" && next !== "script" && next !== "editor") next = "canvas";
+    if (next !== "editor" && state.editor && state.editor.playing) stopEditorPlayback();
+    state.workspace = next;
+    renderWorkspace();
+    if (next === "canvas") {
+      renderCards();
+      drawWires();
+      renderDock();
+    }
+    persist();
+  }
+  function addWorkspaceShot() {
+    const pos = newShotPosition(shots().length);
+    const shot = { id: uid("shot"), kind: "shot", title: "分镜" + (shots().length + 1), x: pos.x, y: pos.y, url: "", firstFrameId: "", prompt: "" };
+    state.nodes.push(shot);
+    ensureWorkspaceModel();
+    const scene = sceneById(state._scriptSceneId) || state.script.scenes[0];
+    assignShotToScene(shot.id, scene.id);
+    state._scriptShotId = shot.id;
+    state.editor.activeShotId = shot.id;
+    selectNode(shot.id, { collapsed: true });
+    persist();
+    renderWorkspace();
+  }
+  function addWorkspaceScene() {
+    ensureWorkspaceModel();
+    const scene = createScriptScene(state.script.scenes.length);
+    state.script.scenes.push(scene);
+    state._scriptSceneId = scene.id;
+    persist();
+    renderWorkspace();
+  }
+  function deleteWorkspaceScene(sceneId) {
+    ensureWorkspaceModel();
+    if (state.script.scenes.length <= 1) {
+      setMsg("至少保留一个场次", "warn");
+      return;
+    }
+    const index = state.script.scenes.findIndex((scene) => scene.id === sceneId);
+    if (index < 0) return;
+    const fallback = state.script.scenes[index === 0 ? 1 : 0];
+    const doomed = state.script.scenes[index];
+    (doomed.shotIds || []).slice().forEach((id) => assignShotToScene(id, fallback.id));
+    state.script.scenes = state.script.scenes.filter((scene) => scene.id !== sceneId);
+    state._scriptSceneId = fallback.id;
+    persist();
+    renderWorkspace();
+  }
+  function moveEditorShot(shotId, direction) {
+    const shot = nodeById(shotId);
+    const scene = shot && shotScene(shotId);
+    if (!shot || !scene) return;
+    const at = scene.shotIds.indexOf(shotId);
+    const to = direction === "up" ? at - 1 : at + 1;
+    if (at < 0 || to < 0 || to >= scene.shotIds.length) return;
+    const row = scene.shotIds.splice(at, 1)[0];
+    scene.shotIds.splice(to, 0, row);
+    persist();
+    renderWorkspace();
+  }
+  function stopEditorPlayback() {
+    if (state.editor && state.editor.timer) clearTimeout(state.editor.timer);
+    if (state.editor) {
+      state.editor.timer = null;
+      state.editor.playing = false;
+    }
+  }
+  function scheduleEditorPlayback() {
+    if (!state.editor.playing) return;
+    const sequence = editorSequence();
+    if (!sequence.length) {
+      stopEditorPlayback();
+      renderWorkspace();
+      return;
+    }
+    const at = Math.max(0, sequence.findIndex((item) => item.shot.id === state.editor.activeShotId));
+    state.editor.playIndex = at < 0 ? 0 : at;
+    state.editor.activeShotId = sequence[state.editor.playIndex].shot.id;
+    renderWorkspace();
+    state.editor.timer = setTimeout(() => {
+      if (!state.editor.playing) return;
+      state.editor.playIndex = (state.editor.playIndex + 1) % sequence.length;
+      scheduleEditorPlayback();
+    }, shotDurationSeconds(sequence[state.editor.playIndex].shot) * 1000);
+  }
+  function toggleEditorPlayback() {
+    if (state.editor.playing) stopEditorPlayback();
+    else {
+      state.editor.playing = true;
+      state.editor.playIndex = 0;
+      scheduleEditorPlayback();
+      return;
+    }
+    renderWorkspace();
+  }
+  function nextEditorShot() {
+    const sequence = editorSequence();
+    if (!sequence.length) return;
+    const at = sequence.findIndex((item) => item.shot.id === state.editor.activeShotId);
+    state.editor.activeShotId = sequence[(at + 1 + sequence.length) % sequence.length].shot.id;
+    renderWorkspace();
+    persist();
+  }
+  function bindWorkspace() {
+    document.querySelectorAll("[data-workspace]").forEach((btn) => {
+      btn.addEventListener("click", () => setWorkspace(btn.dataset.workspace));
+    });
+    const script = $("scriptWorkspace");
+    if (script) script.addEventListener("click", (e) => {
+      const sceneBtn = e.target.closest("[data-script-scene]");
+      if (sceneBtn) {
+        state._scriptSceneId = sceneBtn.dataset.scriptScene;
+        renderWorkspace();
+        return;
+      }
+      const shotBtn = e.target.closest("[data-workspace-shot]");
+      if (shotBtn) {
+        state._scriptShotId = shotBtn.dataset.workspaceShot;
+        state.editor.activeShotId = state._scriptShotId;
+        selectNode(state._scriptShotId, { keepClosed: true });
+        return;
+      }
+      const act = e.target.closest("[data-script-act]");
+      if (!act) return;
+      if (act.dataset.scriptAct === "add-scene") addWorkspaceScene();
+      else if (act.dataset.scriptAct === "add-shot") addWorkspaceShot();
+      else if (act.dataset.scriptAct === "delete-scene") deleteWorkspaceScene(act.dataset.sceneId);
+      else if (act.dataset.scriptAct === "open-canvas") setWorkspace("canvas");
+      else if (act.dataset.scriptAct === "assign-shot") {
+        const id = script.querySelector("[data-script-shot-select]") && script.querySelector("[data-script-shot-select]").value;
+        const scene = sceneById(state._scriptSceneId);
+        if (id && scene && assignShotToScene(id, scene.id)) {
+          state._scriptShotId = id;
+          persist();
+          renderWorkspace();
+        }
+      }
+    });
+    if (script) script.addEventListener("input", (e) => {
+      const field = e.target.closest("[data-script-field]");
+      if (field) {
+        state.script[field.dataset.scriptField] = field.value;
+        persist();
+        return;
+      }
+      const sceneField = e.target.closest("[data-scene-field]");
+      const scene = sceneById(state._scriptSceneId);
+      if (sceneField && scene) {
+        scene[sceneField.dataset.sceneField] = sceneField.value;
+        persist();
+        return;
+      }
+      const title = e.target.closest("[data-shot-title]");
+      const shot = title && nodeById(title.dataset.shotTitle);
+      if (shot) {
+        shot.title = title.value || "分镜";
+        state._scriptShotId = shot.id;
+        renderCards();
+        persist();
+      }
+    });
+    if (script) script.addEventListener("change", (e) => {
+      if (e.target.matches("[data-script-shot-select]")) state._scriptShotId = e.target.value;
+    });
+    const editor = $("editorWorkspace");
+    if (editor) editor.addEventListener("click", (e) => {
+      const shotBtn = e.target.closest("[data-editor-shot]");
+      if (shotBtn) {
+        state.editor.activeShotId = shotBtn.dataset.editorShot;
+        state.selected = state.editor.activeShotId;
+        renderWorkspace();
+        persist();
+        return;
+      }
+      const act = e.target.closest("[data-editor-act]");
+      if (act) {
+        if (act.dataset.editorAct === "play") toggleEditorPlayback();
+        else if (act.dataset.editorAct === "next") nextEditorShot();
+        else if (act.dataset.editorAct === "open-canvas") setWorkspace("canvas");
+        return;
+      }
+      const move = e.target.closest("[data-editor-move]");
+      if (move) moveEditorShot(move.dataset.shotId, move.dataset.editorMove);
+    });
+    if (editor) editor.addEventListener("change", (e) => {
+      const sceneSelect = e.target.closest("[data-editor-scene]");
+      if (sceneSelect) {
+        assignShotToScene(sceneSelect.dataset.editorScene, sceneSelect.value);
+        persist();
+        renderWorkspace();
+        return;
+      }
+      const duration = e.target.closest("[data-editor-duration]");
+      const shot = duration && nodeById(duration.dataset.editorDuration);
+      if (shot) {
+        shot.duration = duration.value;
+        persist();
+        renderWorkspace();
+      }
+    });
+  }
   function connectedNodes(shotId) {
     return state.edges.filter((e) => e.to === shotId).map((e) => nodeById(e.from)).filter(Boolean);
   }
@@ -490,6 +927,12 @@
         cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
         railTab: state.railTab,
         groups: state.groups || [],
+        workspace: state.workspace || "canvas",
+        script: state.script || { title: "未命名故事", logline: "", scenes: [] },
+        editor: {
+          activeShotId: state.editor && state.editor.activeShotId || null,
+          playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
+        },
         backend: $("backend") && $("backend").value,
         service: $("service") && $("service").value,
         duration: $("duration") && $("duration").value,
@@ -525,6 +968,13 @@
       state.edges = p.edges || [];
       state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
       state.railTab = p.railTab || "assets";
+      state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
+      state.script = p.script && typeof p.script === "object"
+        ? p.script
+        : { title: "未命名故事", logline: "", scenes: [] };
+      state.editor = Object.assign(state.editor || {}, p.editor || {});
+      state.editor.timer = null;
+      state.editor.playing = false;
       state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
         id: g.id || uid("grp"),
         name: g.name || "组",
@@ -1202,6 +1652,8 @@
     const n = nodeById(id);
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
+      state._scriptShotId = n.id;
+      if (state.editor) state.editor.activeShotId = n.id;
       if (state.cam.s >= 1) {
         if (constrainShotsToViewport()) renderCards();
         constrainCameraToShots(n);
@@ -1222,6 +1674,7 @@
     renderDock();
     syncLoraUi();
     syncGroupRunBtn();
+    if (state.workspace !== "canvas") renderWorkspace();
   }
   function clientToWorld(cx, cy) {
     const r = vp.getBoundingClientRect();
@@ -5245,6 +5698,7 @@
     });
   }
   bindImportModal();
+  bindWorkspace();
 
   function importServiceAvailable(sid) {
     if (state.catalogById && state.catalogById[sid]) return true;
@@ -5473,6 +5927,7 @@
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
+  ensureWorkspaceModel();
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
   let _wantHfLoraFixture = false;
@@ -5506,6 +5961,7 @@
   });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
+  renderWorkspace();
   if (/[?&]probe=1\b/.test(String(location.search || ""))) {
     window.__sbProbe = {
       buildGraph: function () {

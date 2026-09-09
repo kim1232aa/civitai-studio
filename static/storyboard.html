@@ -23,9 +23,9 @@
   .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#5ee0c5,#3aa0ff)}
   .title{font-weight:600;font-size:13px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36vw}
   .tabs{display:flex;gap:6px;background:#16161a;border:1px solid var(--line);border-radius:999px;padding:3px;margin:0 auto}
-  .tabs a,.tabs span{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:999px;font-size:12px}
+  .tabs button{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:999px;font-size:12px;
+    border:0;background:transparent;cursor:pointer}
   .tabs .on{background:#222228;color:#fff}
-  .tabs .off{opacity:.45;cursor:not-allowed}
   .mode-mini{display:flex;gap:8px;align-items:center;margin-left:auto}
   .mode-mini a{color:var(--muted);text-decoration:none;font-size:12px}
   .mode-mini a:hover{color:#fff}
@@ -362,9 +362,9 @@
     <div class="logo" aria-hidden="true"></div>
     <div class="title" id="projTitle">未命名画布</div>
     <nav class="tabs" aria-label="工作流">
-      <span class="off" title="本版只做画布，剧本策划入口保留">剧本策划</span>
-      <a class="on" href="/storyboard.html" aria-current="page">画布</a>
-      <span class="off" title="本版不做剪辑时间线">编辑器</span>
+      <button type="button" data-workspace="script" aria-controls="scriptWorkspace">剧本策划</button>
+      <button type="button" class="on" data-workspace="canvas" aria-current="page" aria-controls="viewport">画布</button>
+      <button type="button" data-workspace="editor" aria-controls="editorWorkspace">编辑器</button>
     </nav>
     <div class="mode-mini">
       <a href="/">配方台</a>
@@ -373,7 +373,9 @@
     </div>
   </header>
   <div class="stage">
-    <div class="tools" aria-label="画布工具">
+    <div class="workspace-panel" id="scriptWorkspace" role="region" aria-labelledby="scriptWorkspaceTitle" hidden></div>
+    <div class="workspace-panel" id="editorWorkspace" role="region" aria-labelledby="editorWorkspaceTitle" hidden></div>
+    <div class="tools canvas-only" aria-label="画布工具">
       <button class="tool" id="btnAdd" title="添加分镜">+</button>
       <button class="tool" id="btnText" title="添加提示词节点">文</button>
       <button class="tool" id="btnRev" title="提示词反推">↻</button>
@@ -393,17 +395,17 @@
       <button type="button" id="selUngroup">解组</button>
       <button type="button" id="selGroupRun" disabled>▶ 整组</button>
     </div>
-    <aside class="rail" id="assetRail" aria-label="资产索引"></aside>
-    <div class="atbox" id="atbox"></div>
-    <div class="skillbox" id="skillbox" aria-label="Skill 选择"></div>
-    <div class="viewport" id="viewport">
+    <aside class="rail canvas-only" id="assetRail" aria-label="资产索引"></aside>
+    <div class="atbox canvas-only" id="atbox"></div>
+    <div class="skillbox canvas-only" id="skillbox" aria-label="Skill 选择"></div>
+    <div class="viewport canvas-only" id="viewport">
       <div class="world" id="world">
         <div class="grid"></div>
         <svg class="wires" id="wires"></svg>
       </div>
     </div>
-    <div class="minimap" id="minimap" title="小地图 · 点击平移"><canvas id="minimapCv" width="160" height="100"></canvas></div>
-    <div class="zoom">
+    <div class="minimap canvas-only" id="minimap" title="小地图 · 点击平移"><canvas id="minimapCv" width="160" height="100"></canvas></div>
+    <div class="zoom canvas-only">
       <button type="button" id="zOut">−</button>
       <span id="zPct">50%</span>
       <button type="button" id="zIn">+</button>
@@ -414,10 +416,10 @@
         <button type="button" data-z="fit">Fit</button>
       </div>
     </div>
-    <div class="canvas-tip show" id="canvasTip" role="note">选分镜→写画面→LoRA→↑</div>
-    <button type="button" class="composer-chip" id="composerChip" title="重新打开 Composer" hidden><span class="dot" aria-hidden="true"></span>Composer</button>
-    <div class="picker" id="picker"></div>
-    <aside class="dock" id="dock" aria-label="Composer">
+    <div class="canvas-tip canvas-only show" id="canvasTip" role="note">选分镜→写画面→LoRA→↑</div>
+    <button type="button" class="composer-chip canvas-only" id="composerChip" title="重新打开 Composer" hidden><span class="dot" aria-hidden="true"></span>Composer</button>
+    <div class="picker canvas-only" id="picker"></div>
+    <aside class="dock canvas-only" id="dock" aria-label="Composer">
       <div class="dock-hd" id="dockHd">
         <button type="button" class="dock-btn primary expand-only" id="dockExpand" title="展开 Composer">▴ 展开</button>
         <span class="dock-title" id="dockTitle">Composer</span>
