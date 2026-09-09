@@ -57,7 +57,7 @@
   .shot .label{position:absolute;top:-22px;left:0;font-size:11px;color:#9a9aa3;display:flex;align-items:center;gap:5px}
   .shot .face{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6a6a74;gap:8px;
     border-radius:15px;overflow:hidden}
-  .shot .face img,.shot .face video{width:100%;height:100%;object-fit:cover;border-radius:15px}
+  .shot .face img,.shot .face video{width:100%;height:100%;object-fit:cover;background:#121214;border-radius:15px}
   .shot .hint{font-size:11px}
   .shot.sel{border-color:#fff;box-shadow:0 0 0 1px #fff, 0 16px 40px rgba(0,0,0,.4)}
   .asset.sel{border-color:#5ee0c5}
@@ -90,6 +90,8 @@
   /* ONE scroll owner for the whole body */
   .dock-scroll{flex:1 1 auto;min-height:0;overflow:auto}
   .dock.expanded .dock-scroll{min-height:0}
+  .param-field{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .param-field > span{font-size:10px;line-height:1;color:#8b8b94;padding-left:2px}
   /* foot is not a second scroller */
   .dock-foot{flex:0 0 auto;max-height:none;overflow:visible;position:static;background:#16161af2;padding-top:2px;z-index:3;pointer-events:auto}
   /* LoRA list may scroll internally without a full-panel twin bar */
@@ -372,7 +374,7 @@
       <button class="tool" id="btnFit" title="适配">◎</button>
       <button class="tool" id="btnImport" title="导入分镜素材">⇪</button>
       <div class="tools-sep" aria-hidden="true"></div>
-      <div class="tools-hint">GROUP</div>
+      <div class="tools-hint">分组</div>
       <button class="tool lbl" id="btnGroup" title="成组 · Shift多选后点">成组</button>
       <button class="tool lbl" id="btnUngroup" title="解组">解组</button>
       <button class="tool lbl" id="btnGroupRun" title="整组执行（逐步）" disabled>▶ 整组</button>
@@ -466,27 +468,27 @@
           <button type="button" id="catalogRetry" hidden>重试本页</button>
         </div>
         <span class="param-group" id="falParams">
-          <select id="duration">
+          <label class="param-field"><span>时长</span><select id="duration">
             <option selected>5s</option><option>12s</option><option>16s</option>
-          </select>
-          <select id="aspect">
+          </select></label>
+          <label class="param-field"><span>比例</span><select id="aspect">
             <option>16:9</option><option>9:16</option><option>1:1</option><option>21:9</option>
-          </select>
-          <select id="res">
+          </select></label>
+          <label class="param-field"><span>分辨率</span><select id="res">
             <option>720P</option><option>1080P</option>
-          </select>
+          </select></label>
         </span>
         <span class="param-group hidden" id="comfyParams">
-          <input id="width" type="number" min="64" max="2048" step="8" title="宽" placeholder="宽" />
-          <input id="height" type="number" min="64" max="2048" step="8" title="高" placeholder="高" />
-          <input id="steps" type="number" min="1" max="150" title="步数" placeholder="steps" />
-          <input id="cfg" type="number" min="0" max="30" step="0.1" title="CFG" placeholder="cfg" />
-          <select id="sampler" title="采样器"></select>
-          <select id="scheduler" title="调度器"></select>
-          <input id="seed" type="text" title="种子" placeholder="seed" />
+          <label class="param-field"><span>宽</span><input id="width" type="number" min="64" max="2048" step="8" title="宽" placeholder="宽" /></label>
+          <label class="param-field"><span>高</span><input id="height" type="number" min="64" max="2048" step="8" title="高" placeholder="高" /></label>
+          <label class="param-field"><span>步数</span><input id="steps" type="number" min="1" max="150" title="步数" placeholder="steps" /></label>
+          <label class="param-field"><span>CFG</span><input id="cfg" type="number" min="0" max="30" step="0.1" title="CFG" placeholder="cfg" /></label>
+          <label class="param-field"><span>采样器</span><select id="sampler" title="采样器"></select></label>
+          <label class="param-field"><span>调度器</span><select id="scheduler" title="调度器"></select></label>
+          <label class="param-field"><span>Seed</span><input id="seed" type="text" title="种子" placeholder="seed" /></label>
         </span>
         <span class="param-group hidden" id="nanoParams">
-          <select id="nanoRes" title="Nano 分辨率 token"></select>
+          <label class="param-field"><span>分辨率</span><select id="nanoRes" title="Nano 分辨率 token"></select></label>
         </span>
         <span class="grow"></span>
         <button type="button" class="send" id="send" data-testid="composer-send" title="生成">↑</button>

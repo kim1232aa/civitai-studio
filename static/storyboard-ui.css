@@ -82,6 +82,9 @@ header {
 .shot .face, .shot .face :is(img, video) { border-radius: 17px; }
 .shot .face :is(img, video), .asset :is(img, video).thumb { object-fit: contain; background: #141416; }
 .shot .face { color: #a4a4af; }
+.shot .result-error { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px; color: #ffd0ca; background: rgba(120,31,25,.18); overflow: auto; }
+.shot .result-error strong { color: var(--coral); font-size: 16px; }
+.shot .result-error span { color: #f0aaa2; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .shot .label { top: -34px; font-size: 22px; line-height: 28px; color: #b9bbc4; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .shot .hint { font-size: 20px; }
 .shot .dur { font-size: 16px; }
@@ -115,10 +118,10 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 .dock-hd .dock-hint { display: none; }
 .dock-btn { height: 32px; min-width: 32px; }
 .dock.expanded .dock-body {
-  display: block; overflow: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: contain;
   scrollbar-gutter: stable; padding: 14px; min-height: 0;
 }
-.dock.expanded .dock-scroll { overflow: visible; }
+.dock.expanded .dock-scroll { overflow: auto; min-height: 0; }
 .dock-foot { background: transparent; padding-top: 4px; }
 .dock.expanded .lora-block { max-height: none; overflow: visible; }
 .modes { width: 100%; border-radius: 10px; gap: 2px; }
@@ -129,6 +132,8 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 .prompt { min-height: 140px; max-height: 280px; background: #141416; line-height: 1.65; border-color: #3b3b42; }
 .prompt.neg { min-height: 70px; max-height: 140px; }
 .param-warn { overflow-wrap: anywhere; }
+.param-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.param-field > span { color: var(--muted); font-size: 10px; line-height: 1; padding-left: 2px; }
 .lora-block { padding: 10px; background: #17171a; }
 .lora-row input { width: 0; }
 .lora-hits:empty { margin: 0; }

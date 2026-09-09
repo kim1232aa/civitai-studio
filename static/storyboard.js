@@ -123,6 +123,7 @@
     _serviceItems: [],
     _providerCaps: {},
   };
+  const minimapImages = new WeakMap();
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
   function esc(s) {
@@ -854,6 +855,7 @@
       if (p.res && $("res")) $("res").value = p.res;
       if (p.width != null && $("width")) $("width").value = p.width;
       if (p.height != null && $("height")) $("height").value = p.height;
+      if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
       if (p.steps != null && $("steps")) $("steps").value = p.steps;
       if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
       if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
@@ -1084,6 +1086,8 @@
         ? (isVideoUrl(n.url)
             ? '<video src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
             : '<img src="' + esc(n.url) + '" alt="">')
+        : n._error
+          ? '<div class="result-error"><strong>生成失败</strong><span>' + esc(n._error) + '</span></div>'
         : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
       const busy = n._busy ? " busy" : "";
@@ -1133,6 +1137,28 @@
     world.querySelectorAll(".card,.group-bound").forEach((el) => el.remove());
     renderGroupBounds();
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
+    world.querySelectorAll(".card.shot img,.card.shot video").forEach((el) => {
+      const card = el.closest(".card");
+      const shot = card && nodeById(card.dataset.id);
+      if (!shot) return;
+      const sync = () => {
+        const w = el.naturalWidth || el.videoWidth || 0;
+        const h = el.naturalHeight || el.videoHeight || 0;
+        if (!w || !h || (shot.mediaWidth === w && shot.mediaHeight === h)) return;
+        shot.mediaWidth = w;
+        shot.mediaHeight = h;
+        if (state.selected === shot.id) {
+          if ($("width")) $("width").value = String(w);
+          if ($("height")) $("height").value = String(h);
+          syncAspectFromSize(w, h);
+          writeComfyParamsToShot(shot);
+          persist();
+        }
+        drawMinimap();
+      };
+      if (el.complete) sync();
+      else el.addEventListener("load", sync, { once: true });
+    });
     drawMinimap();
     syncGroupRunBtn();
     syncSelBar();
@@ -1173,8 +1199,19 @@
       const y = oy + (n.y - b.minY) * scale;
       const w = Math.max(2, nb.w * scale);
       const h = Math.max(2, nb.h * scale);
-      ctx.fillStyle = n.kind === "shot" ? "#3a3a48" : "#2a3a36";
-      ctx.fillRect(x, y, w, h);
+      const preview = minimapImages.get(n);
+      if (n.url && preview && preview.complete && preview.naturalWidth) {
+        ctx.drawImage(preview, x, y, w, h);
+      } else {
+        ctx.fillStyle = n.kind === "shot" ? "#3a3a48" : "#2a3a36";
+        ctx.fillRect(x, y, w, h);
+        if (n.url && !preview) {
+          const image = new Image();
+          image.onload = drawMinimap;
+          image.src = n.url;
+          minimapImages.set(n, image);
+        }
+      }
       if (state.selected === n.id) {
         ctx.strokeStyle = n.kind === "shot" ? "#fff" : "#5ee0c5";
         ctx.lineWidth = 1;
@@ -1615,6 +1652,7 @@
         y: shot.y + 20,
         url: url,
         fromShot: shot.id,
+        userPromoted: true,
         mediaKind: mediaKindOf(url),
       };
       state.nodes.push(asset);
@@ -1622,6 +1660,7 @@
       asset.url = url;
       asset.title = (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片");
       asset.fromShot = shot.id;
+      asset.userPromoted = true;
       asset.mediaKind = mediaKindOf(url);
     }
     return asset;
@@ -3958,6 +3997,19 @@
     writeComfyParamsToShot(nodeById(state.selected));
   }
 
+  function syncAspectFromSize(width, height) {
+    const aspectEl = $("aspect");
+    const w = Number(width), h = Number(height);
+    if (!aspectEl || !Number.isFinite(w) || !Number.isFinite(h) || h <= 0) return;
+    const ratio = w / h;
+    const choices = [["1:1", 1], ["9:16", 9 / 16], ["21:9", 21 / 9], ["16:9", 16 / 9]];
+    let best = choices[0];
+    choices.forEach((item) => {
+      if (Math.abs(item[1] - ratio) < Math.abs(best[1] - ratio)) best = item;
+    });
+    if (Math.abs(best[1] - ratio) <= 0.04) aspectEl.value = best[0];
+  }
+
   function buildGraph(shot) {
     const frame = frameAsset(shot);
     const linked = connectedAssets(shot.id);
@@ -4055,9 +4107,16 @@
     state.history = [item].concat((state.history || []).filter((h) => h && h.url !== url)).slice(0, 24);
   }
   function writebackResult(shot, url) {
-    // v0821i: persist shot.url (caller), promote to assets, push 生成历史 — images + videos
+    // A generated result belongs to its shot. Only an explicit “入库” click
+    // creates a separate canvas asset; normal generation must not duplicate cards.
     if (!shot || !url) return;
-    promoteResult(shot, url);
+    const removed = new Set(state.nodes
+      .filter((n) => n.kind !== "shot" && n.fromShot === shot.id && !n.userPromoted)
+      .map((n) => n.id));
+    if (removed.size) {
+      state.nodes = state.nodes.filter((n) => !removed.has(n.id));
+      state.edges = state.edges.filter((e) => !removed.has(e.from) && !removed.has(e.to));
+    }
     pushHistoryItem(url, (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
   }
@@ -4337,6 +4396,7 @@
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     setShotBusy(shot, true);
+    shot._error = "";
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -4396,11 +4456,13 @@
           renderDock();
           return { status: "more", stageOp: stage.op };
         }
+        shot._error = "";
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
         setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
       } else if (url) {
+        shot._error = "";
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
@@ -4413,20 +4475,26 @@
           || j.status === "IN_QUEUE" || j.status === "IN_PROGRESS"
           || !j.status
         ));
+        shot._error = stillGoing
+          ? "等待超时，云端任务仍在进行中"
+          : "云端已返回，没有可预览地址";
         if (stillGoing) {
           setMsg(prefix + "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）", "warn");
         } else {
           setMsg(prefix + "云端已返回，没有可预览地址", "warn");
         }
         if (!opts.keepSend) markSendBusy(false);
+        renderCards();
         renderDock();
         return { status: "blocked", stageOp: stageOp };
       }
     } catch (e) {
       setShotBusy(shot, false);
+      shot._error = formatErr(e);
       // v0821k: surface Fal/job.error onto Composer (renderDock must not wipe bad)
       setMsg(prefix + formatErr(e), "bad");
       if (!opts.keepSend) markSendBusy(false);
+      renderCards();
       renderDock();
       return { status: "error", stageOp: stageOp, error: formatErr(e) };
     }
@@ -5295,6 +5363,7 @@
     if ($("negative")) $("negative").value = (j.negativePrompt != null ? j.negativePrompt : (shot && shot.negativePrompt) || "") || "";
 
     applyComfyParamsToUi(j);
+    if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
     if (shot) {
       ["width", "height", "steps", "sampler", "scheduler", "seed"].forEach(function (k) {
         if (j[k] != null) shot[k] = j[k];
