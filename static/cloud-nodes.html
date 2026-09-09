@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-<title>节点画布 · Night Lab · LiteGraph · v0804-lg-footer</title>
+<title>节点画布 · Night Lab · LiteGraph · v0821o6b-ms-lora-shape</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/css/litegraph.css" />
 <link rel="stylesheet" href="/static/litegraph.css" />
 <style>
@@ -17,9 +17,10 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font:13px/1.45 "PingFang SC","Noto Sans SC",system-ui,sans-serif}
   body{display:flex;flex-direction:column}
-  header{display:flex;align-items:center;gap:12px;padding:10px 14px;
-    border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0}
-  header strong{font-size:14px}
+  header{display:flex;align-items:center;gap:8px;padding:6px 12px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0;
+    min-height:40px;box-shadow:none}
+  header strong{font-size:13px;letter-spacing:.02em}
   .muted{color:var(--muted);font-size:12px}
   .mode-switch{display:inline-flex;background:var(--elev);border:1px solid var(--line);
     border-radius:999px;padding:2px}
@@ -28,21 +29,23 @@
   .mode-switch a.on{background:#12151d;color:#fff}
   .stamp{margin-left:auto;font:600 11px/1.3 ui-monospace,Menlo,monospace;color:var(--buzz)}
   .wrap{flex:1;display:flex;min-height:0}
-  .rail{width:292px;background:var(--panel);border-right:1px solid var(--line);
-    padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;flex-shrink:0}
+  .rail{width:300px;background:var(--panel);border-right:1px solid var(--line);
+    padding:10px 12px;display:flex;flex-direction:column;gap:8px;overflow:auto;flex-shrink:0}
   .rail h2{margin:8px 0 0;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:650}
   .rail h2:first-child{margin-top:0}
   .pal{display:flex;flex-wrap:wrap;gap:6px}
   .pal button{border:1px solid var(--line);background:var(--elev);color:var(--text);
-    border-radius:8px;padding:6px 8px;font-size:11px;cursor:pointer}
+    border-radius:7px;padding:7px 9px;font-size:11px;cursor:pointer;transition:.15s border-color,.15s background}
   .pal button:hover{border-color:var(--coral)}
+  .pal button:focus-visible,.btn:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible
+    {outline:2px solid var(--buzz);outline-offset:2px}
   .canvas-wrap{flex:1;position:relative;min-width:0;background:#0c0e14}
   #graph-canvas{width:100%;height:100%;display:block}
-  .dock{padding:10px 16px;background:rgba(14,16,22,.96);border-top:1px solid var(--line);
-    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .dock{padding:11px 16px;background:rgba(14,16,22,.98);border-top:1px solid var(--line);
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:58px}
   .btn{border:0;border-radius:999px;padding:8px 14px;background:var(--coral);
     color:#fff;font-weight:600;cursor:pointer}
-  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn:disabled,.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
   .btn.ghost{background:var(--elev);color:var(--text);border:1px solid var(--line)}
   select,input,textarea{width:100%;max-width:100%;margin-top:4px;background:var(--elev);color:var(--text);
     border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
@@ -52,8 +55,23 @@
   .ok{color:var(--ok)} .warn{color:var(--buzz)} .bad{color:var(--bad)}
   .hint{color:var(--muted);font-size:11px;line-height:1.45;margin:0}
   .preview{border:1px solid var(--line);border-radius:8px;background:#0c0e14;
-    min-height:88px;display:grid;place-items:center;overflow:hidden}
-  .preview img,.preview video{max-width:100%;max-height:140px;display:block}
+    min-height:112px;height:148px;display:grid;place-items:center;overflow:hidden;
+    box-shadow:inset 0 1px rgba(255,255,255,.03);flex-shrink:0}
+  .preview img,.preview video{width:100%;height:100%;max-height:148px;object-fit:contain;display:block;border-radius:6px}
+  #inspector{min-height:220px;height:220px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#12151d;overflow:auto;flex-shrink:0}
+  #inspector label{display:block;margin:0 0 8px}
+  #inspector label:last-child{margin-bottom:0}
+  #inspector input,#inspector select,#inspector textarea{margin-top:3px}
+  #inspector textarea{min-height:54px}
+  #inspector .insp-empty{min-height:168px;display:flex;align-items:center}
+  #outBox{min-height:64px}
+  .dock .btn{min-height:34px}
+  .dock .btn[aria-disabled="true"]{filter:saturate(.7)}
+  @media (max-width:800px){
+    .rail{width:250px;padding:10px}
+    header{gap:8px;padding:8px 10px}
+    header .muted{display:none}
+  }
   .litemenu-panel,.litegraph-search,.graphdialog{z-index:60 !important}
 </style>
 </head>
@@ -66,7 +84,7 @@
       <a class="on" href="/litegraph" aria-current="page">LiteGraph</a>
     </nav>
     <span class="muted">LiteGraph · 双击搜节点 · 端口拖线 · 执行走云 API</span>
-    <span class="stamp">v0804-lg-footer</span>
+    <span class="stamp">v0821o6b-ms-lora-shape</span>
   </header>
   <div class="wrap">
     <aside class="rail">
@@ -94,7 +112,7 @@
   </div>
   <div class="dock">
     <button class="btn ghost" type="button" id="btnValidate">校验连线</button>
-    <button class="btn" type="button" id="btnGen" disabled>运行此步</button>
+    <button class="btn" type="button" id="btnGen" aria-disabled="true">运行此步</button>
     <button class="btn ghost" type="button" id="btnUndo">撤销</button>
     <span class="muted" id="dockMsg">先加载示例或双击加节点</span>
     <span style="flex:1"></span>
@@ -110,6 +128,8 @@
   const $ = (id) => document.getElementById(id);
   const STORE = "cloud-nodes-litegraph-v2";
 
+  LiteGraph.NODE_TITLE_HEIGHT = 24;
+  LiteGraph.NODE_SLOT_HEIGHT = 18;
   LiteGraph.NODE_TITLE_COLOR = "#e8eaef";
   LiteGraph.NODE_TEXT_COLOR = "#c8cdd8";
   LiteGraph.NODE_DEFAULT_COLOR = "#1e2430";
@@ -263,6 +283,16 @@
   let undo = [];
   let stageUrls = {};
   let persistTimer = 0;
+  let genBusy = false;
+
+  function setGenState(disabled, text) {
+    const btn = $("btnGen");
+    btn.disabled = false;
+    const locked = !!(disabled || genBusy);
+    btn.setAttribute("aria-disabled", locked ? "true" : "false");
+    if (text) btn.textContent = text;
+    else if (genBusy) btn.textContent = "运行中…";
+  }
 
   function snapshot() {
     try { undo.push(JSON.stringify(graph.serialize())); } catch (_) {}
@@ -285,8 +315,7 @@
     lastCompile = null;
     lastEpoch = -1;
     stageUrls = {};
-    $("btnGen").disabled = true;
-    $("btnGen").textContent = "运行此步";
+    setGenState(true, "运行此步");
     $("dockMsg").textContent = reason || "图已变更 · 请重新校验";
     $("dockMsg").className = "warn";
     persist();
@@ -366,7 +395,7 @@
     const box = $("inspector");
     const n = canvas.selected_nodes ? Object.values(canvas.selected_nodes)[0] : null;
     if (!n) {
-      box.innerHTML = '<p class="hint">点画布上的节点编辑参数。</p>';
+      box.innerHTML = '<p class="hint insp-empty">点画布上的节点编辑参数。空态/选中态共用这块固定面板，不随节点类型改高度。</p>';
       return;
     }
     const props = n.properties || {};
@@ -526,8 +555,7 @@
     lastEpoch = epoch;
     $("outBox").textContent = JSON.stringify(j, null, 2);
     if (!(j && j.ok && lastEpoch === epoch)) {
-      $("btnGen").disabled = true;
-      $("btnGen").textContent = "运行此步";
+      setGenState(true, "运行此步");
       $("dockMsg").textContent = (j && j.error) || "校验未通过";
       $("dockMsg").className = "bad";
       return;
@@ -535,25 +563,23 @@
     if (j.multiStep || j.execute === "staged") {
       const nxt = nextRunnableStage(j);
       if (nxt) {
-        $("btnGen").disabled = false;
-        $("btnGen").textContent = "运行下一步 · " + nxt.op;
+        setGenState(false, "运行下一步 · " + nxt.op);
         $("dockMsg").textContent = "多步链：按 stages 逐步跑，不假装一次出片";
         $("dockMsg").className = "warn";
       } else {
-        $("btnGen").disabled = true;
-        $("btnGen").textContent = "运行此步";
+        setGenState(true, "运行此步");
         $("dockMsg").textContent = "多步链已全部有成片，或还缺上游";
         $("dockMsg").className = "ok";
       }
       return;
     }
-    $("btnGen").disabled = false;
-    $("btnGen").textContent = "运行此步";
+    setGenState(false, "运行此步");
     $("dockMsg").textContent = "单步校验通过，可运行此步";
     $("dockMsg").className = "ok";
   }
 
   async function generate() {
+    if (genBusy) return;
     if (!lastCompile || !lastCompile.ok || lastEpoch !== epoch) return;
     let payload = null;
     let stage = null;
@@ -578,7 +604,8 @@
       $("dockMsg").className = "bad";
       return;
     }
-    $("btnGen").disabled = true;
+    genBusy = true;
+    setGenState(true, "运行中…");
     $("dockMsg").textContent = "正在请求云 API…";
     $("dockMsg").className = "muted";
     try {
@@ -592,7 +619,6 @@
       if (!r.ok || j.error) {
         $("dockMsg").textContent = j.error || ("HTTP " + r.status);
         $("dockMsg").className = "bad";
-        $("btnGen").disabled = false;
         return;
       }
       const jobId = j.id || j.jobId || j.workflowId;
@@ -625,8 +651,6 @@
       }
       if (lastCompile.multiStep || lastCompile.execute === "staged") {
         const nxt = nextRunnableStage(lastCompile);
-        $("btnGen").disabled = !nxt;
-        $("btnGen").textContent = nxt ? ("运行下一步 · " + nxt.op) : "运行此步";
         if (url && nxt) {
           $("dockMsg").textContent = "完成 " + stage.op + " · 多步链：按 stages 逐步跑，不假装一次出片";
           $("dockMsg").className = "warn";
@@ -644,12 +668,18 @@
         const stillGoing2 = !url && !!(j && (j.status === "pending" || j.status === "processing" || j.status === "running" || !j.status));
         $("dockMsg").textContent = url ? "此步完成" : (stillGoing2 ? "等待超时，云端任务仍在进行中（视频约需数分钟）" : "云端已返回，没有可预览地址");
         $("dockMsg").className = url ? "ok" : "warn";
-        $("btnGen").disabled = false;
       }
     } catch (e) {
       $("dockMsg").textContent = String(e);
       $("dockMsg").className = "bad";
-      $("btnGen").disabled = false;
+    } finally {
+      genBusy = false;
+      if (lastCompile && (lastCompile.multiStep || lastCompile.execute === "staged")) {
+        const nxt = nextRunnableStage(lastCompile);
+        setGenState(!nxt, nxt ? ("运行下一步 · " + nxt.op) : "运行此步");
+      } else {
+        setGenState(false, "运行此步");
+      }
     }
   }
 
@@ -683,8 +713,7 @@
     }
     $("dockMsg").className = "muted";
     lastCompile = null;
-    $("btnGen").disabled = true;
-    $("btnGen").textContent = "运行此步";
+    setGenState(true, "运行此步");
     graph.setDirtyCanvas(true, true);
     renderInspector();
     persist();
@@ -721,7 +750,19 @@
   };
   $("btnClear").onclick = () => { snapshot(); graph.clear(); stageUrls = {}; invalidate("画布已清空"); renderInspector(); };
   $("btnValidate").onclick = () => validate();
-  $("btnGen").onclick = () => generate();
+  $("btnGen").onclick = () => {
+    if (genBusy) {
+      $("dockMsg").textContent = "正在运行，请等成片后再点";
+      $("dockMsg").className = "warn";
+      return;
+    }
+    if ($("btnGen").getAttribute("aria-disabled") === "true") {
+      $("dockMsg").textContent = "请先校验连线";
+      $("dockMsg").className = "warn";
+      return;
+    }
+    generate();
+  };
   $("backend").onchange = () => { capHint(); invalidate("供应商已换"); loadCatalog(); };
 
   NODE_DEFS.forEach((def) => {
@@ -746,7 +787,8 @@
     }
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      if (!$("btnGen").disabled) generate();
+      if (genBusy) return;
+      if ($("btnGen").getAttribute("aria-disabled") !== "true") generate();
       else validate();
       return;
     }

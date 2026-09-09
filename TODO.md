@@ -1,7 +1,18 @@
 # Night Lab 代办清单
-更新：2026-09-02 · v0755
+更新：2026-09-09 · v0755（禁止项按通道拆清：nscale 兼容体 ≠ 整家 HF）
 
 原则：不造幻觉功能、不删已有功能、只接官方已有字段。
+
+HF LoRA 必须按通道写，禁止项和越权复盘对着同一条 API：
+
+| 通道 | 官方字段 | `loras` |
+| --- | --- | --- |
+| HF Fal 路由 mapped turbo（`POST router.huggingface.co/{provider}/{providerId}`） | 跟 Fal schema | 可带 `loras[]`。发出去 ≠ 上游一定加载 |
+| HF OpenAI 兼容体（nscale 等 `POST …/v1/images/generations`） | `prompt` / `model` / `n` / `size` | **无**。禁止发明 |
+| HF `hf-inference` bytes | `inputs` / `parameters` | **无** |
+| 魔搭 Inference（Hub） | `loras` | 只要 `owner/repo`，出站 `[{model,weight}]`。不是发明字段 |
+
+细则见 [`docs/provider-lora.md`](docs/provider-lora.md)。官方字段/范围/出处矩阵：[`docs/provider-model-parameter-matrix.md`](docs/provider-model-parameter-matrix.md)（没查到 ≠ 不支持；仓库 TODO 不是官方依据）。
 
 ---
 
@@ -9,7 +20,7 @@
 
 - [ ] 不要加 xAI 后端 / xAI 出图
 - [ ] 不要用 Civitai 公开 `/api/v1/images` 冒充完整导入（`meta` 经常是 null）
-- [ ] 不要给 HF OpenAI 兼容通道发明 `loras`（那条通道忽略）。Fal 路由 mapped turbo 可带 `loras[]`；魔搭只要 Hub `owner/repo`。细则见 `docs/provider-lora.md`
+- [ ] 不要给 **nscale 这类** HF OpenAI 兼容体（`POST …/v1/images/generations`）发明 `loras`。官方 schema 无此字段，发出去也会被忽略。**禁止的是这条兼容体，不是整家 HF。** Fal 路由 mapped turbo 可带 `loras[]`；魔搭只要 Hub `owner/repo`。细则见 `docs/provider-lora.md`
 - [ ] 不要删除 Fal LoRA（搜索、导入、payload、发送）。Fal 官方有 `loras` 参数
 - [ ] 不要给 Fal / HF / 魔搭做黄 Buzz
 - [ ] 不要导入后代点生成
@@ -81,7 +92,7 @@
 - [ ] Civitai 图片：prompt / 负向 / 宽高 / steps / CFG / sampler / scheduler / seed / AIR / LoRA / 预估 / 成人
 - [ ] Civitai 视频：首帧、视频尺寸、引擎字段；不要继续显示图片采样器
 - [ ] Fal：只显示当前端点 schema 有的字段
-- [ ] HF / 魔搭：prompt、尺寸、steps、seed；LoRA / sampler 不显示或标明不发送
+- [ ] HF 按通道：Fal 路由 mapped turbo 显示 LoRA（可发 `loras[]`，`loraConfidence=unverified`，禁止绿勾「已加载」）；nscale 这类 `/v1/images/generations` 兼容体 **不显示、不发送** LoRA（官方无此字段）；sampler 仅 fal 通道。魔搭：LoRA 显示并发送 Hub `owner/repo`（出站 `[{model,weight}]`），**不是「不发送」**
 - [x] 视频 Tab 按 recipe=video 显示视频表单（不再只看 Civitai `step=videoGen`）
 
 ---
@@ -106,7 +117,7 @@
 **不算越权**
 
 - NanoGPT：用户明确要加。
-- HF / 魔搭 LoRA：官方可用。见 [`docs/provider-lora.md`](docs/provider-lora.md)。不要再写成「发明字段」。
+- HF **Fal 路由** mapped turbo 的 `loras[]`、魔搭 Hub LoRA：官方可用。见 [`docs/provider-lora.md`](docs/provider-lora.md)。不要再写成「发明字段」。这和 nscale 的 `/v1/images/generations` **不是同一条 API**；后者无 `loras`，发明才算越权。
 - v0753 已撤：魔搭 Civitai→Hub 自动换 Asian-beauty。
 
 **还算偏歪 / 待收**

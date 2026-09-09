@@ -47,7 +47,7 @@
 
 - `_maybe_lora_pid`：**不**切到 Fal `/lora`（路由 404「Model not supported」）。
 - fal 通道：先 `apply_fal_loras`（mapped id 多半无 lora 字段 → 空），再 `_force_loras` **硬塞** `loras[{path,scale}]` 最多 3 条（Civitai http 可用）。
-- OpenAI 兼容通道：忽略 LoRA。
+- OpenAI 兼容通道（nscale 等 `POST …/v1/images/generations`）：官方无 `loras`，忽略。禁止发明字段。**不是**整家 HF 不能 LoRA。
 - `hf-inference` bytes：无 LoRA。
 - replicate：禁止 POST。
 - 搜：`GET huggingface.co/api/models?search=&filter=lora` → 选中的是 Hub `owner/repo`，但 fal 通道实际更吃 http/Civitai 链。
