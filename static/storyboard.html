@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<title>画布 · Night Lab · v0821o7-param-surface</title>
+<title>画布 · Night Lab</title>
 <style>
   :root{
     --bg:#0b0b0d; --panel:#121214; --elev:#19191d; --line:#2a2a30;
@@ -61,6 +61,17 @@
   .shot .hint{font-size:11px}
   .shot.sel{border-color:#fff;box-shadow:0 0 0 1px #fff, 0 16px 40px rgba(0,0,0,.4)}
   .asset.sel{border-color:#5ee0c5}
+  .text{width:320px;height:280px;border-radius:12px;padding:12px 12px 42px;background:#141418;overflow:visible}
+  .text .label{position:absolute;top:-34px;left:0;font-size:16px;line-height:22px;color:#b9bbc4;
+    max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+  .text textarea.editor{width:100%;height:calc(100% - 4px);resize:none;border:0;background:transparent;
+    color:#e8e8ec;font-size:16px;line-height:1.65;padding:0;outline:none;white-space:pre-wrap;
+    overflow:auto;overflow-wrap:anywhere;word-break:break-word}
+  .text.sel{border-color:#5ee0c5;box-shadow:0 0 0 1px #5ee0c5, 0 12px 28px rgba(0,0,0,.35)}
+  .text .port.in{left:-8px;top:50%;transform:translateY(-50%)}
+  .text .port.out{right:-8px;top:50%;transform:translateY(-50%)}
+  .text .acts{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:4px;z-index:4}
+  .text .acts button{flex:1;border:1px solid #3a3a44;background:#111114cc;color:#eee;border-radius:7px;padding:3px 0;font-size:10px}
   .badge{position:absolute;top:8px;left:8px;z-index:4;font-size:10px;line-height:1;padding:4px 7px;border-radius:6px;
     background:rgba(12,12,16,.78);border:1px solid rgba(255,255,255,.12);color:#e8e8ec;backdrop-filter:blur(6px);pointer-events:none}
   .badge.vid{border-color:rgba(94,224,197,.35);color:#b8f5e6}
@@ -109,10 +120,12 @@
   .dock-btn.primary{border-color:rgba(94,224,197,.45);color:#b8f5e6;background:rgba(94,224,197,.10)}
   .dock.collapsed .collapse-only,
   .dock.expanded .expand-only{display:none}
-  .modes{display:flex;gap:4px;margin-bottom:10px;background:#121216;border:1px solid #2a2a32;border-radius:999px;padding:3px;width:fit-content;max-width:100%;flex-wrap:wrap}
-  .modes button{border:0;background:transparent;color:#8b8b94;border-radius:999px;padding:6px 12px;font-size:12px}
-  .modes button.on{color:#fff;background:#26262e;box-shadow:inset 0 0 0 1px #3a3a44}
-  .modes button.stub{opacity:.7}
+  .modes{display:flex;gap:4px;margin-bottom:10px;background:#121216;border:1px solid #2a2a32;border-radius:12px;padding:4px;width:100%;max-width:100%;flex-wrap:wrap}
+  .modes button{border:0;background:transparent;color:#d2d2d8;border-radius:10px;padding:8px 8px;font-size:12px;line-height:1.25;white-space:normal;flex:1 1 76px;min-width:76px;text-align:center;overflow:visible}
+  .modes button.on{color:#fff;background:#3a3a44;box-shadow:inset 0 0 0 1px #5ee0c5;font-weight:600}
+  .modes button.stub{opacity:1;color:#c8c8d0;background:#1a1a20}
+  .modes button .mode-tag{display:block;margin-top:2px;font-size:10px;font-weight:400;color:#8b8b94;line-height:1.2}
+  .modes button.on .mode-tag{color:#b8f5e6}
   .refs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .chip-btn,.chip{width:44px;height:44px;border-radius:10px;border:1px solid #2e2e36;background:#1a1a1f;
     display:grid;place-items:center;color:#9a9aa3;font-size:10px;overflow:hidden}
@@ -124,8 +137,9 @@
   .frame-slot.missing{color:#e85d4c}
   .prompt{width:100%;min-height:120px;max-height:180px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
+  #prompt{position:sticky;top:0;z-index:4;background:#121214}
   .prompt:focus{outline:1px solid #3a3a44}
-  .prompt.neg{min-height:56px;max-height:96px;margin-top:8px}
+  .prompt.neg{min-height:56px;max-height:96px;margin-top:8px;position:static}
   .prompt.is-over{border-color:#e85d4c;outline:1px solid rgba(232,93,76,.45)}
   .param-warn{margin-top:6px;font-size:11px;color:var(--buzz);min-height:1.1em}
   .param-warn.bad{color:var(--coral)}
@@ -143,6 +157,10 @@
   .bar #seed{width:auto;min-width:168px;flex:1 1 168px;max-width:240px}
   .bar #sampler,.bar #scheduler,.bar #nanoRes{max-width:140px}
   .bar .param-group{display:contents}
+  .bar .param-field{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .bar .param-field>span{font-size:11px;color:#9a9aa3;line-height:1.2}
+  .bar .param-field.param-span{grid-column:1/-1;flex:1 1 100%}
+  .bar .param-field:has(.hidden){display:none}
   .bar .param-group.hidden{display:none}
   .bar .hidden,.prompt.hidden{display:none !important}
   .bar input.is-over, .bar select.is-over{border-color:#e85d4c;box-shadow:0 0 0 1px rgba(232,93,76,.45)}
@@ -151,8 +169,17 @@
     position:relative;z-index:5;pointer-events:auto;touch-action:manipulation;margin:2px}
   .send::before{content:"";position:absolute;inset:-12px;border-radius:50%}
   .send:disabled,.send.is-blocked,.send[aria-disabled="true"]{background:#3a3a44;color:#8b8b94;opacity:1;cursor:not-allowed;box-shadow:none}
-  .msg{margin-top:8px;font-size:12px;color:var(--muted);min-height:1.2em}
+  .msg{margin-top:8px;font-size:12px;color:var(--muted);min-height:1.2em;max-height:6.5em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap;line-height:1.5}
   .msg.ok{color:var(--ok)} .msg.bad{color:var(--coral)} .msg.warn{color:var(--buzz)}
+  .msg .msg-main{display:block}
+  .msg .msg-more{margin-top:2px}
+  .msg .msg-more summary{cursor:pointer;color:inherit}
+  .msg .msg-excerpt{margin:4px 0 0;font:11px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:3.6em;overflow:auto}
+  .shot .result-error{width:100%;height:100%;max-height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:24px;color:#ffd0ca;background:rgba(120,31,25,.18);overflow:auto}
+  .shot .result-error strong{color:var(--coral);font-size:16px;flex-shrink:0}
+  .shot .result-error span{color:#f0aaa2;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:8em;overflow:auto}
+  .shot .result-error-more{font-size:12px;color:#f0aaa2}
+  .shot .result-error-more pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:6em;overflow:auto;margin:6px 0 0}
   .hidden-file{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
   .picker{position:absolute;left:50%;bottom:210px;transform:translateX(-50%);z-index:18;width:min(520px,90vw);
     background:#16161a;border:1px solid #2c2c34;border-radius:14px;padding:10px;display:none;max-height:240px;overflow:auto}
@@ -171,7 +198,7 @@
     color:#ddd;border-radius:10px;padding:4px;text-align:left}
   .rail-item img,.rail-item video{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0}
   .rail-item.on{border-color:#5ee0c5}
-  .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;flex:1}
+  .rail-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;flex:1;min-width:0}
   .rail-item.add{justify-content:center;color:#9a9aa3}
   .rail-item .pin{flex:0 0 auto;width:22px;height:22px;border:0;background:transparent;color:#8b8b94;font-size:12px;padding:0}
   .rail-item .pin:hover{color:#5ee0c5}
@@ -196,8 +223,9 @@
   .lora-block.hidden{display:none}
   .lora-hd{display:flex;align-items:center;gap:8px;margin:0 0 8px}
   .lora-hd .lbl{font-size:12px;color:#9a9aa3;flex:1}
-  .lora-hint{font-size:11px;color:var(--buzz);margin:0 0 8px;display:none}
+  .lora-hint{font-size:11px;color:#9a9aa3;margin:0 0 8px;display:none}
   .lora-hint.show{display:block}
+  .lora-str::placeholder{color:#8b8b94;opacity:1}
   .lora-row{display:flex;gap:6px;align-items:center}
   .lora-row input{flex:1;min-width:0;background:#1a1a1f;border:1px solid #2e2e36;border-radius:999px;padding:6px 10px;color:#e8e8ec;font-size:12px}
   .lora-row button{border:1px solid #2e2e36;background:#1a1a1f;color:#c8c8d0;border-radius:999px;padding:6px 12px;font-size:12px;flex-shrink:0}
@@ -347,7 +375,7 @@
   .composer-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260909">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-merge1">
 </head>
 <body>
 <div class="app">
@@ -362,7 +390,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp">v0821o7-param-surface</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o8-caption-i2i</span>
     </div>
   </header>
   <div class="stage">
@@ -370,6 +398,8 @@
     <div class="workspace-panel" id="editorWorkspace" role="region" aria-labelledby="editorWorkspaceTitle" hidden></div>
     <div class="tools canvas-only" aria-label="画布工具">
       <button class="tool" id="btnAdd" title="添加分镜">+</button>
+      <button class="tool" id="btnText" title="添加提示词节点">文</button>
+      <button class="tool" id="btnRev" title="提示词反推">↻</button>
       <button class="tool" id="btnAuto" title="自动布局">▦</button>
       <button class="tool" id="btnFit" title="适配">◎</button>
       <button class="tool" id="btnImport" title="导入分镜素材">⇪</button>
@@ -422,10 +452,10 @@
       <div class="dock-body" id="dockBody">
       <div class="dock-scroll" id="dockScroll">
       <div class="modes">
-        <button type="button" id="modeText" class="stub" data-mode="text">文本生成</button>
+        <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本生成<span class="mode-tag">未接</span></button>
         <button type="button" id="modeImg" data-mode="image">图片生成</button>
         <button type="button" id="modeVid" data-mode="video">视频生成</button>
-        <button type="button" id="modeAud" class="stub" data-mode="audio">音频生成</button>
+        <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频生成<span class="mode-tag">未接</span></button>
       </div>
       <div class="refs" id="refs"></div>
       <div class="composer-acts" id="composerActs">
@@ -479,16 +509,16 @@
           </select></label>
         </span>
         <span class="param-group hidden" id="comfyParams">
-          <label class="param-field"><span>宽</span><input id="width" type="number" min="64" max="2048" step="8" title="宽" placeholder="宽" /></label>
-          <label class="param-field"><span>高</span><input id="height" type="number" min="64" max="2048" step="8" title="高" placeholder="高" /></label>
-          <label class="param-field"><span>步数</span><input id="steps" type="number" min="1" max="150" title="步数" placeholder="steps" /></label>
-          <label class="param-field"><span>CFG</span><input id="cfg" type="number" min="0" max="30" step="0.1" title="CFG" placeholder="cfg" /></label>
-          <label class="param-field"><span>采样器</span><select id="sampler" title="采样器"></select></label>
-          <label class="param-field"><span>调度器</span><select id="scheduler" title="调度器"></select></label>
-          <label class="param-field"><span>Seed</span><input id="seed" type="text" title="种子" placeholder="seed" /></label>
+          <label class="param-field" for="width"><span>宽</span><input id="width" type="number" min="64" max="2048" step="8" title="宽" placeholder="宽" /></label>
+          <label class="param-field" for="height"><span>高</span><input id="height" type="number" min="64" max="2048" step="8" title="高" placeholder="高" /></label>
+          <label class="param-field" for="steps"><span>步数</span><input id="steps" type="number" min="1" max="150" title="步数" placeholder="steps" /></label>
+          <label class="param-field" for="cfg"><span>CFG</span><input id="cfg" type="number" min="0" max="30" step="0.1" title="CFG" placeholder="cfg" /></label>
+          <label class="param-field" for="sampler"><span>采样器</span><select id="sampler" title="采样器"></select></label>
+          <label class="param-field" for="scheduler"><span>调度器</span><select id="scheduler" title="调度器"></select></label>
+          <label class="param-field param-span" for="seed"><span>Seed</span><input id="seed" type="text" title="种子" placeholder="seed" /></label>
         </span>
         <span class="param-group hidden" id="nanoParams">
-          <label class="param-field"><span>分辨率</span><select id="nanoRes" title="Nano 分辨率 token"></select></label>
+          <label class="param-field param-span" for="nanoRes"><span>分辨率</span><select id="nanoRes" title="Nano 分辨率 token"></select></label>
         </span>
         <span class="grow"></span>
         <button type="button" class="send" id="send" data-testid="composer-send" title="生成">↑</button>
@@ -524,9 +554,9 @@
     <div class="import-url-row" id="importUrlRow">
       <input id="importUrl" type="text" placeholder="Civitai 图 id / 链接，如 https://civitai.red/images/134923572" autocomplete="off" />
       <button type="button" class="primary" id="importUrlBtn">导入参数</button>
-      <button type="button" id="btnFalLoraFix" title="挂载 Fal fal-ai/krea-2/turbo/lora + LoRA 3231694">Fal LoRA夹具</button>
-      <button type="button" id="btnHfLoraFix" title="挂载 HF krea/Krea-2-Turbo + LoRA 3231694">HF LoRA夹具</button>
-      <button type="button" id="btnMsLoraFix" title="选择魔搭 krea/Krea-2-Turbo；不预置 LoRA，请填写真实 Hub 仓库和权重">魔搭模型（不预置 LoRA）</button>
+      <button type="button" id="btnFalLoraFix" class="dev-fixture" hidden title="开发夹具">Fal LoRA夹具</button>
+      <button type="button" id="btnHfLoraFix" class="dev-fixture" hidden title="开发夹具">HF LoRA夹具</button>
+      <button type="button" id="btnMsLoraFix" class="dev-fixture" hidden title="开发夹具">魔搭模型（不预置 LoRA）</button>
     </div>
     <div class="import-body" id="importBody"></div>
     <div class="import-ft">
@@ -539,6 +569,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=v0821o7-param-surface"></script>
+<script src="/static/storyboard.js?v=20260910-merge1"></script>
 </body>
 </html>

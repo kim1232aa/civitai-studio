@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
   // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
   // v0821o6: Magao ② mount Tongyi-MAI/Z-Image-Turbo + Hub LoRA; skip Civitai http; no AI↔CN drift
@@ -141,8 +142,66 @@
     return mediaKindOf(u, n.kind === "shot" ? n.mode : (n.mediaKind || n.kind)) === "image";
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
-  function box(n) { return n.kind === "shot" ? { w: 640, h: 360 } : { w: 132, h: 208 }; }
-  function assets() { return state.nodes.filter((n) => n.kind !== "shot"); }
+  const SHOT_BOX_LONG = 640;
+  const ASPECT_CHOICES = [["1:1", 1], ["9:16", 9 / 16], ["21:9", 21 / 9], ["16:9", 16 / 9]];
+  function scaleShotBox(pw, ph) {
+    let w = Number(pw), h = Number(ph);
+    if (!Number.isFinite(w) || w <= 0) w = 16;
+    if (!Number.isFinite(h) || h <= 0) h = 9;
+    if (w >= h) return { w: SHOT_BOX_LONG, h: Math.max(1, Math.round(SHOT_BOX_LONG * h / w)) };
+    return { w: Math.max(1, Math.round(SHOT_BOX_LONG * w / h)), h: SHOT_BOX_LONG };
+  }
+  function shotPixelSize(n) {
+    let w = NaN, h = NaN;
+    const take = (src) => {
+      if (!src) return;
+      const sw = Number(src.width);
+      const sh = Number(src.height);
+      if (Number.isFinite(sw) && sw > 0) w = sw;
+      if (Number.isFinite(sh) && sh > 0) h = sh;
+    };
+    take(n && n.composer && n.composer.fields);
+    take(n);
+    if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) return { w: w, h: h };
+    const fields = n && n.composer && n.composer.fields;
+    const live = n && n.id === _composerShotId;
+    const aspect = (fields && fields.aspect) || (n && n.aspect)
+      || (live && $("aspect") && $("aspect").value) || "16:9";
+    const res = (fields && fields.res) || (n && n.res)
+      || (live && $("res") && $("res").value) || "720P";
+    const size = sizeFromAspectRes(aspect, res);
+    return { w: size.width, h: size.height };
+  }
+  function box(n) {
+    if (n.kind === "shot") {
+      const px = shotPixelSize(n);
+      return scaleShotBox(px.w, px.h);
+    }
+    if (n.kind === "text") return { w: 320, h: 280 };
+    return { w: 132, h: 208 };
+  }
+  function railItemKey(it) {
+    if (!it) return "";
+    return String(it.url || it.path || it.file || it.name || it.title || "");
+  }
+  function isJunkRailItem(it) {
+    if (!it) return true;
+    const url = String(it.url || it.path || "");
+    const title = String(it.title || it.file || it.name || "");
+    const key = (url + " " + title).toLowerCase();
+    if (!url) return true;
+    if (it.bytes === 0 || it.size === 0) return true;
+    if (/light-preset/i.test(key)) return true;
+    if (/(^|\/)dot_[0-9a-f._-]+\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) return true;
+    if (/^dot_/i.test(title)) return true;
+    if (/(^|\/)artifact\.(jpe?g|png|webp)(\?|$)/i.test(url)) return true;
+    if (/无图占位|尚未生成/.test(title)) return true;
+    if (/\/static\/light-preset/i.test(url)) return true;
+    return false;
+  }
+  function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
+  function railAssets() { return assets().filter((n) => !isJunkRailItem(n)); }
+  function railHistory() { return (state.history || []).filter((h) => !isJunkRailItem(h)); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
   function sceneById(id) {
     return (state.script && Array.isArray(state.script.scenes))
@@ -585,7 +644,7 @@
   }
   function connectedPending(shotId) {
     // A blank shot is an upstream generation dependency, not an upload in flight.
-    return connectedNodes(shotId).filter((n) => n && n.kind !== "shot" && !n.url);
+    return connectedNodes(shotId).filter((n) => n && n.kind !== "shot" && n.kind !== "text" && !n.url);
   }
   function refReadyMessage(shot) {
     if ((state.uploading || 0) > 0) return "参考图上传中，请稍等";
@@ -607,7 +666,146 @@
   function sourceTitle(n) {
     if (!n) return "";
     if (n.kind === "shot") return (n.title || "分镜") + "成片";
+    if (n.kind === "text") return n.title || "提示词";
     return n.title || "资产";
+  }
+
+  function describePrompt(asset, caption) {
+    if (!asset || !asset.url) return "";
+    return String(caption || "")
+      .split("\n")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  async function captionFromAsset(asset) {
+    if (!asset || !asset.url) return "";
+    try {
+      const r = await fetch("/api/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: asset.url }),
+      });
+      let j = null;
+      try { j = await r.json(); } catch (_) { j = null; }
+      if (r.ok) {
+        const cap = j && (j.caption || j.text || j.prompt);
+        if (cap) return String(cap);
+      }
+      const err = (j && (j.error || j.message)) || ("视觉打标失败 HTTP " + r.status);
+      setMsg(err, "warn");
+    } catch (e) {
+      setMsg("视觉打标失败：" + ((e && e.message) || e), "warn");
+    }
+    try {
+      const sidecar = asset.url.replace(/\.[a-zA-Z0-9]+(\?|$)/, ".json$1");
+      if (sidecar !== asset.url) {
+        const r2 = await fetch(sidecar);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          const cap2 = j2 && (j2.caption || j2.text || j2.prompt);
+          if (cap2) return String(cap2);
+        }
+      }
+    } catch (_) {}
+    return "";
+  }
+
+  async function reverseFromImage(asset) {
+    if (!asset || !asset.url) return null;
+    let node = state.nodes.find(
+      (n) => n.kind === "text" && state.edges.some((e) => e.from === asset.id && e.to === n.id),
+    );
+    const userCaption = node ? String(node.text || "").trim() : "";
+    let visualCaption = "";
+    try {
+      visualCaption = await captionFromAsset(asset);
+    } catch (_) {
+      visualCaption = "";
+    }
+    const text = describePrompt(asset, [userCaption, visualCaption].filter(Boolean).join("\n"));
+    if (!text) {
+      setMsg("未能从真实资产取得描述，请先填写提示词", "warn");
+      return null;
+    }
+    if (node) {
+      node.text = text;
+    } else {
+      node = {
+        id: uid("text"),
+        kind: "text",
+        title: "反推·" + sourceTitle(asset),
+        x: asset.x + 220,
+        y: asset.y,
+        text: text,
+      };
+      state.nodes.push(node);
+      state.edges.push({ from: asset.id, to: node.id });
+    }
+    selectNode(node.id);
+    persist();
+    return node;
+  }
+
+  async function generateFromText(node) {
+    if (!node || node.kind !== "text") return;
+    const existing = shots();
+    let shot = existing.find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id));
+    if (!shot) {
+      const isEmpty = function (s) {
+        return s && !s.url && !String(s.prompt || "").trim();
+      };
+      shot = existing.find(function (s) { return isEmpty(s) && /分镜\s*1$/.test(String(s.title || "")); })
+        || existing.find(isEmpty)
+        || existing.find(function (s) { return s && !s.url; });
+    }
+    if (!shot) {
+      const i = existing.length;
+      const pos = typeof newShotPosition === "function" ? newShotPosition(i) : { x: node.x + 420, y: node.y };
+      shot = {
+        id: uid("shot"),
+        kind: "shot",
+        title: "分镜" + (i + 1),
+        x: pos.x,
+        y: pos.y,
+        url: "",
+        firstFrameId: "",
+        prompt: "",
+      };
+      state.nodes.push(shot);
+    }
+    if (!state.edges.some((e) => e.from === node.id && e.to === shot.id)) {
+      state.edges.push({ from: node.id, to: shot.id });
+    }
+    shot.prompt = node.text || "";
+    connectedNodes(node.id).filter(isImageSource).forEach((img) => {
+      if (!state.edges.some((e) => e.from === img.id && e.to === shot.id)) {
+        state.edges.push({ from: img.id, to: shot.id });
+      }
+      if (!shot.firstFrameId) shot.firstFrameId = img.id;
+    });
+    state.mode = "image";
+    selectNode(shot.id, { preserveLayout: true });
+    if (typeof fitShotsInView === "function") fitShotsInView();
+    if ($("prompt")) $("prompt").value = shot.prompt || "";
+    persist();
+    if (!$("service") || !$("service").value) {
+      await loadCatalog();
+    }
+    if (!$("service") || !$("service").value) {
+      setMsg("生图必须显式选择图片模型，不会用默认假值", "bad");
+      renderDock();
+      return;
+    }
+    const item = catalogItemForService();
+    const category = String((item && item.category) || "").toLowerCase();
+    if (category === "text" || category === "chat") {
+      setMsg("当前选中的是文本模型，不能拿去生图。请先切到图片模型", "bad");
+      renderDock();
+      return;
+    }
+    await generate();
   }
   /** Raw outs / provider file ids — must never land in the prompt textarea. */
   function isRawFileTitle(t) {
@@ -876,6 +1074,7 @@
         state.groups = [];
         return false;
       }
+      removeUnpromotedFromShot();
       return true;
     } catch (_) { return false; }
   }
@@ -907,7 +1106,9 @@
 
   function canLink(src, dst) {
     if (!src || !dst || src.id === dst.id) return false;
+    if (dst.kind === "text") return isImageSource(src);
     if (dst.kind !== "shot") return false;
+    if (src.kind === "text") return true;
     // Blank image shots are real upstream dependencies, not fake image assets.
     // Video/audio results cannot feed an image port.
     if (!isImageSource(src) && !(src.kind === "shot" && !src.url &&
@@ -941,7 +1142,7 @@
     shot.mode = state.mode;
     shot.prompt = $("prompt").value;
     shot.negativePrompt = $("negative") ? $("negative").value : "";
-    writeComfyParamsToShot(shot);
+    persistShotFrame(shot);
   }
 
   function activateShotComposer(shot) {
@@ -949,26 +1150,39 @@
     if (_composerShotId === id) return;
     saveDisplayedComposer();
     _composerShotId = id;
-    if (!id || !shot.composer) return;
-    const recipe = shot.composer;
-    const key = recipe.backend + ":" + recipe.mode;
-    state.mode = recipe.mode;
-    $("backend").value = recipe.backend;
-    state.loras = JSON.parse(JSON.stringify(recipe.loras || []));
-    Object.keys(recipe.fields || {}).forEach((field) => {
-      const el = $(field);
-      if (!el || SHOT_COMPOSER_FIELDS.indexOf(field) < 0) return;
-      if (el.tagName === "SELECT") ensureSelectOpt(el, recipe.fields[field]);
-      el.value = recipe.fields[field];
-    });
-    if (state._catalogKey !== key || _catalogFlight) {
-      state._pendingService = recipe.service || "";
-      loadCatalog();
-    } else {
-      $("service").value = "";
-      if (recipe.service && state.catalogById[recipe.service]) {
-        ensureSelectOpt($("service"), recipe.service);
+    if (!id) return;
+    if (shot.composer) {
+      const recipe = shot.composer;
+      const key = recipe.backend + ":" + recipe.mode;
+      state.mode = recipe.mode;
+      $("backend").value = recipe.backend;
+      state.loras = JSON.parse(JSON.stringify(recipe.loras || []));
+      Object.keys(recipe.fields || {}).forEach((field) => {
+        const el = $(field);
+        if (!el || SHOT_COMPOSER_FIELDS.indexOf(field) < 0) return;
+        if (el.tagName === "SELECT") ensureSelectOpt(el, recipe.fields[field]);
+        el.value = recipe.fields[field];
+      });
+      if (state._catalogKey !== key || _catalogFlight) {
+        state._pendingService = recipe.service || "";
+        loadCatalog();
+      } else {
+        $("service").value = "";
+        if (recipe.service && state.catalogById[recipe.service]) {
+          ensureSelectOpt($("service"), recipe.service);
+        }
       }
+    } else {
+      applyComfyParamsToUi(shot);
+      if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
+      if (shot.res && $("res")) $("res").value = shot.res;
+    }
+    const restoredW = $("width") ? parseInt($("width").value, 10) : NaN;
+    const restoredH = $("height") ? parseInt($("height").value, 10) : NaN;
+    if (Number.isFinite(restoredW) && restoredW > 0 && Number.isFinite(restoredH) && restoredH > 0) {
+      syncAspectFromSize(restoredW, restoredH);
+    } else {
+      applyAspectToSize();
     }
   }
 
@@ -979,11 +1193,14 @@
     const titleSet = new Set(shots().map((shot) => shot.title));
     let number = 1;
     while (titleSet.has("分镜" + number)) number++;
-    const shot = Object.assign({}, readComfyParamsFromUi(), {
+    const comfy = readComfyParamsFromUi();
+    const b = scaleShotBox(comfy.width, comfy.height);
+    const shot = Object.assign({}, comfy, {
       id: uid("shot"), kind: "shot", title: "分镜" + number,
-      x: point.x - (link.side === "in" ? 640 : 0), y: point.y - 180,
+      x: point.x - (link.side === "in" ? b.w : 0), y: point.y - b.h / 2,
       url: "", firstFrameId: "", prompt: recipe.fields.prompt || "",
       negativePrompt: recipe.fields.negative || "", mode: recipe.mode,
+      aspect: recipe.fields.aspect, res: recipe.fields.res,
       composer: recipe,
     });
     const src = link.side === "in" ? shot : origin;
@@ -1025,11 +1242,12 @@
       let src = null;
       let dst = null;
       if (fromSide === "out") {
-        if (n.kind !== "shot") return;
+        if (n.kind !== "shot" && n.kind !== "text") return;
         side = "in";
         src = from;
         dst = n;
       } else {
+        if (from.kind !== "shot" && from.kind !== "text") return;
         side = "out";
         src = n;
         dst = from;
@@ -1081,17 +1299,34 @@
     const sel = state.selected === n.id ? " sel" : "";
     const multi = isMulti(n.id) ? " multi" : "";
     const badge = mediaBadge(n);
+    if (n.kind === "text") {
+      return '<div class="card text' + sel + multi + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+        '<div class="label">✎ ' + esc(n.title || "提示词") + "</div>" +
+        '<textarea class="editor" data-text data-id="' + esc(n.id) + '" placeholder="反推或手写提示词…">' +
+        esc(n.text || "") + "</textarea>" +
+        '<div class="acts">' +
+        '<button type="button" data-textact="rev" data-id="' + esc(n.id) + '">反推</button>' +
+        '<button type="button" data-textact="gen" data-id="' + esc(n.id) + '">生图</button>' +
+        "</div>" +
+        '<button class="port in" data-side="in" type="button" aria-label="输入"></button>' +
+        '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
+    }
     if (n.kind === "shot") {
       const media = n.url
         ? (isVideoUrl(n.url)
             ? '<video src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
             : '<img src="' + esc(n.url) + '" alt="">')
         : n._error
-          ? '<div class="result-error"><strong>生成失败</strong><span>' + esc(n._error) + '</span></div>'
+          ? '<div class="result-error"><strong>生成失败</strong><span>' + esc(n._error) + '</span>'
+            + (n._errorDetail
+              ? '<details class="result-error-more"><summary>详情</summary><pre>' + esc(n._errorDetail) + '</pre></details>'
+              : '')
+            + '</div>'
         : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
       const busy = n._busy ? " busy" : "";
-      return '<div class="card shot' + sel + multi + busy + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px">' +
+      const b = box(n);
+      return '<div class="card shot' + sel + multi + busy + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -1178,6 +1413,34 @@
     return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
   }
 
+  function minimapPreviewReady(preview) {
+    if (!preview) return false;
+    if (preview.tagName === "VIDEO") return preview.readyState >= 2 && preview.videoWidth > 0;
+    return !!(preview.complete && preview.naturalWidth);
+  }
+  function ensureMinimapPreview(n) {
+    if (!n || !n.url) return null;
+    let preview = minimapImages.get(n);
+    if (preview && preview._mmapUrl !== n.url) {
+      minimapImages.delete(n);
+      preview = null;
+    }
+    if (preview) return preview;
+    if (isVideoUrl(n.url)) {
+      preview = document.createElement("video");
+      preview.muted = true;
+      preview.playsInline = true;
+      preview.preload = "metadata";
+      preview.addEventListener("loadeddata", drawMinimap, { once: true });
+    } else {
+      preview = new Image();
+      preview.onload = drawMinimap;
+    }
+    preview._mmapUrl = n.url;
+    preview.src = n.url;
+    minimapImages.set(n, preview);
+    return preview;
+  }
   function drawMinimap() {
     const cv = $("minimapCv");
     if (!cv) return;
@@ -1199,18 +1462,13 @@
       const y = oy + (n.y - b.minY) * scale;
       const w = Math.max(2, nb.w * scale);
       const h = Math.max(2, nb.h * scale);
-      const preview = minimapImages.get(n);
-      if (n.url && preview && preview.complete && preview.naturalWidth) {
+      const preview = ensureMinimapPreview(n);
+      if (n.url && minimapPreviewReady(preview)) {
         ctx.drawImage(preview, x, y, w, h);
       } else {
         ctx.fillStyle = n.kind === "shot" ? "#3a3a48" : "#2a3a36";
         ctx.fillRect(x, y, w, h);
-        if (n.url && !preview) {
-          const image = new Image();
-          image.onload = drawMinimap;
-          image.src = n.url;
-          minimapImages.set(n, image);
-        }
+
       }
       if (state.selected === n.id) {
         ctx.strokeStyle = n.kind === "shot" ? "#fff" : "#5ee0c5";
@@ -1250,16 +1508,22 @@
     persist();
   }
 
+  function keepComposerPromptVisible() {
+    const reset = function () {
+      const sc = $("dockScroll");
+      const body = $("dockBody");
+      if (sc) sc.scrollTop = 0;
+      if (body) body.scrollTop = 0;
+    };
+    reset();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(reset);
+  }
   function setDockMode(mode) {
     if (mode !== "collapsed" && mode !== "expanded" && mode !== "closed") mode = "collapsed";
     state.dockMode = mode;
     renderDock();
     if (mode === "expanded") {
-      // First paint of expanded dock: show modes+#prompt at top of dock-scroll.
-      requestAnimationFrame(() => {
-        const sc = $("dockScroll");
-        if (sc) sc.scrollTop = 0;
-      });
+      requestAnimationFrame(function () { keepComposerPromptVisible(); });
     }
   }
 
@@ -1341,35 +1605,43 @@
       '<button type="button" data-tab="history"' + (!tabAssets ? ' class="on"' : "") + ">历史</button></div>";
     let body;
     if (tabAssets) {
-      const list = assets();
+      const list = railAssets();
       body = '<div class="rail-h">画布资产 · 可拖出</div>' +
         list.map((a) => {
           const on = state.selected === a.id ? " on" : "";
+          const name = sourceTitle(a);
           const thumb = a.url
             ? (isVideoUrl(a.url)
                 ? '<video src="' + esc(a.url) + '" muted playsinline preload="metadata"></video>'
                 : '<img src="' + esc(a.url) + '" alt="">')
             : "";
-          return '<div class="rail-item' + on + '" data-rail="' + esc(a.id) + '">' +
+          const pin = (canPin && a.url)
+            ? '<button class="pin" type="button" data-pin="' + esc(a.id) + '" title="接到此镜">接到此镜</button>'
+            : "";
+          return '<div class="rail-item' + on + '" data-rail="' + esc(a.id) + '" title="' + esc(name) + '">' +
             thumb +
-            "<span>" + esc(a.title) + "</span>" +
-            (canPin ? '<button class="pin" type="button" data-pin="' + esc(a.id) + '" title="接到此镜">＋</button>' : "") +
+            '<span title="' + esc(name) + '">' + esc(name) + "</span>" +
+            pin +
             "</div>";
         }).join("") +
-        '<button class="rail-item add" type="button" data-act="upload">+ 上传</button>';
+        '<button class="rail-item add" type="button" data-act="upload">上传</button>';
     } else {
-      const list = state.history;
+      const list = railHistory();
       body = '<div class="rail-h">生成历史 · 拖到画布</div>' +
         (list.length ? list.map((it, i) => {
+          const name = String(it.title || "");
           const thumb = it.url
             ? (isVideoUrl(it.url)
                 ? '<video src="' + esc(it.url) + '" muted playsinline preload="metadata"></video>'
                 : '<img src="' + esc(it.url) + '" alt="">')
             : "";
-          return '<div class="rail-item" data-hist="' + i + '">' +
+          const pin = (canPin && it.url)
+            ? '<button class="pin" type="button" data-hist-pin="' + i + '" title="接到此镜">接到此镜</button>'
+            : "";
+          return '<div class="rail-item" data-hist="' + i + '" title="' + esc(name) + '">' +
             thumb +
-            "<span>" + esc(it.title) + "</span>" +
-            (canPin ? '<button class="pin" type="button" data-hist-pin="' + i + '" title="接到此镜">＋</button>' : "") +
+            '<span title="' + esc(name) + '">' + esc(name) + "</span>" +
+            pin +
             "</div>";
         }).join("") : "<div class='rail-h'>还没有成片</div>");
     }
@@ -1522,11 +1794,7 @@
     renderRail();
     requestAnimationFrame(() => {
       positionDock();
-      // Expand path (selectNode / setDockMode): keep #prompt in first paint, not scrolled under foot.
-      if (expanded) {
-        const sc = $("dockScroll");
-        if (sc) sc.scrollTop = 0;
-      }
+      if (expanded) keepComposerPromptVisible();
     });
   }
 
@@ -1544,7 +1812,7 @@
       state.lastComposerShot = n.id;
       state._scriptShotId = n.id;
       if (state.editor) state.editor.activeShotId = n.id;
-      if (state.cam.s >= 1) {
+      if (state.cam.s >= 1 && !opts.preserveLayout) {
         if (constrainShotsToViewport()) renderCards();
         constrainCameraToShots(n);
         applyCam();
@@ -1620,7 +1888,7 @@
       invalidateStageProgress(shot);
     }
     mention(asset, shot);
-    if (shot && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
     return true;
   }
   function unlinkAssetFromShot(asset, shot) {
@@ -1639,6 +1907,7 @@
   }
 
   function promoteResult(shot, url) {
+    // Explicit 入库 only. Generation writeback must not call this.
     // v0821i: promote images AND videos into outs/assets (history/drag survive refresh)
     if (!shot || !url) return null;
     const aid = "out-" + shot.id;
@@ -1671,6 +1940,7 @@
     const existing = assets().find((a) => a.url === item.url);
     if (existing) {
       if (x != null) { existing.x = x; existing.y = y; }
+      existing.userPromoted = true;
       return existing;
     }
     const node = {
@@ -1680,6 +1950,8 @@
       x: x != null ? x : 220,
       y: y != null ? y : 24 + assets().length * 40,
       url: item.url,
+      userPromoted: true,
+      mediaKind: mediaKindOf(item.url),
     };
     state.nodes.push(node);
     return node;
@@ -2057,20 +2329,44 @@
     state.cam.y = axis(bounds.minY, bounds.maxY, top, bottom, state.cam.y, target.y, tb.h);
   }
 
+  function fitShotsInView() {
+    const list = shots();
+    if (!list.length) return;
+    const area = canvasArea();
+    const pad = 16;
+    const vw = Math.max(1, area.right - area.left - pad * 2);
+    const vh = Math.max(1, area.bottom - area.top - pad * 2);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    list.forEach(function (n) {
+      const b = box(n);
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + b.w);
+      maxY = Math.max(maxY, n.y + b.h);
+    });
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const fitS = Math.min(vw / bw, vh / bh);
+    if (state.cam.s > fitS) state.cam.s = Math.max(0.16, fitS);
+    constrainCameraToShots(list[0]);
+    applyCam();
+  }
+
   function constrainShotsToViewport() {
     if (state.cam.s < 1) return false;
     const area = canvasArea(), pad = 12, scale = state.cam.s;
-    const minX = (area.left + pad - state.cam.x) / scale;
-    const maxX = (area.right - pad - state.cam.x) / scale - 640;
-    const minY = (area.top + pad - state.cam.y) / scale;
-    const maxY = (area.bottom - pad - state.cam.y) / scale - 360;
     const list = shots();
     if (!list.length) return false;
+    const loX = (area.left + pad - state.cam.x) / scale;
+    const hiX = (area.right - pad - state.cam.x) / scale;
+    const loY = (area.top + pad - state.cam.y) / scale;
+    const hiY = (area.bottom - pad - state.cam.y) / scale;
     const bounds = list.reduce((out, n) => {
+      const b = box(n);
       out.minX = Math.min(out.minX, n.x);
       out.minY = Math.min(out.minY, n.y);
-      out.maxX = Math.max(out.maxX, n.x + 640);
-      out.maxY = Math.max(out.maxY, n.y + 360);
+      out.maxX = Math.max(out.maxX, n.x + b.w);
+      out.maxY = Math.max(out.maxY, n.y + b.h);
       return out;
     }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
     const shift = (min, max, lo, hi) => {
@@ -2079,17 +2375,18 @@
       if (max + d > hi) d = hi - max;
       return d;
     };
-    const dx = shift(bounds.minX, bounds.maxX, minX, maxX + 640);
-    const dy = shift(bounds.minY, bounds.maxY, minY, maxY + 360);
+    const dx = shift(bounds.minX, bounds.maxX, loX, hiX);
+    const dy = shift(bounds.minY, bounds.maxY, loY, hiY);
     let changed = false;
     list.forEach((n) => {
+      const b = box(n);
       const oldX = n.x, oldY = n.y;
       n.x += dx;
       n.y += dy;
-      // ponytail: if several cards exceed the 100% viewport, clamp individually;
-      // upgrade to a layout pass only when non-overlapping placement is required.
-      if (maxX >= minX) n.x = Math.max(minX, Math.min(n.x, maxX));
-      if (maxY >= minY) n.y = Math.max(minY, Math.min(n.y, maxY));
+      const maxX = hiX - b.w;
+      const maxY = hiY - b.h;
+      if (maxX >= loX) n.x = Math.max(loX, Math.min(n.x, maxX));
+      if (maxY >= loY) n.y = Math.max(loY, Math.min(n.y, maxY));
       changed = changed || n.x !== oldX || n.y !== oldY;
     });
     return changed;
@@ -2098,19 +2395,21 @@
   function newShotPosition(index) {
     const area = canvasArea();
     const scale = state.cam.s || 1;
-    const b = { w: 640, h: 360 };
+    const selected = nodeById(state.selected);
+    const comfy = readComfyParamsFromUi();
+    const bNew = scaleShotBox(comfy.width, comfy.height);
+    const bSel = (selected && selected.kind === "shot") ? box(selected) : bNew;
     const pad = 16;
     const minX = (area.left + pad - state.cam.x) / scale;
-    const maxX = (area.right - pad - state.cam.x) / scale - b.w;
+    const maxX = (area.right - pad - state.cam.x) / scale - bNew.w;
     const minY = (area.top + pad - state.cam.y) / scale;
-    const maxY = (area.bottom - pad - state.cam.y) / scale - b.h;
-    const selected = nodeById(state.selected);
+    const maxY = (area.bottom - pad - state.cam.y) / scale - bNew.h;
     const baseX = selected && selected.kind === "shot"
-      ? selected.x + b.w + 24 / scale
-      : ((area.left + area.right) / 2 - state.cam.x) / scale - b.w / 2;
+      ? selected.x + bSel.w + 24 / scale
+      : ((area.left + area.right) / 2 - state.cam.x) / scale - bNew.w / 2;
     const baseY = selected && selected.kind === "shot"
       ? selected.y
-      : ((area.top + area.bottom) / 2 - state.cam.y) / scale - b.h / 2;
+      : ((area.top + area.bottom) / 2 - state.cam.y) / scale - bNew.h / 2;
     const clamp = (v, lo, hi) => hi < lo ? (lo + hi) / 2 : Math.max(lo, Math.min(v, hi));
     return {
       x: clamp(baseX + (index % 2) * (24 / scale), minX, maxX),
@@ -2214,6 +2513,12 @@
     }
     if (card) {
       const n = nodeById(card.dataset.id);
+      if (e.target.closest("textarea,[data-textact],.acts")) {
+        if (state.selected !== n.id || e.shiftKey) {
+          selectNode(n.id, { shift: !!(e.shiftKey) });
+        }
+        return;
+      }
       selectNode(n.id, { shift: !!(e.shiftKey) });
       if (e.shiftKey) {
         // multi-toggle only — skip drag start to avoid accidental moves
@@ -2281,7 +2586,7 @@
         if (linkAssetToShot(src, dst)) {
           selectNode(dst.id);
         } else {
-          setMsg("连线被拒绝：需连接图片输出到分镜输入，且不能形成循环", "bad");
+          setMsg("连线被拒绝：需连接图片到分镜或提示词卡，且不能形成循环", "bad");
         }
       } else if (!target && !snap && isBlankCanvasDrop(e, link)) {
         createLinkedShot(link, w);
@@ -2326,6 +2631,35 @@
     applyCam(); persist();
   }, { passive: false });
 
+  world.addEventListener("input", (e) => {
+    const ta = e.target.closest("textarea[data-text]");
+    if (!ta) return;
+    const n = nodeById(ta.dataset.id);
+    if (n && n.kind === "text") {
+      n.text = ta.value;
+      persist();
+    }
+  });
+  world.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-textact]");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const n = nodeById(btn.dataset.id);
+    if (!n) return;
+    if (btn.dataset.textact === "gen") {
+      generateFromText(n);
+    } else if (btn.dataset.textact === "rev") {
+      const src = connectedNodes(n.id).find(isImageSource);
+      if (src) {
+        setMsg("正在反推…");
+        reverseFromImage(src).then((node) => {
+          if (node) setMsg("反推完成，提示词已更新", "ok");
+        });
+      } else setMsg("这张提示词卡还没连图片", "warn");
+    }
+  });
+
   $("refs").addEventListener("click", (e) => {
     const frameBtn = e.target.closest("[data-frame]");
     if (frameBtn) {
@@ -2361,11 +2695,11 @@
     const hit = hitNode(w.x, w.y);
     let node = payload.node || null;
     if (!node && payload.item) node = spawnHistoryAt(payload.item, w.x - 66, w.y - 40);
-    if (node && (!hit || hit.kind !== "shot")) {
+    if (node && (!hit || (hit.kind !== "shot" && hit.kind !== "text"))) {
       node.x = w.x - 66;
       node.y = w.y - 40;
     }
-    if (node && hit && hit.kind === "shot") {
+    if (node && hit && (hit.kind === "shot" || hit.kind === "text")) {
       linkAssetToShot(node, hit);
       selectNode(hit.id);
     } else if (node) {
@@ -2385,7 +2719,7 @@
         state.railDrag = { kind: "asset", id: asset.id, url: asset.url, title: asset.title, x: e.clientX, y: e.clientY, moved: false };
         railBtn.setPointerCapture(e.pointerId);
       } else if (histBtn) {
-        const item = state.history[Number(histBtn.dataset.hist)];
+        const item = railHistory()[Number(histBtn.dataset.hist)];
         if (!item) return;
         state.railDrag = { kind: "hist", item: item, url: item.url, title: item.title, x: e.clientX, y: e.clientY, moved: false };
         histBtn.setPointerCapture(e.pointerId);
@@ -2425,7 +2759,7 @@
       const tab = e.target.closest("[data-tab]");
       if (tab) { state.railTab = tab.dataset.tab; renderRail(); persist(); return; }
       const up = e.target.closest("[data-act]");
-      if (up && up.dataset.act === "upload") { openImportModal(); return; }
+      if (up && up.dataset.act === "upload") { if ($("file")) $("file").click(); return; }
       const pin = e.target.closest("[data-pin]");
       if (pin) {
         const asset = nodeById(pin.dataset.pin);
@@ -2437,7 +2771,7 @@
       }
       const histPin = e.target.closest("[data-hist-pin]");
       if (histPin) {
-        const item = state.history[Number(histPin.dataset.histPin)];
+        const item = railHistory()[Number(histPin.dataset.histPin)];
         const shot = nodeById(state.selected);
         if (item && shot && shot.kind === "shot") {
           const node = spawnHistoryAt(item, shot.x - 180, shot.y + 40);
@@ -2682,10 +3016,18 @@
   if ($("modeAud")) $("modeAud").onclick = () => setMode("audio");
   ["backend", "service", "duration", "aspect", "res"].concat(COMFY_PARAM_IDS).forEach((id) => {
     if ($(id)) $(id).addEventListener("change", () => {
-      if (COMFY_PARAM_IDS.indexOf(id) >= 0) writeComfyParamsToShot(nodeById(state.selected));
       if (id === "aspect" || id === "res") applyAspectToSize();
+      else if (id === "width" || id === "height") {
+        syncAspectFromSize($("width") && $("width").value, $("height") && $("height").value);
+        persistShotFrame(nodeById(state.selected));
+      } else if (COMFY_PARAM_IDS.indexOf(id) >= 0) {
+        writeComfyParamsToShot(nodeById(state.selected));
+      }
       persist();
       if (id === "duration" && state.mode === "video") {
+        renderCards(); drawWires(); positionDock();
+      }
+      if (id === "aspect" || id === "res" || id === "width" || id === "height") {
         renderCards(); drawWires(); positionDock();
       }
       if (id === "backend" || id === "service") syncParamSurface();
@@ -2693,16 +3035,42 @@
     if ($(id) && COMFY_PARAM_IDS.indexOf(id) >= 0) {
       $(id).addEventListener("input", () => {
         if (id === "seed" && $("seed")) $("seed").title = String($("seed").value || "");
-        writeComfyParamsToShot(nodeById(state.selected));
+        if (id === "width" || id === "height") {
+          syncAspectFromSize($("width") && $("width").value, $("height") && $("height").value);
+          persistShotFrame(nodeById(state.selected));
+          renderCards(); drawWires(); positionDock();
+        } else {
+          writeComfyParamsToShot(nodeById(state.selected));
+        }
         persist();
       });
     }
   });
 
-  function setMsg(t, cls) {
-    if (!$("msg")) return;
-    $("msg").textContent = t;
-    $("msg").className = "msg" + (cls ? " " + cls : "");
+  function setMsg(t, cls, excerpt) {
+    const el = $("msg");
+    if (!el) return;
+    el.className = "msg" + (cls ? " " + cls : "");
+    const text = t == null ? "" : String(t);
+    const extra = excerpt == null || excerpt === "" ? "" : String(excerpt);
+    el.textContent = "";
+    if (!text && !extra) return;
+    const main = document.createElement("span");
+    main.className = "msg-main";
+    main.textContent = text;
+    el.appendChild(main);
+    if (extra && extra !== text) {
+      const d = document.createElement("details");
+      d.className = "msg-more";
+      const s = document.createElement("summary");
+      s.textContent = "详情";
+      const pre = document.createElement("pre");
+      pre.className = "msg-excerpt";
+      pre.textContent = extra;
+      d.appendChild(s);
+      d.appendChild(pre);
+      el.appendChild(d);
+    }
   }
 
   // v0821k: sticky click-ack — successors keep「已点生成」visible (never wipe bare)
@@ -2711,20 +3079,82 @@
     setMsg(body ? ("已点生成 · " + body) : "已点生成", cls);
   }
 
-  function formatErr(e) {
-    if (e == null || e === "") return "未知错误";
+  function shortErrExcerpt(s, max) {
+    const t = String(s || "").replace(/\s+/g, " ").trim();
+    const n = max == null ? 180 : max;
+    if (!t) return "";
+    return t.length <= n ? t : (t.slice(0, n) + "…");
+  }
+  function isBillingErrText(s) {
+    const t = String(s || "");
+    if (!t) return false;
+    if (/额度不足|账单错误|账单失败/.test(t)) return true;
+    return /\b(402)\b/.test(t)
+      || /\b(payment|billing|invoice|quota|credit|credits)\b/i.test(t)
+      || /insufficient(?:\s+\w+){0,4}\s+(funds|credit|quota)/i.test(t)
+      || /exceeded.{0,32}(quota|limit|credit)/i.test(t)
+      || /card(?:\s+was)?\s+declined/i.test(t)
+      || /past[\s_-]?due/i.test(t);
+  }
+  function unwrapErrText(e, depth) {
+    if (depth > 6) return "";
+    if (e == null || e === "") return "";
     if (typeof e === "string") return e;
-    if (e instanceof Error) return e.message || String(e);
+    if (typeof e === "number" || typeof e === "boolean") return String(e);
+    if (e instanceof Error) {
+      if (e.message) return e.message;
+      return String(e);
+    }
     if (typeof e === "object") {
-      if (e.error != null && e.error !== e) return formatErr(e.error);
-      if (e.message != null) return String(e.message);
-      if (e.detail != null) {
-        if (typeof e.detail === "string") return e.detail;
-        try { return JSON.stringify(e.detail); } catch (_) {}
+      if (e.status === 402 || e.statusCode === 402 || e.code === 402) {
+        const inner402 = unwrapErrText(e.error || e.message || e.detail, depth + 1);
+        return inner402 || "HTTP 402";
       }
-      try { return JSON.stringify(e); } catch (_) { return String(e); }
+      const keys = ["error", "message", "detail", "msg", "reason", "description", "body"];
+      for (let i = 0; i < keys.length; i++) {
+        const v = e[keys[i]];
+        if (v == null || v === e) continue;
+        const inner = unwrapErrText(v, depth + 1);
+        if (inner) return inner;
+      }
+      try {
+        const s = JSON.stringify(e);
+        if (s && s !== "{}" && s !== "null") return s;
+      } catch (_) {}
+      return String(e);
     }
     return String(e);
+  }
+  function formatErrInfo(e) {
+    const raw = unwrapErrText(e, 0) || "未知错误";
+    const billing = isBillingErrText(raw) || (e && typeof e === "object" && (e.status === 402 || e.statusCode === 402));
+    if (billing) {
+      return { text: "额度不足或账单错误", excerpt: shortErrExcerpt(raw, 180), billing: true };
+    }
+    const human = raw.length > 240 ? (raw.slice(0, 240) + "…") : raw;
+    const excerpt = raw.length > 240 ? shortErrExcerpt(raw, 180) : "";
+    return { text: human || "未知错误", excerpt: excerpt, billing: false };
+  }
+  function formatErr(e) {
+    return formatErrInfo(e).text;
+  }
+  function clearShotError(shot) {
+    if (!shot) return;
+    shot._error = "";
+    delete shot._errorDetail;
+  }
+  function paintShotFail(shot, err, cls) {
+    const info = formatErrInfo(err);
+    const tone = cls || "bad";
+    if (shot && shot.kind === "shot") {
+      shot._error = info.text;
+      if (info.excerpt) shot._errorDetail = info.excerpt;
+      else delete shot._errorDetail;
+    }
+    setMsg(info.text, tone, info.excerpt);
+    renderCards();
+    if (typeof keepComposerPromptVisible === "function") keepComposerPromptVisible();
+    return info.text;
   }
 
   function readComposerPrompt() {
@@ -2875,10 +3305,10 @@
     }
     if (hint) {
       if (isModelscopeBe()) {
-        hint.textContent = "魔搭需要 Hub owner/repo；Civitai 下载链不能用（不会做 remap）";
+        hint.textContent = "请填写魔搭仓库名，例如 Qwen/Qwen-Image";
         hint.classList.add("show");
       } else if (be === "huggingface") {
-        hint.textContent = "HF 路由会带上 loras[]；上游是否加载取决于映射端点";
+        hint.textContent = "可搜索模型名，或粘贴 Hugging Face 仓库 / 直链";
         hint.classList.add("show");
       } else {
         hint.textContent = "";
@@ -2889,9 +3319,16 @@
   // v0821n3: prefer air URN in chip subtitle so civitai outbound id is visible (path hid it)
   function loraChipSubtitle(l) {
     l = l || {};
+    const name = String(l.name || "").trim();
     const air = String(l.air || "").trim();
-    if (air) return air;
-    return l.path || l.downloadUrl || l.url || "";
+    const vid = String(l.versionId || loraVersionId(l) || "").trim();
+    let sub = air || String(l.path || l.downloadUrl || l.url || "").trim();
+    if (!sub || sub === name) {
+      if (air && air !== name) return air;
+      if (vid) return "versionId " + vid;
+      return "无 AIR";
+    }
+    return sub;
   }
   function loraStrengthInputValue(l) {
     if (!l || l.strengthMissing || (l.strength == null && l.scale == null)) return "";
@@ -2918,7 +3355,7 @@
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
           esc(strVal) +
-          '" data-lora-str="' + i + '" title="strength">' +
+          '" placeholder="未填" data-lora-str="' + i + '" title="strength 未填则留空" aria-label="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
     }).join("");
@@ -3063,11 +3500,7 @@
         const over = (lo != null && n < lo) || (hi != null && n > hi);
         markOver(seedEl, over);
         if (over) {
-          if (seedSpec.clamp === "reject" || seedSpec.clamp === "none") {
-            msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
-          } else {
-            msgs.push("种子 " + n + " 超出范围，发送前会按官方规则处理");
-          }
+          msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
         }
       }
     } else {
@@ -3186,6 +3619,12 @@
     // keep cfg mirror on shot for STORE hang / fixture
     if (p.cfgScale != null && shot.cfg == null) shot.cfg = p.cfgScale;
   }
+  function persistShotFrame(shot) {
+    if (!shot || shot.kind !== "shot") return;
+    writeComfyParamsToShot(shot);
+    if ($("aspect")) shot.aspect = $("aspect").value;
+    if ($("res")) shot.res = $("res").value;
+  }
   function applyComfyParamsToUi(src) {
     if (!src) return;
     if (src.width != null && $("width")) $("width").value = src.width;
@@ -3235,9 +3674,7 @@
       const d = j.defaults || {};
       fillSelectOpts($("sampler"), j.samplers || [], ($("sampler") && $("sampler").value) || d.sampler || "er_sde");
       fillSelectOpts($("scheduler"), j.schedulers || [], ($("scheduler") && $("scheduler").value) || d.scheduler || "sgm_uniform");
-      // Only fill empty UI slots so STORE/shot restore wins.
-      if ($("width") && !$("width").value && d.width != null) $("width").value = d.width;
-      if ($("height") && !$("height").value && d.height != null) $("height").value = d.height;
+      // Width/height follow #aspect/#res. Never fill Civitai 960×1440 into empty boxes.
       if ($("steps") && !$("steps").value && d.steps != null) $("steps").value = d.steps;
       if ($("cfg") && !$("cfg").value && d.cfgScale != null) $("cfg").value = d.cfgScale;
       if (d.sampler && $("sampler") && !$("sampler").value) ensureSelectOpt($("sampler"), d.sampler);
@@ -3247,14 +3684,13 @@
     } catch (_) {
       fillSelectOpts($("sampler"), ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], "er_sde");
       fillSelectOpts($("scheduler"), ["sgm_uniform", "simple", "normal", "karras", "exponential", "ddim_uniform", "beta"], "sgm_uniform");
-      if ($("width") && !$("width").value) $("width").value = 960;
-      if ($("height") && !$("height").value) $("height").value = 1440;
       if ($("steps") && !$("steps").value) $("steps").value = 8;
       if ($("cfg") && !$("cfg").value) $("cfg").value = 1;
       // Catalog ordering hint only — never soft-fill into generate/buildGraph.
       state._civitaiDefaultService = CIVITAI_PREF_SERVICE;
     }
     syncParamSurface();
+    ensureComposerSize();
   }
 
   // Pack like index.html base.loras (~2231) + slimPayload (~2302): path/url/versionId/air/scale.
@@ -3328,7 +3764,7 @@
     const be = currentBackend();
     hits.textContent = "搜…";
     if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
-      addLora({ path: q, name: q, strength: 0.8 });
+      addLora({ path: q, name: q });
       hits.textContent = "";
       return;
     }
@@ -3994,20 +4430,54 @@
     const size = sizeFromAspectRes(aspectEl.value, resEl.value);
     if ($("width")) $("width").value = String(size.width);
     if ($("height")) $("height").value = String(size.height);
-    writeComfyParamsToShot(nodeById(state.selected));
+    persistShotFrame(nodeById(state.selected));
   }
-
-  function syncAspectFromSize(width, height) {
-    const aspectEl = $("aspect");
+  function closestAspectChoice(width, height) {
     const w = Number(width), h = Number(height);
-    if (!aspectEl || !Number.isFinite(w) || !Number.isFinite(h) || h <= 0) return;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
     const ratio = w / h;
-    const choices = [["1:1", 1], ["9:16", 9 / 16], ["21:9", 21 / 9], ["16:9", 16 / 9]];
-    let best = choices[0];
-    choices.forEach((item) => {
+    let best = ASPECT_CHOICES[0];
+    ASPECT_CHOICES.forEach(function (item) {
       if (Math.abs(item[1] - ratio) < Math.abs(best[1] - ratio)) best = item;
     });
-    if (Math.abs(best[1] - ratio) <= 0.04) aspectEl.value = best[0];
+    return { name: best[0], ratio: best[1], err: Math.abs(best[1] - ratio) };
+  }
+  function syncAspectFromSize(width, height) {
+    const aspectEl = $("aspect");
+    const hit = closestAspectChoice(width, height);
+    if (!aspectEl || !hit || hit.err > 0.04) return;
+    aspectEl.value = hit.name;
+  }
+  function isSilentSizeDefault(w, h) {
+    const key = String(w) + "x" + String(h);
+    return key === "960x1440" || key === "1440x960"
+      || key === "2048x2048" || key === "1024x1024"
+      || key === "512x768" || key === "768x512";
+  }
+  function ensureComposerSize() {
+    const w = $("width") ? parseInt($("width").value, 10) : NaN;
+    const h = $("height") ? parseInt($("height").value, 10) : NaN;
+    const aspect = ($("aspect") && $("aspect").value) || "16:9";
+    const res = ($("res") && $("res").value) || "720P";
+    if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
+      const mapped = sizeFromAspectRes(aspect, res);
+      const mappedRatio = mapped.width / mapped.height;
+      const ratio = w / h;
+      if (Math.abs(ratio - mappedRatio) <= 0.04) {
+        /* keep exact pixels (import 944×1672 + 9:16) */
+      } else {
+        const hit = closestAspectChoice(w, h);
+        if (hit && hit.err <= 0.04) {
+          if (isSilentSizeDefault(w, h) && hit.name !== aspect) applyAspectToSize();
+          else $("aspect").value = hit.name;
+        } else if (isSilentSizeDefault(w, h)) {
+          applyAspectToSize();
+        }
+      }
+    } else {
+      applyAspectToSize();
+    }
+    persistShotFrame(nodeById(state.selected) || shots()[0]);
   }
 
   function buildGraph(shot) {
@@ -4104,19 +4574,33 @@
       title: title || (isVideoUrl(url) ? "视频成片" : "历史成片"),
       kind: mediaKindOf(url),
     };
-    state.history = [item].concat((state.history || []).filter((h) => h && h.url !== url)).slice(0, 24);
+    if (isJunkRailItem(item)) return;
+    state.history = [item].concat((state.history || []).filter((h) => h && h.url !== url && !isJunkRailItem(h))).slice(0, 24);
+  }
+  function removeUnpromotedFromShot(shotId) {
+    const removed = new Set(state.nodes
+      .filter((n) => n && n.kind !== "shot" && n.kind !== "text" && n.fromShot && !n.userPromoted && (!shotId || n.fromShot === shotId))
+      .map((n) => n.id));
+    if (!removed.size) return false;
+    state.nodes = state.nodes.filter((n) => !removed.has(n.id));
+    state.edges = state.edges.filter((e) => !removed.has(e.from) && !removed.has(e.to));
+    state.nodes.forEach((n) => {
+      if (n.kind === "shot" && removed.has(n.firstFrameId)) n.firstFrameId = "";
+    });
+    state.groups = (state.groups || []).map((g) => ({
+      id: g.id,
+      name: g.name,
+      memberIds: (g.memberIds || []).filter((id) => !removed.has(id)),
+    })).filter((g) => (g.memberIds || []).length);
+    if (removed.has(state.selected)) state.selected = shotId || null;
+    state.multi = (state.multi || []).filter((id) => !removed.has(id));
+    return true;
   }
   function writebackResult(shot, url) {
-    // A generated result belongs to its shot. Only an explicit “入库” click
-    // creates a separate canvas asset; normal generation must not duplicate cards.
+    // Generated media stays on the target shot. Do not spawn a canvas clone.
+    // History rail may record the url; canvas copies require 入库 / 拖到画布.
     if (!shot || !url) return;
-    const removed = new Set(state.nodes
-      .filter((n) => n.kind !== "shot" && n.fromShot === shot.id && !n.userPromoted)
-      .map((n) => n.id));
-    if (removed.size) {
-      state.nodes = state.nodes.filter((n) => !removed.has(n.id));
-      state.edges = state.edges.filter((e) => !removed.has(e.from) && !removed.has(e.to));
-    }
+    removeUnpromotedFromShot(shot.id);
     pushHistoryItem(url, (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
   }
@@ -4209,62 +4693,75 @@
   }
 
   async function runShotStep(shotId, opts) {
+    try {
+      return await runShotStepWork(shotId, opts);
+    } finally {
+      keepComposerPromptVisible();
+    }
+  }
+  async function runShotStepWork(shotId, opts) {
     opts = opts || {};
     const shot = nodeById(shotId);
     const prefix = opts.progressPrefix ? (opts.progressPrefix + " · ") : "";
-    if (!shot || shot.kind !== "shot") {
-      // v0821f: never silent — asset/empty selection was a CLICK_NOOP with no msg
-      setMsg(prefix + "请先选中分镜再生成", "bad");
-      return { status: "blocked" };
+    function fail(err, status, cls) {
+      const info = formatErrInfo(err);
+      const text = prefix + info.text;
+      if (shot && shot.kind === "shot") {
+        shot._error = info.text;
+        if (info.excerpt) shot._errorDetail = info.excerpt;
+        else delete shot._errorDetail;
+      }
+      setMsg(text, cls || "bad", info.excerpt);
+      if (shot) setShotBusy(shot, false);
+      if (!opts.keepSend) markSendBusy(false);
+      renderCards();
+      renderDock();
+      const out = { status: status || "blocked", error: text };
+      return out;
     }
+    if (!shot || shot.kind !== "shot") {
+      return fail("请先选中分镜再生成", "blocked");
+    }
+    clearShotError(shot);
     if (state.groupRunAbort) {
-      setMsg(prefix + "已中止", "warn");
-      return { status: "aborted" };
+      return fail("已中止", "aborted", "warn");
     }
     const dependency = upstreamImageBlock(shot);
     if (dependency) {
-      setMsg(prefix + dependency, "bad");
-      return { status: "blocked", error: dependency };
+      return fail(dependency, "blocked");
     }
     if (isStubMode()) {
-      setMsg(prefix + (state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
-      return { status: "blocked" };
+      return fail((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "blocked", "warn");
     }
     if (state.mode === "video" && !frameAsset(shot)) {
-      setMsg(prefix + "视频需要先连一张首帧图，不能偷配方台", "bad");
-      return { status: "blocked" };
+      return fail("视频需要先连一张首帧图，不能偷配方台", "blocked");
     }
     // v0821b: do not silently run i2v on t2i flux / pure t2v that drops the frame.
     if (state.mode === "video") {
       const sidVid = ($("service") && $("service").value) || "";
       const itVid = catalogItemForService() || (sidVid ? { id: sidVid } : null);
       if (sidVid && !catalogItemSupportsI2v(itVid)) {
-        setMsg(prefix + "当前服务不吃首帧（非 i2v），请改选视频/图生视频模型", "bad");
-        return { status: "blocked" };
+        return fail("当前服务不吃首帧（非 i2v），请改选视频/图生视频模型", "blocked");
       }
     }
     // v0821k: before POST — fal i2v / catalog-required prompt; hard red, no soft-fill
     if (needsPromptBeforeGenerate()) {
-      setMsg(prefix + "此模型需要提示词", "bad");
-      return { status: "blocked" };
+      return fail("此模型需要提示词", "blocked");
     }
     // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
     if (currentBackend() === "civitai") {
       const civSid = ($("service") && $("service").value) || "";
       if (!civSid) {
-        setMsg(prefix + "请先选择 Civitai 服务（不会默认填入 Krea2）", "bad");
-        return { status: "blocked" };
+        return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
       }
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
-      setMsg(prefix + outboundLoraBlockMsg(), "bad");
-      return { status: "blocked" };
+      return fail(outboundLoraBlockMsg(), "blocked");
     }
     const gate = paramGateMessage();
     if (gate) {
-      setMsg(prefix + gate, "bad");
-      return { status: "blocked" };
+      return fail(gate, "blocked");
     }
     if (!opts.keepSend) markSendBusy(true);
     // v0821k/i: sticky ack — keep 已点生成 in successor (group uses progressPrefix)
@@ -4278,18 +4775,13 @@
       });
       compiled = await r.json();
     } catch (e) {
-      setMsg(prefix + String(e), "bad");
-      if (!opts.keepSend) markSendBusy(false);
-      return { status: "error" };
+      return fail(e, "error");
     }
     if (state.groupRunAbort) {
-      if (!opts.keepSend) markSendBusy(false);
-      return { status: "aborted" };
+      return fail("已中止", "aborted", "warn");
     }
     if (!compiled.ok) {
-      setMsg(prefix + (compiled.error || "校验未通过"), "bad");
-      if (!opts.keepSend) markSendBusy(false);
-      return { status: "blocked" };
+      return fail(compiled.error || "校验未通过", "blocked");
     }
     // Never one-shot a multi-step plan via stage-zero payload or whole compile body.
     var staged = !!(compiled.multiStep || compiled.execute === "staged" ||
@@ -4300,23 +4792,17 @@
       if (!shot.stageUrls) shot.stageUrls = {};
       stage = nextRunnableStage(compiled, shot.stageUrls);
       if (!stage || !stage.payload) {
-        setMsg(prefix + (compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "warn");
-        if (!opts.keepSend) markSendBusy(false);
-        return { status: "blocked", stageOp: stage && stage.op };
+        return fail((compiled.note || "多步链需按序物化上游") + " · 禁止一次假跑通", "blocked", "warn");
       }
       payload = fillStageRefs(stage.payload, shot.stageUrls);
       if (hasUnresolvedStageOut(payload)) {
-        setMsg(prefix + "上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "bad");
-        if (!opts.keepSend) markSendBusy(false);
-        return { status: "blocked", stageOp: stage.op };
+        return fail("上游还没有成片地址，不能偷配方台图 · 禁止一次假跑通", "blocked");
       }
     } else {
       // single-step only — never stage-zero payload fallback
       payload = compiled.payload;
       if (!payload) {
-        setMsg(prefix + "没有 payload", "bad");
-        if (!opts.keepSend) markSendBusy(false);
-        return { status: "blocked" };
+        return fail("没有 payload", "blocked");
       }
     }
     const stageOp = stage ? stage.op : "";
@@ -4325,14 +4811,10 @@
     const refCap = maxRefCount(catalogItemForService());
     const unusedMsg = refUnusedGateMessage(shot);
     if (unusedMsg) {
-      setMsg(prefix + unusedMsg, "bad");
-      if (!opts.keepSend) markSendBusy(false);
-      return { status: "blocked", stageOp: stageOp };
+      return fail(unusedMsg, "blocked");
     }
     if (refUrls.length > refCap) {
-      setMsg(prefix + "参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "bad");
-      if (!opts.keepSend) markSendBusy(false);
-      return { status: "blocked", stageOp: stageOp };
+      return fail("参考图 " + refUrls.length + "/" + refCap + " · 超过上限，请减少连线后再生成（不静默丢弃）", "blocked");
     }
     attachExtraImages(payload, shot);
     // v0816-sb-lora: attach selected LoRAs (index.html base.loras shape)
@@ -4341,9 +4823,7 @@
       const packedLoras = packLorasForPayload();
       const list = Array.isArray(state.loras) ? state.loras : [];
       if (list.length && (!packedLoras || !packedLoras.length)) {
-        setMsg(prefix + outboundLoraBlockMsg(), "bad");
-        if (!opts.keepSend) markSendBusy(false);
-        return { status: "blocked", stageOp: stageOp };
+        return fail(outboundLoraBlockMsg(), "blocked");
       }
       if (packedLoras && packedLoras.length) {
         payload.loras = packedLoras;
@@ -4378,9 +4858,7 @@
         // Explicit UI selection only — never CIVITAI_PREF / _civitaiDefaultService soft-fill.
         const sid = ($("service") && $("service").value) || "";
         if (!sid) {
-          setMsg(prefix + "请先选择 Civitai 服务（不会默认填入 Krea2）", "bad");
-          if (!opts.keepSend) markSendBusy(false);
-          return { status: "blocked", stageOp: stageOp };
+          return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
         }
         payload.serviceId = sid;
         // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
@@ -4403,7 +4881,7 @@
         body: JSON.stringify(payload),
       });
       let j = await r.json();
-      if (!r.ok || j.error) throw new Error(formatErr(j.error || j.message || j.detail || ("HTTP " + r.status)));
+      if (!r.ok || j.error) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
       const jobId = j.id || j.jobId || j.workflowId;
       if (jobId && !pickUrl(j)) {
         // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
@@ -4417,9 +4895,7 @@
         }
         for (let i = 0; i < pollMax; i++) {
           if (state.groupRunAbort) {
-            setShotBusy(shot, false);
-            if (!opts.keepSend) markSendBusy(false);
-            return { status: "aborted", stageOp: stageOp };
+            return fail("已中止", "aborted", "warn");
           }
           await new Promise((res) => setTimeout(res, pollMs));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
@@ -4440,9 +4916,7 @@
         }
       }
       if (state.groupRunAbort) {
-        setShotBusy(shot, false);
-        if (!opts.keepSend) markSendBusy(false);
-        return { status: "aborted", stageOp: stageOp };
+        return fail("已中止", "aborted", "warn");
       }
       const url = pickUrl(j);
       if (url && stage) {
@@ -4456,47 +4930,29 @@
           renderDock();
           return { status: "more", stageOp: stage.op };
         }
-        shot._error = "";
+        clearShotError(shot);
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
+        setMsg(prefix + "此镜完成，已写入卡片", "ok");
       } else if (url) {
-        shot._error = "";
+        clearShotError(shot);
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + (isVideoUrl(url) ? "此镜视频完成，已写入卡片/历史" : "此镜完成，成片已收进资产库"), "ok");
+        setMsg(prefix + "此镜完成，已写入卡片", "ok");
       } else {
-        setShotBusy(shot, false);
-        // v0821m: poll budget exhausted while Fal still IN_PROGRESS ≠ 「已返回无媒体」
         const stillGoing = !!(j && (
           /^(pending|processing|running|in_queue|in_progress)$/i.test(String(j.status || ""))
           || j.status === "IN_QUEUE" || j.status === "IN_PROGRESS"
           || !j.status
         ));
-        shot._error = stillGoing
-          ? "等待超时，云端任务仍在进行中"
-          : "云端已返回，没有可预览地址";
-        if (stillGoing) {
-          setMsg(prefix + "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）", "warn");
-        } else {
-          setMsg(prefix + "云端已返回，没有可预览地址", "warn");
-        }
-        if (!opts.keepSend) markSendBusy(false);
-        renderCards();
-        renderDock();
-        return { status: "blocked", stageOp: stageOp };
+        return fail(stillGoing
+          ? "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）"
+          : "云端已返回，没有可预览地址", "blocked", stillGoing ? "warn" : "bad");
       }
     } catch (e) {
-      setShotBusy(shot, false);
-      shot._error = formatErr(e);
-      // v0821k: surface Fal/job.error onto Composer (renderDock must not wipe bad)
-      setMsg(prefix + formatErr(e), "bad");
-      if (!opts.keepSend) markSendBusy(false);
-      renderCards();
-      renderDock();
-      return { status: "error", stageOp: stageOp, error: formatErr(e) };
+      return fail(e, "error");
     }
     setShotBusy(shot, false);
     if (!opts.keepSend) markSendBusy(false);
@@ -4566,6 +5022,7 @@
   function fireSend(e) {
     const btn = $("send");
     if (!btn) return;
+    if (typeof keepComposerPromptVisible === "function") keepComposerPromptVisible();
     if (e && e.type === "pointerdown" && e.button != null && e.button !== 0) return;
     // v0821l: same DOM event handled once (#send + #dockFoot both wired)
     if (e) {
@@ -4595,27 +5052,29 @@
       setMsg("请先选中分镜再生成", "bad");
       return;
     }
+    const failUi = function (err) {
+      if (typeof paintShotFail === "function") paintShotFail(n, err, "bad");
+      else setMsg(err, "bad");
+    };
     if (isStubMode()) {
-      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "bad");
+      failUi((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接");
       return;
     }
     if (state.mode === "video" && !frameAsset(n)) {
-      setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+      failUi("缺首帧 · 视频需要先连一张首帧图");
       return;
     }
-    // v0821k: prefer client gate in fireSend (video+fal / catalog-required) — abort before generate
     if (needsPromptBeforeGenerate()) {
-      setMsg("此模型需要提示词", "bad");
+      failUi("此模型需要提示词");
       return;
     }
-    // v0821n2: LoRA chips without air → red before 已点生成 / generate
     if (chipsLackAirForOutbound()) {
-      setMsg(outboundLoraBlockMsg(), "bad");
+      failUi(outboundLoraBlockMsg());
       return;
     }
     const gate = paramGateMessage();
     if (gate) {
-      setMsg(gate, "bad");
+      failUi(gate);
       return;
     }
     // v0821l: only ack when proceeding to generate()
@@ -4667,17 +5126,20 @@
   }
 
   async function generate() {
-    // v0821k: sticky 已点生成 · 校验连线… (never wipe click ack without successor)
+    const shot = nodeById(state.selected);
     if (needsPromptBeforeGenerate()) {
-      setMsg("此模型需要提示词", "bad");
+      paintShotFail(shot, "此模型需要提示词", "bad");
       return;
     }
     setAckMsg("校验连线…");
     markSendBusy(true);
     try {
       await runShotStep(state.selected, {});
+    } catch (e) {
+      paintShotFail(nodeById(state.selected), e, "bad");
     } finally {
       markSendBusy(false);
+      if (typeof keepComposerPromptVisible === "function") keepComposerPromptVisible();
     }
   }
   bindSendButton();
@@ -4815,6 +5277,43 @@
     constrainShotsToViewport();
     selectNode(id); persist();
   };
+  if ($("btnText")) {
+    $("btnText").onclick = () => {
+      const base = nodeById(state.selected);
+      const id = uid("text");
+      state.nodes.push({
+        id: id,
+        kind: "text",
+        title: "提示词",
+        x: base ? base.x + 200 : 220,
+        y: base ? base.y : 24,
+        text: "",
+      });
+      selectNode(id);
+      persist();
+    };
+  }
+  if ($("btnRev")) {
+    $("btnRev").onclick = () => {
+      const n = nodeById(state.selected);
+      const src =
+        n && isImageSource(n)
+          ? n
+          : n && n.kind === "shot"
+            ? frameAsset(n)
+            : n && n.kind === "text"
+              ? connectedNodes(n.id).find(isImageSource)
+              : null;
+      if (!src) {
+        setMsg("先选中一张图片资产再反推", "warn");
+        return;
+      }
+      setMsg("正在反推…");
+      reverseFromImage(src).then((node) => {
+        if (node) setMsg("反推完成，提示词已写入文本节点", "ok");
+      });
+    };
+  }
   function resolveLayoutScope(fromSelBar) {
     pruneGroups();
     const multiIds = (state.multi || []).filter((id) => !!nodeById(id));
@@ -5031,7 +5530,7 @@
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         const t = sel.options[i].textContent || "";
-        if (!t || t === want || t === "默认模型" || t.indexOf(want) < 0) {
+        if (want === HF_LORA_PREF_SERVICE && (!t || t === want || t === "默认模型" || t.indexOf(want) < 0)) {
           sel.options[i].textContent = "Krea 2 Turbo · " + want;
         }
         break;
@@ -5066,9 +5565,17 @@
 
   function pinMsLoraServiceId(sid) {
     const s = String(sid || "").trim();
-    // Empty / Fal sibling / Civitai image/… → Hub turbo. Never rewrite Hub → fal-ai/.../lora.
-    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return MS_LORA_PREF_SERVICE;
-    return s;
+    // Empty / Fal sibling / Civitai image/… → Hub turbo.
+    // Never rewrite a real Hub id (Tongyi-MAI/Z-Image-Turbo) to krea/Krea-2-Turbo.
+    if (s && !looksFalServiceId(s) && !looksCivitaiServiceId(s)) return s;
+    return MS_LORA_PREF_SERVICE;
+  }
+  function msLoraOptionLabel(want, currentText) {
+    const id = String(want || "").trim();
+    const t = String(currentText || "");
+    if (id !== MS_LORA_PREF_SERVICE) return t || id;
+    if (!t || t === id || t === "默认模型" || t.indexOf(id) < 0) return "Krea 2 Turbo · " + id;
+    return t;
   }
   function ensureMsLoraServiceSelected() {
     const be = ($("backend") && $("backend").value) || "";
@@ -5079,15 +5586,11 @@
     ensureSelectOpt(sel, want);
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
-        const t = sel.options[i].textContent || "";
-        if (!t || t === want || t === "默认模型" || t.indexOf(want) < 0) {
-          sel.options[i].textContent = "Krea 2 Turbo · " + want;
-        }
+        sel.options[i].textContent = msLoraOptionLabel(want, sel.options[i].textContent || "");
         break;
       }
     }
     sel.value = want;
-    // Do not fabricate a fake catalog row — only pin a real / already-listed id.
     if (state.catalogById && state.catalogById[want]) return;
   }
   function msLoraFixtureImport() {
@@ -5170,7 +5673,10 @@
   }
   async function mountFalLoraFixture() {
     closeImportModal();
-    return applyImport(falLoraFixtureImport());
+    state._pinFalLoraService = FAL_LORA_PREF_SERVICE;
+    const ok = await applyImport(falLoraFixtureImport());
+    ensureFalLoraServiceSelected();
+    return ok;
   }
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
@@ -5671,6 +6177,9 @@
       sel.value = byId[pinWant] ? pinWant : "";
       renderServiceOptions(items, "选择模型");
       delete state._pendingService;
+      if (be === "fal") ensureFalLoraServiceSelected();
+      if (be === "huggingface") ensureHfLoraServiceSelected();
+      if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       syncParamSurface();
       syncLoraUi();
@@ -5701,14 +6210,16 @@
       const items = (j.items || []).filter((it) => {
         const u = it.url || it.path || "";
         if (!u) return false;
+        if (it.bytes === 0) return false;
         const k = it.kind || mediaKindOf(u);
-        return k === "image" || k === "video";
+        if (!(k === "image" || k === "video")) return false;
+        return !isJunkRailItem({ url: u, title: it.file || it.name, bytes: it.bytes });
       });
       state.history = items.slice(0, 24).map((it) => ({
         url: it.url || it.path,
         title: String(it.file || it.name || "历史成片").replace(/\.[^.]+$/, ""),
         kind: it.kind || mediaKindOf(it.url || it.path || ""),
-      })).filter((it) => it.url);
+      })).filter((it) => it.url && !isJunkRailItem(it));
       renderRail();
     } catch (_) {}
   }

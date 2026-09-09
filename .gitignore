@@ -15,3 +15,5 @@ docs/_code_findings.md
 docs/review.md
 docs/hf-modelscope-listing.proposed.patch
 patch_*.py
+data/
+.test-tmp/

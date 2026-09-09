@@ -304,6 +304,15 @@ class HFContract(unittest.TestCase):
         self.assertEqual([c.kwargs.get("method", "GET") for c in self.transport.call_args_list],
                          ["POST", "GET", "GET", "GET"])
         self.assertTrue(all(c.args[0].startswith(hf.ROUTER + "/fal-ai/") for c in self.transport.call_args_list))
+        poll_urls = [c.args[0] for c in self.transport.call_args_list if c.kwargs.get("method", "GET") == "GET"]
+        self.assertTrue(poll_urls)
+        self.assertTrue(all("/fal-ai/fal-ai/model/requests/offline-queue" in u for u in poll_urls), poll_urls)
+
+    def test_queue_url_matches_official_router_fal_ai_prefix(self):
+        got = hf._queue_url("https://queue.fal.run/fal-ai/qwen-image-edit/requests/abc")
+        self.assertEqual(got, hf.ROUTER + "/fal-ai/fal-ai/qwen-image-edit/requests/abc?_subdomain=queue")
+        got = hf._queue_url("https://router.huggingface.co/fal-ai/fal-ai/qwen-image-edit/requests/abc")
+        self.assertEqual(got, hf.ROUTER + "/fal-ai/fal-ai/qwen-image-edit/requests/abc?_subdomain=queue")
 
     def test_unknown_job_is_not_reported_succeeded(self):
         code, data = hf.HuggingFaceProvider().job_status("hf|sync|never-submitted")

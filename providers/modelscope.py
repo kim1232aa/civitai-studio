@@ -105,28 +105,78 @@ def _value(payload, *names):
     return values[0] if values else None
 
 
+_HUB_LORA_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+
+def _hub_lora_repo(raw):
+    if not isinstance(raw, str):
+        return None
+    repo = raw.strip()
+    return repo if _HUB_LORA_RE.fullmatch(repo) else None
+
+
 def _modelscope_loras(payload: dict):
-    """Encode all requested Hub LoRAs as [{model, weight}], or reject all."""
+    """Official API-Inference LoRA wire shape (2026-09-09 live + docs).
+
+    https://www.modelscope.cn/docs/model-service/API-Inference/intro
+      - one LoRA:  string \"owner/repo\"
+      - many:      {\"owner/repo\": weight, ...} and weights must sum to 1.0
+
+    Live Krea 400: `loras[0] is not a string` when we sent [{model, weight}].
+    Live CN 500: `{repo: 0.8}` for one LoRA → 模型不存在. Single with weight is
+    not remapped to a dict and the weight is not dropped.
+    Civitai download / AIR is not remapped; refuse rather than drop or invent Hub id.
+    Missing weight is not defaulted to 1.0.
+    """
     raw = payload.get("loras")
     if raw in (None, [], {}):
         return None
+    items = []
     if isinstance(raw, str):
-        raw = [{"model": raw}]
+        items = [(raw, None)]
     elif isinstance(raw, dict):
-        raw = [{"model": key, "weight": value} for key, value in raw.items()]
-    if not isinstance(raw, list):
-        raise ValueError("魔搭 LoRA 必须是 Hub 条目数组")
-    out = []
-    for item in raw:
-        if isinstance(item, str):
-            item = {"model": item}
-        if not isinstance(item, dict):
-            raise ValueError("魔搭 LoRA 条目必须有 model 和 weight")
-        repo = item.get("model") or item.get("path") or item.get("url") or item.get("downloadUrl") or item.get("download_url") or item.get("name") or item.get("id")
-        if not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo.strip()):
+        items = list(raw.items())
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                items.append((item, None))
+            elif isinstance(item, dict):
+                repo = (
+                    item.get("model") or item.get("path") or item.get("url")
+                    or item.get("downloadUrl") or item.get("download_url")
+                    or item.get("name") or item.get("id")
+                )
+                items.append((repo, _value(item, "weight", "scale", "strength")))
+            else:
+                raise ValueError("魔搭 LoRA 条目必须是 Hub owner/repo")
+    else:
+        raise ValueError("魔搭 LoRA 必须是 Hub owner/repo 字符串、{repo:weight} 或数组")
+    parsed = []
+    for repo, weight in items:
+        hub = _hub_lora_repo(repo)
+        if not hub:
             raise ValueError("魔搭 LoRA 必须是 Hub owner/repo，不能跳过下载链或 AIR 后只生成底模")
-        weight = _value(item, "weight", "scale", "strength")
-        out.append({"model": repo.strip(), "weight": _number(1.0 if weight is None else weight, "LoRA weight")})
+        parsed.append((hub, weight))
+    if not parsed:
+        return None
+    if len(parsed) == 1:
+        repo, weight = parsed[0]
+        if weight is not None:
+            raise ValueError(
+                "魔搭单条 LoRA 官方字段是 owner/repo 字符串，没有 weight；"
+                "不会改成 {repo:weight}（CN 实测 500 模型不存在），也不会丢权重"
+            )
+        return repo
+    out = {}
+    for repo, weight in parsed:
+        if weight is None:
+            raise ValueError("魔搭多 LoRA 必须每条都有 weight/scale/strength，拒绝默认 1.0")
+        if repo in out:
+            raise ValueError(f"魔搭 LoRA 重复: {repo}")
+        out[repo] = _number(weight, "LoRA weight")
+    total = sum(out.values())
+    if abs(total - 1.0) > 1e-6:
+        raise ValueError(f"魔搭多 LoRA 官方要求 weight 之和为 1.0，收到 {total}；拒绝缩放")
     return out
 
 

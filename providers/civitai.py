@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .base import Provider
-from .http import collect_urls, json_call, parse_job_id, save_media_urls
+from .http import collect_urls, extract_error, json_call, parse_job_id, save_media_urls
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -1485,6 +1485,95 @@ def _resource_airs(payload: dict) -> list:
             if air:
                 out.append(air)
     return out
+
+
+def _extract_caption(data) -> str:
+    if isinstance(data, str) and data.strip():
+        return data.strip()
+    if not isinstance(data, dict):
+        return ""
+    for key in ("caption", "text", "prompt", "description"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for step in data.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        found = _extract_caption(step.get("output") or step.get("result") or {})
+        if found:
+            return found
+    blobs = data.get("blobs") or data.get("output") or {}
+    if isinstance(blobs, dict):
+        found = _extract_caption(blobs)
+        if found:
+            return found
+    return ""
+
+
+def caption_media(media_url: str, model: str = "joy-caption") -> tuple[int, dict]:
+    """POST orchestration mediaCaptioning recipe. Real vision caption, never a fixed string."""
+    url = (media_url or "").strip()
+    if not url:
+        return 400, {"error": "缺少 mediaUrl", "code": "missing_url", "backend": "civitai"}
+    if not has_key():
+        return 401, {"error": "没有 Civitai API Key", "code": "no_key", "backend": "civitai"}
+    chosen = (model or "joy-caption").strip() or "joy-caption"
+    if chosen not in ("joy-caption", "ideogram4"):
+        chosen = "joy-caption"
+    body = {"mediaUrl": url, "model": chosen}
+    code, data = civitai(
+        f"{ORCH}/v2/consumer/recipes/mediaCaptioning?whatif=false",
+        method="POST",
+        body=body,
+        timeout=120,
+    )
+    if not isinstance(data, dict):
+        return 502, {"error": f"Civitai caption 返回无法解析（HTTP {code}）", "backend": "civitai"}
+    if code >= 400:
+        return code, {
+            "error": extract_error(data, data.get("title") or f"Civitai caption HTTP {code}"),
+            "code": "caption_failed",
+            "backend": "civitai",
+        }
+    caption = _extract_caption(data)
+    if caption:
+        return 200, {"caption": caption, "backend": "civitai", "model": chosen}
+    wf_id = data.get("id") or data.get("workflowId") or data.get("token")
+    if not wf_id:
+        return 502, {
+            "error": "Civitai caption 未返回描述",
+            "backend": "civitai",
+            "raw": {k: data.get(k) for k in list(data)[:12]},
+        }
+    deadline = time.time() + 90
+    last = data
+    while time.time() < deadline:
+        time.sleep(1.5)
+        poll, last = civitai(f"{ORCH}/v2/consumer/workflows/{wf_id}")
+        if not isinstance(last, dict):
+            continue
+        caption = _extract_caption(last)
+        if caption:
+            return 200, {
+                "caption": caption,
+                "backend": "civitai",
+                "model": chosen,
+                "workflowId": wf_id,
+            }
+        st = str(last.get("status") or "").lower()
+        if st in ("failed", "canceled", "cancelled", "error"):
+            return 502, {
+                "error": extract_error(last, f"Civitai caption {st}"),
+                "backend": "civitai",
+                "workflowId": wf_id,
+            }
+        if poll >= 400 and st not in ("pending", "processing", "queued"):
+            break
+    return 504, {
+        "error": "Civitai caption 超时，没有拿到描述",
+        "backend": "civitai",
+        "workflowId": wf_id,
+    }
 
 
 class CivitaiProvider(Provider):
