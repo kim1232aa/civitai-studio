@@ -170,10 +170,10 @@ def main() -> int:
     assert code == 400, (code, body)
     assert "resolution" in body["error"].lower() or "分辨率" in body["error"], body
 
-    # --- seed: official Nano int32, fail-closed, never modulo ---
+    # --- seed: official WaveSpeed/NanoGPT have no int32 max; fail-closed, never modulo ---
     clamp_src = _fn_source("_clamp_seed")
     check("%" not in clamp_src)
-    check("2147483647" in clamp_src)
+    check("2147483647" not in clamp_src)
     check("n % " not in SRC)
     meta_src = _fn_source("_seed_clamp_meta")
     check("seedOriginal" not in meta_src)
@@ -187,17 +187,18 @@ def main() -> int:
     check(nanogpt._clamp_seed(42) == 42)
     check(nanogpt._clamp_seed("7") == 7)
     check(nanogpt._clamp_seed(2147483647) == 2147483647)
+    check(nanogpt._clamp_seed(2147483648) == 2147483648)
+    check(nanogpt._clamp_seed(467475143677094) == 467475143677094)
     check(nanogpt._seed_clamp_meta(42) == {})
     check(nanogpt._seed_clamp_meta(None) == {})
     check(nanogpt._seed_clamp_meta(-1) == {})
-    for bad in (2147483648, 891104780613135, -2, -3, 1.5, True, False, "abc", [], {}, 4.2):
+    check(nanogpt._seed_clamp_meta(467475143677094) == {})
+    for bad in (-2, -3, 1.5, True, False, "abc", [], {}, 4.2):
         msg = _raises_zh(nanogpt._clamp_seed, bad, must=("种子", "静默"))
         check("取模" in msg or "改值" in msg)
-    msg = _raises_zh(nanogpt._seed_clamp_meta, 891104780613135, must=("种子",))
-    check("取模" in msg)
     check(nanogpt._response_seed({"seed": 42}) == 42)
     check(nanogpt._response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99)
-    check(nanogpt._response_seed({"seed": 891104780613135}) is None)
+    check(nanogpt._response_seed({"seed": 467475143677094}) == 467475143677094)
 
     img_seed_spec = {
         "id": "z-image-turbo",
@@ -205,20 +206,27 @@ def main() -> int:
         "supported_parameters": {"resolutions": ["1024x1024"], "max_output_images": 4},
         "capabilities": {},
     }
+    captured = {}
+
+    def _capture_seed_post(url, method="GET", headers=None, body=None, timeout=None):
+        captured["url"] = url
+        captured["body"] = body
+        return 200, {"data": [{"url": "https://example.invalid/x.png", "seed": (body or {}).get("seed")}]}
+
     with patch.object(nanogpt, "nano_key", return_value="offline-key"), patch.object(
         nanogpt, "find_spec", return_value=img_seed_spec
-    ), patch.object(
-        nanogpt, "json_call", side_effect=AssertionError("oversized seed must not POST")
+    ), patch.object(nanogpt, "json_call", side_effect=_capture_seed_post), patch.object(
+        nanogpt, "_save_result", return_value="/tmp/nano-seed-probe.png"
     ):
         code, body = nanogpt.NanoGptProvider().generate({
             "serviceId": "z-image-turbo",
             "prompt": "hi",
             "resolution": "1024x1024",
-            "seed": 891104780613135,
+            "seed": 467475143677094,
         })
-    check(code == 400)
-    check("种子" in body["error"])
-    check("seedClamped" not in body)
+    check(code == 200)
+    check(captured["body"]["seed"] == 467475143677094)
+    check("seedClamped" not in (body or {}))
     check(body.get("seedOriginal") is None)
 
     with patch.object(nanogpt, "nano_key", return_value="offline-key"), patch.object(

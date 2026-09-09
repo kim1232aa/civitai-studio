@@ -99,9 +99,6 @@ def _alnum(s):
 
 
 
-_INT32_MAX = 2147483647
-
-
 def _finite_number(raw, field, *, integer=False, minimum=None, maximum=None):
     """Validate before encoding; never truncate, wrap, default, or drop."""
     try:
@@ -162,17 +159,19 @@ def _response_seed(data):
 
 
 def _clamp_seed(raw):
-    """Parse Nano seed as signed int32. Never modulo, clip, or drop.
+    """Parse Nano seed as integer. Never modulo, clip, drop, or invent an int32 max.
 
-    None/''/'random' → omit. Non-int, < -1, or > 2147483647 → ValueError 中文.
+    Official WaveSpeed krea-v2/turbo-lora: seed is integer, Range "-", -1 = random.
+    Official NanoGPT Image API: seed is optional integer, no min/max in the schema.
+    None/''/'random' → omit. Non-int or < -1 → ValueError 中文.
     """
     if raw in (None, "", "random"):
         return None
     try:
-        return _finite_number(raw, "seed", integer=True, minimum=-1, maximum=_INT32_MAX)
+        return _finite_number(raw, "seed", integer=True, minimum=-1)
     except ValueError:
         raise ValueError(
-            f"NanoGPT 种子必须是整数（-1～{_INT32_MAX}），收到 {raw!r}，拒绝静默取模"
+            f"NanoGPT 种子必须是整数（≥ -1），收到 {raw!r}，拒绝静默取模"
         ) from None
 
 

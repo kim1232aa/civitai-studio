@@ -140,7 +140,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "loraPath": "civitai_download",
         "loraConfidence": "official",
         "resolution": "catalog_token",
-        "seed": _seed(min_v=-1, max_v=2147483647, clamp="reject"),
+        # WaveSpeed krea-v2/turbo-lora seed Range is "-" (no max); -1 = random.
+        # NanoGPT Image API seed is integer with no documented max. Do not copy ModelScope int32.
+        "seed": _seed(min_v=-1, max_v=None, clamp="none"),
         "promptMax": None,
         "negative": True,
         "progress": "none",
