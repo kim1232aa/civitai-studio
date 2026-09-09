@@ -6648,6 +6648,7 @@
 
   if (!restore()) loadDemo();
   separateOverlappingShots();
+  if (state.cam.s >= 1) compactShotsAt100();
   ensureWorkspaceModel();
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
