@@ -128,27 +128,39 @@ def main() -> int:
     from providers.nanogpt import closest_aspect, pick_resolution, _loras, _clamp_seed as nano_seed, _image_body
     assert closest_aspect(960, 1440) in ("2:3", "4:5")
     spec = {"supported_parameters": {"resolutions": ["1k", "2k"]}}
-    assert pick_resolution(spec, 1024, 1024) == "1k"
-    assert pick_resolution(spec, 2048, 2048) == "2k"
+    # No size-tier/aspect/nearest-pixel guessing: literal WxH miss + no preferred → None
+    assert pick_resolution(spec, 1024, 1024) is None
+    assert pick_resolution(spec, 2048, 2048) is None
+    assert pick_resolution(spec, 1024, 1024, preferred="1k") == "1k"
+    assert pick_resolution(spec, 2048, 2048, preferred="2k") == "2k"
     spec2 = {"supported_parameters": {"resolutions": ["1:1", "4:3", "2:3", "9:16"]}}
-    assert pick_resolution(spec2, 960, 1440) == "2:3"
+    assert pick_resolution(spec2, 960, 1440) is None
+    assert pick_resolution(spec2, 960, 1440, preferred="2:3") == "2:3"
     zspec = {"supported_parameters": {"resolutions": [
         "256*256", "512*512", "768*768", "1024*1024", "1280*720", "720*1280",
         "1536*1024", "1024*1536", "1536*1536",
     ]}}
-    assert pick_resolution(zspec, 960, 1440) == "1024*1536"
+    # 960x1440 has no literal token in the catalog — nearest-pixel fallback is gone
+    assert pick_resolution(zspec, 960, 1440) is None
+    assert pick_resolution(zspec, 960, 1440, preferred="1024*1536") == "1024*1536"
     assert pick_resolution(zspec, 1024, 1024) == "1024*1024"
     assert pick_resolution({"supported_parameters": {"resolutions": []}}, 1024, 1024) is None
     assert pick_resolution({}, 256, 256) is None
     assert pick_resolution(spec, 1024, 1024, preferred="2k") == "2k"
     ls = _loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]})
     assert ls and ls[0]["path"].startswith("https://")
-    assert nano_seed(475720515768790) <= 2147483647
-    body = _image_body({"serviceId": "wavespeed-ai/krea-v2/turbo-lora", "prompt": "x", "width": 1024, "height": 1024, "quantity": 1, "loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 1}]}, spec)
+    try:
+        nano_seed(475720515768790)
+        raise AssertionError("NanoGPT oversize seed must reject, not modulo-clamp")
+    except ValueError as exc:
+        assert "种子" in str(exc)
+    body = _image_body({"serviceId": "wavespeed-ai/krea-v2/turbo-lora", "prompt": "x", "width": 1024, "height": 1024, "resolution": "1k", "quantity": 1, "loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 1}]}, spec)
     assert body["model"] == "wavespeed-ai/krea-v2/turbo-lora"
     assert body["loras"][0]["path"].startswith("https://")
     assert body["resolution"] == "1k"
     assert "width" not in body and "height" not in body
+    body_no_pref = _image_body({"serviceId": "wavespeed-ai/krea-v2/turbo-lora", "prompt": "x", "width": 1024, "height": 1024, "quantity": 1}, spec)
+    assert "resolution" not in body_no_pref and "size" not in body_no_pref
     from providers.nanogpt import sanitize_submitted_for_persist
     persisted = sanitize_submitted_for_persist({**body, "width": 960, "height": 1440})
     assert "width" not in persisted and "height" not in persisted
@@ -742,8 +754,16 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "seedHint" in html
     assert 'title="v0776"' in html
     from providers.nanogpt import _response_seed, _clamp_seed as _ns, _seed_clamp_meta
-    assert _ns(891104780613135) == 2146323191
-    assert _seed_clamp_meta(891104780613135) == {"seedOriginal": 891104780613135, "seedClamped": True}
+    try:
+        _ns(891104780613135)
+        raise AssertionError("NanoGPT oversize seed must reject, not modulo-clamp")
+    except ValueError as exc:
+        assert "种子" in str(exc)
+    try:
+        _seed_clamp_meta(891104780613135)
+        raise AssertionError("_seed_clamp_meta must reject oversize seed too, not report seedClamped=True")
+    except ValueError as exc:
+        assert "种子" in str(exc)
     assert _seed_clamp_meta(42) == {}
     assert _response_seed({"seed": 42}) == 42
     assert _response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99
@@ -782,7 +802,7 @@ console.log('PASS isMusePublicQwenImageCousin');
                         "seed": 222,
                     })
                     assert code2 == 200 and body2.get("seed") == 222, body2
-                    # v0774: oversized seed → seedOriginal + seedClamped; seed stays response/clamped
+                    # v0794: oversized seed → hard 400 reject, never modulo-clamp into a wrong seed
                     jc.return_value = (200, {"data": [{"url": "https://example.com/c.png"}]})
                     code3, body3 = prov.generate({
                         "serviceId": "z-image-turbo",
@@ -791,10 +811,8 @@ console.log('PASS isMusePublicQwenImageCousin');
                         "height": 1024,
                         "seed": 891104780613135,
                     })
-                    assert code3 == 200, body3
-                    assert body3.get("seed") == 2146323191, body3
-                    assert body3.get("seedClamped") is True, body3
-                    assert body3.get("seedOriginal") == 891104780613135, body3
+                    assert code3 == 400, (code3, body3)
+                    assert "种子" in (body3.get("error") or ""), body3
 
 
 
