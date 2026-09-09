@@ -37,6 +37,7 @@
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
   const HF_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
+  const HF_I2I_PREF_SERVICE = "Qwen/Qwen-Image-Edit";
   const MS_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
@@ -4414,7 +4415,7 @@
   function promotePagedCatalogPref(items) {
     const be = $("backend") && $("backend").value;
     const pinId = be === "huggingface"
-      ? (state._pinHfLoraService || HF_LORA_PREF_SERVICE)
+      ? (state._pinHfLoraService || (selectedShotWantsI2i() ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE))
       : (be === "modelscope-ai" || be === "modelscope-cn")
         ? (state._pinMsLoraService || MS_LORA_PREF_SERVICE)
         : "";
@@ -4658,13 +4659,41 @@
     if (id.indexOf("image-to-video") >= 0 || id.indexOf("text-to-video") >= 0) return false;
     return true;
   }
+  function catalogItemSupportsI2i(it) {
+    if (!it || !catalogItemSupportsImage(it)) return false;
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    if (caps.image_to_image === true || caps.inpainting === true) return true;
+    if (it.needsSource) return true;
+    if (caps.image_to_image === false) return false;
+    const task = String(it.task || it.hubTask || "").toLowerCase();
+    const tags = Array.isArray(it.tags) ? it.tags.map(function (t) { return String(t).toLowerCase(); }) : [];
+    const id = String(it.id || it.name || "").toLowerCase();
+    if (task === "image-to-image" || tags.indexOf("i2i") >= 0) return true;
+    if (task === "text-to-image" || tags.indexOf("t2i") >= 0) return false;
+    if (id.indexOf("image-to-image") >= 0 || /(?:^|\/|-)edit(?:$|\b|\/)/.test(id)) return true;
+    return false;
+  }
+  function selectedShotWantsI2i() {
+    if (state.mode === "video" || state.mode === "text" || state.mode === "audio") return false;
+    const shot = nodeById(state.selected) || (typeof shots === "function" ? shots()[0] : null);
+    if (!shot || shot.kind !== "shot") return false;
+    return connectedAssets(shot.id).length > 0;
+  }
+  function currentGraphOp() {
+    if (state.mode === "video") return "i2v";
+    if (selectedShotWantsI2i()) return "i2i";
+    return "t2i";
+  }
   function filterCatalogForMode(items) {
     const list = Array.isArray(items) ? items : [];
     // text/audio are stub modes — do not list image models (looks like they work).
     if (state.mode === "text" || state.mode === "audio") return [];
     if (state.mode === "video") return list.filter(catalogItemSupportsI2v);
     if (state.mode === "image") {
-      return list.filter(catalogItemSupportsImage);
+      const imgs = list.filter(catalogItemSupportsImage);
+      if (!selectedShotWantsI2i()) return imgs;
+      const i2i = imgs.filter(catalogItemSupportsI2i);
+      return i2i.length ? i2i : imgs;
     }
     return list;
   }
@@ -4858,7 +4887,8 @@
     if (it.needsSource) return true;
     if (caps.image_to_image === false) return false;
     const backend = String(it.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
-    if (backend === "modelscope-ai" || backend === "modelscope-cn" || backend === "modelscope") {
+    if (backend === "modelscope-ai" || backend === "modelscope-cn" || backend === "modelscope"
+        || backend === "huggingface") {
       const task = String(it.task || it.hubTask || "").toLowerCase();
       const tags = Array.isArray(it.tags) ? it.tags.map((t) => String(t).toLowerCase()) : [];
       if (task === "image-to-image" || task === "image-to-video" || tags.indexOf("i2i") >= 0 || tags.indexOf("i2v") >= 0) return true;
@@ -5041,8 +5071,8 @@
     const pickedService = ($("service") && $("service").value) || "";
     let serviceId = pickedService;
     if (!serviceId && be === "huggingface") {
-      // v0821o4: HF empty → Hub turbo; never fal-ai/.../turbo/lora sibling
-      serviceId = HF_LORA_PREF_SERVICE;
+      // t2i empty → Hub turbo; i2i empty → Qwen-Image-Edit. Never t2i turbo on 图生图.
+      serviceId = (op === "i2i" ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE);
     } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
       // v0821o6: Magao empty → Hub turbo; never fal sibling / 默认模型
       serviceId = MS_LORA_PREF_SERVICE;
@@ -5053,7 +5083,7 @@
       else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
     }
     if (be === "huggingface") {
-      serviceId = pinHfLoraServiceId(serviceId);
+      serviceId = pinHfLoraServiceId(serviceId, op);
     }
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       serviceId = pinMsLoraServiceId(serviceId);
@@ -5379,7 +5409,7 @@
           payload.endpoint = pinned;
           ensureFalLoraServiceSelected();
         } else if (currentBackend() === "huggingface") {
-          const pinned = pinHfLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          const pinned = pinHfLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "", currentGraphOp());
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureHfLoraServiceSelected();
@@ -6061,10 +6091,14 @@
     if (/^hf\//i.test(s) || /^huggingface\//i.test(s)) return true;
     return isHfRepo(s);
   }
-  function pinHfLoraServiceId(sid) {
+  function pinHfLoraServiceId(sid, op) {
     const s = String(sid || "").trim();
-    // Empty / Fal sibling / Civitai image/… → Hub turbo. Never rewrite Hub → fal-ai/.../lora.
-    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return HF_LORA_PREF_SERVICE;
+    const wantI2i = op === "i2i";
+    const pref = wantI2i ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE;
+    // Empty / Fal sibling / Civitai image/… → Hub pref for this op.
+    // Never rewrite Hub → fal-ai/.../lora. Turbo is the t2i pref; rewrite only that to i2i pref.
+    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return pref;
+    if (wantI2i && s === HF_LORA_PREF_SERVICE) return HF_I2I_PREF_SERVICE;
     return s;
   }
   function ensureHfLoraServiceSelected() {
@@ -6072,7 +6106,7 @@
     if (be !== "huggingface") return;
     const sel = $("service");
     if (!sel) return;
-    const want = pinHfLoraServiceId(sel.value || state._pinHfLoraService || "");
+    const want = pinHfLoraServiceId(sel.value || state._pinHfLoraService || "", currentGraphOp());
     ensureSelectOpt(sel, want);
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
@@ -6685,13 +6719,15 @@
           items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
         }
       }
+      const hfPref = selectedShotWantsI2i() ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE;
       const needHfPin = (be === "huggingface" && mode !== "video" && (
         (Array.isArray(state.loras) && state.loras.length)
         || pinWant === HF_LORA_PREF_SERVICE
+        || pinWant === HF_I2I_PREF_SERVICE
         || state._pinHfLoraService
       ));
       if (needHfPin) {
-        const pinId = state._pinHfLoraService || HF_LORA_PREF_SERVICE;
+        const pinId = state._pinHfLoraService || hfPref;
         const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
         if (pinItem) {
           items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
