@@ -1487,7 +1487,7 @@ def test_v0821g_send_bind():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1545,7 +1545,7 @@ def test_v0821h_send_aria():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1717,7 +1717,7 @@ def test_v0821j_send_busy_msg():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1838,7 +1838,7 @@ def test_v0821k_i2v_prompt_req():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2026,7 +2026,7 @@ def test_v0821l_send_once():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2375,7 +2375,7 @@ def test_v0821n4_js_cache_bust():
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
@@ -2384,8 +2384,8 @@ def test_v0821n5_dock_scroll():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2411,8 +2411,8 @@ def test_v0821o_fal_lora_knife():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2579,8 +2579,8 @@ def test_v0821o2_fal_turbo_pin():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2641,8 +2641,8 @@ def test_v0821o3_fal_clear_loras():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2783,8 +2783,8 @@ def test_v0821o4_hf_turbo_lora():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3006,8 +3006,8 @@ def test_v0821o5_hf_no_wavespeed():
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
     assert_true("v0821o8-caption-i2i" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3150,8 +3150,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3525,8 +3525,8 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-merge2" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-ckpt-air" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
@@ -3654,7 +3654,7 @@ def test_v0821o7_param_surface():
 
     assert_true("v0821o8-caption-i2i" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-merge2"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-ckpt-air"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 

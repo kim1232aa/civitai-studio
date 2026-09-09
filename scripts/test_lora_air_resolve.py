@@ -80,6 +80,22 @@ def main():
         {"loras": [{"versionId": "122359", "name": "Checkpoint 真身"}]},
         "裸 version 122359 是 Checkpoint，服务端拒绝当 LoRA 发出去",
     )
+    raises(
+        {"loras": [{"air": "urn:air:sd1:checkpoint:civitai:96429@122359", "strength": 0.8}]},
+        "已带 Checkpoint AIR 也拒绝，不因 air 已提供就 fail-open",
+    )
+    raises(
+        {
+            "loras": [
+                {
+                    "air": "urn:air:sd1:checkpoint:civitai:96429@122359",
+                    "type": "LORA",
+                    "name": "伪装",
+                }
+            ]
+        },
+        "Checkpoint AIR 即使 type 写成 LORA 也拒绝",
+    )
     raises({"loras": [{"versionId": "999999", "name": "查不到"}]}, "version 查不到时报错，不静默丢")
     raises({"loras": [{"name": "光有名字"}]}, "既无 air 又无 version id 时报错，不静默丢")
     raises(

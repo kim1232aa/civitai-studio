@@ -3332,10 +3332,20 @@
       .toUpperCase()
       .replace(/[\s_]/g, "");
   }
-  // Missing type (URL / bare AIR / hub repo) is not blocked. Named non-LoRA is.
-  function loraTypeUsable(type) {
+  // Keep in lockstep with providers/civitai.py _parse_civitai_air.
+  function airKind(air) {
+    const s = String(air || "").trim();
+    const m = s.match(/(?:urn:)?(?:air:)?[^:]+:([^:]+):civitai:\d+/i);
+    return m ? normalizeLoraType(m[1]) : "";
+  }
+  // Missing type is allowed for URL / hub repo. AIR kind is still checked, so
+  // a Checkpoint URN cannot skip the gate just because type was omitted.
+  function loraTypeUsable(type, air) {
     const t = normalizeLoraType(type);
-    return !t || LORA_TYPES.has(t);
+    if (t && !LORA_TYPES.has(t)) return false;
+    const kind = airKind(air);
+    if (kind && !LORA_TYPES.has(kind)) return false;
+    return true;
   }
   function loraDisplayName(v) {
     // Prefer human model name over raw AIR / version id crumbs (v0821).
@@ -3520,12 +3530,13 @@
   }
   async function addLora(v) {
     const draft = normalizeLora(v);
-    if (!loraTypeUsable(draft.type)) {
+    if (!loraTypeUsable(draft.type, draft.air)) {
+      const kind = normalizeLoraType(draft.type) || airKind(draft.air) || "非 LoRA";
       setLoraNote(
         "version " +
           (draft.versionId || draft.name) +
           " 是 " +
-          draft.type +
+          kind +
           "（" +
           (draft.name || "无名") +
           "），不是 LoRA，没加进来",
@@ -3534,12 +3545,13 @@
       return false;
     }
     const row = await resolveLoraAir(draft);
-    if (!loraTypeUsable(row.type)) {
+    if (!loraTypeUsable(row.type, row.air)) {
+      const kind = normalizeLoraType(row.type) || airKind(row.air) || "非 LoRA";
       setLoraNote(
         "version " +
           (row.versionId || row.name) +
           " 是 " +
-          row.type +
+          kind +
           "（" +
           (row.name || "无名") +
           "），不是 LoRA，没加进来",

@@ -288,19 +288,60 @@ class LoraResolveError(ValueError):
         self.code = code
 
 
-def _row_air(item: dict) -> str:
-    """Use air as-is; otherwise versionId → AIR via fetch_version_air.
+_AIR_CIVITAI_RE = re.compile(
+    r"(?:urn:)?(?:air:)?(?P<eco>[^:]+):(?P<kind>[^:]+):civitai:(?P<mid>\d+)(?:@(?P<vid>\d+))?",
+    re.I,
+)
 
-    fetch_version_air already does public → mini → auth, synthesizes air from
-    modelId@versionId when missing, and caches. modelId / versionId live in
-    different id spaces (122359 is both a LoRA modelId and a Checkpoint
-    versionId) — if the row carries modelId, mismatch means this digit is not
-    the version we think it is. Checkpoint / non-LoRA types fail closed.
+
+def _parse_civitai_air(air: str) -> dict:
+    """Split urn:air:{eco}:{kind}:civitai:{modelId}@{versionId}. Empty fields if not parseable."""
+    s = (air or "").strip()
+    m = _AIR_CIVITAI_RE.search(s)
+    if m:
+        return {
+            "kind": m.group("kind") or "",
+            "modelId": m.group("mid") or "",
+            "versionId": m.group("vid") or "",
+        }
+    vid_m = re.search(r"@(\d+)\s*$", s)
+    return {
+        "kind": "",
+        "modelId": "",
+        "versionId": vid_m.group(1) if vid_m else "",
+    }
+
+
+def _row_air(item: dict) -> str:
+    """Resolve a LoRA row to a Civitai AIR. Fail closed on Checkpoint / non-LoRA.
+
+    A pre-filled air is still type-checked: kind is read from the URN
+    (checkpoint / diffusionmodel / vae / …). When the URN has a versionId
+    but no kind, fetch_version_air confirms the type so a Checkpoint cannot
+    sneak through just because air was already set. versionId-only rows
+    still go through fetch_version_air + modelId mismatch.
     """
     air = (item.get("air") or "").strip()
+    parsed = _parse_civitai_air(air)
+    typ = str(item.get("type") or "")
+    name = str(item.get("name") or "")
+    vid = str(item.get("versionId") or item.get("modelVersionId") or parsed["versionId"] or "").strip()
     if air:
+        # Kind already in the URN → no extra network (generate stays offline
+        # for known LoRA AIRs). Missing kind + versionId → fetch to confirm.
+        if not typ and not parsed["kind"] and vid.isdigit():
+            ver = fetch_version_air(vid) or {}
+            model = ver.get("model") if isinstance(ver.get("model"), dict) else {}
+            typ = str(model.get("type") or ver.get("type") or "")
+            name = name or str(model.get("name") or ver.get("name") or "")
+            want_mid = str(item.get("modelId") or parsed["modelId"] or "").strip()
+            got_mid = str(ver.get("modelId") or "").strip()
+            if want_mid and got_mid and want_mid != got_mid:
+                return ""
+            air = (ver.get("air") or air).strip()
+        if not _is_lora_resource(typ or parsed["kind"], air, name):
+            return ""
         return air
-    vid = str(item.get("versionId") or item.get("modelVersionId") or "").strip()
     if not vid.isdigit():
         return ""
     ver = fetch_version_air(vid) or {}
@@ -336,7 +377,7 @@ def lora_map(payload: dict) -> dict:
         if not air:
             path = (item.get("path") or item.get("url") or "").strip()
             name = str(
-                item.get("name") or item.get("versionId") or path or ""
+                item.get("name") or item.get("versionId") or path or item.get("air") or ""
             ).strip()
             raise LoraResolveError(
                 "LoRA「"
@@ -1034,7 +1075,14 @@ _LORA_TAG_RE = re.compile(r"<lora:([^:>]+)(?::([0-9.]+))?>", re.I)
 
 def _is_lora_resource(typ: str, air: str, name: str = "") -> bool:
     t = (typ or "").upper().replace(" ", "").replace("_", "")
-    if t in _LORA_TYPES:
+    kind = (_parse_civitai_air(air).get("kind") or "").upper().replace(" ", "").replace("_", "")
+    # Explicit non-LoRA type or AIR kind (Checkpoint, VAE, diffusionmodel, …)
+    # wins over a spoofed sibling field and over the :lora: name heuristic.
+    if t and t not in _LORA_TYPES:
+        return False
+    if kind and kind not in _LORA_TYPES:
+        return False
+    if t in _LORA_TYPES or kind in _LORA_TYPES:
         return True
     blob = f"{air} {name}".lower()
     if ":lora:" in blob or "/lora" in blob:

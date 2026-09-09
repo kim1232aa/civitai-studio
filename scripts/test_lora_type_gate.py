@@ -61,11 +61,12 @@ ok(
 ok("CHECKPOINT" not in js_types, "Checkpoint 不在白名单里")
 
 add = fn_body("addLora")
-ok("loraTypeUsable(draft.type)" in add, "addLora 入列前按 type 拦")
+ok("loraTypeUsable(draft.type, draft.air)" in add, "addLora 入列前按 type+air 拦")
 ok(
     add.index("loraTypeUsable") < add.index("resolveLoraAir"),
     "类型校验在 resolveLoraAir 之前，撞号的 checkpoint 不会先去换 air",
 )
+ok("function airKind(" in JS, "前端从 AIR 解 kind，缺 type 不 fail-open")
 norm = fn_body("normalizeLora")
 ok("type: type," in norm, "normalizeLora 把 /api/model-version/ 的 type 带出来")
 ok("modelId: modelId," in norm, "normalizeLora 带 modelId 给服务端交叉校验")
@@ -92,9 +93,38 @@ got = json.loads(out.stdout.strip().splitlines()[-1])
 for (value, want), passed in zip(cases, got):
     ok(passed, "loraTypeUsable(%r) == %s" % (value, want))
 
+air_cases = [
+    ["", "urn:air:sd1:checkpoint:civitai:96429@122359", False],
+    ["", "urn:air:sdxl:lora:civitai:1@2", True],
+    ["LORA", "urn:air:sd1:checkpoint:civitai:96429@122359", False],
+    ["Checkpoint", "urn:air:sdxl:lora:civitai:1@2", False],
+    ["", "", True],
+    ["", "https://civitai.com/api/download/models/1", True],
+]
+prog2 = block + "\nconsole.log(JSON.stringify(%s.map(function(c){return loraTypeUsable(c[0], c[1])===c[2];})));" % json.dumps(air_cases)
+out2 = subprocess.run(
+    ["node", "-e", prog2], capture_output=True, text=True, cwd=str(ROOT)
+)
+ok(out2.returncode == 0, "loraTypeUsable(type, air) 能在 node 里独立跑：%s" % out2.stderr.strip()[-300:])
+got2 = json.loads(out2.stdout.strip().splitlines()[-1])
+for (typ, air, want), passed in zip(air_cases, got2):
+    ok(passed, "loraTypeUsable(%r, %r) == %s" % (typ, air, want))
+
 ok(
     not civ._is_lora_resource("Checkpoint", "urn:air:sd1:checkpoint:civitai:96429@122359"),
     "服务端也认为 122359 的真身 Checkpoint 不是 LoRA 资源",
+)
+ok(
+    not civ._is_lora_resource("", "urn:air:sd1:checkpoint:civitai:96429@122359"),
+    "缺 type 时 Checkpoint AIR 仍拒绝",
+)
+ok(
+    not civ._is_lora_resource("LORA", "urn:air:sd1:checkpoint:civitai:96429@122359"),
+    "Checkpoint AIR 不因 type=LORA 伪装而放行",
+)
+ok(
+    civ._is_lora_resource("", "urn:air:sdxl:lora:civitai:1@2"),
+    "缺 type 的 LoRA AIR 仍可走",
 )
 
 print("\nall ok")
