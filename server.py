@@ -850,6 +850,9 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     print("catalog refresh", e, flush=True)
             body = prov.catalog((qs.get("q") or [""])[0], (qs.get("category") or [""])[0], (qs.get("status") or [""])[0])
+            if backend in ("modelscope-ai", "modelscope-cn", "modelscope"):
+                from providers.capabilities import overlay_modelscope_catalog
+                body = overlay_modelscope_catalog(body)
             return self._json(200, body)
         if path == "/api/defaults":
             civ = providers.get("civitai")
@@ -1040,9 +1043,15 @@ class Handler(BaseHTTPRequestHandler):
                 if blocked:
                     return self._json(400, blocked)
             # Canvas may pack image_urls / input_references; mirror to images.
-            from providers.ref_images import normalize_payload_refs
+            from providers.ref_images import normalize_payload_refs, collect_ref_images
             normalize_payload_refs(payload)
             prov = providers.resolve_from_payload(payload)
+            if path == "/api/generate" and prov and prov.id in ("modelscope-ai", "modelscope-cn"):
+                from providers.capabilities import modelscope_t2i_refs_error
+                n_refs = len(collect_ref_images(payload, include_primary=True))
+                t2i_err = modelscope_t2i_refs_error(payload.get("serviceId"), n_refs)
+                if t2i_err:
+                    return self._json(400, {"error": t2i_err, "backend": prov.id})
             if path == "/api/whatif":
                 code, data = prov.whatif(payload)
             else:

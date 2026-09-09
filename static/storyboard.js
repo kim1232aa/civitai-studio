@@ -3172,6 +3172,8 @@
 
   function refCapGateMessage(shot) {
     if (!shot || shot.kind !== "shot") return "";
+    // t2i-with-refs is a different failure (unused), not "cap=1".
+    if (refUnusedGateMessage(shot)) return "";
     const nRefs = countRefUrls(null, shot).length;
     const cap = maxRefCount(catalogItemForService());
     if (nRefs > cap) {
@@ -3183,12 +3185,22 @@
   // Explicit catalog.image_to_image === false (Flare/Sunburst t2i): connected
   // refs must hard-block. Never attach them onto a text-to-image body and
   // write back a green "此镜完成" that ignored the product photos.
+  // 魔搭 pins ship task/tags even when capabilities is null — Krea-2-Raw is
+  // text-to-image. Treating that as maxRefs=1 made「参考图 5/1」look like a
+  // provider-wide one-image cut.
   function catalogEatsRefs(it) {
     if (!it) return true;
     const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
     if (caps.image_to_image === true || caps.inpainting === true) return true;
     if (it.needsSource) return true;
     if (caps.image_to_image === false) return false;
+    const backend = String(it.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
+    if (backend === "modelscope-ai" || backend === "modelscope-cn" || backend === "modelscope") {
+      const task = String(it.task || it.hubTask || "").toLowerCase();
+      const tags = Array.isArray(it.tags) ? it.tags.map((t) => String(t).toLowerCase()) : [];
+      if (task === "image-to-image" || task === "image-to-video" || tags.indexOf("i2i") >= 0 || tags.indexOf("i2v") >= 0) return true;
+      if (task === "text-to-image" || task === "text-to-video" || tags.indexOf("t2i") >= 0 || tags.indexOf("t2v") >= 0) return false;
+    }
     return true;
   }
   function editSiblingHint(it) {

@@ -456,6 +456,10 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     assert_true("function catalogEatsRefs" in js, "t2i image_to_image=false helper")
     assert_true("function refUnusedGateMessage" in js, "t2i-with-refs hard gate")
     assert_true("不静默忽略" in js, "unused-refs loud copy")
+    eat = js[js.find("function catalogEatsRefs"):js.find("function editSiblingHint")]
+    assert_true("modelscope-cn" in eat and "text-to-image" in eat, "魔搭 t2i task fallback")
+    assert_true("refUnusedGateMessage(shot)" in js[js.find("function refCapGateMessage"):js.find("function catalogEatsRefs")],
+                "over-cap skipped when unused-ref already explains t2i")
     assert_true("refUnusedGateMessage(shot)" in run, "unused-refs gate in runShotStep")
     assert_true(run.find("refUnusedGateMessage") < run.find("attachExtraImages(payload, shot)"),
                 "unused-refs gate before attachExtraImages")
