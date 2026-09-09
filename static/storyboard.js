@@ -1362,7 +1362,9 @@
       const w = maxX - minX + pad * 2;
       const h = maxY - minY + pad * 2 + 12;
       const shotN = members.filter((n) => n.kind === "shot").length;
-      const label = (g.name || "组") + " · " + members.length + "项" + (shotN ? (" · " + shotN + "分镜") : " · 无分镜");
+      const rawName = String(g.name || "").trim();
+      const groupName = /^(group|groups?)$/i.test(rawName) ? "组" : (rawName || "组");
+      const label = groupName + " · " + members.length + "项" + (shotN ? (" · " + shotN + "分镜") : " · 无分镜");
       world.insertAdjacentHTML("beforeend",
         '<div class="group-bound" data-gid="' + esc(g.id) + '" style="left:' + left + 'px;top:' + top +
         'px;width:' + w + 'px;height:' + h + 'px"><span class="gname">' + esc(label) + '</span></div>');
@@ -2352,6 +2354,29 @@
     applyCam();
   }
 
+  function separateOverlappingShots() {
+    const list = shots();
+    let changed = false;
+    const gap = 72;
+    const overlapRatio = (a, b) => {
+      const ab = box(a), bb = box(b);
+      const w = Math.max(0, Math.min(a.x + ab.w, b.x + bb.w) - Math.max(a.x, b.x));
+      const h = Math.max(0, Math.min(a.y + ab.h, b.y + bb.h) - Math.max(a.y, b.y));
+      return (w * h) / Math.max(1, Math.min(ab.w * ab.h, bb.w * bb.h));
+    };
+    list.forEach((n, i) => {
+      let guard = 0;
+      while (list.slice(0, i).some((prev) => overlapRatio(prev, n) > 0.25) && guard++ < list.length) {
+        const prev = list[i - 1] || list[0];
+        n.x = prev.x + box(prev).w + gap;
+        n.y = prev.y;
+        changed = true;
+      }
+    });
+    if (changed) persist();
+    return changed;
+  }
+
   function constrainShotsToViewport() {
     if (state.cam.s < 1) return false;
     const area = canvasArea(), pad = 12, scale = state.cam.s;
@@ -3152,7 +3177,9 @@
       else delete shot._errorDetail;
     }
     setMsg(info.text, tone, info.excerpt);
+    state.dockMode = "expanded";
     renderCards();
+    renderDock();
     if (typeof keepComposerPromptVisible === "function") keepComposerPromptVisible();
     return info.text;
   }
@@ -3581,8 +3608,8 @@
       neg.classList.toggle("hidden", !showNeg);
     }
     if (duration) duration.classList.toggle("hidden", !vid || caps.videoDuration === false);
-    if (aspect) aspect.classList.toggle("hidden", caps.videoAspect === false && !vid);
-    if (res) res.classList.toggle("hidden", !!nano);
+    if (aspect) aspect.classList.toggle("hidden", state.mode === "text" || state.mode === "audio" || (caps.videoAspect === false && vid));
+    if (res) res.classList.toggle("hidden", !!nano || state.mode === "text" || state.mode === "audio");
     if (nano) fillNanoResOptions();
     paramGateMessage();
     if (!syncParamSurface._skipDock) renderDock();
@@ -4714,6 +4741,7 @@
       setMsg(text, cls || "bad", info.excerpt);
       if (shot) setShotBusy(shot, false);
       if (!opts.keepSend) markSendBusy(false);
+      state.dockMode = "expanded";
       renderCards();
       renderDock();
       const out = { status: status || "blocked", error: text };
@@ -6288,6 +6316,7 @@
   window.addEventListener("resize", () => { drawMinimap(); positionDock(); });
 
   if (!restore()) loadDemo();
+  separateOverlappingShots();
   ensureWorkspaceModel();
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;

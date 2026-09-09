@@ -124,13 +124,13 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 .dock-hd .dock-hint { display: none; }
 .dock-btn { height: 32px; min-width: 32px; }
 .dock.expanded .dock-body {
-  display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: contain;
+  display: block; overflow: auto; overscroll-behavior: contain;
   scrollbar-gutter: stable; padding: 14px; min-height: 0;
 }
 .dock.expanded .dock-scroll {
-  flex: 1 1 auto; min-height: 0; overflow: auto; overflow-anchor: none;
+  overflow: visible; overflow-anchor: none;
 }
-.dock-foot { flex: 0 0 auto; background: transparent; padding-top: 4px; overflow: visible; }
+.dock-foot { background: transparent; padding-top: 4px; overflow: visible; }
 .dock.expanded .lora-block { max-height: 140px; overflow: auto; }
 #prompt {
   position: sticky; top: 0; z-index: 4;
