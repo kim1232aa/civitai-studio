@@ -375,7 +375,7 @@
   .composer-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-merge1">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-uifix3">
 </head>
 <body>
 <div class="app">
@@ -466,7 +466,6 @@
       <textarea class="prompt" id="prompt" placeholder="描述你的想法，输入 / + skill 名称使用 Skill"></textarea>
       <textarea class="prompt neg" id="negative" placeholder="负面提示（不想出现的内容，可空）"></textarea>
       <div class="param-warn" id="paramWarn"></div>
-      </div>
       <div class="dock-foot" id="dockFoot">
       <div class="lora-block" id="loraBlock" data-sb-lora="1">
         <div class="lora-hd">
@@ -526,6 +525,7 @@
       <div class="msg" id="msg">点分镜卡编辑提示词。输入 / 使用 Skill；「画布引用」只连线，不写 @filename；手动 @ 可选。</div>
       </div>
       </div>
+      </div>
     </aside>
   </div>
 </div>
@@ -569,6 +569,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r7keys"></script>
+<script src="/static/storyboard.js?v=20260910-uifix2"></script>
 </body>
 </html>

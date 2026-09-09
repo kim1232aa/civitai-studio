@@ -1552,6 +1552,7 @@
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
     const area = canvasArea(), b = box(n), gap = 18;
+    const expanded = state.dockMode === "expanded";
     const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
     const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
     const width = Math.min(640, area.right - area.left);
@@ -1591,7 +1592,8 @@
     left = Math.max(area.left, Math.min(left, area.right - dockW));
     top = Math.max(area.top, Math.min(top, area.bottom - maxH));
     Object.assign(dock.style, {
-      width: dockW + "px", maxHeight: maxH + "px", left: left + "px", top: top + "px",
+      width: dockW + "px", height: expanded ? maxH + "px" : "auto", maxHeight: maxH + "px",
+      left: left + "px", top: top + "px",
       right: "auto", bottom: "auto", transform: "none",
       visibility: x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight ? "hidden" : "",
     });
