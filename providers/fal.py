@@ -425,23 +425,29 @@ def apply_fal_loras(inp: dict, payload: dict, spec: dict, eid: str) -> None:
         elif "strength" in it:
             scale_raw = it.get("strength")
         else:
-            raise ValueError("lora scale/strength 必须是有限数值，不能缺省为 1.0")
-        if scale_raw in (None, ""):
-            raise ValueError(f"lora scale 必须是有限数值，收到 {scale_raw!r}，不能缺省为 1.0")
-        cleaned.append({"path": path, "scale": _strict_float(scale_raw, "lora scale")})
+            scale_raw = None
+        row = {"path": path}
+        # Official Fal LoraWeight: path required, scale optional default 1.
+        # Imported sample 134923572 has strength=null — omit scale, do not invent 1.0.
+        # Invalid non-numeric values still 400.
+        if scale_raw not in (None, ""):
+            row["scale"] = _strict_float(scale_raw, "lora scale")
+        cleaned.append(row)
     if not cleaned:
         return
     if shape == "loras":
         inp["loras"] = cleaned
     elif shape == "lora_url":
         inp["lora_url"] = cleaned[0]["path"]
-        inp["lora_scale"] = cleaned[0]["scale"]
+        if "scale" in cleaned[0]:
+            inp["lora_scale"] = cleaned[0]["scale"]
     elif shape == "lora_path":
         inp["lora_path"] = cleaned[0]["path"]
-        inp["lora_scale"] = cleaned[0]["scale"]
+        if "scale" in cleaned[0]:
+            inp["lora_scale"] = cleaned[0]["scale"]
     elif shape == "lora":
         inp["lora"] = cleaned[0]["path"]
-        if "lora_scale" in [str(x).lower() for x in _schema_keys(spec)]:
+        if "scale" in cleaned[0] and "lora_scale" in [str(x).lower() for x in _schema_keys(spec)]:
             inp["lora_scale"] = cleaned[0]["scale"]
 
 

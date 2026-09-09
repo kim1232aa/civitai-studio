@@ -179,7 +179,7 @@ class CivitaiContract(unittest.TestCase):
         self.transport.assert_not_called()
 
     def test_invalid_lora_strength_is_not_defaulted(self):
-        for strength in ("oops", True, None, ""):
+        for strength in ("oops", True):
             payload = krea_payload(loras=[{"air": KLEA_AIR, "strength": strength}])
             with self.subTest(strength=strength):
                 self.transport.reset_mock()
@@ -189,14 +189,25 @@ class CivitaiContract(unittest.TestCase):
                 code, data = civ.CivitaiProvider().generate(payload)
                 self.assertEqual(code, 400, data)
                 self.transport.assert_not_called()
-        missing = krea_payload(loras=[{"air": KLEA_AIR}])
-        with self.assertRaises(ValueError) as raised:
-            civ.build_workflow(missing)
-        self.assertTrue("strength" in str(raised.exception).lower() or "缺失" in str(raised.exception))
-        self.transport.reset_mock()
-        code, data = civ.CivitaiProvider().generate(missing)
-        self.assertEqual(code, 400, data)
-        self.transport.assert_not_called()
+
+    def test_null_lora_strength_is_omitted_not_defaulted(self):
+        for loras in (
+            [{"air": KLEA_AIR, "strength": None}],
+            [{"air": KLEA_AIR, "strength": ""}],
+            [{"air": KLEA_AIR}],
+        ):
+            payload = krea_payload(loras=loras)
+            with self.subTest(loras=loras):
+                self.transport.reset_mock()
+                inp = step_input(civ.build_workflow(payload))
+                self.assertEqual(inp["loras"], [{"air": KLEA_AIR}])
+                self.assertNotIn("strength", inp["loras"][0])
+                self.assertNotEqual(inp["loras"][0].get("strength"), 1.0)
+                code, data = civ.CivitaiProvider().generate(payload)
+                self.assertEqual(code, 200, data)
+                submitted = data["submittedInput"]["loras"]
+                self.assertEqual(submitted, [{"air": KLEA_AIR}])
+                self.assertNotIn("1.0", str(submitted))
 
     def test_hunyuan_keeps_array_loras_and_original_duration_steps(self):
         air = "urn:air:hunyuan:lora:civitai:9@9"
@@ -557,12 +568,12 @@ class CivitaiContract(unittest.TestCase):
 
         self.transport.reset_mock()
         payload = krea_payload(loras=[{"air": air, "strength": loras[0]["strength"]}])
-        with self.assertRaises(ValueError) as raised:
-            civ.build_workflow(payload)
-        self.assertIn("strength", str(raised.exception).lower())
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp["loras"], [{"air": air}])
+        self.assertNotIn("strength", inp["loras"][0])
         code, data = civ.CivitaiProvider().generate(payload)
-        self.assertEqual(code, 400, data)
-        self.transport.assert_not_called()
+        self.assertEqual(code, 200, data)
+        self.assertEqual(data["submittedInput"]["loras"], [{"air": air}])
 
     def test_prompt_lora_tag_without_weight_is_not_defaulted_to_0_8(self):
         tagged = civ._prompt_lora_tags("<lora:RadianceChrome>")

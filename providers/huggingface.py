@@ -30,9 +30,10 @@ _PREF = ("fal-ai", "nscale", "together", "hf-inference")
 _SKIP_OPENAI = {"replicate"}
 _MAP_CACHE = {"at": 0.0, "items": {}}
 _MAP_TTL = 300
-# Fal / HF Router image seed is int32. Reject out-of-range values; never modulo.
+# Official HF text-to-image `seed` is integer with no documented max.
+# Fal-as-HF-provider already accepted seeds > int32 (live 1055482629632456).
+# Never modulo or clip; reject only non-integers / seed < -1.
 _HF_SEED_MIN = -1
-_HF_SEED_MAX = 2147483647
 
 
 def _mapping_as_dict(raw):
@@ -304,15 +305,9 @@ def _prompt_body(payload: dict) -> dict:
         value = _value(payload, *names)
         if value is not None and not (names[0] == "seed" and value == "random"):
             if names[0] == "seed":
-                try:
-                    params["seed"] = _number(
-                        value, "seed", integer=True, minimum=_HF_SEED_MIN, maximum=_HF_SEED_MAX,
-                    )
-                except ValueError:
-                    raise ValueError(
-                        "seed 超出 Hugging Face / Router 的 int32 范围"
-                        f"（{_HF_SEED_MIN}～{_HF_SEED_MAX}），拒绝取模或截断"
-                    ) from None
+                params["seed"] = _number(
+                    value, "seed", integer=True, minimum=_HF_SEED_MIN,
+                )
             else:
                 params[names[0]] = _number(value, names[0], integer=integer, minimum=minimum)
     for names in (("negative_prompt", "negativePrompt"), ("scheduler",)):
@@ -417,9 +412,12 @@ def _force_loras(body: dict, payload: dict) -> None:
                             or re.match(r"^https?://[^/\s]+/\S+$", path)):
             raise ValueError("HF LoRA 缺少有效下载地址或 Hub owner/repo；拒绝跳过")
         scale = _value(it, "scale", "strength", "weight")
-        if scale is None:
-            raise ValueError("HF LoRA 缺少 scale/strength/weight，拒绝默认 1.0")
-        cleaned.append({"path": path, "scale": _number(scale, "LoRA scale")})
+        row = {"path": path}
+        # Official Fal LoraWeight.scale is optional (vendor default 1). Omit when
+        # the imported sample has strength=null — do not invent 1.0 here.
+        if scale is not None:
+            row["scale"] = _number(scale, "LoRA scale")
+        cleaned.append(row)
     body["loras"] = cleaned
 
 

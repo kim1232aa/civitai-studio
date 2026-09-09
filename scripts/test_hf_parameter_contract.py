@@ -29,10 +29,9 @@ class HFContract(unittest.TestCase):
         params = hf._prompt_body({"seed": 2147483647, "cfgScale": 0, "steps": "8"})
         self.assertEqual(params, {"seed": 2147483647, "guidance_scale": 0, "num_inference_steps": 8})
         self.assertEqual(hf._prompt_body({"seed": -1})["seed"], -1)
-        with self.assertRaises(ValueError) as ctx:
-            hf._prompt_body({"seed": 475720515768790})
-        self.assertIn("2147483647", str(ctx.exception))
-        self.assertIn("拒绝取模", str(ctx.exception))
+        # Official HF seed is integer with no max; sample 134923572 must pass through.
+        self.assertEqual(hf._prompt_body({"seed": 467475143677094})["seed"], 467475143677094)
+        self.assertEqual(hf._prompt_body({"seed": 475720515768790})["seed"], 475720515768790)
         with self.assertRaises(ValueError):
             hf._prompt_body({"seed": -2})
 
@@ -82,17 +81,20 @@ class HFContract(unittest.TestCase):
             with self.subTest(rows=rows), self.assertRaises(ValueError):
                 hf._force_loras({}, {"loras": rows})
 
-    def test_missing_lora_scale_is_not_defaulted(self):
+    def test_missing_lora_scale_is_omitted_not_defaulted(self):
         for rows in (
             [{"path": "org/lora"}],
             [{"path": "https://example.invalid/a.safetensors", "scale": None}],
             [{"path": "org/lora", "strength": None, "weight": None}],
             ["org/lora"],
         ):
-            with self.subTest(rows=rows), self.assertRaises(ValueError) as ctx:
-                hf._force_loras({}, {"loras": rows})
-            self.assertIn("scale", str(ctx.exception))
-            self.assertIn("拒绝默认", str(ctx.exception))
+            with self.subTest(rows=rows):
+                body = {}
+                hf._force_loras(body, {"loras": rows})
+                self.assertTrue(body.get("loras"))
+                for item in body["loras"]:
+                    self.assertNotIn("scale", item)
+                    self.assertNotEqual(item.get("scale"), 1.0)
 
     def test_together_uses_its_image_schema_not_nscale_size(self):
         _, _, body = hf._call_openai("together", "org/model", {

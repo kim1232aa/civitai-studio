@@ -303,9 +303,12 @@ def lora_map(payload: dict) -> dict:
         elif "scale" in item:
             raw = item.get("scale")
         else:
-            raise ValueError(f"lora strength 缺失，不能默认为 1（{air}）")
+            raw = None
+        # Official additionalNetworks.strength is optional. Page 134923572 has
+        # strength=null — omit the number, keep the AIR, do not invent 1.0/0.8.
         if raw in (None, ""):
-            raise ValueError(f"lora strength 必须是数值，收到 {raw!r}（{air}）")
+            out[air] = None
+            continue
         if isinstance(raw, bool):
             raise ValueError(f"lora strength 必须是数值，收到 {raw!r}")
         try:
@@ -671,16 +674,30 @@ def _assign_by_constraint(inp, raw, field, cap=None, aliases=()):
     inp[field] = raw
 
 
+def _lora_row(air: str, strength):
+    row = {"air": air}
+    if strength is not None:
+        row["strength"] = strength
+    return row
+
+
 def _lora_payload(loras: dict, cap: dict | None, engine: str | None):
     """Official Civitai LoRA shapes from constraints.loras.type:
     - object `{air: strength}` (Comfy / sdcpp / Flux2 Klein)
     - array `[{air, strength}]` (Flux2 Dev, Hunyuan, Wan)
     Hunyuan has no type in some dumps; engine==hunyuan still uses the list.
+
+    strength=None (imported sample) omits the number. Object Record<string,number>
+    cannot hold null, so a missing strength forces the official array form
+    `{air}` without inventing 1.0.
     """
     cons = _constraint(cap, "loras")
     kind = (cons.get("type") or "").lower()
-    if kind == "array" or (not kind and engine == "hunyuan"):
-        return [{"air": k, "strength": v} for k, v in loras.items()]
+    use_array = kind == "array" or (not kind and engine == "hunyuan") or any(
+        v is None for v in loras.values()
+    )
+    if use_array:
+        return [_lora_row(k, v) for k, v in loras.items()]
     return loras
 
 

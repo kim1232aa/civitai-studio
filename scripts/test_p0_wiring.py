@@ -59,11 +59,10 @@ def main() -> int:
     forced = {}
     _force_loras(forced, {"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]})
     assert forced["loras"][0]["path"].startswith("https://")
-    try:
-        _prompt_body({"seed": 1074720209731743})
-        raise AssertionError("HF oversize seed must 400, not modulo")
-    except ValueError as exc:
-        assert "int32" in str(exc) or "seed" in str(exc)
+    huge = _prompt_body({"seed": 1074720209731743})
+    assert huge["seed"] == 1074720209731743, huge
+    sample = _prompt_body({"seed": 467475143677094})
+    assert sample["seed"] == 467475143677094, sample
     from providers.modelscope import (
         _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE,
         AI_TOKEN_PATH, CN_TOKEN_PATH, ModelScopeProvider,
