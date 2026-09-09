@@ -123,6 +123,8 @@ def _modelscope_loras(payload: dict):
       - many:      {\"owner/repo\": weight, ...} and weights must sum to 1.0
 
     Live Krea 400: `loras[0] is not a string` when we sent [{model, weight}].
+    Live CN 500: `{repo: 0.8}` for one LoRA → 模型不存在. Single with weight is
+    not remapped to a dict and the weight is not dropped.
     Civitai download / AIR is not remapped; refuse rather than drop or invent Hub id.
     Missing weight is not defaulted to 1.0.
     """
@@ -159,9 +161,12 @@ def _modelscope_loras(payload: dict):
         return None
     if len(parsed) == 1:
         repo, weight = parsed[0]
-        if weight is None:
-            return repo
-        return {repo: _number(weight, "LoRA weight")}
+        if weight is not None:
+            raise ValueError(
+                "魔搭单条 LoRA 官方字段是 owner/repo 字符串，没有 weight；"
+                "不会改成 {repo:weight}（CN 实测 500 模型不存在），也不会丢权重"
+            )
+        return repo
     out = {}
     for repo, weight in parsed:
         if weight is None:

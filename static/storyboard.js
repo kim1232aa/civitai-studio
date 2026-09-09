@@ -2836,7 +2836,7 @@
     const be = currentBackend();
     hits.textContent = "搜…";
     if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
-      addLora({ path: q, name: q, strength: 0.8 });
+      addLora({ path: q, name: q });
       hits.textContent = "";
       return;
     }

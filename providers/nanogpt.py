@@ -32,6 +32,8 @@ GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
 GEN_VIDEO = BASE + "/api/generate-video"
 VIDEO_STATUS = BASE + "/api/video/status"
+TEXT_MODELS = API + "/models?detailed=true"
+CHAT_COMPLETIONS = BASE + "/v1/chat/completions"
 
 _CACHE = {"at": 0.0, "items": None}
 _TTL = 300
@@ -1370,6 +1372,146 @@ class NanoGptProvider(Provider):
             out["status"] = "failed"
             out["error"] = extract_error(data, f"HTTP {code}")
         return 200, out
+
+
+def _row_text(it: dict) -> dict:
+    """Normalize official GET /api/v1/models rows for vision/chat selectors."""
+    mid = str(it.get("id") or "").strip()
+    name = str(it.get("name") or mid.rsplit("/", 1)[-1] or mid).strip()
+    caps = it.get("capabilities") or {}
+    tags = [str(t).lower() for t in (it.get("tags") or []) if t]
+    return {
+        "id": mid,
+        "name": name,
+        "category": "text",
+        "backend": "nano-gpt",
+        "status": "available",
+        "task": "text-generation",
+        "tags": tags,
+        "pricing": it.get("pricing") or {},
+        "supported_parameters": it.get("supported_parameters") or {},
+        "capabilities": caps,
+        "description": it.get("description") or "",
+        "owned_by": it.get("owned_by") or "",
+    }
+
+
+class CatalogFetchError(RuntimeError):
+    def __init__(self, message, code="catalog_fetch_failed"):
+        super().__init__(message)
+        self.code = code
+
+
+def fetch_text_catalog(force=False) -> list:
+    """Fetch official NanoGPT text model IDs. Empty failure raises; never invents a model id."""
+    now = time.time()
+    cache = _CACHE.setdefault("text", {"at": 0.0, "items": None})
+    if not force and cache.get("items") is not None and now - (cache.get("at") or 0) < _TTL:
+        return list(cache["items"])
+    code, data = json_call(TEXT_MODELS, headers={"Accept": "application/json", **_auth()}, timeout=30)
+    rows = data.get("data") if isinstance(data, dict) else None
+    items, seen = [], set()
+    if code == 200 and isinstance(rows, list):
+        for it in rows:
+            if not isinstance(it, dict) or not it.get("id"):
+                continue
+            row = _row_text(it)
+            if row["id"] not in seen:
+                seen.add(row["id"])
+                items.append(row)
+        cache["items"], cache["at"] = items, now
+        cache["error"] = None
+        return list(items)
+    if cache.get("items"):
+        cache["stale"] = True
+        return list(cache["items"])
+    raise CatalogFetchError(f"NanoGPT 文本目录 HTTP {code}，没有可用缓存")
+
+
+def pick_vision_model(explicit: str = "") -> str:
+    chosen = (explicit or "").strip()
+    if chosen.startswith("chat/"):
+        chosen = chosen[len("chat/"):]
+    if chosen:
+        return chosen
+    try:
+        items = fetch_text_catalog()
+    except CatalogFetchError as e:
+        raise CatalogFetchError(f"无法选择视觉模型：{e}", code=e.code) from e
+    ranked = []
+    for it in items:
+        mid = str(it.get("id") or "")
+        blob = " ".join(
+            [
+                mid,
+                str(it.get("name") or ""),
+                " ".join(str(t) for t in (it.get("tags") or [])),
+            ]
+        ).lower()
+        caps = it.get("capabilities") or {}
+        if caps.get("vision") or "vl" in blob or "vision" in blob:
+            score = 0
+            if "instruct" in blob:
+                score += 2
+            if "vl" in blob:
+                score += 3
+            ranked.append((score, mid))
+    ranked.sort(reverse=True)
+    if not ranked:
+        raise CatalogFetchError("NanoGPT 文本目录里没有视觉（vl/vision）模型")
+    return ranked[0][1]
+
+
+def caption_image(image_url: str, model: str = "") -> tuple[int, dict]:
+    """Vision chat completion. Caption text comes from the model, never a fixed string."""
+    key = nano_key()
+    if not key:
+        return 401, {"error": "没有 NanoGPT API Key", "code": "no_key", "backend": "nano-gpt"}
+    url = (image_url or "").strip()
+    if not url:
+        return 400, {"error": "缺少图片 url", "code": "missing_url", "backend": "nano-gpt"}
+    try:
+        mid = pick_vision_model(model)
+    except CatalogFetchError as e:
+        return 503, {"error": str(e), "code": e.code, "backend": "nano-gpt"}
+    prompt = (
+        "Describe this image so it can be reused as an image-generation prompt. "
+        "Be specific about subject, appearance, clothing, pose, setting, lighting, and camera. "
+        "Do not invent a backstory. Output only the description."
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": url}},
+            ],
+        }
+    ]
+    body = {"model": mid, "messages": messages, "max_tokens": 400}
+    code, data = json_call(CHAT_COMPLETIONS, method="POST", headers=_auth(), body=body, timeout=90)
+    if code >= 400 or not isinstance(data, dict):
+        return (
+            code if code >= 400 else 502,
+            {
+                "error": extract_error(data, f"NanoGPT vision HTTP {code}"),
+                "code": "caption_failed",
+                "backend": "nano-gpt",
+                "model": mid,
+            },
+        )
+    choices = data.get("choices") or []
+    content = ""
+    if choices and isinstance(choices[0], dict):
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+    if not content:
+        return 502, {
+            "error": "NanoGPT vision 未返回描述",
+            "code": "empty_caption",
+            "backend": "nano-gpt",
+            "model": mid,
+        }
+    return 200, {"caption": content, "backend": "nano-gpt", "model": mid}
 
 
 from . import register  # noqa: E402

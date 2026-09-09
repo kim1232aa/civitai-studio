@@ -59,7 +59,11 @@ def main() -> int:
     forced = {}
     _force_loras(forced, {"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]})
     assert forced["loras"][0]["path"].startswith("https://")
-    assert _prompt_body({"seed": 1074720209731743})["seed"] <= 2147483647
+    try:
+        _prompt_body({"seed": 1074720209731743})
+        raise AssertionError("HF oversize seed must 400, not modulo")
+    except ValueError as exc:
+        assert "int32" in str(exc) or "seed" in str(exc)
     from providers.modelscope import (
         _modelscope_loras, _clamp_seed, AI_BASE, CN_BASE,
         AI_TOKEN_PATH, CN_TOKEN_PATH, ModelScopeProvider,
@@ -76,7 +80,12 @@ def main() -> int:
     assert ai._base == AI_BASE and cn._base == CN_BASE
     assert ai._token_path == AI_TOKEN_PATH and cn._token_path == CN_TOKEN_PATH
     assert ai.id == "modelscope-ai" and cn.id == "modelscope-cn"
-    assert _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]}) == {"Qwen/foo": 1.0}
+    assert _modelscope_loras({"loras": [{"name": "Qwen/foo"}]}) == "Qwen/foo"
+    try:
+        _modelscope_loras({"loras": [{"name": "Qwen/foo", "scale": 1}]})
+        raise AssertionError("single weighted LoRA must 400, not {repo:1.0}")
+    except ValueError as exc:
+        assert "单条" in str(exc)
     try:
         _modelscope_loras({"loras": [{"path": "https://civitai.com/api/download/models/3231694", "scale": 0.8}]})
         raise AssertionError("Civitai http LoRA must 400")
@@ -91,11 +100,16 @@ def main() -> int:
         raise AssertionError("Civitai http LoRA must 400")
     except ValueError as exc:
         assert "owner/repo" in str(exc)
-    assert _clamp_seed(475720515768790) <= 2147483647
-    assert _clamp_seed(475720515768790) > 0
-    assert _clamp_seed(-3) == -1
-    # v0774: proven UI import seed → Nano int32 modulo
-    assert _clamp_seed(891104780613135) == 2146323191
+    try:
+        _clamp_seed(475720515768790)
+        raise AssertionError("oversize seed must 400, not modulo")
+    except ValueError as exc:
+        assert "seed" in str(exc)
+    try:
+        _clamp_seed(-3)
+        raise AssertionError("seed < -1 must 400, not clamp to -1")
+    except ValueError as exc:
+        assert "seed" in str(exc)
     from providers.io_meta import coerce_int, dims_from_selector, first_int, parse_comfy
     node = {
         "class_type": "ResolutionSelector",

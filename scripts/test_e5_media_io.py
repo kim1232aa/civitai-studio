@@ -55,8 +55,16 @@ with TemporaryDirectory() as tmp:
     check("禁止 blob 冒充", "blob:" not in str(data.get("url")))
 
 print("caption unit")
+check("nano caption_image 存在", callable(getattr(nano_mod, "caption_image", None)))
+check("civitai caption_media 存在", callable(getattr(civitai_mod, "caption_media", None)))
 nano_mod.nano_key = lambda: ""
 civitai_mod.has_key = lambda: False
+code, data = nano_mod.caption_image("data:image/png;base64,xx")
+check("nano 无 key 401 不是 AttributeError", code == 401 and data.get("code") == "no_key" and not data.get("caption"), str((code, data)))
+code, data = civitai_mod.caption_media("")
+check("civitai 缺 url 400", code == 400 and data.get("code") == "missing_url" and not data.get("caption"), str((code, data)))
+code, data = civitai_mod.caption_media("https://example.invalid/x.png")
+check("civitai 无 key 401", code == 401 and data.get("code") == "no_key" and not data.get("caption"), str((code, data)))
 code, data = media_io.caption_request({})
 check("缺 url 400", code == 400 and data.get("code") == "missing_url", str((code, data)))
 code, data = media_io.caption_request({"url": "/out/no-such-file.png"})

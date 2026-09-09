@@ -3178,14 +3178,10 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true('serviceId: "fal-ai/z-image/turbo/lora"' not in fixture_block
                 and "serviceId: FAL_LORA_PREF_SERVICE" not in fixture_block,
                 "Magao fixture must NOT rewrite to fal turbo/lora sibling")
-    assert_true(HUB_LORA in fixture_block, "fixture explicit Hub LoRA repo")
     loras_part = fixture_block.split("loras")[1][:700] if "loras" in fixture_block else ""
-    assert_true(HUB_LORA in loras_part, "loras[] is Hub owner/repo")
+    assert_true("loras: []" in fixture_block, "fixture does not invent a Hub LoRA")
     assert_true("3231694" not in loras_part, "fixture LoRA is not Civitai 3231694")
     assert_true("civitai.com" not in loras_part.lower(), "fixture LoRA is not Civitai http")
-    assert_true("scale: 0.8" in fixture_block or "scale:0.8" in fixture_block, "fixture scale 0.8")
-    assert_true("air:" not in loras_part.lower() or HUB_LORA in loras_part,
-                "loras use Hub repo (not AIR-only)")
 
     assert_true('MS_LORA_PREF_SERVICE = "krea/Krea-2-Turbo"' in js
                 or 'MS_LORA_PREF_SERVICE="krea/Krea-2-Turbo"' in js,
@@ -3387,11 +3383,14 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true("cfgScale" in ms and 'body["guidance"]' in ms, "cfgScale → guidance")
     assert_true('body["size"]' in ms, "size=WxH")
 
-    want_one = {HUB_LORA: 0.8}
-    assert_true(_modelscope_loras({"loras": [{"path": HUB_LORA, "scale": 0.8}]}) == want_one,
-                "Hub repo + scale → official {repo: weight}")
     assert_true(_modelscope_loras({"loras": HUB_LORA}) == HUB_LORA,
                 "bare Hub repo → official single-LoRA string")
+    one_weight_raised = False
+    try:
+        _modelscope_loras({"loras": [{"path": HUB_LORA, "scale": 0.8}]})
+    except ValueError as exc:
+        one_weight_raised = "单条" in str(exc)
+    assert_true(one_weight_raised, "single LoRA + weight refused, not {repo:0.8}")
     http_raised = False
     try:
         _modelscope_loras({"loras": [{"path": HTTP, "scale": 0.8}]})
@@ -3442,7 +3441,7 @@ def test_v0821o6_modelscope_hub_lora():
         "width": 1280,
         "height": 720,
         "seed": 42,
-        "loras": [{"path": HUB_LORA, "scale": 0.8}],
+        "loras": [{"path": HUB_LORA}],
     }
     try:
         msmod.json_call = fake_call
@@ -3452,9 +3451,11 @@ def test_v0821o6_modelscope_hub_lora():
         code_cn, data_cn = ModelScopeProvider("cn").generate(payload)
         http_payload = dict(payload, loras=[{"path": HTTP, "scale": 0.8, "versionId": 3231694}])
         code_skip, data_skip = ModelScopeProvider("ai").generate(http_payload)
+        weighted = dict(payload, loras=[{"path": HUB_LORA, "scale": 0.8}])
+        code_w, data_w = ModelScopeProvider("ai").generate(weighted)
         res_payload = {
             "serviceId": HUB, "prompt": "x", "resolution": "1024x1024",
-            "loras": [{"path": HUB_LORA, "scale": 0.8}],
+            "loras": [{"path": HUB_LORA}],
         }
         ModelScopeProvider("ai").generate(res_payload)
         # AI token missing must 401 — never CN
@@ -3484,9 +3485,11 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true(body_ai.get("guidance") == 1.0, "cfgScale → guidance")
     assert_true(body_ai.get("size") == "1280x720", "size=WxH")
     assert_true(body_ai.get("seed") == 42, "in-range seed kept")
-    assert_true(body_ai.get("loras") == want_one, "outbound loras official {repo: weight}")
-    assert_true(isinstance(body_ai.get("loras"), dict), "weighted single LoRA is dict, not [{model,weight}]")
+    assert_true(body_ai.get("loras") == HUB_LORA, "outbound single LoRA is official string")
+    assert_true(isinstance(body_ai.get("loras"), str), "single LoRA is string, not [{model,weight}]")
     assert_true(HTTP not in str(body_ai.get("loras")), "outbound loras not http")
+    assert_true(code_w >= 400 and "单条" in str(data_w.get("error") or ""),
+                "single LoRA + weight is 400, not {repo:0.8}: %s %s" % (code_w, data_w))
     assert_true(code_skip >= 400, "Civitai http LoRA is 400, not skipped")
     assert_true("owner/repo" in str(data_skip.get("error") or ""),
                 "http LoRA error names owner/repo requirement: %s" % data_skip)
@@ -3533,19 +3536,30 @@ def test_v0821o6b_ms_lora_shape():
     fixture_block = js[fi:fj if fj > fi else fi + 1400]
     assert_true('backend: "modelscope-ai"' in fixture_block, "fixture forces modelscope-ai")
     assert_true("modelscope-cn" not in fixture_block, "fixture must not select CN")
-    assert_true(HUB_LORA in fixture_block, "fixture Hub DistillPatch")
-    assert_true("scale: 0.8" in fixture_block or "scale:0.8" in fixture_block, "fixture @0.8")
+    assert_true("loras: []" in fixture_block, "fixture does not invent DistillPatch or weight")
     assert_true("3231694" not in fixture_block.split("loras")[1][:700], "fixture LoRA not Civitai")
 
-    # Official wire: one LoRA is a string; weighted / multi is {repo: weight}.
-    one = _modelscope_loras({"loras": [{"path": HUB_LORA, "scale": 0.8}]})
-    assert_true(one == WANT, "path+scale → {repo: 0.8}")
-    already = _modelscope_loras({"loras": [{"model": HUB_LORA, "weight": 0.8}]})
-    assert_true(already == WANT, "already {model,weight} → {repo: 0.8}")
+    # Official wire: one LoRA is a string; multi is {repo: weight} summing to 1.0.
     as_str = _modelscope_loras({"loras": HUB_LORA})
     assert_true(as_str == HUB_LORA, "string inbound stays official single-LoRA string")
-    as_dict = _modelscope_loras({"loras": {HUB_LORA: 0.8}})
-    assert_true(as_dict == WANT, "{repo:w} inbound stays official dict")
+    one_weight_raised = False
+    try:
+        _modelscope_loras({"loras": [{"path": HUB_LORA, "scale": 0.8}]})
+    except ValueError as exc:
+        one_weight_raised = "单条" in str(exc)
+    assert_true(one_weight_raised, "path+scale refused, not {repo:0.8}")
+    already_raised = False
+    try:
+        _modelscope_loras({"loras": [{"model": HUB_LORA, "weight": 0.8}]})
+    except ValueError as exc:
+        already_raised = "单条" in str(exc)
+    assert_true(already_raised, "{model,weight} refused for one LoRA")
+    dict_raised = False
+    try:
+        _modelscope_loras({"loras": {HUB_LORA: 0.8}})
+    except ValueError as exc:
+        dict_raised = "单条" in str(exc)
+    assert_true(dict_raised, "one-key {repo:w} refused, not sent")
     assert_true(_modelscope_loras({"loras": []}) is None, "empty loras omitted")
     assert_true(_modelscope_loras({}) is None, "missing loras omitted")
     http_raised = False
@@ -3588,7 +3602,7 @@ def test_v0821o6b_ms_lora_shape():
     payload = {
         "serviceId": HUB,
         "prompt": "portrait, soft light, detailed face, cinematic",
-        "loras": [{"path": HUB_LORA, "scale": 0.8}],
+        "loras": [{"path": HUB_LORA}],
     }
     try:
         msmod.json_call = fake_call
@@ -3596,8 +3610,10 @@ def test_v0821o6b_ms_lora_shape():
         msmod._read_token = fake_read
         code_ai, data_ai = ModelScopeProvider("ai").generate(payload)
         ModelScopeProvider("ai").generate(dict(payload, loras=HUB_LORA))
-        ModelScopeProvider("ai").generate(dict(payload, loras={HUB_LORA: 0.8}))
-        ModelScopeProvider("ai").generate(dict(payload, loras=[{"model": HUB_LORA, "weight": 0.8}]))
+        code_w, data_w = ModelScopeProvider("ai").generate(dict(payload, loras={HUB_LORA: 0.8}))
+        code_obj, data_obj = ModelScopeProvider("ai").generate(
+            dict(payload, loras=[{"model": HUB_LORA, "weight": 0.8}])
+        )
         ModelScopeProvider("ai").generate({"serviceId": HUB, "prompt": "no lora"})
     finally:
         msmod.json_call = orig_call
@@ -3605,24 +3621,23 @@ def test_v0821o6b_ms_lora_shape():
         msmod._read_token = orig_read
 
     assert_true(code_ai < 400 and data_ai.get("backend") == "modelscope-ai", "AI generate ok")
+    assert_true(code_w >= 400 and "单条" in str(data_w.get("error") or ""),
+                "one-key {repo:w} is 400: %s %s" % (code_w, data_w))
+    assert_true(code_obj >= 400 and "单条" in str(data_obj.get("error") or ""),
+                "{model,weight} is 400: %s %s" % (code_obj, data_obj))
     ai_posts = [c for c in captured if c["method"] == "POST" and AI_BASE in c["url"]]
-    assert_true(len(ai_posts) >= 5, "AI posts: path / string / dict / objects / none")
+    assert_true(len(ai_posts) >= 3, "AI posts: path / string / none (weighted singles do not POST)")
     for c in ai_posts:
         assert_true(CN_BASE not in c["url"], "never CN base")
         body = c["body"] or {}
         if "loras" not in body:
             continue
         loras = body["loras"]
-        if isinstance(loras, str):
-            assert_true(loras == HUB_LORA, "string wire is Hub DistillPatch: %s" % (loras,))
-        elif isinstance(loras, dict):
-            assert_true(list(loras.keys()) == [HUB_LORA], "dict wire key is Hub DistillPatch: %s" % (loras,))
-        else:
-            assert_true(False, "wire loras must be string or {repo:weight}, got %s" % (loras,))
+        assert_true(loras == HUB_LORA, "string wire is Hub DistillPatch: %s" % (loras,))
         assert_true(HTTP not in str(loras), "no Civitai http on wire")
     none_posts = [c for c in ai_posts if "loras" not in (c.get("body") or {})]
     assert_true(none_posts, "no-LoRA omits loras key")
-    assert_true(ai_posts[0]["body"].get("loras") == WANT, "path+scale → DistillPatch @0.8 dict")
+    assert_true(ai_posts[0]["body"].get("loras") == HUB_LORA, "path without weight → string")
     assert_true(_clamp_seed(1) == 1, "seed helper still imported")
 
 
