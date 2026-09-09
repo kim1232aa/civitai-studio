@@ -1,6 +1,9 @@
 // Run in an isolated storyboard tab after loading storyboard-ui.css:
 // agent-browser --cdp 9333 eval "$(cat scripts/test_storyboard_ui.js)"
 // Run at desktop/tablet/phone sizes, expanded and collapsed; never generates.
+// Source-level catalog/fixture anchors live in test_storyboard_graph.py:
+// loadCatalog is `function loadCatalog` (not `async function loadCatalog`);
+// Magao fixture copy is `魔搭模型（不预置 LoRA）` (not `魔搭 LoRA夹具`).
 (() => {
   const $ = (s) => document.querySelector(s);
   const passed = [];

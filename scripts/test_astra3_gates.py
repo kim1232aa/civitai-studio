@@ -41,10 +41,11 @@ def source_contracts():
     ok("不能只带走其余条" in JS, "mixed LoRA copy")
     ok("当前模型不支持 LoRA" in JS, "unsupported model copy")
     ok("packed.length !== list.length" in JS, "chipsLack compares packed vs list")
-    ok("modelId: l.modelId" in JS or "modelId: l.modelId || \"\"" in JS, "pack keeps modelId")
+    ok("modelId: modelId" in JS or "modelId: l.modelId" in JS, "pack keeps modelId")
+    ok("function loraModelId" in JS, "loraModelId parses air")
     ok('payload.pop("loras", None)' not in COMPILE, "compile does not silent-pop loras")
     ok("已选 LoRA 不能静默丢掉" in COMPILE, "compile refuses residual LoRA")
-    ok("storyboard.js?v=20260910-astra3" in HTML, "cache stamp")
+    ok("storyboard.js?v=20260910-lora-req" in HTML, "cache stamp")
     ok("revalidateLorasForService()" in JS, "syncParamChrome revalidates")
 
 
@@ -78,7 +79,16 @@ function looksAir(s) {
 function loraVersionId(l) {
   if (!l) return "";
   if (l.versionId) return String(l.versionId);
-  return "";
+  const air = String(l.air || "");
+  const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
+  return m ? m[1] : "";
+}
+function loraModelId(l) {
+  if (!l) return "";
+  if (l.modelId != null && String(l.modelId).trim()) return String(l.modelId).trim();
+  const air = String(l.air || "");
+  const m = air.match(/civitai:(\d+)@/i) || air.match(/civitai:(\d+)\s*$/i);
+  return m ? m[1] : "";
 }
 function $(id) { return null; }
 function persist() {}
@@ -102,11 +112,16 @@ function run(be, rows, item, supportsOverride) {
   };
 }
 const AIR = { air: "urn:air:krea2:lora:civitai:2323765@3071582", modelId: "2323765", versionId: "3071582", strength: 0.8, name: "A" };
+const AIR_PARSE = { air: "urn:air:krea2:lora:civitai:2323765@3071582", strength: 0.8, name: "parse" };
+const AIR_NO_STRENGTH = { air: "urn:air:krea2:lora:civitai:2323765@3071582", modelId: "2323765", versionId: "3071582", strength: null, name: "nullStr" };
 const AIR_ONLY = { air: "urn:air:sdxl:lora:civitai:1", strength: 0.8, name: "AIR" };
 const PATH = { path: "https://civitai.com/api/download/models/1", strength: 0.8, name: "B" };
 const HUB = { path: "owner/repo", strength: 0.8, name: "C" };
 const out = {
   civitaiOk: run("civitai", [AIR]),
+  civitaiFromAir: run("civitai", [AIR_PARSE]),
+  civitaiNoStrength: run("civitai", [AIR_NO_STRENGTH]),
+  civitaiMixedStrength: run("civitai", [AIR, AIR_NO_STRENGTH]),
   civitaiBad: run("civitai", [PATH]),
   civitaiMixed: run("civitai", [AIR, PATH]),
   falOk: run("fal", [PATH], { id: "fal-ai/krea-2/turbo/lora", supportsLora: true }),
@@ -123,6 +138,15 @@ console.log(JSON.stringify(out));
     ok("modelId" in data["civitaiOk"]["fields"], "packed row keeps modelId")
     ok("versionId" in data["civitaiOk"]["fields"], "packed row keeps versionId")
     ok("strength" in data["civitaiOk"]["fields"], "packed row keeps strength")
+    packed_parse = data["civitaiFromAir"]["packed"]
+    ok(packed_parse and packed_parse[0]["modelId"] == "2323765" and packed_parse[0]["versionId"] == "3071582",
+       "civitai parses modelId/versionId from air")
+    ok(data["civitaiNoStrength"]["lack"] is True and data["civitaiNoStrength"]["packed"] is None,
+       "civitai missing strength blocked, no default 1.0")
+    ok("strength" in data["civitaiNoStrength"]["msg"], "missing strength message")
+    ok(data["civitaiMixedStrength"]["lack"] is True and data["civitaiMixedStrength"]["packed"] is None,
+       "civitai mixed strength blocked whole pack")
+    ok("其余条" in data["civitaiMixedStrength"]["msg"], "mixed strength message")
     ok(data["civitaiBad"]["lack"] is True and data["civitaiBad"]["packed"] is None, "civitai path-only blocked")
     ok(data["civitaiMixed"]["lack"] is True and data["civitaiMixed"]["packed"] is None, "civitai mixed blocked")
     ok("其余条" in data["civitaiMixed"]["msg"], "mixed message")

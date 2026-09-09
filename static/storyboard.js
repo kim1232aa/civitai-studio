@@ -3362,6 +3362,13 @@
     const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
     return m ? m[1] : "";
   }
+  function loraModelId(l) {
+    if (!l) return "";
+    if (l.modelId != null && String(l.modelId).trim()) return String(l.modelId).trim();
+    const air = String(l.air || "");
+    const m = air.match(/civitai:(\d+)@/i) || air.match(/civitai:(\d+)\s*$/i);
+    return m ? m[1] : "";
+  }
   function loraHasDirectPath(l) {
     if (!l) return false;
     if (l.path && !looksAir(l.path)) return true;
@@ -4100,6 +4107,7 @@
     l = l || {};
     let path = l.path || l.downloadUrl || l.url || "";
     const versionId = l.versionId || loraVersionId(l) || "";
+    const modelId = l.modelId || loraModelId(l) || "";
     if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
       path = "https://civitai.com/api/download/models/" + versionId;
     }
@@ -4110,7 +4118,7 @@
     const strength = missing ? null : clampLoraScale(rawStrength, null);
     return {
       air: l.air || "",
-      modelId: l.modelId || "",
+      modelId: modelId,
       path: path,
       url: path,
       downloadUrl: l.downloadUrl || path,
@@ -4125,7 +4133,13 @@
   function loraRowCanOutbound(row, be) {
     be = be || currentBackend();
     row = row || {};
-    if (be === "civitai") return !!(row.air && String(row.air).trim());
+    if (be === "civitai") {
+      const airOk = !!(row.air && String(row.air).trim());
+      const modelOk = !!(row.modelId && String(row.modelId).trim());
+      const verOk = !!(row.versionId && String(row.versionId).trim());
+      const strOk = !row.strengthMissing && row.strength != null && row.strength !== "";
+      return airOk && modelOk && verOk && strOk;
+    }
     if (be === "fal" || be === "huggingface") {
       const p = String(row.path || "").trim();
       return !!(p && isHttpUrl(p) && !looksAir(p));
@@ -4165,7 +4179,12 @@
     const mapped = list.map(packLoraRow);
     const bad = mapped.filter(function (row) { return !loraRowCanOutbound(row, be); });
     if (bad.length && bad.length < mapped.length) {
-      return "有 " + bad.length + " 条 LoRA 无法按当前后端出站，不能只带走其余条";
+      return "有 " + bad.length + " 条 LoRA 缺 air/modelId/versionId/strength 或无法出站，不能只带走其余条";
+    }
+    if (be === "civitai" && bad.length) {
+      const missStr = bad.some(function (row) { return row.strengthMissing || row.strength == null || row.strength === ""; });
+      if (missStr) return "LoRA 缺 strength，无法出站（不发明 1.0）";
+      return "LoRA 缺 air/modelId/versionId，无法出站";
     }
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
