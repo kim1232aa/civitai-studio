@@ -48,6 +48,23 @@ def main():
         caps=gc("nano-gpt"),
     )
     assert only_refs == ["https://ex/1.png", "https://ex/2.png"], only_refs
+    from providers.ref_images import collect_ref_images, materialize_local_ref
+    local_payload = {
+        "sourceImage": "/out/upload_20260909150943_1.jpg",
+        "images": ["/out/upload_20260909150943_1.jpg", "/out/upload_20260909150949_1.jpg"],
+    }
+    local_refs = collect_ref_images(local_payload)
+    assert local_refs == [
+        "/out/upload_20260909150943_1.jpg",
+        "/out/upload_20260909150949_1.jpg",
+    ], local_refs
+    data = materialize_local_ref("/out/upload_20260909150943_1.jpg")
+    assert data.startswith("data:image/"), data[:40]
+    try:
+        materialize_local_ref("/out/does-not-exist-xyz.jpg")
+        raise AssertionError("missing /out must raise")
+    except ValueError as e:
+        assert "无法读取" in str(e), e
     from providers.ref_images import normalize_payload_refs
     raw = {"image_urls": ["https://ex/a.png", "https://ex/b.png"]}
     normalize_payload_refs(raw)

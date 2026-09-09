@@ -26,7 +26,7 @@ _HF_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BASE = "https://nano-gpt.com"
 API = BASE + "/api/v1"
 IMG_MODELS = API + "/images/models"
-VID_MODELS = API + "/video-models"
+VID_MODELS = API + "/video-models?detailed=true"
 GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
 GEN_VIDEO = BASE + "/api/generate-video"
@@ -70,15 +70,6 @@ _ASPECTS = (
     (21, 9, "21:9"),
     (235, 100, "2.35:1"),
 )
-_FAL_SIZE = {
-    "1:1": "square_hd",
-    "4:3": "landscape_4_3",
-    "3:4": "portrait_4_3",
-    "16:9": "landscape_16_9",
-    "9:16": "portrait_16_9",
-}
-
-
 def nano_key() -> str:
     try:
         t = TOKEN_PATH.read_text().strip()
@@ -171,13 +162,31 @@ def closest_aspect(w, h) -> str:
     return best
 
 
+def _parameter_options(spec, name):
+    sp = (spec or {}).get("supported_parameters") or {}
+    param = (sp.get("parameters") or sp).get(name) or {}
+    if isinstance(param, list):
+        return param
+    if not isinstance(param, dict):
+        return []
+    values = param.get("options") or param.get("values") or []
+    return [x.get("value") if isinstance(x, dict) else x for x in values]
+
+
+def _resolutions(spec):
+    sp = (spec or {}).get("supported_parameters") or {}
+    return [str(x) for x in (sp.get("resolutions") or _parameter_options(spec, "resolution"))
+            if x not in (None, "")]
+
+
 def pick_resolution(spec, w=None, h=None, preferred=None):
     """Pick a catalog resolution token the model actually lists.
 
     Empty catalog resolutions → None (caller must 400). Never invent `{w}x{h}`.
+    preferred miss → None. No preferred and no exact catalog WxH → None.
+    No size-tier, aspect, Fal-name, nearest-pixel, auto, or first-token fallback.
     """
-    sp = (spec or {}).get("supported_parameters") or {}
-    res = [str(x) for x in (sp.get("resolutions") or []) if x not in (None, "")]
+    res = _resolutions(spec)
     if not res:
         return None
 
@@ -202,49 +211,7 @@ def pick_resolution(spec, w=None, h=None, preferred=None):
         hit = low.get(f"{wi}x{hi}")
         if hit:
             return hit
-    if "1k" in low or "2k" in low:
-        mx = max(wi, hi)
-        if mx >= 1536 and "2k" in low:
-            return low["2k"]
-        if "1k" in low:
-            return low["1k"]
-    ar = closest_aspect(wi or 1024, hi or 1024)
-    if ar.lower() in low:
-        return low[ar.lower()]
-    token = _FAL_SIZE.get(ar)
-    if token and token.lower() in low:
-        return low[token.lower()]
-    parsed = []
-    for r in res:
-        n = norm(r)
-        if "x" not in n:
-            continue
-        a, _, b = n.partition("x")
-        try:
-            pw, ph = int(a), int(b)
-        except ValueError:
-            continue
-        if pw > 0 and ph > 0:
-            parsed.append((pw, ph, r))
-    if parsed and wi and hi:
-        def score(t):
-            pw, ph, _ = t
-            aspect_d = abs((pw / ph) - (wi / hi))
-            area_d = abs(pw * ph - wi * hi) / max(wi * hi, 1)
-            return (aspect_d, area_d)
-
-        parsed.sort(key=score)
-        return parsed[0][2]
-    if wi and hi and wi == hi:
-        for t in ("square_hd", "square", "1024x1024", "1:1"):
-            if t in low:
-                return low[t]
-    if "auto" in low:
-        return low["auto"]
-    if parsed:
-        parsed.sort(key=lambda t: -(t[0] * t[1]))
-        return parsed[0][2]
-    return res[0]
+    return None
 
 
 
@@ -633,9 +600,31 @@ def _loras(payload: dict) -> list:
     return out
 
 
+_EDIT_ID_RE = re.compile(r"(?:^|[/_\-])edit(?:/|$)", re.I)
+_EDIT_NAME_RE = re.compile(r"(?:^|[\s\-])edit(?:\s|$)", re.I)
+
+
+def _looks_like_required_edit(mid: str, name: str = "") -> bool:
+    """Catalog ids like openai/.../flare/edit or names ending in Edit require ≥1 input image."""
+    if _EDIT_ID_RE.search((mid or "").strip()):
+        return True
+    if _EDIT_NAME_RE.search((name or "").strip()):
+        return True
+    return False
+
+
+def _min_input_images(spec: dict | None) -> int:
+    spec = spec or {}
+    if spec.get("needsSource"):
+        return 1
+    if _looks_like_required_edit(spec.get("id") or "", spec.get("name") or ""):
+        return 1
+    return 0
+
+
 def _source_images(payload: dict) -> list:
     """Collect + clamp refs for Nano input_references (provider maxRefs default 5)."""
-    from .ref_images import payload_ref_images
+    from .ref_images import payload_ref_images, materialize_local_refs
     from .capabilities import get_provider_capabilities
     caps = get_provider_capabilities("nano-gpt")
     # Prefer catalog-declared max on the model row when present
@@ -645,7 +634,8 @@ def _source_images(payload: dict) -> list:
         item = find_spec(mid) if mid else None
     except Exception:
         item = None
-    return payload_ref_images(payload, backend="nano-gpt", caps=caps, item=item or {})
+    raw = payload_ref_images(payload, backend="nano-gpt", caps=caps, item=item or {})
+    return materialize_local_refs(raw)
 
 
 def _row_image(it: dict) -> dict:
@@ -681,6 +671,10 @@ def _row_image(it: dict) -> dict:
     }
     if i2i and not t2i:
         row["needsSource"] = True
+    elif i2i and _looks_like_required_edit(mid, name):
+        # Flare/Sunburst Edit etc. also advertise image_generation, so the
+        # i2i-and-not-t2i branch never fired — Nano then 400'd "requires 1..N".
+        row["needsSource"] = True
     if lora:
         row["supportsLora"] = True
         if "lora" not in row["tags"]:
@@ -694,23 +688,27 @@ def _row_video(it: dict) -> dict:
     caps = it.get("capabilities") or {}
     tags = [str(t).lower() for t in (it.get("tags") or []) if t]
     blob = (mid + " " + name).lower()
-    i2v = bool(caps.get("image_to_video"))
-    t2v = bool(caps.get("text_to_video") or caps.get("video_generation", True))
+    i2v = caps.get("image_to_video") is True
+    t2v = caps.get("text_to_video") is True
     row = {
         "id": mid,
         "name": name,
         "category": "video",
         "backend": "nano-gpt",
         "status": "available",
-        "task": "image-to-video" if (i2v and not t2v) else "text-to-video",
+        "task": "text-to-video" if t2v else ("image-to-video" if i2v else "video"),
         "tags": tags,
         "pricing": it.get("pricing") or {},
-        "supported_parameters": it.get("supported_parameters") or {},
+        "supported_parameters": dict(it.get("supported_parameters") or {}),
         "capabilities": caps,
         "description": it.get("description") or "",
     }
     if i2v and not t2v:
         row["needsFirstFrame"] = True
+    # Detailed video discovery nests selectors under parameters, unlike images.
+    # Keep the official schema and expose its exact tokens to the existing UI.
+    if _resolutions(it):
+        row["supported_parameters"]["resolutions"] = _resolutions(it)
     if "upscale" in blob:
         row["category"] = "upscale"
     return row
@@ -766,14 +764,38 @@ def model_id(service_id: str) -> str:
     return s
 
 
+def _image_count(payload, spec):
+    # Nano's documented alias precedence; quantity is Studio's input name.
+    raw = payload.get("nImages", payload.get("n", payload.get("quantity", 1)))
+    try:
+        if isinstance(raw, bool) or not re.fullmatch(r"[0-9]+", str(raw)):
+            raise ValueError()
+        n = int(raw)
+        if n < 1:
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("NanoGPT 图片数量必须是正整数，拒绝静默改值") from None
+    if "quantity" in payload and (isinstance(payload["quantity"], bool) or
+                                  not re.fullmatch(r"[0-9]+", str(payload["quantity"])) or
+                                  int(payload["quantity"]) != n):
+        raise ValueError("quantity 与 n/nImages 冲突，拒绝覆盖")
+    sp = (spec or {}).get("supported_parameters") or {}
+    count_spec = sp.get("n") or {}
+    low = count_spec.get("min", 1) if isinstance(count_spec, dict) else 1
+    high = count_spec.get("max") if isinstance(count_spec, dict) else None
+    if high is None:
+        high = sp.get("max_output_images")
+    if high is None and n > 1:
+        raise ValueError("NanoGPT 当前模型目录未声明多图数量上限，拒绝猜测")
+    if n < low or (high is not None and n > high):
+        raise ValueError(f"NanoGPT 当前模型图片数量范围为 {low}–{high}，拒绝截断")
+    return n
+
+
 def _image_body(payload: dict, spec: dict) -> dict:
     w = payload.get("width")
     h = payload.get("height")
-    try:
-        n = int(payload.get("quantity") or payload.get("n") or 1)
-    except (TypeError, ValueError):
-        n = 1
-    n = max(1, min(4, n))
+    n = _image_count(payload, spec)
     body = {
         "model": model_id(payload.get("serviceId") or spec.get("id") or ""),
         "prompt": payload.get("prompt") or "",
@@ -798,6 +820,13 @@ def _image_body(payload: dict, spec: dict) -> dict:
     if seed is not None:
         body["seed"] = seed
     imgs = _source_images(payload)
+    min_in = _min_input_images(spec)
+    if min_in and len(imgs) < min_in:
+        max_in = ((spec or {}).get("supported_parameters") or {}).get("max_input_images")
+        rng = f"{min_in}–{max_in}" if max_in else str(min_in)
+        raise ValueError(
+            f"当前模型需要 {rng} 张参考图，请求里是 {len(imgs)} 张。请先把图片连到分镜，不能静默发 0 张"
+        )
     if imgs:
         # NanoGPT rejects mixing input_references with image / imageDataUrl / image_url.
         body["input_references"] = imgs
@@ -866,38 +895,99 @@ def _save_result(data, jid, meta) -> list:
 
 
 def _video_body(payload: dict, spec: dict) -> dict:
+    from .ref_images import collect_ref_images, materialize_local_refs
+
+    for field in ("prompt", "negativePrompt", "resolution", "lastFrame", "last_image"):
+        if payload.get(field) is not None and not isinstance(payload[field], str):
+            raise ValueError(f"{field} 必须是文本")
+    sp = spec.get("supported_parameters") or {}
+    params = sp.get("parameters") or sp
+    caps = spec.get("capabilities") or {}
+    # Do not let invalid/local media disappear in the shared URL collector and
+    # accidentally turn an intended I2V request into a billable T2V request.
+    for field in ("firstFrame", "sourceImage", "startImage", "image_url", "imageUrl",
+                  "imageDataUrl", "image", "images", "referenceImages", "input_references", "image_urls"):
+        value = payload.get(field)
+        if value in (None, "", []):
+            continue
+        if isinstance(value, list) and field not in ("images", "referenceImages", "input_references", "image_urls"):
+            raise ValueError(f"{field} 必须是单张图片")
+        for image in value if isinstance(value, list) else [value]:
+            if not isinstance(image, str) or not image.startswith(("http://", "https://", "data:image/", "/out/")):
+                raise ValueError(f"{field} 必须是 HTTP(S) 图片 URL、图片 data URL 或已上传的 /out 文件")
+    imgs = materialize_local_refs(collect_ref_images(payload))
+    modes = {"t2v": "text-to-video", "i2v": "image-to-video"}
+    requested = []
+    for key in ("mode", "op", "operation"):
+        value = payload.get(key)
+        if value in (None, "", "auto", "video", "image"):
+            continue
+        if not isinstance(value, str):
+            raise ValueError(f"{key} 必须是文本")
+        mode = modes.get(value, value)
+        if mode not in ("text-to-video", "image-to-video"):
+            raise ValueError(f"NanoGPT 当前视频适配器未接入 {key}={value}")
+        requested.append(mode)
+    if len(set(requested)) > 1:
+        raise ValueError("视频 mode/op/operation 冲突，拒绝换模式")
+    mode = requested[0] if requested else ("image-to-video" if imgs else "text-to-video")
+    _image_count(payload, {"supported_parameters": {"max_output_images": 1}})
+    last = payload.get("lastFrame") or payload.get("last_image")
+    if payload.get("lastFrame") and payload.get("last_image") and payload["lastFrame"] != payload["last_image"]:
+        raise ValueError("lastFrame 与 last_image 冲突")
+    for field in ("last_frame_url", "end_image_url", "tail_image_url", "endImage",
+                  "videoUrl", "videoDataUrl", "video", "audioUrl", "audioDataUrl", "audio", "script"):
+        if payload.get(field) not in (None, "", []):
+            raise ValueError(f"NanoGPT 当前 T2V/I2V 适配器未接入 {field}，拒绝丢参")
+    if mode == "text-to-video" and (imgs or last):
+        raise ValueError("纯文生视频不能带首帧、尾帧或参考图；不会自动改成图生视频")
+    if mode == "text-to-video" and not (payload.get("prompt") or "").strip():
+        raise ValueError("纯文生视频需要非空 prompt")
+    capability = mode.replace("-", "_")
+    if caps.get(capability) is not True:
+        raise ValueError(f"NanoGPT 当前模型官方目录未声明支持 {mode}")
+    if mode == "image-to-video" and len(imgs) != 1:
+        raise ValueError("NanoGPT 图生视频需要恰好一张首帧，不能丢弃多余参考图")
+    if last:
+        # Public GET /video-models?detailed=true declares this exact key only
+        # for some models. Never infer last_frame_url/lastFrame from the name.
+        if not isinstance(params.get("last_image"), dict):
+            raise ValueError("NanoGPT 当前模型官方目录未声明尾帧字段 last_image")
+        if not isinstance(last, str) or not last.startswith(("https://", "http://")):
+            raise ValueError("NanoGPT last_image 需要公开 HTTP(S) 图片 URL")
     mid = model_id(payload.get("serviceId") or spec.get("id") or "")
-    body = {"model": mid, "prompt": payload.get("prompt") or ""}
+    body = {"model": mid, "prompt": payload.get("prompt") or "", "mode": mode}
     neg = (payload.get("negativePrompt") or "").strip()
     if neg:
         body["negative_prompt"] = neg
     dur = payload.get("duration")
     if dur not in (None, ""):
-        body["duration"] = str(int(dur) if str(dur).isdigit() else dur)
+        options = _parameter_options(spec, "duration")
+        if not options or str(dur) not in [str(x) for x in options]:
+            raise ValueError("duration 必须是当前视频模型目录中的原始选项")
+        body["duration"] = str(dur)
     w, h = payload.get("width"), payload.get("height")
-    ar = closest_aspect(w or 1280, h or 720)
-    body["aspect_ratio"] = ar
+    ar = payload.get("aspect_ratio") or payload.get("aspectRatio")
+    if payload.get("aspect_ratio") and payload.get("aspectRatio") and payload["aspect_ratio"] != payload["aspectRatio"]:
+        raise ValueError("aspectRatio 与 aspect_ratio 冲突")
+    if ar:
+        if ar not in _parameter_options(spec, "aspect_ratio"):
+            raise ValueError("aspect_ratio 必须是当前视频模型目录中的原始选项")
+        body["aspect_ratio"] = ar
     res = pick_resolution(spec, w, h, preferred=(payload or {}).get("resolution"))
     if res:
         body["resolution"] = res
-        body["size"] = res
+    elif payload.get("resolution") or w not in (None, "") or h not in (None, ""):
+        raise ValueError("无法从当前视频模型目录选中 resolution token，拒绝近似尺寸")
+    elif _resolutions(spec):
+        raise ValueError("请在构图里选一个目录视频 resolution token")
     seed = _clamp_seed(payload.get("seed"))
     if seed is not None:
         body["seed"] = seed
-    imgs = _source_images(payload)
-    ff = (payload or {}).get("firstFrame") or (imgs[0] if imgs else "")
-    if ff:
-        if str(ff).startswith("data:"):
-            body["imageDataUrl"] = ff
-        else:
-            body["imageUrl"] = ff
-            body["image_url"] = ff
-        body["mode"] = "image-to-video"
-    else:
-        body["mode"] = "text-to-video"
-    last = (payload or {}).get("lastFrame")
+    if imgs:
+        body["imageDataUrl" if imgs[0].startswith("data:") else "imageUrl"] = imgs[0]
     if last:
-        body["lastFrame"] = last
+        body["last_image"] = last
     loras = _loras(payload)
     if loras:
         body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
@@ -960,9 +1050,9 @@ class NanoGptProvider(Provider):
             except (TypeError, ValueError, KeyError):
                 price = None
         try:
-            n = max(1, int(payload.get("quantity") or 1))
-        except (TypeError, ValueError):
-            n = 1
+            n = _image_count(payload, spec)
+        except ValueError as exc:
+            return 400, {"error": str(exc), "serviceId": mid}
         note = "NanoGPT 按次美元计费，无黄 Buzz"
         if price is not None:
             note = f"约 ${price * n:.4f} USD · {note}"
@@ -992,8 +1082,11 @@ class NanoGptProvider(Provider):
         too = prompt_length_error((payload or {}).get("prompt"))
         if too:
             return 400, too
-        sp = (spec or {}).get("supported_parameters") or {}
-        if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
+        try:
+            _image_count(payload, spec)
+        except ValueError as exc:
+            return 400, {"error": str(exc), "serviceId": mid}
+        if not _resolutions(spec):
             return 400, {
                 "error": "当前 NanoGPT 模型目录没有 resolutions，请换一个带分辨率列表的目录模型（勿自拼 WxH）",
                 "serviceId": mid,
@@ -1016,7 +1109,10 @@ class NanoGptProvider(Provider):
                 return 400, err
             pl["loras"] = resolved
             lora_meta = list(resolved or [])
-        full = _image_body(pl, spec)
+        try:
+            full = _image_body(pl, spec)
+        except ValueError as exc:
+            return 400, {"error": str(exc), "serviceId": mid}
         if not full.get("resolution") and not full.get("size"):
             return 400, {
                 "error": "无法从目录选中 resolution token，请在构图里选一个目录分辨率",
@@ -1080,11 +1176,15 @@ class NanoGptProvider(Provider):
         if too:
             return 400, too
         sp = (spec or {}).get("supported_parameters") or {}
-        if not [x for x in (sp.get("resolutions") or []) if x not in (None, "")]:
+        if not sp:
             return 400, {
-                "error": "当前 NanoGPT 视频模型目录没有 resolutions，不能猜测或近似替换分辨率",
+                "error": "当前 NanoGPT 视频模型目录没有 supported_parameters/resolutions，不能猜测参数",
                 "serviceId": mid,
             }
+        try:
+            body = _video_body(payload, spec)
+        except ValueError as exc:
+            return 400, {"error": str(exc), "serviceId": mid}
         # v0770: video path also runs resolve_nano_loras (same fail-closed rules).
         pl = dict(payload or {})
         raw_loras = pl.get("loras") or []
@@ -1103,12 +1203,8 @@ class NanoGptProvider(Provider):
                 return 400, err
             pl["loras"] = resolved
             lora_meta = list(resolved or [])
-        body = _video_body(pl, spec)
-        if not body.get("resolution") and not body.get("size"):
-            return 400, {
-                "error": "无法从目录选中视频 resolution token，请在构图里选一个目录分辨率",
-                "serviceId": mid,
-            }
+        if raw_loras:
+            body = _video_body(pl, spec)
         persist_body = sanitize_submitted_for_persist(body, lora_meta)
         seed_extra = _seed_clamp_meta((payload or {}).get("seed"))
         code, data = json_call(GEN_VIDEO, method="POST", headers=_auth(), body=body, timeout=90)
