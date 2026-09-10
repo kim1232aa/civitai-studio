@@ -154,15 +154,19 @@ def find_service(service_id: str):
 def match_service(engine=None, operation=None, ecosystem=None, model=None, category=None):
     items, _, _ = catalog_items()
     scored = []
+    want_eco = _catalog_ecosystem(ecosystem) if ecosystem else None
     for it in items:
         if category and it.get("category") != category:
+            continue
+        # When ecosystem is requested, wrong-eco must not win via available(+2).
+        if want_eco and not _ecosystems_compatible(it.get("ecosystem"), want_eco):
             continue
         s = 0
         if engine and it.get("engine") == engine:
             s += 4
         if operation and it.get("operation") == operation:
             s += 3
-        if ecosystem and it.get("ecosystem") == ecosystem:
+        if want_eco and _ecosystems_compatible(it.get("ecosystem"), want_eco):
             s += 2
         if model and it.get("model") == model:
             s += 1
@@ -810,12 +814,16 @@ def build_workflow(payload: dict) -> dict:
         if dest:
             _assign_by_constraint(inp, value, dest, cap, (key,))
             continue
-        # sdcpp OpenAPI: checkpoint AIR is `model` (not Comfy `diffusionModel`)
+        # Outbound checkpoint AIR: prefer official diffuserModel; else model (SDXL precedent).
+        # Never silently drop diffusionModel; wrong service stays honest 400.
         if key == "diffusionModel":
             schema = _schema_fields(cap)
+            if "diffuserModel" in schema:
+                _assign_by_constraint(inp, value, "diffuserModel", cap, (key,))
+                continue
             if "diffusionModel" not in schema and "model" in schema:
                 cur = inp.get("model")
-                if cur in (None, ""):
+                if cur in (None, "") or _is_recipe_short_model(cur):
                     _assign_by_constraint(inp, value, "model", cap, (key,))
                     continue
         if key in _KNOWN_UI_FIELDS:
@@ -867,6 +875,28 @@ def _ecosystem_from_blob(*parts) -> str:
     if "sdxl" in blob or "pony" in blob or "illustrious" in blob:
         return "sdxl"
     return ""
+
+
+def _catalog_ecosystem(eco) -> str:
+    """Map blob/AIR eco labels onto catalog ecosystem ids (flux → flux1)."""
+    e = str(eco or "").strip()
+    if e == "flux":
+        return "flux1"
+    return e
+
+
+def _ecosystems_compatible(a, b) -> bool:
+    if not a or not b:
+        return False
+    return _catalog_ecosystem(a) == _catalog_ecosystem(b)
+
+
+def _is_recipe_short_model(cur) -> bool:
+    """True for recipe distillation slots (turbo/base) — not family ids or AIR URNs."""
+    s = str(cur or "").strip()
+    if not s or s.lower().startswith("urn:air:"):
+        return False
+    return s in {"turbo", "base"}
 
 
 def _air_from_ids(model_id, version_id, typ="", base="", name=""):
@@ -1557,7 +1587,8 @@ def import_image(image_id: str) -> dict:
             # Stable Diffusion XL / Pony / Illustrious — sdcpp createImage (not krea2 turbo)
             engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None
         elif eco == "flux":
-            engine, operation, ecosystem, model = "sdcpp", "createImage", "flux", None
+            # Catalog id is flux1 (blob/AIR often say "flux"); never leave eco=flux for match_service.
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "flux1", None
         elif eco == "wan":
             engine, operation, ecosystem, model = "sdcpp", "createImage", "wan", None
         elif eco == "zImage":
@@ -1566,7 +1597,7 @@ def import_image(image_id: str) -> dict:
             engine, operation, ecosystem, model = "sdcpp", "createImage", "qwen", None
         else:
             # Unknown eco from blob — still prefer detected label over silent krea2
-            ecosystem = eco
+            ecosystem = _catalog_ecosystem(eco) or eco
     svc = match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category=kind)
     denoise = meta.get("denoise") if meta.get("denoise") is not None else file_parsed.get("denoise")
     try:

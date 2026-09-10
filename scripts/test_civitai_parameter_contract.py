@@ -1007,5 +1007,96 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(kwargs.get("method") or args[1], "DELETE")
 
 
+    def test_o34_match_service_flux1_beats_available_zimage(self):
+        """ecosystem=flux1 must pin flux1/createImage; available zImage must not win."""
+        hit = civ.match_service(engine="sdcpp", operation="createImage", ecosystem="flux1")
+        self.assertIsNotNone(hit)
+        self.assertTrue(str(hit.get("id") or "").endswith("flux1/createImage"), hit)
+        self.assertNotIn("zImage", str(hit.get("id") or ""))
+        self.assertEqual(hit.get("ecosystem"), "flux1")
+
+        # catalog alias: blob/label "flux" must also resolve to flux1, not zImage
+        hit_flux = civ.match_service(engine="sdcpp", operation="createImage", ecosystem="flux")
+        self.assertIsNotNone(hit_flux)
+        self.assertTrue(str(hit_flux.get("id") or "").endswith("flux1/createImage"), hit_flux)
+        self.assertNotIn("zImage", str(hit_flux.get("id") or ""))
+
+    def test_o34_catalog_ecosystem_alias_flux_to_flux1(self):
+        self.assertEqual(civ._catalog_ecosystem("flux"), "flux1")
+        self.assertEqual(civ._catalog_ecosystem("flux1"), "flux1")
+        self.assertEqual(civ._catalog_ecosystem("zImage"), "zImage")
+        self.assertEqual(civ._ecosystem_from_blob("Flux1.D"), "flux")
+        self.assertEqual(civ._catalog_ecosystem(civ._ecosystem_from_blob("Flux1.D")), "flux1")
+
+    def test_o34_flux1_build_workflow_maps_diffusionModel_to_diffuserModel(self):
+        """28533250-shaped: flux1 service + Flux ckpt AIR + LoRA @0.7 → diffuserModel, loras only."""
+        ckpt = "urn:air:flux:diffusionmodel:civitai:999@888"
+        lora = "urn:air:flux1:lora:civitai:730162@823089"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "x" * 446,
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 42,
+            "diffusionModel": ckpt,
+            "loras": [{"air": lora, "strength": 0.7}],
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("ecosystem"), "flux1")
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertNotIn("diffusionModel", inp)
+        # do not leave checkpoint AIR stuffed into recipe `model`
+        self.assertNotEqual(inp.get("model"), ckpt)
+        self.assertEqual(inp.get("loras"), {lora: 0.7})
+        self.assertNotIn("additionalNetworks", inp)
+        self.assertEqual(len(payload["prompt"]), 446)
+
+    def test_o34_diffusionModel_to_diffuserModel_even_when_model_prefilled_turbo(self):
+        """Generic remap: zImage schema uses diffuserModel; prefilled model=turbo must not block AIR."""
+        ckpt = "urn:air:zImage:diffusionmodel:civitai:1@2"
+        payload = {
+            "serviceId": "image/sdcpp/zImage/turbo/createImage",
+            "prompt": "z remap",
+            "width": 1024,
+            "height": 1024,
+            "steps": 8,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertEqual(inp.get("model"), "turbo")
+        self.assertNotIn("diffusionModel", inp)
+        self.assertNotIn("additionalNetworks", inp)
+
+    def test_o34_wrong_service_without_diffuser_or_replaceable_model_stays_honest_400(self):
+        """If diffusionModel cannot map (no diffuserModel; model occupied by non-default), honest 400."""
+        # krea2 turbo already has diffusionModel in schema — pick a service that rejects unknown UI field
+        # Use fal krea2 which has neither diffuserModel nor empty model slot for AIR overwrite.
+        sid = "image/fal/krea2/createImage"
+        refs = [{"url": "https://example.invalid/style.jpg", "strength": 1.0}]
+        payload = {
+            "serviceId": sid,
+            "prompt": "no dm",
+            "quantity": 1,
+            "aspectRatio": "9:16",
+            "creativity": "raw",
+            "size": "large",
+            "imageStyleReferences": refs,
+            "diffusionModel": "urn:air:flux:diffusionmodel:civitai:1@2",
+        }
+        with self.assertRaises(ValueError) as raised:
+            civ.build_workflow(payload)
+        msg = str(raised.exception)
+        # Honest reject (unsupported field) — never silent drop of diffusionModel.
+        self.assertIn("diffusionModel", msg)
+        self.assertIn("不接受", msg)
+
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
