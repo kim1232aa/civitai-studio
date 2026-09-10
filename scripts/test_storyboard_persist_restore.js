@@ -11,13 +11,19 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o15-server-writeback"), "html stamp o15");
-assert.ok(html.includes("storyboard.js?v=20260910-r15srvwb"), "cache bust o15");
-assert.ok(source.includes('const STORE = "nl-storyboard-v0821o15"'), "STORE o15");
-assert.ok(source.includes('"nl-storyboard-v0821o14"'), "STORE_OLDS keeps o14");
+assert.ok(html.includes("v0821o16-persist-skip-empty"), "html stamp o16");
+assert.ok(html.includes("storyboard.js?v=20260910-r16perskip"), "cache bust o16");
+assert.ok(source.includes('const STORE = "nl-storyboard-v0821o16"'), "STORE o16");
+assert.ok(source.includes('"nl-storyboard-v0821o15"'), "STORE_OLDS keeps o15");
+assert.ok(source.includes("skip PUT"), "persistServer skips empty nodes");
+assert.ok(source.includes("服务端保存失败 HTTP"), "persistServer surfaces HTTP fail");
 assert.ok(source.includes("function persistServer"), "persistServer");
 assert.ok(source.includes("function hydrateFromServer"), "hydrateFromServer");
 assert.ok(source.includes("/api/storyboard-graph"), "storyboard-graph path");
+assert.ok(source.includes("function pickSavedUrl"), "pickSavedUrl");
+assert.ok(source.includes("pickSavedUrl(st)"), "poll waits for saved");
+assert.ok(source.includes("pickSavedUrl(j) || pickUrl(j)"), "final prefer saved");
+assert.ok(!source.includes("if (pickUrl(st)) break;"), "no CDN-only poll break");
 
 function section(from, to) {
   const start = source.indexOf(from);
@@ -84,17 +90,26 @@ function harness(opts) {
         const method = String((init && init.method) || "GET").toUpperCase();
         if (method === "PUT") {
           const body = JSON.parse(init.body);
-          serverStore.graph = body;
           puts.push(body);
-          return { ok: true, status: 200, json: async () => ({ graph: body }) };
+          if (opts && opts.putFail) {
+            return {
+              ok: false,
+              status: opts.putFailStatus || 400,
+              text: async () => String(opts.putFailText || "storyboard graph.nodes 必须是非空数组"),
+              json: async () => ({ error: "bad" }),
+            };
+          }
+          serverStore.graph = body;
+          return { ok: true, status: 200, text: async () => "", json: async () => ({ graph: body }) };
         }
         return {
           ok: true,
           status: 200,
+          text: async () => "",
           json: async () => ({ graph: serverStore.graph }),
         };
       }
-      return { ok: false, status: 404, json: async () => ({ error: "not found" }) };
+      return { ok: false, status: 404, text: async () => "", json: async () => ({ error: "not found" }) };
     },
   };
   vm.createContext(sandbox);
@@ -144,10 +159,10 @@ function test_persist_clear_session_restore_keeps_shot_url() {
   const api = harness();
   const shot = { id: "shot-1", kind: "shot", title: "分镜1", url: "", x: 0, y: 0 };
   api.state.nodes = [shot];
-  api.writebackResult(shot, "/out/proof-o15.png");
-  assert.equal(api.state.nodes[0].url, "/out/proof-o15.png", "writeback sets live.url");
+  api.writebackResult(shot, "/out/proof-o16.png");
+  assert.equal(api.state.nodes[0].url, "/out/proof-o16.png", "writeback sets live.url");
   const rawLocal = api.localStorage.getItem(api.STORE);
-  assert.ok(rawLocal && rawLocal.includes("/out/proof-o15.png"), "persisted into localStorage");
+  assert.ok(rawLocal && rawLocal.includes("/out/proof-o16.png"), "persisted into localStorage");
   assert.ok(api.sessionStorage.getItem(api.STORE), "also mirrored to sessionStorage");
 
   // Hard-refresh simulation: session gone; in-memory graph wiped; restore from localStorage.
@@ -157,7 +172,7 @@ function test_persist_clear_session_restore_keeps_shot_url() {
   const ok = api.restore();
   assert.equal(ok, true, "restore returns true");
   assert.equal(api.state.nodes.length, 1, "restored one node");
-  assert.equal(api.state.nodes[0].url, "/out/proof-o15.png", "shot.url survives clear-session restore");
+  assert.equal(api.state.nodes[0].url, "/out/proof-o16.png", "shot.url survives clear-session restore");
 }
 
 function test_merge_prefer_url_session_fills_blank_local() {
@@ -223,11 +238,93 @@ async function test_writeback_puts_server_and_clean_profile_hydrate() {
   assert.ok(api.localStorage.getItem(api.STORE), "hydrate mirrors into localStorage");
 }
 
+
+async function test_persistServer_skips_empty_nodes() {
+  const api = harness();
+  api.state.nodes = [];
+  const before = api.__puts.length;
+  api.persistServer();
+  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(api.__puts.length, before, "empty nodes must not PUT");
+}
+
+async function test_persistServer_puts_nonempty_nodes() {
+  const api = harness();
+  api.state.nodes = [{ id: "shot-1", kind: "shot", title: "分镜1", url: "/out/a.png", x: 0, y: 0 }];
+  api.persistServer();
+  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(api.__puts.length >= 1, "non-empty nodes PUT");
+  assert.equal(api.__puts[api.__puts.length - 1].nodes.length, 1);
+}
+
+async function test_persistServer_surfaces_http_fail() {
+  const api = harness({ putFail: true, putFailStatus: 400, putFailText: "storyboard graph.nodes 必须是非空数组" });
+  api.state.nodes = [{ id: "shot-1", kind: "shot", title: "分镜1", url: "/out/a.png" }];
+  api.persistServer();
+  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(
+    api.__msgs.some((m) => m.cls === "bad" && /服务端保存失败 HTTP 400/.test(m.t) && /必须是非空数组/.test(m.t)),
+    "HTTP fail surfaces Composer msg: " + JSON.stringify(api.__msgs)
+  );
+}
+
+async function test_writeback_reattaches_orphan_shot() {
+  const api = harness();
+  api.state.nodes = [];
+  const orphan = { id: "shot-orphan", kind: "shot", title: "孤儿", url: "", x: 1, y: 2 };
+  api.writebackResult(orphan, "/out/orphan-o16.png");
+  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(api.state.nodes.length, 1, "orphan shot pushed into state.nodes");
+  assert.equal(api.state.nodes[0].id, "shot-orphan");
+  assert.equal(api.state.nodes[0].url, "/out/orphan-o16.png");
+  assert.ok(api.__puts.length >= 1, "orphan writeback still PUTs after re-attach");
+  assert.equal(api.__puts[api.__puts.length - 1].nodes[0].url, "/out/orphan-o16.png");
+}
+
+
+function test_pickSavedUrl_ignores_steps_cdn() {
+  // Slice production helpers into VM (pickSavedUrl + pickUrl share first()).
+  const start = source.indexOf("  function pickSavedUrl(data) {");
+  const end = source.indexOf("  function hasUnresolvedStageOut", start);
+  assert.ok(start >= 0 && end > start, "pickSavedUrl/pickUrl seam");
+  const sandbox = { console };
+  const vm = require("node:vm");
+  vm.createContext(sandbox);
+  vm.runInContext(source.slice(start, end) + "\nglobalThis.pickSavedUrl = pickSavedUrl;\nglobalThis.pickUrl = pickUrl;", sandbox);
+  const cdnOnly = {
+    status: "succeeded",
+    steps: [{ output: { images: [{ url: "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg" }] } }],
+  };
+  const withSaved = {
+    status: "succeeded",
+    saved: [{ url: "/out/12100372-20260910083801255_0.jpg" }],
+    steps: [{ output: { images: [{ url: "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg" }] } }],
+  };
+  assert.equal(sandbox.pickSavedUrl(cdnOnly), "", "CDN steps must not count as saved");
+  assert.equal(sandbox.pickUrl(cdnOnly), "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg", "pickUrl still sees CDN");
+  assert.equal(sandbox.pickSavedUrl(withSaved), "/out/12100372-20260910083801255_0.jpg", "saved wins");
+  assert.equal(sandbox.pickUrl(withSaved), "/out/12100372-20260910083801255_0.jpg", "pickUrl prefers saved");
+  assert.equal(sandbox.pickSavedUrl(withSaved) || sandbox.pickUrl(withSaved), "/out/12100372-20260910083801255_0.jpg");
+  assert.equal(sandbox.pickSavedUrl(cdnOnly) || sandbox.pickUrl(cdnOnly), "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg", "fallback CDN after no saved");
+}
+
+test_pickSavedUrl_ignores_steps_cdn();
 test_mergePreferUrl_unit();
 test_persist_clear_session_restore_keeps_shot_url();
 test_merge_prefer_url_session_fills_blank_local();
 test_quota_exceeded_surfaces_warn();
-test_writeback_puts_server_and_clean_profile_hydrate().then(() => {
+Promise.all([
+  test_writeback_puts_server_and_clean_profile_hydrate(),
+  test_persistServer_skips_empty_nodes(),
+  test_persistServer_puts_nonempty_nodes(),
+  test_persistServer_surfaces_http_fail(),
+  test_writeback_reattaches_orphan_shot(),
+]).then(() => {
   console.log("ok: storyboard persist/restore executable checks passed");
 }).catch((e) => {
   console.error(e);

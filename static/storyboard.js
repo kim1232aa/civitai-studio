@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o15";
-  const STORE_OLDS = ["nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o16";
+  const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o16: persistServer skip empty + surface PUT fail; orphan reattach; poll wait saved[] not CDN
   // v0821o15: writeback also PUT /api/storyboard-graph; boot hydrate so clean-profile hard refresh keeps card
   // v0821o14: persist→localStorage + QuotaExceeded warn; restore merge prefer-url (session media not clobbered)
   // v0821o13: writebackResult persists shot.url to localStorage (hard refresh keeps card); dual-read session migrate
@@ -1144,15 +1145,33 @@
       return true;
     } catch (_) { return false; }
   }
-  /** v0821o15: shared-studio writeback — any client hydrates shot.url from this file. */
+  /** v0821o16: shared-studio writeback — skip empty nodes; surface PUT failures on Composer. */
   function persistServer() {
     try {
       const payload = graphPayload();
+      let parsed = null;
+      try { parsed = JSON.parse(payload); } catch (_) { return; }
+      const nodes = parsed && parsed.nodes;
+      if (!Array.isArray(nodes) || !nodes.length) {
+        try { console.warn("persistServer: skip PUT — nodes empty/missing"); } catch (_) {}
+        return;
+      }
       fetch("/api/storyboard-graph", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: payload,
-      }).catch(function () {});
+      }).then(async function (r) {
+        if (r.ok) return;
+        let errText = "";
+        try { errText = await r.text(); } catch (_) {}
+        try {
+          setMsg("服务端保存失败 HTTP " + r.status + (errText ? ": " + errText : ""), "bad");
+        } catch (_) {}
+      }).catch(function (e) {
+        try {
+          setMsg("服务端保存失败: " + (e && e.message ? e.message : String(e || "network")), "bad");
+        } catch (_) {}
+      });
     } catch (_) {}
   }
   function shotsHaveMedia() {
@@ -4874,9 +4893,13 @@
   function writebackResult(shot, url) {
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
-    // v0821o15: persist local + PUT /api/storyboard-graph so clean-profile hard refresh keeps card.
+    // v0821o16: re-attach orphan shot into state.nodes before persist/PUT (avoid empty nodes 400).
     if (!shot || !url) return;
-    const live = nodeById(shot.id) || shot;
+    let live = nodeById(shot.id);
+    if (!live) {
+      if (shot.kind === "shot") state.nodes.push(shot);
+      live = shot;
+    }
     live.url = url;
     removeUnpromotedFromShot(live.id);
     pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
@@ -4884,6 +4907,24 @@
     try { renderCards(); drawWires(); } catch (_) {}
     persist();
     persistServer();
+  }
+
+  function pickSavedUrl(data) {
+    // v0821o16: ONLY materialized saved[]/files (and result.saved/files) — never steps CDN.
+    if (!data) return "";
+    const first = (arr) => {
+      if (!arr || !arr[0]) return "";
+      const x = arr[0];
+      if (typeof x === "string") return x;
+      return (x && (x.url || x.path || x.previewUrl)) || "";
+    };
+    const savedHit = first(data.saved) || first(data.files);
+    if (savedHit) return savedHit;
+    if (data.result && typeof data.result === "object") {
+      const rs = first(data.result.saved) || first(data.result.files);
+      if (rs) return rs;
+    }
+    return "";
   }
 
     function pickUrl(data) {
@@ -4897,12 +4938,9 @@
       return (x && (x.url || x.path || x.previewUrl)) || "";
     };
     // 1) materialized /out (or any saved/files) — survives refresh
-    const savedHit = first(data.saved) || first(data.files);
+    const savedHit = pickSavedUrl(data);
     if (savedHit) return savedHit;
-    if (data.result && typeof data.result === "object") {
-      const rs = first(data.result.saved) || first(data.result.files);
-      if (rs) return rs;
-    }
+    // pickSavedUrl already checked result.saved/files — keep CDN path below
     // 1b) civitai orchestration: steps[].output.images[].url (same class as i2v missing shape)
     if (Array.isArray(data.steps)) {
       for (let si = 0; si < data.steps.length; si++) {
@@ -5183,15 +5221,19 @@
       let j = await r.json();
       if (!r.ok || j.error) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
       const jobId = j.id || j.jobId || j.workflowId;
-      if (jobId && !pickUrl(j)) {
+      const bePoll = currentBackend() || (payload && payload.backend) || "";
+      // Materializing backends download CDN → /out saved[]; do not treat steps CDN as done.
+      const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
+        || bePoll === "modelscope-ai" || bePoll === "modelscope-cn";
+      // Enter poll unless we already have saved[] (materializing) or any url (others).
+      if (jobId && !(materializing ? pickSavedUrl(j) : pickUrl(j))) {
         // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
         // Hub image (魔搭 AI) routinely exceeds 100s — keep "? 180 : 40" then extend Hub ticks.
         const isVideoPoll = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v"));
         let pollMax = isVideoPoll ? 180 : 40;
         const pollMs = isVideoPoll ? 3000 : 2500;
-        const bePoll = currentBackend() || (payload && payload.backend) || "";
         // v0821o12: civitai comfy (krea2) same class as fal/hub — allow materialize+download ticks
-        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface" || bePoll === "fal" || bePoll === "civitai")) {
+        if (!isVideoPoll && materializing) {
           pollMax = 120;
         }
         for (let i = 0; i < pollMax; i++) {
@@ -5209,9 +5251,13 @@
             // Throw raw so fail() → formatErrInfo keeps English in excerpt.
             throw (st.error || (st.wait && st.wait.log) || st.message || "任务失败");
           }
-          // v0821i: never break on succeeded alone — wait for saved[]/video.url (pickUrl) or keep polling.
+          // v0821o16: materializing → break only on saved[]; else CDN/pickUrl ok for early break.
           j = st;
-          if (pickUrl(st)) break;
+          if (materializing) {
+            if (pickSavedUrl(st)) break;
+          } else if (pickSavedUrl(st) || pickUrl(st)) {
+            break;
+          }
           const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
           const tick = (i + 1) + "/" + pollMax;
           if (prefix) setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + tick);
@@ -5221,7 +5267,8 @@
       if (state.groupRunAbort) {
         return fail("已中止", "aborted", "warn");
       }
-      const url = pickUrl(j);
+      // Materialized /out preferred; CDN (pickUrl) only as fallback after poll ends.
+      const url = pickSavedUrl(j) || pickUrl(j);
       if (url && stage) {
         shot.stageUrls[String(stage.id)] = url;
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
