@@ -760,6 +760,27 @@ _FRAME_KEYS = {
 }
 
 
+_FLUX_BROKEN_DIFFUSIONMODEL_AIR_RE = re.compile(
+    r"^urn:air:flux:diffusionmodel:civitai:(\d+)@(\d+)$", re.I
+)
+
+
+def _normalize_sdcpp_flux1_diffuser_air(air: str) -> str:
+    """Outbound value for flux1 diffuserModel.
+
+    Prefer REST/model-versions air verbatim. Rewrite only the known-broken
+    `_air_from_ids` shape `flux:diffusionmodel` → `flux1:checkpoint` (same mid@version).
+    FORBIDDEN: unilaterally rewrite site `checkpoint` → `diffuser`.
+    Official `flux1:diffuser` resource AIRs pass through unchanged.
+    """
+    s = str(air or "").strip()
+    m = _FLUX_BROKEN_DIFFUSIONMODEL_AIR_RE.match(s)
+    if m:
+        return f"urn:air:flux1:checkpoint:civitai:{m.group(1)}@{m.group(2)}"
+    return s
+
+
+
 def build_workflow(payload: dict) -> dict:
     payload = payload or {}
     sid = (payload.get("serviceId") or "").strip()
@@ -819,7 +840,13 @@ def build_workflow(payload: dict) -> dict:
         if key == "diffusionModel":
             schema = _schema_fields(cap)
             if "diffuserModel" in schema:
-                _assign_by_constraint(inp, value, "diffuserModel", cap, (key,))
+                out_val = value
+                # o35: sdcpp flux1 only — fix broken flux:diffusionmodel mint; never checkpoint→diffuser
+                eco = _catalog_ecosystem(inp.get("ecosystem") or (svc.get("ecosystem") if svc else "") or "")
+                sid_l = str(sid or "").lower()
+                if eco == "flux1" or "/flux1/" in sid_l:
+                    out_val = _normalize_sdcpp_flux1_diffuser_air(value)
+                _assign_by_constraint(inp, out_val, "diffuserModel", cap, (key,))
                 continue
             if "diffusionModel" not in schema and "model" in schema:
                 cur = inp.get("model")
@@ -868,6 +895,9 @@ def _ecosystem_from_blob(*parts) -> str:
         return "zImage"
     if "qwen" in blob:
         return "qwen"
+    # o35: flux.1 / flux1 before bare flux (AIR eco = flux1; catalog still aliases flux→flux1)
+    if "flux.1" in blob or "flux1" in blob:
+        return "flux1"
     if "flux" in blob:
         return "flux"
     if "wan" in blob:
@@ -900,13 +930,23 @@ def _is_recipe_short_model(cur) -> bool:
 
 
 def _air_from_ids(model_id, version_id, typ="", base="", name=""):
+    """Mint AIR only when REST `air` is absent.
+
+    o35: never hand-roll `urn:air:flux:diffusionmodel:…`. Flux family → eco=flux1;
+    non-LoRA checkpoints use kind=`checkpoint` (REST truth). Prefer model-versions `air` verbatim upstream.
+    """
     try:
         mid = int(model_id)
         vid = int(version_id)
     except (TypeError, ValueError):
         return ""
-    eco = _ecosystem_from_blob(base, name, typ) or "krea2"
-    kind = "lora" if _is_lora_resource(typ, "", name or "") else "diffusionmodel"
+    eco = _catalog_ecosystem(_ecosystem_from_blob(base, name, typ) or "krea2") or "krea2"
+    if _is_lora_resource(typ, "", name or ""):
+        kind = "lora"
+    elif eco == "flux1":
+        kind = "checkpoint"
+    else:
+        kind = "diffusionmodel"
     return f"urn:air:{eco}:{kind}:civitai:{mid}@{vid}"
 
 
@@ -1586,8 +1626,8 @@ def import_image(image_id: str) -> dict:
         elif eco == "sdxl":
             # Stable Diffusion XL / Pony / Illustrious — sdcpp createImage (not krea2 turbo)
             engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None
-        elif eco == "flux":
-            # Catalog id is flux1 (blob/AIR often say "flux"); never leave eco=flux for match_service.
+        elif eco in ("flux", "flux1"):
+            # Catalog id is flux1 (blob/AIR often say "flux" / "flux.1"); never leave eco=flux for match_service.
             engine, operation, ecosystem, model = "sdcpp", "createImage", "flux1", None
         elif eco == "wan":
             engine, operation, ecosystem, model = "sdcpp", "createImage", "wan", None

@@ -1025,12 +1025,19 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(civ._catalog_ecosystem("flux"), "flux1")
         self.assertEqual(civ._catalog_ecosystem("flux1"), "flux1")
         self.assertEqual(civ._catalog_ecosystem("zImage"), "zImage")
-        self.assertEqual(civ._ecosystem_from_blob("Flux1.D"), "flux")
+        # o35: flux.1 / flux1 → flux1 first (not bare flux)
+        self.assertEqual(civ._ecosystem_from_blob("Flux1.D"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux.1 D"), "flux1")
         self.assertEqual(civ._catalog_ecosystem(civ._ecosystem_from_blob("Flux1.D")), "flux1")
 
     def test_o34_flux1_build_workflow_maps_diffusionModel_to_diffuserModel(self):
-        """28533250-shaped: flux1 service + Flux ckpt AIR + LoRA @0.7 → diffuserModel, loras only."""
-        ckpt = "urn:air:flux:diffusionmodel:civitai:999@888"
+        """28533250-shaped: flux1 service + ckpt AIR + LoRA @0.7 → diffuserModel, loras only.
+
+        o35: broken flux:diffusionmodel normalizes to flux1:checkpoint (same mid@version);
+        never rewrite site checkpoint → diffuser.
+        """
+        legacy = "urn:air:flux:diffusionmodel:civitai:999@888"
+        expect = "urn:air:flux1:checkpoint:civitai:999@888"
         lora = "urn:air:flux1:lora:civitai:730162@823089"
         payload = {
             "serviceId": "image/sdcpp/flux1/createImage",
@@ -1040,15 +1047,15 @@ class CivitaiContract(unittest.TestCase):
             "steps": 20,
             "cfgScale": 1,
             "seed": 42,
-            "diffusionModel": ckpt,
+            "diffusionModel": legacy,
             "loras": [{"air": lora, "strength": 0.7}],
         }
         inp = step_input(civ.build_workflow(payload))
         self.assertEqual(inp.get("ecosystem"), "flux1")
-        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertEqual(inp.get("diffuserModel"), expect)
         self.assertNotIn("diffusionModel", inp)
         # do not leave checkpoint AIR stuffed into recipe `model`
-        self.assertNotEqual(inp.get("model"), ckpt)
+        self.assertNotEqual(inp.get("model"), expect)
         self.assertEqual(inp.get("loras"), {lora: 0.7})
         self.assertNotIn("additionalNetworks", inp)
         self.assertEqual(len(payload["prompt"]), 446)
@@ -1096,6 +1103,147 @@ class CivitaiContract(unittest.TestCase):
         self.assertIn("不接受", msg)
 
 
+
+
+    def test_o35_ecosystem_flux1_before_bare_flux(self):
+        self.assertEqual(civ._ecosystem_from_blob("flux1"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux.1"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("FLUX.1 D"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux"), "flux")
+        self.assertEqual(civ._catalog_ecosystem("flux"), "flux1")
+
+    def test_o35_air_from_ids_flux_checkpoint_not_diffusionmodel(self):
+        """FORBIDDEN: hand-roll urn:air:flux:diffusionmodel — mint flux1:checkpoint instead."""
+        air = civ._air_from_ids(1752722, 1983609, "Checkpoint", "Flux.1 D", "Sample")
+        self.assertEqual(air, "urn:air:flux1:checkpoint:civitai:1752722@1983609")
+        air_bare = civ._air_from_ids(1752722, 1983609, "Checkpoint", "Flux", "Sample")
+        self.assertEqual(air_bare, "urn:air:flux1:checkpoint:civitai:1752722@1983609")
+        self.assertNotIn(":flux:diffusionmodel:", air)
+        self.assertNotIn(":flux:diffusionmodel:", air_bare)
+        # LoRA still lora kind
+        lora = civ._air_from_ids(730162, 823089, "LORA", "Flux.1 D", "face")
+        self.assertEqual(lora, "urn:air:flux1:lora:civitai:730162@823089")
+        # non-flux unchanged
+        krea = civ._air_from_ids(2782456, 3146785, "Checkpoint", "Krea", "k")
+        self.assertEqual(krea, "urn:air:krea2:diffusionmodel:civitai:2782456@3146785")
+
+    def test_o35_prefer_rest_air_over_air_from_ids(self):
+        """Import checkpoint uses REST air verbatim; never overwrite with _air_from_ids."""
+        rest_air = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        resources = [{
+            "modelVersionId": 1983609,
+            "modelId": 1752722,
+            "modelType": "Checkpoint",
+            "modelName": "Flux sample",
+            "baseModel": "Flux.1 D",
+            # no air on resource — must come from fetch_version_air
+        }]
+
+        def fake_civitai(url, method="GET", body=None, timeout=90):
+            if "image.getGenerationData" in url:
+                return 200, {"result": {"data": {"json": {
+                    "meta": {"prompt": "o35", "steps": 20, "cfgScale": 1,
+                             "sampler": "euler", "width": 832, "height": 1216},
+                    "resources": resources,
+                }}}}
+            if "image.get" in url:
+                return 200, {"result": {"data": {"json": {
+                    "type": "image", "url": "https://example.invalid/x",
+                    "width": 832, "height": 1216,
+                }}}}
+            return 200, {}
+
+        def fake_json_call(url, method="GET", headers=None, body=None, timeout=90):
+            if "/api/generation/data" in url and "28533250" in url:
+                return 200, {"type": "image", "resources": [], "params": {}}
+            raise AssertionError(f"unexpected json_call {url}")
+
+        with patch.object(civ, "civitai", side_effect=fake_civitai), \
+             patch.object(civ, "json_call", side_effect=fake_json_call), \
+             patch.object(civ, "has_key", return_value=True), \
+             patch.object(civ, "generation_from_page", return_value={}), \
+             patch.object(civ, "public_image_row", return_value={}), \
+             patch.object(civ, "fetch_version_air", return_value={
+                 "id": 1983609,
+                 "air": rest_air,
+                 "modelId": 1752722,
+                 "baseModel": "Flux.1 D",
+                 "model": {"name": "Flux sample", "type": "Checkpoint"},
+             }):
+            imported = civ.import_image("28533250")
+        self.assertEqual(imported.get("diffusionModel"), rest_air)
+        self.assertNotIn(":flux:diffusionmodel:", imported.get("diffusionModel") or "")
+        self.assertTrue(str(imported.get("serviceId") or "").endswith("flux1/createImage"), imported.get("serviceId"))
+
+    def test_o35_flux1_outbound_checkpoint_air_verbatim_no_companion(self):
+        """Field diffuserModel; value = REST checkpoint air. No companion inject. No checkpoint→diffuser."""
+        ckpt = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "o35 sample",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertNotIn("flux1:diffuser:", inp.get("diffuserModel") or "")
+        self.assertNotIn("vaeModel", inp)
+        self.assertNotIn("clipLModel", inp)
+        self.assertNotIn("t5XXLModel", inp)
+        self.assertNotIn("diffusionModel", inp)
+
+    def test_o35_flux1_outbound_legacy_diffusionmodel_to_checkpoint(self):
+        """Known-broken _air_from_ids shape → flux1:checkpoint same mid@version (not diffuser)."""
+        legacy = "urn:air:flux:diffusionmodel:civitai:1752722@1983609"
+        expect = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "legacy",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 2,
+            "diffusionModel": legacy,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), expect)
+        self.assertNotIn(":diffuser:", inp.get("diffuserModel") or "")
+
+    def test_o35_official_diffuser_air_passthrough(self):
+        """Real flux1:diffuser resource AIR (official example) passes through unchanged."""
+        official = "urn:air:flux1:diffuser:civitai:618692@691639"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "official diffuser",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 3,
+            "diffusionModel": official,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), official)
+
+    def test_o35_non_flux1_unchanged_zimage(self):
+        ckpt = "urn:air:zImage:diffusionmodel:civitai:1@2"
+        payload = {
+            "serviceId": "image/sdcpp/zImage/turbo/createImage",
+            "prompt": "z",
+            "width": 1024,
+            "height": 1024,
+            "steps": 8,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
 
 
 if __name__ == "__main__":
