@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
   // v0821o50: nano LoRA omit null scale (never invent 1.0); tip with o49b
@@ -8462,6 +8463,15 @@
         let items = roster.slice();
       // v0821: mode-filter so video Composer lists i2v services (not silent t2i flux).
       items = filterCatalogForMode(items);
+      // v0821o52: import _pendingService must survive i2i filter (t2i krea2 onto shot that still has refs).
+      // Re-inject from official roster only — never invent a synthetic model row.
+      if (state._pendingService) {
+        const want = String(state._pendingService || "").trim();
+        if (want && !items.some(function (it) { return (it.id || it.name) === want; })) {
+          const raw = roster.find(function (it) { return (it.id || it.name) === want; });
+          if (raw) items = [raw].concat(items);
+        }
+      }
       // CIVITAI_PREF / _civitaiDefaultService = catalog ordering hint only (not generate fallback).
       const pref = (be === "civitai" && state.mode !== "video")
         ? (state._civitaiDefaultService || CIVITAI_PREF_SERVICE)
