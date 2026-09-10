@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o53: capacity rematch when N>maxRefs (catalog eats+cap≥N; no silent unlink); stamp v0821o53-capacity-rematch
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
@@ -2380,7 +2381,7 @@
     const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - refCount);
     const refHint = refCount > refCap
-      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出，请减少连线</span>'
+      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出上限（不静默丢线）</span>'
       : '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap +
           (remain ? (' · 还可 ' + remain) : '') + '</span>';
     // Unlinked thumbnails are selectable suggestions, not sent references.
@@ -2406,11 +2407,18 @@
     const smartBtn = sibId
       ? '<button class="chip-btn smart-edit" type="button" data-act="apply-edit-sibling" title="一键改选图生图 Edit">一键改选 Edit</button>'
       : "";
+    // v0821o53: over-cap → 一键匹配 eats+maxRefs≥N (never silent unlink)
+    const rematchId = (refCount > refCap) ? capacityRematchId(refCount, catalogItemForService()) : "";
+    const rematchBtn = (refCount > refCap)
+      ? '<button class="chip-btn capacity-rematch" type="button" data-act="capacity-rematch" title="' +
+          (rematchId ? ("一键匹配 maxRefs≥" + refCount) : "目录无足够容量的图生图模型") +
+          '">一键匹配</button>'
+      : "";
     // 灌满测试: only when current model eats refs and still has remain capacity
     const fillBtn = (eats && remain > 0)
       ? '<button class="chip-btn fill-cap" type="button" data-act="fill-refs-cap" title="灌满至 maxRefs=' + refCap + '">灌满测试</button>'
       : "";
-    const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || fillBtn);
+    const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || rematchBtn || fillBtn);
     // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
     // v0821o39: empty capacity slots count as chips so cap is always visible when dock open.
     // Expanded always keeps 上传/选择; collapsed keeps them when pinned or video needs frame.
@@ -2422,7 +2430,7 @@
       refsEl.innerHTML = frameHtml +
         '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
         '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-        promoteBtn + smartBtn + fillBtn + refHint + ownChip +
+        promoteBtn + smartBtn + rematchBtn + fillBtn + refHint + ownChip +
         chipNodes.map((a) => {
           const on = linked.some((x) => x.id === a.id) ? " on" : "";
           return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
@@ -4971,7 +4979,16 @@
     syncParamSurface();
   }
   function applyServiceConstraints() {
+    // v0821o53: over-cap → try rematch from catalog (never silent unlink).
+    if (typeof tryCapacityRematchAfterServiceChange === "function") {
+      try {
+        if (tryCapacityRematchAfterServiceChange()) {
+          /* rematched — fall through to chrome sync on new service */
+        }
+      } catch (_) {}
+    }
     syncParamChrome();
+    try { renderDock(); } catch (_) {}
   }
   function readComfyParamsFromUi() {
     const width = $("width") ? parseInt($("width").value, 10) : NaN;
@@ -5876,7 +5893,11 @@
       return "当前模型参考图上限未知，不能按通用上限截断。请减少连线或改选已声明上限的模型";
     }
     if (resolved.known && nRefs > resolved.maxRefs) {
-      return "参考图 " + nRefs + "/" + resolved.maxRefs + " · 超过上限，请减少连线后再生成（不静默丢弃）";
+      const mid = capacityRematchId(nRefs, catalogItemForService());
+      if (mid) {
+        return "参考图 " + nRefs + "/" + resolved.maxRefs + " · 超过上限，可一键匹配 " + mid + "（不静默丢弃连线）";
+      }
+      return "参考图 " + nRefs + "/" + resolved.maxRefs + " · 超过上限，请减少连线或改选 maxRefs≥" + nRefs + " 的图生图（不静默丢弃）";
     }
     return "";
   }
@@ -5958,6 +5979,84 @@
     setMsg("已改选图生图：" + ((sib && sib.name) || editId), "ok");
     return true;
   }
+  // v0821o53: find catalog row that eats refs and maxRefs>=N (never invent outside catalog).
+  function capacityRematchId(nRefs, currentIt) {
+    const need = Number(nRefs) || 0;
+    if (!(need > 0) || !state.catalogById) return "";
+    const curId = String((currentIt && currentIt.id) || ($("service") && $("service").value) || "");
+    const curBe = String((currentIt && currentIt.backend) || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
+    const curName = String((currentIt && currentIt.name) || "");
+    const curFamily = curId.split("/").slice(0, 2).join("/");
+    const scored = [];
+    Object.keys(state.catalogById).forEach(function (cid) {
+      const row = state.catalogById[cid];
+      if (!row) return;
+      if (!catalogEatsRefs(row)) return;
+      const cap = maxRefCount(row);
+      if (!(cap != null && cap >= need)) return;
+      const rid = String(row.id || cid);
+      if (rid === curId) return;
+      const be = String(row.backend || curBe || "").toLowerCase();
+      let score = 0;
+      if (be && curBe && be === curBe) score += 100;
+      if (curFamily && rid.indexOf(curFamily) === 0) score += 40;
+      if (curName && String(row.name || "").indexOf(curName.split(" ")[0]) === 0) score += 20;
+      if (catalogItemSupportsI2i && catalogItemSupportsI2i(row)) score += 10;
+      // Prefer smallest sufficient cap (tight fit) then higher score
+      scored.push({ id: rid, score: score, cap: cap });
+    });
+    if (!scored.length) return "";
+    scored.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.cap - b.cap;
+    });
+    return scored[0].id;
+  }
+  function applyCapacityRematch() {
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return false;
+    const nRefs = countRefUrls(null, shot).length;
+    const it = catalogItemForService();
+    const resolved = resolveRefCaps(it);
+    if (!(resolved.known && nRefs > resolved.maxRefs)) return false;
+    const want = capacityRematchId(nRefs, it);
+    if (!want || !state.catalogById[want]) {
+      setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 目录无 maxRefs≥" + nRefs + " 的图生图模型可匹配（不静默丢线）", "bad");
+      return false;
+    }
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, want);
+    sel.value = want;
+    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    shot.serviceId = want;
+    renderDock();
+    syncParamSurface();
+    const row = state.catalogById[want];
+    setMsg("已匹配容量：" + ((row && row.name) || want) + " · 参考 " + nRefs + "/" + maxRefCount(row), "ok");
+    return true;
+  }
+  /** On service change: if over-cap, try rematch once. Fail → keep hard gate (no unlink). */
+  function tryCapacityRematchAfterServiceChange() {
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return false;
+    const nRefs = countRefUrls(null, shot).length;
+    if (!nRefs) return false;
+    const it = catalogItemForService();
+    const resolved = resolveRefCaps(it);
+    if (!(resolved.known && nRefs > resolved.maxRefs)) return false;
+    const want = capacityRematchId(nRefs, it);
+    if (!want || !state.catalogById[want]) return false;
+    if (String(it && it.id) === want) return false;
+    const sel = $("service");
+    if (!sel) return false;
+    // Avoid change-event loop: set value then sync without re-entering via change.
+    ensureSelectOpt(sel, want);
+    sel.value = want;
+    shot.serviceId = want;
+    return true;
+  }
+
   function refUnusedGateMessage(shot) {
     if (!shot || shot.kind !== "shot") return "";
     const nRefs = countRefUrls(null, shot).length;
