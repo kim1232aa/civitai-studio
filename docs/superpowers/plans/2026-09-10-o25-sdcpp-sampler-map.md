@@ -1,6 +1,6 @@
 # o25 sdcpp sampler allowlist map Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Map import/post sampler `dpmpp_2m` (and honest siblings) onto sdcpp official `sampleMethod` enum so page ↑ for sample 19201654 does not 400 with `sampleMethod=dpmpp_2m 不在允许列表`.
 
@@ -31,7 +31,7 @@
 - Consumes: `civ.build_workflow`, sdcpp sdxl serviceId, import sampler/scheduler
 - Produces: outbound `sampleMethod=dpm++2m`, `schedule=karras`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 def test_sdcpp_sdxl_maps_dpmpp_2m_karras_from_import(self):
@@ -54,15 +54,15 @@ def test_sdcpp_sdxl_maps_dpmpp_2m_karras_from_import(self):
     self.assertNotIn("sampler", inp)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m unittest scripts.test_civitai_parameter_contract.CivitaiParameterContractTest.test_sdcpp_sdxl_maps_dpmpp_2m_karras_from_import -v`
 Expected: FAIL with `sampleMethod=dpmpp_2m 不在允许列表`
 
-- [ ] **Step 3: Implement match_allowed_choice + wire _assign_choice**
+- [x] **Step 3: Implement match_allowed_choice + wire _assign_choice**
 
 In `io_meta.py`: compact fold + aliases including locked `dpmpp_2m`→`dpm++2m`, `euler_ancestral`→`euler_a`, `dpm_2`→`dpm2`, `dpmpp_2s_ancestral`→`dpm++2s_a`. In `civitai._assign_choice`: resolve via helper before `_check_range`.
 
-- [ ] **Step 4: Run tests pass**
+- [x] **Step 4: Run tests pass**
 
-- [ ] **Step 5: Stamp o25 + commit + push + report under /workspace/projects/**
+- [x] **Step 5: Stamp o25 + commit + push + report under /workspace/projects/**

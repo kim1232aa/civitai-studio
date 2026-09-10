@@ -20,7 +20,7 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 - Hub task slug：`text-to-image-synthesis`（**不是** `text-to-image`）、`image-to-image`、`text-to-video-synthesis`、`image-to-video`。
 - 钉选：`docs/ms-models.json`。
 - `GET /api/catalog?backend=modelscope-ai|modelscope-cn`。
-- LoRA 搜：Hub search，返回 `path=owner/repo`。
+- LoRA 搜：Hub search，返回 `path=owner/repo`；Studio 路由 `GET /api/search?backend=modelscope-ai|modelscope-cn`（无 `/api/search-loras`）。
 
 ## Import
 
@@ -48,16 +48,21 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 ## LoRA / 静默丢
 
+权威：`providers/modelscope.py` `_modelscope_loras`（2026-09-09/10 实测 + 单测）。旧「单条也用 `[{model,weight}]`」已作废。
+
 | | |
 | --- | --- |
-| 出站（实测） | `loras: [{ "model": "owner/repo", "weight": 0.8 }, …]`；见 [`../modelscope-hub-lora.md`](../modelscope-hub-lora.md) |
-| 勿发 | 字符串 `"owner/repo"` 或 `{repo: weight}`（会 500 Model does not exist） |
-| http / Civitai 链 | **`continue` 跳过** |
-| 有 loras 入站但全跳过 | 响应 `warning: 魔搭 LoRA 只要 Hub 的 owner/repo，Civitai 下载链不能用`（UI 可能不展示） |
-| AIR `urn:` | 跳过 |
-| 禁止 | Civitai→Hub 自动换模对照表（v0753 已撤） |
+| 单条（无 weight） | 出站 **字符串** `"owner/repo"` |
+| 单条带 weight/scale/strength | **本地 400**「单条 LoRA 官方字段是 owner/repo 字符串，没有 weight」——不改成 `{repo:w}`、也不丢权重 |
+| 多条 | 出站 `{ "owner/repo": weight, …}`，且 **weight 之和必须 = 1.0**；缺 weight → 400（拒默认 1.0） |
+| 勿发 | `[{ "model": "owner/repo", "weight": 0.8 }]`（Krea 实测 400：`loras[0] is not a string`）；单条 `{repo: weight}`（CN 实测 500 模型不存在） |
+| http / Civitai / AIR | **硬拒**（ValueError / 400），不再 `continue` 跳过只出底模 |
+| Hub 搜 | `GET /api/search?backend=modelscope-ai|modelscope-cn&q=`（**不是** `/api/search-loras`） |
+| 禁止 | Civitai→Hub 自动换模对照表（v0753 已撤）；发明默认 strength |
 
-夹具：path `…/3231694` → `_modelscope_loras` 返回 `None`（`test_p0_wiring`）。
+夹具：path `…/3231694` → 非 Hub → 400（`test_p0_wiring` / `test_storyboard_graph`）。
+
+现场债（2026-09-10）：`Tongyi-MAI/Z-Image-Turbo` + 单条字符串 `DiffSynth-Studio/Z-Image-Turbo-DistillPatch`（strength 未填）→ Infer 500 `Model does not exist`。Hub GET 两模型均 200。待无 LoRA 底模 ↑ 隔离是底模还是该 LoRA 不可 API 下载。
 
 ## Seed / 进度 / 取消
 
@@ -76,7 +81,7 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 | 动作 | 行 |
 | --- | --- |
 | Token / BASE | `modelscope.py:15-21` |
-| `_clamp_seed` / `_modelscope_loras` | `:78-140` |
+| `_clamp_seed` / `_modelscope_loras` | `:78-180`（单条字符串 / 多条 dict） |
 | Hub fetch | `:201-275` |
 | `generate` | `:427-531` |
 | `job_status` | `:533-582` |
@@ -110,7 +115,7 @@ Hub 列表（AI/CN **共用**搜目录，**不**共用生成 base）：
 | --- | --- |
 | Civitai `serviceId`（`image/...`） | 400「当前选中的是 Civitai 服务…」 |
 | `payload.model` ≠ `serviceId` | 400 拒 remap |
-| http / AIR LoRA | `_modelscope_loras` `continue`；有入站 loras 但全跳过 → `warning`（UI 可能不展示） |
+| http / AIR LoRA | `_modelscope_loras` **硬拒 400**（不再 continue 只出底模） |
 | AI 主机失败 | **禁止**改走 CN（文案声明） |
 | 旧域 `api.modelscope.ai` | 已 NXDOMAIN |
 
@@ -118,6 +123,6 @@ Hub 列表（AI/CN **共用**搜目录，**不**共用生成 base）：
 
 - Hub OpenAPI：`https://www.modelscope.cn/openapi/v1/models`（filter.task 用 synthesis slug）。
 - 生成：`POST https://api-inference.modelscope.{ai|cn}/v1/images/generations`；官方键集合见上表（多余键 4xx 时 slim 重试）。
-- LoRA：出站 `[{ "model": "owner/repo", "weight": 0.8 }, …]`（单条也用数组对象）；字符串 / `{repo:w}` 会 500。**不要**发 Civitai 下载链。
+- LoRA：单条出站字符串 `"owner/repo"`（带 weight→本地 400）；多条 `{repo:weight}` 且和为 1.0。勿发 `[{model,weight}]` / 单条 `{repo:w}` / Civitai 链。
 - 能力表：`lora=hub_repo`，`progress=status_only`，`cancel=False`，`maxRefs=1`，`refImagesField=image_url`。
 - 全量 Hub 不在本仓库落盘 → inventory 只保证钉选 + 发现端点诚实。
