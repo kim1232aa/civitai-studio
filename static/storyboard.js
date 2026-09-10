@@ -493,6 +493,11 @@
     if (index < 0) return;
     const fallback = state.script.scenes[index === 0 ? 1 : 0];
     const doomed = state.script.scenes[index];
+    const shotCount = (doomed.shotIds || []).length;
+    const moveNotice = shotCount
+      ? "\n其中 " + shotCount + " 个分镜将移动到「" + (fallback.title || "场次") + "」。"
+      : "";
+    if (!window.confirm("删除「" + (doomed.title || "场次") + "」？" + moveNotice)) return;
     (doomed.shotIds || []).slice().forEach((id) => assignShotToScene(id, fallback.id));
     state.script.scenes = state.script.scenes.filter((scene) => scene.id !== sceneId);
     state._scriptSceneId = fallback.id;
@@ -631,6 +636,8 @@
         if (act.dataset.editorAct === "play") toggleEditorPlayback();
         else if (act.dataset.editorAct === "next") nextEditorShot();
         else if (act.dataset.editorAct === "open-canvas") setWorkspace("canvas");
+        else if (act.dataset.editorAct === "open-script") setWorkspace("script");
+        else if (act.dataset.editorAct === "add-shot") addWorkspaceShot();
         return;
       }
       const move = e.target.closest("[data-editor-move]");
@@ -1020,7 +1027,7 @@
   function persist() {
     try {
       saveDisplayedComposer();
-      sessionStorage.setItem(STORE, JSON.stringify({
+      localStorage.setItem(STORE, JSON.stringify({
         cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
         railTab: state.railTab,
         groups: state.groups || [],
@@ -1050,18 +1057,24 @@
   }
   function restore() {
     try {
-      let raw = sessionStorage.getItem(STORE);
+      let raw = null;
+      try { raw = localStorage.getItem(STORE); } catch (_) {}
       if (!raw) {
-        for (let i = 0; i < STORE_OLDS.length; i++) {
-          raw = sessionStorage.getItem(STORE_OLDS[i]);
-          if (raw) break;
+        try { raw = sessionStorage.getItem(STORE); } catch (_) {}
+      }
+      if (!raw) {
+        for (let i = 0; i < STORE_OLDS.length && !raw; i++) {
+          try { raw = localStorage.getItem(STORE_OLDS[i]); } catch (_) {}
+          if (!raw) {
+            try { raw = sessionStorage.getItem(STORE_OLDS[i]); } catch (_) {}
+          }
         }
       }
       const p = JSON.parse(raw || "null");
-      if (!p || !p.nodes || !p.nodes.length) return false;
+      if (!p || (!Array.isArray(p.nodes) && (!p.script || typeof p.script !== "object"))) return false;
       state.cam = p.cam || state.cam;
       if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
-      state.nodes = p.nodes;
+      state.nodes = Array.isArray(p.nodes) ? p.nodes : [];
       state.edges = p.edges || [];
       state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
       state.railTab = p.railTab || "assets";

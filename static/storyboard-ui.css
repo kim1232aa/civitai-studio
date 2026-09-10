@@ -381,7 +381,17 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 .editor-row-actions { display: flex; gap: 3px; }
 .editor-row-actions .workspace-icon-btn { min-width: 26px; min-height: 26px; }
 .editor-empty { padding: 34px 18px; border: 1px dashed #383842; border-radius: 12px; color: var(--muted); text-align: center; }
+.editor-empty-action { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.editor-empty-action strong { color: #eee; font-size: 13px; }
+.editor-empty-action span { max-width: 360px; line-height: 1.55; }
+.editor-empty-action .workspace-btn { margin-top: 2px; }
 .editor-playing { color: var(--teal) !important; }
+
+@media (max-width: 1100px) {
+  .workspace-grid { grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr); }
+  .editor-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+  .workspace-shot-title { width: clamp(90px, 14vw, 120px); }
+}
 
 @media (max-width: 900px) {
   .workspace-panel { padding: 24px 18px 36px; }
