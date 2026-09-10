@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o19: 双↑→单↑ (capsule #send only); persistServer keepalive; ensure first-frame edges paint
   // v0821o18: P1 chatRail video path on; collapsed keep #send; writeback+i2v first-frame harden
   // v0821o17: node capsule + right chat-rail skeleton; visible wires; i2v first-frame slot actions
   // v0821o16: persistServer skip empty + surface PUT fail; orphan reattach; poll wait saved[] not CDN
@@ -1162,10 +1163,12 @@
         try { console.warn("persistServer: skip PUT — nodes empty/missing"); } catch (_) {}
         return;
       }
+      // v0821o19: keepalive so writeback PUT survives hard-refresh / tab close race
       fetch("/api/storyboard-graph", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: payload,
+        keepalive: true,
       }).then(async function (r) {
         if (r.ok) return;
         let errText = "";
@@ -1410,6 +1413,14 @@
   }
 
   function drawWires() {
+    // v0821o19: if firstFrameId set but edge dropped, re-emit so path.edge actually paints
+    (state.nodes || []).forEach(function (n) {
+      if (!n || n.kind !== "shot" || !n.firstFrameId) return;
+      if (!nodeById(n.firstFrameId)) return;
+      if (!(state.edges || []).some(function (e) { return e && e.from === n.firstFrameId && e.to === n.id; })) {
+        state.edges.push({ from: n.firstFrameId, to: n.id });
+      }
+    });
     const parts = ["<defs></defs>"];
     state.edges.forEach((e, i) => {
       const a = nodeById(e.from), b = nodeById(e.to);
@@ -1858,13 +1869,11 @@
       else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑（同一 /api/generate，无第二套出站）";
     }
     if (actsEl) {
+      // v0821o19 双↑: right rail must NOT mint a second ↑ — only capsule #send is the generate entry.
       let acts = "";
       if (needFrame) {
         acts += '<button class="chip-btn" type="button" data-act="upload">上传首帧</button>' +
           '<button class="chip-btn" type="button" data-act="pick">选择首帧</button>';
-      }
-      if (!stub && shotOk) {
-        acts += '<button type="button" class="chat-rail-send" id="chatRailSend" data-testid="composer-send" title="生成">↑</button>';
       }
       actsEl.innerHTML = acts;
     }
@@ -5568,19 +5577,7 @@
       foot.addEventListener("click", onFoot, true);
       foot.addEventListener("pointerdown", onFoot, true);
     }
-    const chatActs = $("chatRailActs");
-    if (chatActs && chatActs.dataset.nlSendDelegate !== "1") {
-      chatActs.dataset.nlSendDelegate = "1";
-      const onChatSend = function (ev) {
-        const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
-        if (!t) return;
-        if (ev._nlSendHandled) return;
-        fireSend(ev);
-      };
-      chatActs.addEventListener("click", onChatSend, true);
-      chatActs.addEventListener("pointerdown", onChatSend, true);
-    }
-  }
+      }
 
   function bindComposerSendKeys() {
     if (bindComposerSendKeys._done) return;

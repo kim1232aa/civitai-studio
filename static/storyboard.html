@@ -100,7 +100,7 @@
   .dock.collapsed .dock-body{display:flex;flex-direction:column;overflow:visible;padding:8px 12px 10px;min-height:0;flex:0 0 auto}
   .dock.collapsed .dock-scroll{overflow:visible;flex:0 0 auto}
   .dock.collapsed .dock-scroll > :not(.modes):not(.refs){display:none}
-  /* v0821o18 P1: collapsed capsule keeps dock-foot/#send visible */
+  /* v0821o19: single ↑ = capsule #send; collapsed keeps dock-foot/#send visible */
   .dock.collapsed .dock-foot{display:flex;flex-direction:column;gap:4px;padding:0 4px 6px;flex:0 0 auto}
   .dock.collapsed .dock-foot .lora-block{display:none}
   .dock.collapsed .dock-foot .bar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:36px}
@@ -400,11 +400,11 @@
   .chat-rail-copy{margin:0;font-size:12px;color:#9a9aa3;line-height:1.45}
   .chat-rail-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .chat-rail-acts .chip-btn{width:auto;min-width:44px;height:32px;padding:0 10px}
-  .chat-rail-send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px}
-  .chat-rail-send[aria-disabled="true"]{background:#3a3a44;color:#8b8b94}
+  /* v0821o19: chat-rail ↑ removed (双↑); keep class unused for safety */
+  .chat-rail-send{display:none}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r18writeback">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r19singleup">
 </head>
 <body>
 <div class="app">
@@ -419,7 +419,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o18-writeback-i2v</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o19-single-up-writeback</span>
     </div>
   </header>
   <div class="stage">
@@ -607,6 +607,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r18writeback"></script>
+<script src="/static/storyboard.js?v=20260910-r19singleup"></script>
 </body>
 </html>

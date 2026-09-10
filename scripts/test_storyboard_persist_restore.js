@@ -11,13 +11,15 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o18-writeback-i2v"), "html stamp o16");
-assert.ok(html.includes("storyboard.js?v=20260910-r18writeback"), "cache bust o16");
+assert.ok(html.includes("v0821o19-single-up-writeback"), "html stamp o16");
+assert.ok(html.includes("storyboard.js?v=20260910-r19singleup"), "cache bust o16");
 assert.ok(source.includes('const STORE = "nl-storyboard-v0821o16"'), "STORE o16");
 assert.ok(source.includes('"nl-storyboard-v0821o15"'), "STORE_OLDS keeps o15");
 assert.ok(source.includes("skip PUT"), "persistServer skips empty nodes");
 assert.ok(source.includes("服务端保存失败 HTTP"), "persistServer surfaces HTTP fail");
 assert.ok(source.includes("function persistServer"), "persistServer");
+assert.ok(source.includes("keepalive: true"), "persistServer keepalive");
+assert.ok(!source.includes("chatRailSend"), "no dual ↑ chatRailSend");
 assert.ok(source.includes("function hydrateFromServer"), "hydrateFromServer");
 assert.ok(source.includes("/api/storyboard-graph"), "storyboard-graph path");
 assert.ok(source.includes("function pickSavedUrl"), "pickSavedUrl");
