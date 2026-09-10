@@ -468,7 +468,7 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
                 f"Civitai 不接受 Fal 字段 {key}，请用官方首尾帧字段，不会静默改名或丢掉"
             )
     frames = list((cap or {}).get("frameFields") or [])
-    from .ref_images import payload_ref_images, max_refs
+    from .ref_images import payload_ref_images, max_refs, materialize_local_ref, materialize_local_refs
     from .capabilities import get_provider_capabilities
     caps = get_provider_capabilities("civitai")
     first = ""
@@ -540,6 +540,17 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
             inp[name] = payload["videoUrl"]
         elif name == "maskImage" and payload.get("maskImage"):
             inp[name] = payload["maskImage"]
+    # o44: Civitai cannot fetch studio /out — materialize to data URLs (same as Fal/Nano).
+    # Fail-closed on missing local files; never silent-drop.
+    for key in ("images", "referenceImages"):
+        if key in inp and isinstance(inp[key], list):
+            inp[key] = materialize_local_refs(inp[key])
+    for key in (
+        "sourceImage", "firstFrame", "startImage", "firstFrameImage", "image", "sourceImageUrl",
+        "lastFrame", "endImage", "endSourceImage", "lastFrameImage", "maskImage",
+    ):
+        if key in inp and isinstance(inp[key], str) and inp[key].strip():
+            inp[key] = materialize_local_ref(inp[key])
     schema = _schema_fields(cap)
     if payload.get("turbo") is not None and "turbo" in schema:
         inp["turbo"] = bool(payload.get("turbo"))
@@ -1909,6 +1920,37 @@ def caption_media(media_url: str, model: str = "joy-caption") -> tuple[int, dict
     }
 
 
+
+def _civitai_media_ref_audit(inp: dict | None) -> dict:
+    """Lengths only — never dump data URL bytes. Used for generate audit / 核."""
+    inp = inp if isinstance(inp, dict) else {}
+    imgs = inp.get("images")
+    if not isinstance(imgs, list):
+        imgs = inp.get("referenceImages") if isinstance(inp.get("referenceImages"), list) else []
+    n_data = 0
+    n_http = 0
+    n_out = 0
+    lenses: list[int] = []
+    for u in imgs:
+        if not isinstance(u, str):
+            lenses.append(0)
+            continue
+        lenses.append(len(u))
+        if u.startswith("data:"):
+            n_data += 1
+        elif u.startswith(("http://", "https://")):
+            n_http += 1
+        elif u.startswith("/out/") or (u and not u.startswith(("http://", "https://", "data:"))):
+            n_out += 1
+    return {
+        "nRefs": len(imgs),
+        "nDataUrls": n_data,
+        "nHttpUrls": n_http,
+        "nOutPaths": n_out,
+        "imageUrlLens": lenses,
+    }
+
+
 class CivitaiProvider(Provider):
     id = "civitai"
     label = "Civitai"
@@ -1986,6 +2028,16 @@ class CivitaiProvider(Provider):
             submitted["serviceId"] = meta.get("serviceId")
             data["submittedInput"] = submitted
             data["backend"] = "civitai"
+            audit = _civitai_media_ref_audit(inp)
+            data.update(audit)
+            print(
+                "[civitai] generate-audit",
+                json.dumps({
+                    "serviceId": meta.get("serviceId"),
+                    **audit,
+                }, ensure_ascii=False)[:800],
+                flush=True,
+            )
             if not data.get("id"):
                 data["id"] = data.get("workflowId") or data.get("token")
         return code, data
@@ -2006,6 +2058,8 @@ class CivitaiProvider(Provider):
             submitted["serviceId"] = meta.get("serviceId")
             data["submittedInput"] = submitted
             data["backend"] = "civitai"
+            audit = _civitai_media_ref_audit(inp)
+            data.update(audit)
         return code, data
 
     def job_status(self, job_id: str):

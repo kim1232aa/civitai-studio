@@ -190,8 +190,8 @@ def test_audit_lengths_helper():
 def test_stamp_and_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    check("v0821o42-nano-edit-refs" in html, "html stamp")
-    check("20260910-o42nanoeditrefs" in html, "cache-bust")
+    check("v0821o44-civitai-edit-materialize-refs" in html, "html stamp")
+    check("20260910-o44civitaimaterializerefs" in html, "cache-bust")
     check("v0821o42" in js, "js header o42")
 
 
