@@ -3,8 +3,11 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
+  // v0821o50: nano LoRA omit null scale (never invent 1.0); tip with o49b
   // v0821o49: harness stamp align (persist/restore + graph); stamp v0821o49-harness-stamp-o48
   // v0821o48: hydrate server shot.url wins over stale localStorage; stamp v0821o48-hydrate-server-wins
+  // o49b freshness supersedes blind o48 unconditional win
   // v0821o47: Composer board sync (Magao maxRefs/seed clamp strip) + adapt cache-bust; stamp v0821o47-composer-board-sync
   // v0821o46b: local /out resume when upstream failed (invalid response format); stamp v0821o46b-local-out-resume
   // v0821o46: resume writeback after tab death (pending jobId↔shotId + boot resume); stamp v0821o46-resume-job-writeback
@@ -1225,13 +1228,40 @@
         try { console.warn("persistServer: skip PUT — nodes empty/missing"); } catch (_) {}
         return;
       }
+      // o49b: prefer not sending blank url overwrites (server merge is source of truth)
+      const pendingIds = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (!n || n.kind !== "shot") continue;
+        const u = n.url != null ? String(n.url).trim() : "";
+        if (!u) {
+          try { delete n.url; } catch (_) { n.url = undefined; }
+        } else {
+          pendingIds.push(n.id);
+        }
+      }
+      for (let i = 0; i < (state.nodes || []).length; i++) {
+        const live = state.nodes[i];
+        if (!live || live.kind !== "shot") continue;
+        if (pendingIds.indexOf(live.id) >= 0) {
+          live._pendingPut = true;
+          live.pendingPut = true;
+        }
+      }
+      const body = JSON.stringify(parsed);
       // v0821o19: keepalive so writeback PUT survives hard-refresh / tab close race
       fetch("/api/storyboard-graph", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: payload,
+        body: body,
         keepalive: true,
       }).then(async function (r) {
+        for (let i = 0; i < (state.nodes || []).length; i++) {
+          const live = state.nodes[i];
+          if (!live || pendingIds.indexOf(live.id) < 0) continue;
+          try { delete live._pendingPut; } catch (_) { live._pendingPut = false; }
+          try { delete live.pendingPut; } catch (_) { live.pendingPut = false; }
+        }
         if (r.ok) return;
         let errText = "";
         try { errText = await r.text(); } catch (_) {}
@@ -1239,6 +1269,12 @@
           setMsg("服务端保存失败 HTTP " + r.status + (errText ? ": " + errText : ""), "bad");
         } catch (_) {}
       }).catch(function (e) {
+        for (let i = 0; i < (state.nodes || []).length; i++) {
+          const live = state.nodes[i];
+          if (!live || pendingIds.indexOf(live.id) < 0) continue;
+          try { delete live._pendingPut; } catch (_) { live._pendingPut = false; }
+          try { delete live.pendingPut; } catch (_) { live.pendingPut = false; }
+        }
         try {
           setMsg("服务端保存失败: " + (e && e.message ? e.message : String(e || "network")), "bad");
         } catch (_) {}
@@ -1249,9 +1285,19 @@
     return (state.nodes || []).some(function (n) { return n && n.kind === "shot" && n.url; });
   }
   /** Clean profile / empty demo: adopt server graph.
-   * o48: when local already has media, server shot.url still wins over stale localStorage
-   * (same id + server url non-empty → adopt server). Belt writeback must survive hard refresh.
+   * o49b freshness supersedes blind o48 unconditional win:
+   * keep local when pendingPut / newer urlUpdatedAt / local media newer than server;
+   * adopt server when local url empty OR local clearly stale (no pending, older/missing mtime).
+   * Server still wins when fresher (belt writeback survives hard refresh).
    */
+  function shotUrlMtime(n) {
+    if (!n) return 0;
+    const v = (n._urlUpdatedAt != null && n._urlUpdatedAt !== "") ? n._urlUpdatedAt
+      : ((n.urlUpdatedAt != null && n.urlUpdatedAt !== "") ? n.urlUpdatedAt : 0);
+    if (v === 0 || v == null || v === "") return 0;
+    const t = typeof v === "number" ? v : Date.parse(String(v));
+    return Number.isFinite(t) ? t : 0;
+  }
   async function hydrateFromServer() {
     try {
       const r = await fetch("/api/storyboard-graph");
@@ -1278,11 +1324,31 @@
         const serverUrl = o.url != null ? String(o.url).trim() : "";
         if (!serverUrl) continue;
         const localUrl = n.url != null ? String(n.url).trim() : "";
-        // o48: server wins whenever non-empty (fixes OOM writeback then hard-refresh covered by old LS)
-        if (localUrl !== serverUrl) {
+        if (!localUrl) {
           n.url = serverUrl;
+          const stm = shotUrlMtime(o);
+          if (stm) {
+            n._urlUpdatedAt = o._urlUpdatedAt != null ? o._urlUpdatedAt : o.urlUpdatedAt;
+            n.urlUpdatedAt = n._urlUpdatedAt;
+          }
           changed = true;
+          continue;
         }
+        if (localUrl === serverUrl) continue;
+        // Keep local: pending PUT in flight
+        if (n._pendingPut || n.pendingPut) continue;
+        const localTs = shotUrlMtime(n);
+        const serverTs = shotUrlMtime(o);
+        // Keep local when newer than server, or local has mtime and server looks older/missing
+        if (localTs > serverTs) continue;
+        if (localTs > 0 && serverTs === 0) continue;
+        // Adopt server when fresher, or both missing mtime (stale LS → server wins when fresher/unknown)
+        n.url = serverUrl;
+        if (serverTs) {
+          n._urlUpdatedAt = o._urlUpdatedAt != null ? o._urlUpdatedAt : o.urlUpdatedAt;
+          n.urlUpdatedAt = n._urlUpdatedAt;
+        }
+        changed = true;
       }
       if (changed) persist();
       return changed;
@@ -5357,6 +5423,20 @@
     const sid = String(shotId || "").trim();
     if (!jid || !sid) return;
     const jobs = readLocalPending();
+    // o49b: retire other jobIds mapped to same shotId (local + DELETE server)
+    const retire = [];
+    for (const oldId of Object.keys(jobs)) {
+      if (oldId === jid) continue;
+      const rec = jobs[oldId];
+      if (rec && String(rec.shotId || "") === sid) retire.push(oldId);
+    }
+    for (let i = 0; i < retire.length; i++) {
+      const oldId = retire[i];
+      delete jobs[oldId];
+      try {
+        fetch("/api/pending-jobs/" + encodeURIComponent(oldId), { method: "DELETE", keepalive: true }).catch(function () {});
+      } catch (_) {}
+    }
     jobs[jid] = { shotId: sid, backend: String(backend || ""), startedAt: Date.now() };
     writeLocalPending(jobs);
     try {
@@ -5410,6 +5490,16 @@
       shot = (state.nodes || []).find(function (n) { return n && n.id === sid && n.kind === "shot"; });
     }
     if (!shot) {
+      clearPendingJob(jid);
+      return;
+    }
+    // o49b: do not write old /out onto a card that already moved on
+    if (shot._jobId && String(shot._jobId) !== jid) {
+      clearPendingJob(jid);
+      return;
+    }
+    const existingUrl = shot.url != null ? String(shot.url).trim() : "";
+    if (existingUrl && String(shot._jobId || "") !== jid) {
       clearPendingJob(jid);
       return;
     }
@@ -5509,6 +5599,11 @@
     }
     live.url = url;
     shot.url = url; // keep caller reference in sync (poll path may hold stale shot obj)
+    const nowTs = Date.now();
+    live._urlUpdatedAt = nowTs;
+    live.urlUpdatedAt = nowTs;
+    shot._urlUpdatedAt = nowTs;
+    shot.urlUpdatedAt = nowTs;
     removeUnpromotedFromShot(live.id);
     const frame = (typeof frameAsset === "function") ? frameAsset(live) : null;
     if (frame && frame.id && !(state.edges || []).some((e) => e.from === frame.id && e.to === live.id)) {

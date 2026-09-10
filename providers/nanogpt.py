@@ -463,7 +463,9 @@ def sanitize_submitted_for_persist(body: dict, lora_meta: list | None = None) ->
             m = meta[i] if i < len(meta) and isinstance(meta[i], dict) else {}
             vid = m.get("versionId") or civitai_version_id(it) or civitai_version_id(m)
             path = persist_safe_lora_path(it.get("path") or "", vid)
-            row = {"path": path, "scale": it.get("scale")}
+            row = {"path": path}
+            if it.get("scale") not in (None, ""):
+                row["scale"] = it.get("scale")
             if m.get("name"):
                 row["name"] = m.get("name")
             if vid:
@@ -508,6 +510,35 @@ def model_supports_lora(spec: dict | None, mid: str = "") -> bool:
     return "lora" in blob
 
 
+def _nano_lora_scale_field(it) -> float | None:
+    """Fal-aligned: null/missing strength → omit scale (never invent 1.0).
+
+    Plain string LoRA entries omit scale. Invalid non-numeric → ValueError.
+    Clip only when a real numeric scale is provided.
+    """
+    if isinstance(it, str):
+        return None
+    if not isinstance(it, dict):
+        return None
+    if "scale" in it:
+        raw_s = it.get("scale")
+    elif "strength" in it:
+        raw_s = it.get("strength")
+    else:
+        return None
+    if raw_s in (None, ""):
+        return None
+    try:
+        if isinstance(raw_s, bool):
+            raise ValueError()
+        scale = float(raw_s)
+        if not math.isfinite(scale):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"lora scale 必须是有限数值，收到 {raw_s!r}，不能缺省为 1.0") from None
+    return max(0.0, min(4.0, scale))
+
+
 def resolve_nano_loras(payload: dict, *, timeout: float = 30):
     """Resolve ≤3 LoRAs to clean B2 signed paths at generate time. Fail closed.
 
@@ -537,21 +568,25 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
     failed = []
     out = []
     for it in raw:
+        scale = None
         if isinstance(it, str):
             name = it.strip() or "LoRA"
-            scale = 1.0
+            # o50: plain string → omit scale (do not invent 1.0)
+            try:
+                scale = _nano_lora_scale_field(it)
+            except ValueError as e:
+                failed.append({"name": name, "error": str(e)})
+                continue
             vid = civitai_version_id(it)
             dl = civitai_download_api_url(it)
             path_hint = it.strip()
         elif isinstance(it, dict):
             name = str(it.get("name") or it.get("path") or it.get("air") or "LoRA")
             try:
-                raw_s = it.get("scale")
-                if raw_s is None:
-                    raw_s = it.get("strength")
-                scale = float(raw_s) if raw_s not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                scale = 1.0
+                scale = _nano_lora_scale_field(it)
+            except ValueError as e:
+                failed.append({"name": name, "error": str(e)})
+                continue
             vid = civitai_version_id(it)
             dl = civitai_download_api_url(it)
             path_hint = (
@@ -564,7 +599,6 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
             failed.append({"name": "LoRA", "error": "条目格式无效"})
             continue
 
-        scale = max(0.0, min(4.0, scale))
         try:
             if not path_hint or path_hint.lower().startswith("urn:"):
                 raise ValueError("无下载链 / versionId（无直链）")
@@ -611,13 +645,15 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
             if "civitai.com/api/download" in resolved.lower() and "authorization=" not in resolved.lower():
                 # Still the API URL — Nano may not follow with our key; fail closed
                 raise ValueError("未拿到 B2 直链")
-            out.append({
+            row = {
                 "path": resolved,
-                "scale": scale,
                 "name": name,
                 "versionId": vid or "",
                 "downloadUrl": dl or (f"https://civitai.com/api/download/models/{vid}" if vid else ""),
-            })
+            }
+            if scale is not None:
+                row["scale"] = scale
+            out.append(row)
         except Exception as e:
             failed.append({
                 "name": name,
@@ -643,25 +679,22 @@ def _loras(payload: dict) -> list:
     for it in raw if isinstance(raw, list) else []:
         if isinstance(it, str):
             path = it.strip()
-            scale = 1.0
             name = path
+            scale = _nano_lora_scale_field(it)  # None → omit
         elif isinstance(it, dict):
             path = (it.get("path") or it.get("downloadUrl") or it.get("url") or it.get("air") or "").strip()
             name = it.get("name") or path
-            try:
-                raw_s = it.get("scale")
-                if raw_s is None:
-                    raw_s = it.get("strength")
-                scale = float(raw_s) if raw_s not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                scale = 1.0
+            scale = _nano_lora_scale_field(it)  # ValueError fail-closed; None omit
             if (not path or path.lower().startswith("urn:")) and str(it.get("versionId") or "").isdigit():
                 path = "https://civitai.com/api/download/models/" + str(it.get("versionId"))
         else:
             continue
         if not path or path.lower().startswith("urn:"):
             continue
-        out.append({"path": path, "scale": max(0.0, min(4.0, scale)), "name": name})
+        row = {"path": path, "name": name}
+        if scale is not None:
+            row["scale"] = scale
+        out.append(row)
         if len(out) >= 3:
             break
     return out
@@ -934,10 +967,17 @@ def _image_body(payload: dict, spec: dict) -> dict:
         body["guidance_scale"] = _finite_number(cfg, "cfgScale")
     loras = _loras(payload)
     if loras:
-        body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
+        packed = []
+        for x in loras:
+            row = {"path": x["path"]}
+            if "scale" in x:
+                row["scale"] = x["scale"]
+            packed.append(row)
+        body["loras"] = packed
         for i, item in enumerate(loras, 1):
             body[f"lora_{i}_url"] = item["path"]
-            body[f"lora_{i}_scale"] = item["scale"]
+            if "scale" in item:
+                body[f"lora_{i}_scale"] = item["scale"]
     if payload.get("allowMatureContent"):
         body["enable_safety_checker"] = False
     return body
@@ -1136,10 +1176,17 @@ def _video_body(payload: dict, spec: dict) -> dict:
         body["last_image"] = last
     loras = _loras(payload)
     if loras:
-        body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
+        packed = []
+        for x in loras:
+            row = {"path": x["path"]}
+            if "scale" in x:
+                row["scale"] = x["scale"]
+            packed.append(row)
+        body["loras"] = packed
         for i, item in enumerate(loras, 1):
             body[f"lora_{i}_url"] = item["path"]
-            body[f"lora_{i}_scale"] = item["scale"]
+            if "scale" in item:
+                body[f"lora_{i}_scale"] = item["scale"]
     return body
 
 

@@ -262,9 +262,11 @@ class NanoLoraResolveOffline(unittest.TestCase):
         })
         self.assertIsNone(err)
         self.assertEqual(len(out), 3)
-        self.assertEqual([r["scale"] for r in out], [0.5, 1.25, 1.0])
+        self.assertEqual(out[0]["scale"], 0.5)
+        self.assertEqual(out[1]["scale"], 1.25)
+        self.assertNotIn("scale", out[2], "blank strength must omit scale (never invent 1.0)")
         for row in out:
-            self.assertEqual(set(row) >= {"path", "scale"}, True)
+            self.assertIn("path", row)
             self.assertEqual(row["path"], FAKE_B2)
 
     def test_stale_b2_with_version_id_reresolves_via_download_api(self):
@@ -450,6 +452,63 @@ class NanoLoraResolveOffline(unittest.TestCase):
         nano.resolve_nano_loras({"loras": [{"versionId": 3231694, "name": "X"}]})
         # If the production HEAD helper were invoked, setUp's build_opener would raise.
         self.assertTrue(self.head.called)
+
+    # --- o50: never invent scale 1.0 ---
+
+    def test_null_strength_omits_scale(self):
+        self._allow_b2_head()
+        out, err = nano.resolve_nano_loras({
+            "loras": [{"versionId": 3231694, "name": "NullStr", "strength": None}],
+        })
+        self.assertIsNone(err)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["path"], FAKE_B2)
+        self.assertNotIn("scale", out[0])
+        self.assertNotEqual(out[0].get("scale"), 1.0)
+
+    def test_missing_scale_and_strength_omits_scale(self):
+        self._allow_b2_head()
+        out, err = nano.resolve_nano_loras({
+            "loras": [{"versionId": 3231694, "name": "NoScale"}],
+        })
+        self.assertIsNone(err)
+        self.assertNotIn("scale", out[0])
+
+    def test_plain_string_lora_omits_scale(self):
+        self._allow_b2_head()
+        out, err = nano.resolve_nano_loras({"loras": [DL_API]})
+        self.assertIsNone(err)
+        self.assertEqual(len(out), 1)
+        self.assertNotIn("scale", out[0])
+
+    def test_invalid_non_numeric_strength_fail_closed(self):
+        out, err = nano.resolve_nano_loras({
+            "loras": [{"versionId": 3231694, "name": "Bad", "strength": "hot"}],
+        })
+        self.assertIsNone(out)
+        self.assertEqual(err["code"], "lora_no_direct_url")
+        blob = err["error"] + " " + " ".join(f.get("error") or "" for f in err["failed"])
+        self.assertTrue("scale" in blob.lower() or "数值" in blob or "有限" in blob, blob)
+        self.head.assert_not_called()
+
+    def test_loras_helper_omits_null_scale(self):
+        rows = nano._loras({"loras": [{"path": "owner/my-lora", "strength": None}]})
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("scale", rows[0])
+
+    def test_loras_helper_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            nano._loras({"loras": [{"path": "owner/my-lora", "scale": "nope"}]})
+
+    def test_image_body_omits_lora_scale_when_missing(self):
+        body = nano._image_body(
+            {"serviceId": "z-image-turbo-lora", "prompt": "x", "loras": [{"path": FAKE_B2, "name": "X"}], "resolution": "1k"},
+            LORA_SPEC,
+        )
+        self.assertEqual(body["loras"], [{"path": FAKE_B2}])
+        self.assertNotIn("lora_1_scale", body)
+        self.assertEqual(body["lora_1_url"], FAKE_B2)
+
 
 
 if __name__ == "__main__":

@@ -87,8 +87,35 @@ def write_storyboard_graph(payload: dict) -> dict:
     if not isinstance(nodes, list) or not nodes:
         raise ValueError("storyboard graph.nodes 必须是非空数组")
     STORYBOARD_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
-    raw = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     with _storyboard_graph_lock:
+        # o49b: empty/missing incoming url must not wipe existing non-empty url (same shot id)
+        existing = None
+        if STORYBOARD_GRAPH_PATH.exists():
+            try:
+                existing = json.loads(STORYBOARD_GRAPH_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                existing = None
+        if isinstance(existing, dict) and isinstance(existing.get("nodes"), list):
+            by_id = {}
+            for en in existing["nodes"]:
+                if isinstance(en, dict) and en.get("id"):
+                    by_id[en["id"]] = en
+            for n in nodes:
+                if not isinstance(n, dict) or n.get("kind") != "shot":
+                    continue
+                nid = n.get("id")
+                if not nid or nid not in by_id:
+                    continue
+                old = by_id[nid]
+                incoming_url = str(n.get("url") or "").strip()
+                old_url = str(old.get("url") or "").strip()
+                if not incoming_url and old_url:
+                    n["url"] = old.get("url")
+                    if old.get("urlUpdatedAt") not in (None, "") and n.get("urlUpdatedAt") in (None, ""):
+                        n["urlUpdatedAt"] = old.get("urlUpdatedAt")
+                    if old.get("_urlUpdatedAt") not in (None, "") and n.get("_urlUpdatedAt") in (None, ""):
+                        n["_urlUpdatedAt"] = old.get("_urlUpdatedAt")
+        raw = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
         fd, tmp_name = tempfile.mkstemp(
             prefix=f".{STORYBOARD_GRAPH_PATH.name}.",
             suffix=".tmp",
@@ -109,7 +136,11 @@ def write_storyboard_graph(payload: dict) -> dict:
     return payload
 
 def apply_pending_job_to_graph(job_id: str, url: str) -> dict | None:
-    """Belt: when job materializes saved[], bind url onto pending shot in graph."""
+    """Belt: when job materializes saved[], bind url onto pending shot in graph.
+
+    o49b: if pending missing (retired) → no-op; if shot already moved on to a
+    different _jobId / newer url for another job → clear stale pending, do not overwrite.
+    """
     from providers import pending_jobs as pj
     jid = (job_id or "").strip()
     u = (url or "").strip()
@@ -132,8 +163,32 @@ def apply_pending_job_to_graph(job_id: str, url: str) -> dict | None:
     for n in nodes:
         if isinstance(n, dict) and n.get("id") == shot_id and n.get("kind") == "shot":
             found = True
+            existing = str(n.get("url") or "").strip()
+            shot_job = str(n.get("_jobId") or "").strip()
+            # Shot already bound to a different job — do not stomp with stale pending
+            if shot_job and shot_job != jid:
+                pj.clear_pending(jid)
+                return {
+                    "jobId": jid,
+                    "shotId": shot_id,
+                    "url": existing,
+                    "updated": False,
+                    "skipped": "job_mismatch",
+                }
+            if existing and existing != u and shot_job and shot_job != jid:
+                pj.clear_pending(jid)
+                return {
+                    "jobId": jid,
+                    "shotId": shot_id,
+                    "url": existing,
+                    "updated": False,
+                    "skipped": "shot_moved_on",
+                }
             if n.get("url") != u:
                 n["url"] = u
+                now_ms = int(time.time() * 1000)
+                n["_urlUpdatedAt"] = now_ms
+                n["urlUpdatedAt"] = now_ms
                 changed = True
             break
     if not found:

@@ -190,8 +190,8 @@ def test_audit_lengths_helper():
 def test_stamp_and_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    check("v0821o49-harness-stamp-o48" in html, "html stamp")
-    check("20260911-o49harnessstampo48" in html, "cache-bust")
+    check("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    check("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
     check("v0821o42" in js, "js header o42")
 
 

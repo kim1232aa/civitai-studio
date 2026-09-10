@@ -90,6 +90,13 @@ def register_pending(job_id: str, shot_id: str, backend: str = "", **extra: Any)
         raise ValueError("jobId and shotId required")
     data = _read()
     jobs = data.setdefault("jobs", {})
+    # o49b: retire other job entries for the same shotId before insert
+    for old_jid in list(jobs.keys()):
+        if old_jid == jid:
+            continue
+        rec_old = jobs.get(old_jid)
+        if isinstance(rec_old, dict) and str(rec_old.get("shotId") or "").strip() == sid:
+            del jobs[old_jid]
     rec = {
         "shotId": sid,
         "backend": (backend or "").strip(),
@@ -99,6 +106,7 @@ def register_pending(job_id: str, shot_id: str, backend: str = "", **extra: Any)
         if v is not None and k not in rec:
             rec[k] = v
     jobs[jid] = rec
+    data["jobs"] = jobs
     _write(data)
     out = dict(rec)
     out["jobId"] = jid
