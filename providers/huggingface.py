@@ -1102,14 +1102,43 @@ class HuggingFaceProvider(Provider):
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
             return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
+        # v0821o31: official Fal LoRA endpoints (flux-lora / */lora) may be selected on HF
+        # when payload carries loras[]. Never accept bare fal-ai/krea-2/turbo (no LoRA).
+        from .fal import fal_supports_lora, find_model as fal_find_model
+        direct_fal_lora = None
         if (sid or "").startswith(("fal-ai/", "fal.ai/")):
-            return 400, {"error": "当前选中的是 Fal 服务，不能发给 Hugging Face。请选 krea/Krea-2-Turbo。"}
-        mid = model_id(sid)
-        if not mid:
-            return 400, {"error": "缺少 Hugging Face 模型 id"}
-        spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
-        mapping = inference_mapping(mid)
-        candidates = _provider_candidates(mapping, mid, spec, payload)
+            eid = (sid or "").replace("fal.ai/", "fal-ai/", 1)
+            if _has_loras(payload) and fal_supports_lora(fal_find_model(eid) or {"id": eid}):
+                direct_fal_lora = eid
+            else:
+                return 400, {
+                    "error": "当前选中的是不接受 LoRA 的 Fal 服务，不能发给 Hugging Face。"
+                    "有 LoRA 时请选 fal-ai/flux-lora 等；无 LoRA 时请选 Hub 模型。",
+                    "backend": self.id,
+                    "serviceId": sid,
+                }
+        if direct_fal_lora:
+            mid = direct_fal_lora
+            spec = fal_find_model(direct_fal_lora) or {"id": direct_fal_lora, "task": "text-to-image"}
+            mapping = {"fal-ai": {"providerId": direct_fal_lora, "status": "live", "task": "text-to-image"}}
+            candidates = [("fal-ai", direct_fal_lora, "fal")]
+        else:
+            mid = model_id(sid)
+            if not mid:
+                return 400, {"error": "缺少 Hugging Face 模型 id"}
+            spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
+            mapping = inference_mapping(mid)
+            candidates = _provider_candidates(mapping, mid, spec, payload)
+            # Hub mid mapped to a no-LoRA fal pid while loras[] present → honest 400 (UI should have pinned).
+            if _has_loras(payload) and candidates:
+                prov, pid, style = candidates[0]
+                if style == "fal" and not fal_supports_lora(fal_find_model(pid) or {"id": pid}):
+                    return 400, {
+                        "error": f"HF 映射端点 {pid} 不接受 LoRA，不能静默换 sibling；请改选 fal-ai/flux-lora 等",
+                        "backend": self.id,
+                        "serviceId": mid,
+                        "mapped": pid,
+                    }
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
         # One click authorizes one route. Extra keys are only for HTTP 402 credits,
