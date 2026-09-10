@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o30: send-gate — #send clickability (z-index/hit); failUi never silent in capsule; unsupported filled = warn-only (keep o28/o29)
   // v0821o29: Fal LoRA endpoint by AIR base (flux1→flux-lora; krea2→krea-2/turbo/lora; else 不支持 — never hard-pin wrong family)
   // v0821o28: Composer field adapt — board show/disable/「不支持」+ strength「未填」(static/composer-field-adapt.js; no Fal pin)
   // v0821o27: import strength — trpc null backfill from REST /api/generation/data (28533344→0.7; never invent)
@@ -4019,20 +4020,36 @@
     } else {
       markOver(nano, false);
     }
-    // v0821o28: honest unsupported filled fields (adapt board; no silent drop).
+    // v0821o28/o30: unsupported filled fields — warn-only for omitable (sampler/…);
+    // hard-block only true capability gaps (i2v). 铁律8: no silent / no 多余门阀.
+    let adaptWarn = "";
     try {
       const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
-      if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
-        const extra = adapt.filledUnsupportedMessages({
-          $: $,
-          backend: currentBackend(),
-          mode: state.mode,
-          caps: caps
-        }) || [];
-        extra.forEach(function (m) { if (m) msgs.push(m); });
+      const ctxAdapt = {
+        $: $,
+        backend: currentBackend(),
+        mode: state.mode,
+        caps: caps
+      };
+      if (adapt && typeof adapt.blockingUnsupportedMessages === "function") {
+        const blocks = adapt.blockingUnsupportedMessages(ctxAdapt) || [];
+        blocks.forEach(function (m) { if (m) msgs.push(m); });
+      } else if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
+        // legacy: only keep i2v-ish as block
+        (adapt.filledUnsupportedMessages(ctxAdapt) || []).forEach(function (m) {
+          if (m && /不支持 i2v/.test(m)) msgs.push(m);
+        });
+      }
+      if (adapt && typeof adapt.filledUnsupportedWarnings === "function") {
+        const warns = adapt.filledUnsupportedWarnings(ctxAdapt) || [];
+        if (warns[0]) adaptWarn = warns[0];
+      } else if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
+        const all = adapt.filledUnsupportedMessages(ctxAdapt) || [];
+        const w = all.filter(function (m) { return m && !/不支持 i2v/.test(m); })[0];
+        if (w) adaptWarn = w;
       }
     } catch (_) {}
-    setParamWarn(msgs[0] || "", !!msgs.length);
+    setParamWarn(msgs[0] || adaptWarn || "", !!(msgs.length || adaptWarn));
     return msgs[0] || "";
   }
   function fillNanoResOptions() {
@@ -5588,6 +5605,51 @@
     return { status: "done", stageOp: stageOp };
   }
 
+  function showSendToast(text, cls) {
+    const foot = $("dockFoot");
+    if (!foot) return;
+    let el = $("sendToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "sendToast";
+      el.className = "send-toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "assertive");
+      foot.insertBefore(el, foot.firstChild);
+    }
+    el.hidden = false;
+    el.className = "send-toast" + (cls ? (" " + cls) : "");
+    el.textContent = text == null ? "" : String(text);
+    try { el.setAttribute("data-send-toast", "1"); } catch (_) {}
+    if (showSendToast._timer) clearTimeout(showSendToast._timer);
+    // Keep reject toasts until next success ack; soft acks auto-clear.
+    if (cls !== "bad" && cls !== "warn") {
+      showSendToast._timer = setTimeout(function () {
+        if (el && el.className.indexOf("bad") < 0 && el.className.indexOf("warn") < 0) el.hidden = true;
+      }, 4200);
+    }
+  }
+  function surfaceSendReject(err, cls, shot) {
+    const tone = cls || "bad";
+    const text = err == null ? "无法生成" : String(err);
+    try {
+      const btn = $("send");
+      if (btn) {
+        btn.setAttribute("data-last-reject", text.slice(0, 180));
+        btn.setAttribute("data-send-fired", "1");
+      }
+    } catch (_) {}
+    if (shot && shot.kind === "shot" && typeof paintShotFail === "function") {
+      paintShotFail(shot, text, tone);
+    } else {
+      setMsg(text, tone);
+      state.dockMode = "expanded";
+      try { renderDock(); } catch (_) {}
+    }
+    showSendToast(text, tone);
+    try { setParamWarn(text, true); } catch (_) {}
+    return text;
+  }
   function setSendVisual(blocked, reason) {
     const btn = $("send");
     if (!btn) return;
@@ -5674,14 +5736,22 @@
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
     }
+    // v0821o30: prove click reached fireSend (even if a gate rejects next)
+    try {
+      btn.setAttribute("data-send-fired", "1");
+      btn.setAttribute("data-send-fired-at", String(now));
+    } catch (_) {}
     // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
-      setMsg("请先选中分镜再生成", "bad");
+      if (typeof surfaceSendReject === "function") surfaceSendReject("请先选中分镜再生成", "bad", null);
+      else setMsg("请先选中分镜再生成", "bad");
       return;
     }
     const failUi = function (err) {
-      if (typeof paintShotFail === "function") paintShotFail(n, err, "bad");
+      // v0821o30: never silent — expand capsule, keep collapsed .msg.bad visible, toast near ↑
+      if (typeof surfaceSendReject === "function") surfaceSendReject(err, "bad", n);
+      else if (typeof paintShotFail === "function") paintShotFail(n, err, "bad");
       else setMsg(err, "bad");
     };
     if (isStubMode()) {
@@ -5713,6 +5783,8 @@
     }
     // v0821l: only ack when proceeding to generate()
     setMsg("已点生成");
+    if (typeof showSendToast === "function") showSendToast("已点生成", "ok");
+    try { btn.removeAttribute("data-last-reject"); } catch (_) {}
     generate();
   }
 

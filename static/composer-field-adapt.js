@@ -4,6 +4,7 @@
  * strength/scale null →「未填」; never invent 0.8/1.0.
  * Live caps from GET /api/providers + catalog may only tighten.
  * Parallel-safe: Composer field visibility only (Fal endpoint pin owned by o29).
+ * o30: filled unsupported (sampler/…) warn-only — hard-block only i2v unsupported.
  */
 (function (root) {
   "use strict";
@@ -308,7 +309,11 @@
     return "strength 未填：出站省略数值（不写 1.0/0.8）";
   }
 
-  function filledUnsupportedMessages(ctx) {
+  /**
+   * Warn-only: filled unsupported fields that outbound simply omits.
+   * o30: NEVER hard-block ↑ for these (铁律8 禁止多余门阀) — surface in strip/paramWarn.
+   */
+  function filledUnsupportedWarnings(ctx) {
     const $ = ctx && ctx.$;
     if (!$) return [];
     const msgs = [];
@@ -327,10 +332,21 @@
     if (filledUnsupported.length) {
       msgs.push("本家不支持 " + filledUnsupported.join("/") + " · 出站不会带上（不静默改值）");
     }
-    if (ctx.mode === "video" && resolveFieldSupport("i2v", ctx) === "unsupported") {
+    return msgs;
+  }
+
+  /** Hard-block only (capability truly unavailable). */
+  function blockingUnsupportedMessages(ctx) {
+    const msgs = [];
+    if (ctx && ctx.mode === "video" && resolveFieldSupport("i2v", ctx) === "unsupported") {
       msgs.push("本家不支持 i2v · Composer 已禁用该能力（明文不支持）");
     }
     return msgs;
+  }
+
+  /** @deprecated o30: prefer filledUnsupportedWarnings + blockingUnsupportedMessages */
+  function filledUnsupportedMessages(ctx) {
+    return blockingUnsupportedMessages(ctx).concat(filledUnsupportedWarnings(ctx));
   }
 
   /**
@@ -388,6 +404,8 @@
     applyFieldSupport: applyFieldSupport,
     applyToSurface: applyToSurface,
     filledUnsupportedMessages: filledUnsupportedMessages,
+    filledUnsupportedWarnings: filledUnsupportedWarnings,
+    blockingUnsupportedMessages: blockingUnsupportedMessages,
     fieldSupportStripText: fieldSupportStripText,
     syncParamSupportStrip: syncParamSupportStrip,
     loraShape: loraShape,

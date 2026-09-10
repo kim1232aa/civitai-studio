@@ -1,3 +1,4 @@
+/* v0821o30-send-gate: dock above zoom/minimap; send hit */
 /* Storyboard-only visual layer. Node dimensions match box() and portPos();
    no graph, provider, parameter, or generation behavior is changed. */
 :root {
@@ -453,3 +454,11 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
 .param-support-strip { font-size: 11px; color: #8b8b94; line-height: 1.35; margin: 4px 0 2px; overflow-wrap: anywhere; }
 .param-field.param-unsupported :is(input, select) { opacity: 0.55; cursor: not-allowed; }
 .prompt.neg.param-unsupported-control { opacity: 0.55; cursor: not-allowed; }
+
+/* v0821o30-send-gate */
+.dock.show { z-index: 26; }
+.dock.collapsed .dock-foot .msg.bad,
+.dock.collapsed .dock-foot .msg.warn { display: block !important; }
+.send::before { inset: -14px; }
+.dock.collapsed .dock-foot .bar { display: flex !important; justify-content: flex-end; }
+.dock-foot .send-toast:not([hidden]) { display: block !important; }
