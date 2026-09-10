@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o36: checkpoint AIR must not enter loras[] — isLoraAir true only :lora:/:lycoris:/…; false :checkpoint:/:diffusionmodel:/:diffuser:; applyImport+pack drop non-LoRA; never invent strength
   // v0821o35: flux1 diffuser AIR — prefer REST air verbatim (flux1:checkpoint); never hand-roll flux:diffusionmodel; never rewrite checkpoint→diffuser; no companion VAE/CLIP/T5 invent
   // v0821o34: flux import match — pin image/sdcpp/flux1/createImage (flux→flux1); diffusionModel→diffuserModel|model; never keep zImage for Flux
   // v0821o33: HF+Fal /lora → Composer「HF Router 不托管该 Fal LoRA 端点，请换家 Fal」(Path A 不计 HF 分; debug HF_ALLOW_FAL_TRANSPORT only)
@@ -3693,6 +3694,31 @@
     const t = String(s || "");
     return /^urn:air:/i.test(t) || /:lora:/i.test(t);
   }
+  // v0821o36: LoRA-family AIR only. Checkpoint / diffusionmodel / diffuser never count as LoRA chips.
+  function isLoraAir(air) {
+    const s = String(air || "").trim();
+    if (!s) return false;
+    const low = s.toLowerCase();
+    // Mirror providers/civitai._LORA_TYPES resource tokens in AIR (urn:air:{eco}:{type}:…).
+    if (/:(lora|lycoris|locon|loha|lokr|dora)(:|\||$)/i.test(low)) return true;
+    if (/:(textualinversion|embedding)(:|\||$)/i.test(low)) return true;
+    return false;
+  }
+  function isNonLoraModelAir(air) {
+    const s = String(air || "").trim();
+    if (!s) return false;
+    return /:(checkpoint|diffusionmodel|diffuser)(:|\||$)/i.test(s);
+  }
+  /** True when an AIR-shaped string must not live in state.loras / outbound loras[]. */
+  function shouldDropNonLoraAir(air, diffusionModel) {
+    const a = String(air || "").trim();
+    if (!a) return false;
+    const dm = String(diffusionModel || "").trim();
+    if (dm && a === dm) return true;
+    if (isNonLoraModelAir(a)) return true;
+    if ((/^urn:air:/i.test(a) || looksAir(a)) && !isLoraAir(a)) return true;
+    return false;
+  }
   function loraDownloadUrl(v) {
     if (!v) return "";
     const vid = loraVersionId(v);
@@ -3881,6 +3907,11 @@
   function addLora(v) {
     const row = normalizeLora(v);
     if (!row.air && !row.path && !row.versionId) return;
+    // v0821o36: never chip checkpoint/diffuser/diffusionmodel AIR as LoRA (incl. paste urn:air:…).
+    if (shouldDropNonLoraAir(row.air)) {
+      try { setMsg("已拒绝非 LoRA AIR（checkpoint/diffuser 不进 loras[]）", "warn"); } catch (_) {}
+      return;
+    }
     const be = currentBackend();
     if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
     if (!Array.isArray(state.loras)) state.loras = [];
@@ -4226,7 +4257,9 @@
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (!list.length) return null;
     const be = currentBackend();
+    let skippedNonLora = 0;
     // v0821n: civitai lora_map skips no-air — path-only must not ship empty air entries
+    // v0821o36: drop checkpoint/diffuser/diffusionmodel AIRs — never invent strength for them
     const mapped = list.map(function (l) {
       let path = l.path || l.downloadUrl || l.url || "";
       const versionId = loraVersionId(l) || "";
@@ -4254,6 +4287,11 @@
         name: l.name || "LoRA",
       };
     }).filter(function (row) {
+      // v0821o36: checkpoint AIR never outbound as LoRA (any backend)
+      if (shouldDropNonLoraAir(row.air)) {
+        skippedNonLora++;
+        return false;
+      }
       if (be === "civitai") return !!(row.air && String(row.air).trim());
       // v0821o: fal outbound needs http path (AIR-only chips would silent-drop in providers/fal.py)
       // v0821o4: huggingface same — _fal_lora_path / _force_loras drop AIR-only
@@ -4269,6 +4307,11 @@
       }
       return true;
     });
+    if (skippedNonLora > 0) {
+      try {
+        setMsg("已丢弃 " + skippedNonLora + " 个非 LoRA AIR（checkpoint/diffuser 不进 loras[]，未发明 strength）", "warn");
+      } catch (_) {}
+    }
     return mapped.length ? mapped : null;
   }
   // v0821n2: UI chips present but pack empty (all lack air on civitai) → must not POST without loras[]
@@ -4319,7 +4362,13 @@
       } catch (_) { hits.textContent = "没找到这个 version"; }
       return;
     }
-    if (q.startsWith("urn:air:") || q.includes(":lora:")) {
+    if (q.startsWith("urn:air:") || q.includes(":lora:") || q.includes(":lycoris:")) {
+      // v0821o36: checkpoint/diffuser AIR paste must not become a LoRA chip
+      if (shouldDropNonLoraAir(q) || (q.startsWith("urn:air:") && !isLoraAir(q))) {
+        hits.textContent = "不是 LoRA AIR（checkpoint/diffuser 请走底模）";
+        try { setMsg("已拒绝非 LoRA AIR（checkpoint/diffuser 不进 loras[]）", "warn"); } catch (_) {}
+        return;
+      }
       addLora({ air: q, name: q.split(":").pop(), strength: null });
       hits.textContent = "";
       return;
@@ -6898,6 +6947,9 @@
     // v0821o3: missing loras[] clears chips for Fal and all backends (was wantCivitai-only; reviewer ~3589)
     if (Array.isArray(j.loras)) {
       // v0821n3-import-air: copy air/name/strength/versionId/path onto chips (normalizeLora + reaffirm air)
+      // v0821o36: drop non-LoRA AIRs (esp. equals j.diffusionModel); never invent strength
+      const dmAir = (j.diffusionModel != null) ? String(j.diffusionModel).trim() : "";
+      let droppedCkpt = 0;
       state.loras = j.loras.map(function (row) {
         const n = normalizeLora(row || {});
         if (row && row.air) n.air = String(row.air).trim();
@@ -6916,7 +6968,18 @@
           }
         }
         return n;
+      }).filter(function (n) {
+        if (shouldDropNonLoraAir(n && n.air, dmAir)) {
+          droppedCkpt++;
+          return false;
+        }
+        return true;
       });
+      if (droppedCkpt > 0) {
+        try {
+          setMsg("导入已丢弃 " + droppedCkpt + " 个非 LoRA AIR（checkpoint 只留 diffusionModel）", "warn");
+        } catch (_) {}
+      }
     } else {
       state.loras = [];
     }
