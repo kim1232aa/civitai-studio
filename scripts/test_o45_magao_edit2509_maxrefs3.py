@@ -41,8 +41,8 @@ def main():
 
     html = (ROOT / "static" / "storyboard.html").read_text()
     js = (ROOT / "static" / "storyboard.js").read_text()
-    check("v0821o48-hydrate-server-wins" in html, "html stamp")
-    check("20260911-o48hydrateserverwins" in html, "cache-bust")
+    check("v0821o49-harness-stamp-o48" in html, "html stamp")
+    check("20260911-o49harnessstampo48" in html, "cache-bust")
     check('"modelscope-ai": { maxRefs: 3' in js or '"modelscope-ai": { maxRefs: 3,' in js, "UI PROVIDER_REF_CAPS ai=3")
     check("catalogAllowsList" in js, "resolveRefCaps list escape for 2509")
 

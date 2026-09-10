@@ -11,8 +11,8 @@ const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 const server = fs.readFileSync(path.join(root, "server.py"), "utf8");
 
-assert.ok(html.includes("v0821o48-hydrate-server-wins"), "html stamp o41");
-assert.ok(html.includes("storyboard.js?v=20260911-o48hydrateserverwins"), "cache bust o41");
+assert.ok(html.includes("v0821o49-harness-stamp-o48"), "html stamp o41");
+assert.ok(html.includes("storyboard.js?v=20260911-o49harnessstampo48"), "cache bust o41");
 assert.ok(source.includes("v0821o41:"), "js header o41");
 assert.ok(source.includes("/out/fill-cap-"), "fill-cap urls");
 assert.ok(!source.includes("/out/o40-fill-"), "no phantom o40-fill");
