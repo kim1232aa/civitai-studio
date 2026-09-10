@@ -1,4 +1,5 @@
-/*! v0821o28-composer-adaptive
+/*! v0821o47-composer-board-sync
+ * Continues o28. Board sync: Magao maxRefs ceiling 3; seed int32 clamp hint.
  * Composer field adapt from docs/api-usage/composer-field-board.md §硬规则 1–6.
  * unsupported/none → disable + plain「不支持」(never hide as-complete).
  * strength/scale null →「未填」; never invent 0.8/1.0.
@@ -9,7 +10,7 @@
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o28-composer-adaptive";
+  const STAMP = "v0821o47-composer-board-sync";
   const BOARD_SRC = "docs/api-usage/composer-field-board.md";
 
   // Values: supported | catalog | unsupported | unknown
@@ -273,6 +274,9 @@
       if (board.loraConfidence === "unverified") loraBit += "(unverified)";
       bits.push(loraBit);
     }
+    const caps = (ctx && ctx.caps) || {};
+    const mr = Number(caps.maxRefs || caps.maxImages || 0);
+    if (mr > 0) bits.push("maxRefs=" + mr);
     const unsupported = ["sampler", "scheduler", "steps", "cfg", "width", "height", "nanoRes", "i2v"]
       .filter(function (f) { return resolveFieldSupport(f, ctx) === "unsupported"; });
     if (unsupported.length) bits.push("不支持:" + unsupported.join("/"));
@@ -381,6 +385,18 @@
     applyFieldSupport($("width"), "width", false, ctx);
     applyFieldSupport($("height"), "height", false, ctx);
     applyFieldSupport($("seed"), "seed", false, ctx);
+    // o47: HF / Magao / Nano seed mod int32 — honest clamp hint (board)
+    (function () {
+      const seedEl = $("seed");
+      if (!seedEl) return;
+      const be = String(ctx.backend || "");
+      const needsClamp = be === "huggingface" || be === "modelscope-ai" || be === "modelscope-cn" || be === "nano-gpt";
+      if (needsClamp) {
+        const prev = String(seedEl.title || "");
+        const hint = "本家 seed 出站 mod int32（不发明默认；超范围按适配器 clamp/reject）";
+        if (!/mod int32/.test(prev)) seedEl.title = prev ? (prev + " · " + hint) : hint;
+      }
+    })();
     applyNegative($("negative"), ctx);
 
     applyFieldSupport($("duration"), "duration", !vid, ctx);

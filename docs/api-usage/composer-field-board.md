@@ -20,7 +20,7 @@
 | seed | no clamp | no clamp | **mod int32** | mod int32 | mod int32 |
 | LoRA 形态 | **`{air: float}`** | **`[{path,scale}]`**（AIR 不当 path） | `[{path,scale}]` **unverified** | 单条 **字符串** `owner/repo`；多条 `{repo:w}` 和=1 | `[{path,scale}]`≤3 + 须 `*-lora` 模型 |
 | LoRA strength | 必填 float；null 不得发明 | scale clip[0,4]；缺 strength 读 strength | 同 Fal 形 | 单条带 weight→本地 400；多条必填 | 同 path/scale |
-| maxRefs | 9 · field=`images` | 默认 9；单图端点 catalog→1 · `image_urls` | 9 · `image_urls` | **1** · `image_url` | **5** · `input_references` |
+| maxRefs | 9 · field=`images` | 默认 9；单图端点/OpenAPI 收紧（如 flux-2/edit=4）· `image_urls` | 9 · `image_urls` | 天花板 **3**（Edit-2509=3；其它 catalog 收紧到 1）· `image_url` | **5** · `input_references` |
 | i2i | source/images | first_frame / image_urls | 启发式 wants_img；OpenAI 弱 | image_url | input_references（禁混 image_url） |
 | i2v | sourceImage 等 frameFields | fal_endpoint 字段族 | i2v=none（能力表） | image_url | image_url / imageDataUrl |
 | progress | rate | queue | **none**（禁假动画） | status_only | none |
@@ -55,7 +55,7 @@
 ### modelscope-ai / modelscope-cn
 - **必露**：owner/repo model、prompt、negative、size、seed、steps、guidance  
 - **LoRA**：Hub owner/repo；单条无 weight→字符串；有 weight 单条→硬拒；多条 dict 和=1  
-- **maxRefs=1**；sampler/scheduler **unsupported**（硬拒丢参）  
+- **maxRefs**：天花板 3；Edit-2509=3，其它模型 catalog 收紧到 1；sampler/scheduler **unsupported**（硬拒丢参）  
 - **死值债**：Z-Image + 字符串 LoRA 实测 500 `Model does not exist`；poll 曾翻 FAILED  
 - **出站证据**：底模无 LoRA Pass；带 LoRA Fail
 

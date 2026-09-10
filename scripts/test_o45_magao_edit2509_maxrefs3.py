@@ -41,8 +41,8 @@ def main():
 
     html = (ROOT / "static" / "storyboard.html").read_text()
     js = (ROOT / "static" / "storyboard.js").read_text()
-    check("v0821o46b-local-out-resume" in html, "html stamp")
-    check("20260911-o46blocaloutresume" in html, "cache-bust")
+    check("v0821o47-composer-board-sync" in html, "html stamp")
+    check("20260911-o47composerboardsync" in html, "cache-bust")
     check('"modelscope-ai": { maxRefs: 3' in js or '"modelscope-ai": { maxRefs: 3,' in js, "UI PROVIDER_REF_CAPS ai=3")
     check("catalogAllowsList" in js, "resolveRefCaps list escape for 2509")
 
