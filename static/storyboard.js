@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o18: P1 chatRail video path on; collapsed keep #send; writeback+i2v first-frame harden
   // v0821o17: node capsule + right chat-rail skeleton; visible wires; i2v first-frame slot actions
   // v0821o16: persistServer skip empty + surface PUT fail; orphan reattach; poll wait saved[] not CDN
   // v0821o15: writeback also PUT /api/storyboard-graph; boot hydrate so clean-profile hard refresh keeps card
@@ -1840,7 +1841,7 @@
     const sid = ($("service") && $("service").value) || "";
     const steps = [
       { on: shotOk, warn: !shotOk, text: shotOk ? ("分镜 · " + (shot.title || "")) : "请先选中分镜" },
-      { on: state.mode === "image" && !stub, warn: stub, text: stub ? (ml + " · 未接") : ("模式 · " + ml) },
+      { on: !stub && (state.mode === "image" || state.mode === "video"), warn: stub, text: stub ? (ml + " · 未接") : ("模式 · " + ml) },
       { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + sid) : "选 Civitai / Fal 等服务（同配方台）" },
     ];
     if (state.mode === "video") {
@@ -2120,6 +2121,11 @@
     }
     mention(asset, shot);
     if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    // v0821o18: explicit attach only — never steal recipe-desk history; announce when video first frame lands
+    if (shot && shot.kind === "shot" && state.mode === "video" && isImageSource(asset) && shot.firstFrameId === asset.id) {
+      try { setMsg("首帧已就绪 · 可生成", "ok"); } catch (_) {}
+      try { if (typeof renderChatRail === "function") renderChatRail(); } catch (_) {}
+    }
     return true;
   }
   function unlinkAssetFromShot(asset, shot) {
@@ -3111,9 +3117,15 @@
       } else if (created.length) {
         selectNode(created[created.length - 1].id);
       }
-      renderCards(); drawWires(); renderDock(); persist();
+      renderCards(); drawWires(); renderDock();
+      if (typeof renderChatRail === "function") renderChatRail();
+      persist();
+      persistServer();
       if (created.length) {
-        setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
+        const live = nodeById(state.selected);
+        const frameReady = !!(live && live.kind === "shot" && state.mode === "video" && typeof frameAsset === "function" && frameAsset(live));
+        if (frameReady) setMsg("首帧已就绪 · 可生成", "ok");
+        else setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
       }
       if ($("importModal") && $("importModal").classList.contains("show")) {
         refreshImportLibrary().then(() => renderImportModal());
@@ -4986,6 +4998,7 @@
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
     // v0821o16: re-attach orphan shot into state.nodes before persist/PUT (avoid empty nodes 400).
+    // v0821o18: keep live.url even if a later hydrate races; always refresh dock/chat after card write.
     if (!shot || !url) return;
     let live = nodeById(shot.id);
     if (!live) {
@@ -4993,6 +5006,7 @@
       live = shot;
     }
     live.url = url;
+    shot.url = url; // keep caller reference in sync (poll path may hold stale shot obj)
     removeUnpromotedFromShot(live.id);
     const frame = (typeof frameAsset === "function") ? frameAsset(live) : null;
     if (frame && frame.id && !(state.edges || []).some((e) => e.from === frame.id && e.to === live.id)) {
@@ -5001,7 +5015,7 @@
     pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
     if (typeof renderChatRail === "function") renderChatRail();
-    try { renderCards(); drawWires(); } catch (_) {}
+    try { renderCards(); drawWires(); renderDock(); } catch (_) {}
     persist();
     persistServer();
   }

@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "stamp must be v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "stamp must be v0821o18-writeback-i2v")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -364,7 +364,7 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -424,7 +424,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "stamp v0821o18-writeback-i2v")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -483,7 +483,7 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -601,10 +601,10 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o17-capsule-wires: unmention/link helpers still present."""
+    """v0817b lineage under v0821o18-writeback-i2v: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -621,10 +621,10 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o17-capsule-wires: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o18-writeback-i2v: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -667,7 +667,7 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -741,7 +741,7 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -776,7 +776,7 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -802,7 +802,7 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -842,7 +842,7 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -901,7 +901,7 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -972,7 +972,7 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
@@ -1036,7 +1036,7 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -1126,7 +1126,7 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
@@ -1209,7 +1209,7 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp v0821o17-capsule-wires")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp v0821o18-writeback-i2v")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1331,7 +1331,7 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1419,7 +1419,7 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -1483,12 +1483,12 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o17-capsule-wires: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o18-writeback-i2v: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1541,12 +1541,12 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o17-capsule-wires: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o18-writeback-i2v: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1607,7 +1607,7 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821o7"' in js, "STORE_OLDS keeps v0821o7")
@@ -1731,9 +1731,9 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1852,9 +1852,9 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2040,9 +2040,9 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2187,7 +2187,7 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
@@ -2205,7 +2205,7 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -2274,7 +2274,7 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -2397,22 +2397,22 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2436,10 +2436,10 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2604,10 +2604,10 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2666,10 +2666,10 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2808,10 +2808,10 @@ def test_v0821o4_hf_turbo_lora():
     PATH = "https://civitai.com/api/download/models/3231694"
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3031,10 +3031,10 @@ def test_v0821o5_hf_no_wavespeed():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3168,7 +3168,7 @@ def test_v0821o6_modelscope_hub_lora():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o17-capsule-wires"
+    STAMP = "v0821o18-writeback-i2v"
     HUB = "krea/Krea-2-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3177,8 +3177,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3544,7 +3544,7 @@ def test_v0821o6b_ms_lora_shape():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o17-capsule-wires"
+    STAMP = "v0821o18-writeback-i2v"
     HUB = "Tongyi-MAI/Z-Image-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3552,15 +3552,15 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true("nanogpt" not in STAMP and "nano-gpt" not in STAMP, "stamp stays Magao, not Nano")
-    assert_true("v0821o17-capsule-wires" in html and "nano" not in "v0821o17-capsule-wires", "html must not drift onto Nano stamps")
-    assert_true("v0821o17-capsule-wires" in html, "o7 param-surface stamp")
+    assert_true("v0821o18-writeback-i2v" in html and "nano" not in "v0821o18-writeback-i2v", "html must not drift onto Nano stamps")
+    assert_true("v0821o18-writeback-i2v" in html, "o7 param-surface stamp")
 
     fi = js.find("function msLoraFixtureImport")
     fj = js.find("async function mountMsLoraFixture", fi)
@@ -3679,9 +3679,9 @@ def test_v0821o7_param_surface():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp o7")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3750,7 +3750,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r17capwire">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r18writeback">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3911,8 +3911,8 @@ def test_v0821o9_fail_zh_lora_honesty():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     index = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "script cache-bust")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "script cache-bust")
     assert_true("function humanizeFailText" in js, "humanizeFailText helper")
     assert_true('/\\bmissing\\b/.test(lower) && /body\\./.test(lower)' not in js,
                 "no bare missing&&body. false-positive clause")
@@ -4025,12 +4025,12 @@ def test_v0821o15_server_writeback_executable():
     """v0821o15: local persist + PUT /api/storyboard-graph; clean-profile hydrate keeps shot.url."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o15")
     assert_true('"nl-storyboard-v0821o14"' in js, "STORE_OLDS keeps o14")
     assert_true('"nl-storyboard-v0821o13"' in js, "STORE_OLDS keeps o13")
     assert_true('"nl-storyboard-v0821o12"' in js, "STORE_OLDS keeps o12")
-    assert_true("storyboard.js?v=20260910-r17capwire" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-r18writeback" in html, "js cache bust")
     assert_true("function mergePreferUrl" in js, "mergePreferUrl helper")
     assert_true("function isQuotaErr" in js, "isQuotaErr helper")
     assert_true("function persistServer" in js, "persistServer helper")
@@ -4075,13 +4075,13 @@ def test_v0821o15_server_writeback_executable():
     assert_true("ok: storyboard persist/restore executable checks passed" in (proc.stdout or ""), proc.stdout)
 
 
-def test_v0821o17_phase_a_shell():
-    """Phase A: capsule + right rail + visible wires + writeback + i2v slot + honest stubs."""
+def test_v0821o18_phase_a2_writeback_i2v():
+    """Phase A2: writeback+i2v harden + P1 chatRail video on + collapsed #send; keep A1/A3/A5."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o17-capsule-wires" in html, "html stamp o17")
-    assert_true('src="/static/storyboard.js?v=20260910-r17capwire"' in html, "js cache-bust o17")
+    assert_true("v0821o18-writeback-i2v" in html, "html stamp o18")
+    assert_true('src="/static/storyboard.js?v=20260910-r18writeback"' in html, "js cache-bust o18")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
     assert_true('"nl-storyboard-v0821o16"' in js, "STORE_OLDS still knows o16")
 
@@ -4123,6 +4123,16 @@ def test_v0821o17_phase_a_shell():
     assert_true("切到图片生成" in js, "soften copy")
     assert_true("不能偷配方台" in js, "hard gate no recipe steal")
     assert_true("首帧已就绪 · 可生成" in js, "ready copy kept")
+
+    # P1 from code review Pass (o18)
+    assert_true('state.mode === "image" || state.mode === "video"' in js, "chatRail mode step lights for video")
+    assert_true(".dock.collapsed .dock-foot{display:none}" not in html, "collapsed must not hide dock-foot")
+    assert_true(".dock.collapsed .dock-foot{display:flex" in html, "collapsed dock-foot flex visible")
+    assert_true(".dock.collapsed .dock-foot .bar > :not(#send):not(.grow){display:none}" in html,
+                "collapsed keeps #send")
+    assert_true("shot.url = url" in js[js.find("function writebackResult"):js.find("function pickSavedUrl")],
+                "writeback syncs caller shot.url")
+    assert_true("v0821o18: explicit attach only" in js, "i2v attach announces 首帧已就绪")
 
     # A5 honest stubs
     assert_true("文本生成<span class=\"mode-tag\">未接</span>" in html, "text 未接")
@@ -4188,7 +4198,7 @@ def main():
         test_v0821o9_fail_zh_lora_honesty,
         test_r7_new_shot_does_not_stack,
         test_v0821o15_server_writeback_executable,
-        test_v0821o17_phase_a_shell,
+        test_v0821o18_phase_a2_writeback_i2v,
     ]
     failed = 0
     for fn in tests:

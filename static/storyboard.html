@@ -100,7 +100,12 @@
   .dock.collapsed .dock-body{display:flex;flex-direction:column;overflow:visible;padding:8px 12px 10px;min-height:0;flex:0 0 auto}
   .dock.collapsed .dock-scroll{overflow:visible;flex:0 0 auto}
   .dock.collapsed .dock-scroll > :not(.modes):not(.refs){display:none}
-  .dock.collapsed .dock-foot{display:none}
+  /* v0821o18 P1: collapsed capsule keeps dock-foot/#send visible */
+  .dock.collapsed .dock-foot{display:flex;flex-direction:column;gap:4px;padding:0 4px 6px;flex:0 0 auto}
+  .dock.collapsed .dock-foot .lora-block{display:none}
+  .dock.collapsed .dock-foot .bar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:36px}
+  .dock.collapsed .dock-foot .bar > :not(#send):not(.grow){display:none}
+  .dock.collapsed .dock-foot .msg{display:none}
   .dock.expanded{max-height:58vh}
   .dock.expanded .dock-body{display:flex;flex-direction:column;overflow:hidden;padding:10px 14px 12px;min-height:0;flex:1}
   /* ONE scroll owner for the whole body */
@@ -399,7 +404,7 @@
   .chat-rail-send[aria-disabled="true"]{background:#3a3a44;color:#8b8b94}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r17capwire">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r18writeback">
 </head>
 <body>
 <div class="app">
@@ -414,7 +419,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o17-capsule-wires</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o18-writeback-i2v</span>
     </div>
   </header>
   <div class="stage">
@@ -602,6 +607,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r17capwire"></script>
+<script src="/static/storyboard.js?v=20260910-r18writeback"></script>
 </body>
 </html>
