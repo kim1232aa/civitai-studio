@@ -45,3 +45,10 @@ API 调查报告单独保留在 [`api-usage/`](./api-usage/)，可与本文件�
 ---
 
 文档维护：只增补老板新铁律；不要把探测题、agent 复述写成「老板原话」。
+
+## 6. 源站权威入口
+
+Seko 无限画布（老板确认）：
+`https://seko.sensetime.com/infinite-canvas?canvasId=2096017790470868993`
+
+原站对照必须用此入口（或老板另行更新的链接）。
