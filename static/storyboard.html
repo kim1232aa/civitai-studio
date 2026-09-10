@@ -248,8 +248,12 @@
 
   .lora-block{margin:10px 0 0;padding:10px;border:1px solid #2a2a30;border-radius:12px;background:#121216}
   .lora-block.hidden{display:none}
+  .lora-block.lora-unsupported{border-color:#5a3030}
+  .lora-block.lora-unsupported .lora-row.hidden{display:none!important}
   .lora-hd{display:flex;align-items:center;gap:8px;margin:0 0 8px}
   .lora-hd .lbl{font-size:12px;color:#9a9aa3;flex:1}
+  .lora-hd .lora-capability-rematch{border:1px solid #4a4a54;background:#1a1a1f;color:#e8e8ec;border-radius:999px;padding:4px 10px;font-size:11px;cursor:pointer;flex-shrink:0}
+  .lora-hd .lora-capability-rematch:hover{border-color:#6a6a74;color:#fff}
   .lora-hint{font-size:11px;color:#9a9aa3;margin:0 0 8px;display:none}
   .lora-hint.show{display:block}
   .lora-hint.bad{color:var(--coral)}
@@ -421,8 +425,8 @@
   .chat-rail-send{display:none}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260911-o53dcapacityrematchroster">
-  <link rel="stylesheet" href="/static/composer-field-adapt.css?v=20260911-o53dcapacityrematchroster" />
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260911-o54loracapabilitymatch">
+  <link rel="stylesheet" href="/static/composer-field-adapt.css?v=20260911-o54loracapabilitymatch" />
 </head>
 <body>
 <div class="app">
@@ -438,7 +442,7 @@
       <button class="tool-mini" id="canvasManagerToggle" type="button">项目</button>
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o53d-capacity-rematch-roster</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o54-lora-capability-match</span>
     </div>
   </header>
   <div id="canvasManager" class="canvas-manager" aria-label="项目与画布管理"></div>
@@ -629,8 +633,8 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/composer-field-adapt.js?v=20260911-o53dcapacityrematchroster"></script>
-<script src="/static/storyboard.js?v=20260911-o53dcapacityrematchroster"></script>
+<script src="/static/composer-field-adapt.js?v=20260911-o54loracapabilitymatch"></script>
+<script src="/static/storyboard.js?v=20260911-o54loracapabilitymatch"></script>
 <script src="/static/canvas_manager.js?v=20260910-canvas-manager"></script>
 </body>
 </html>

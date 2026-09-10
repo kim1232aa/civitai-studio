@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o54: LoRA capability rematch via supportsLora (chips kept + 一键匹配); stamp v0821o54-lora-capability-match
   // v0821o53d: rematch pool = roster+catalog (not only paged catalogById); stamp v0821o53d-capacity-rematch-roster
   // v0821o53c: wire capacity-rematch click + keep pin on capacity-ok endpoint; stamp v0821o53c-capacity-rematch-click
   // v0821o53: capacity rematch when N>maxRefs (catalog eats+cap≥N; no silent unlink); stamp v0821o53-capacity-rematch
@@ -3646,6 +3647,11 @@
       try { persist(); } catch (_) {}
       return;
     }
+    if (act.dataset.act === "lora-capability-rematch") {
+      applyLoraCapabilityRematch();
+      try { persist(); } catch (_) {}
+      return;
+    }
     if (act.dataset.act === "fill-refs-cap") {
       const shot = nodeById(state.selected);
       if (!shot || shot.kind !== "shot") return;
@@ -4455,9 +4461,18 @@
     return false;
   }
   function catalogItemSupportsLora(it) {
-    it = (arguments.length ? it : catalogItemForService());
+    const hasArg = arguments.length > 0;
+    it = (hasArg ? it : catalogItemForService());
     const be = currentBackend();
     const caps = catalogCaps();
+    // o54: when scoring another catalog row, honor that row's supportsLora (ignore current service caps deny).
+    if (hasArg && it) {
+      if (it.supportsLora === false) return false;
+      if (it.capabilities && it.capabilities.supportsLora === false) return false;
+      if (it.capabilities && it.capabilities.lora === "none") return false;
+      if (it.supportsLora === true) return true;
+      if (it.capabilities && it.capabilities.supportsLora === true) return true;
+    }
     if (caps && caps.lora === "none") return false;
     if (it && it.supportsLora === false) return false;
     if (caps && caps.supportsLora === false) return false;
@@ -4482,7 +4497,9 @@
   }
   function showLoraBlock() {
     const be = currentBackend();
-    if (Array.isArray(state.loras) && state.loras.length) return true;
+    const chips = Array.isArray(state.loras) && state.loras.length > 0;
+    // o54: chips always visible (rematch UI) even when !supportsLora — never silent-drop
+    if (chips) return true;
     if (!catalogItemSupportsLora()) return false;
     if (be === "fal" || be === "civitai" || be === "nano-gpt") return true;
     if (isModelscopeBe() || be === "huggingface") return true;
@@ -4583,6 +4600,39 @@
     if (!block) return;
     const show = showLoraBlock();
     block.classList.toggle("hidden", !show);
+    const chips = Array.isArray(state.loras) && state.loras.length > 0;
+    const support = catalogItemSupportsLora();
+    block.classList.toggle("lora-unsupported", !!(chips && !support));
+    const row = block.querySelector(".lora-row");
+    if (row) {
+      if (chips && !support) {
+        row.classList.add("hidden");
+        row.setAttribute("aria-hidden", "true");
+        if ($("loraQ")) $("loraQ").disabled = true;
+        if ($("searchLora")) $("searchLora").disabled = true;
+      } else {
+        row.classList.remove("hidden");
+        row.removeAttribute("aria-hidden");
+        if ($("loraQ")) $("loraQ").disabled = false;
+        if ($("searchLora")) $("searchLora").disabled = false;
+      }
+    }
+    const hd = block.querySelector(".lora-hd");
+    let btn = block.querySelector('[data-act="lora-capability-rematch"]');
+    if (chips && !support) {
+      if (!btn && hd) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip-btn lora-capability-rematch";
+        btn.setAttribute("data-act", "lora-capability-rematch");
+        btn.textContent = "一键匹配";
+        btn.title = "改选同后端支持 LoRA 的模型（不静默丢芯片）";
+        hd.appendChild(btn);
+      }
+      if (btn) btn.hidden = false;
+    } else if (btn) {
+      btn.hidden = true;
+    }
     syncLoraPlaceholders();
     renderLoras();
   }
@@ -5011,6 +5061,14 @@
         }
       } catch (_) {}
     }
+    // v0821o54: chips + !supportsLora → rematch same-backend LoRA-capable (never silent drop).
+    if (typeof tryLoraCapabilityRematchAfterServiceChange === "function") {
+      try {
+        if (tryLoraCapabilityRematchAfterServiceChange()) {
+          /* rematched */
+        }
+      } catch (_) {}
+    }
     syncParamChrome();
     try { renderDock(); } catch (_) {}
   }
@@ -5205,7 +5263,7 @@
   function outboundLoraBlockMsg() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (list.length && !catalogItemSupportsLora()) {
-      return "当前模型不支持 LoRA，已选 LoRA 不能静默丢掉，请删除芯片或改选支持 LoRA 的模型";
+      return "当前模型不支持 LoRA，已选 LoRA 不能静默丢掉 · 请点「一键匹配」改选同后端 LoRA 端点，或删除芯片";
     }
     const be = currentBackend();
     const mapped = list.map(packLoraRow);
@@ -5234,10 +5292,19 @@
     if (!list.length) return;
     const be = currentBackend();
     if (!catalogItemSupportsLora()) {
-      list.forEach(function (l) { l.status = "当前模型不支持"; });
-      setLoraNote("当前模型不支持 LoRA，已选芯片还在，生成会被拦住（不会静默丢掉）", true);
-      renderLoras();
-      return;
+      let rematched = false;
+      try {
+        if (typeof tryLoraCapabilityRematchAfterServiceChange === "function") {
+          rematched = !!tryLoraCapabilityRematchAfterServiceChange();
+        }
+      } catch (_) {}
+      if (!(rematched && catalogItemSupportsLora())) {
+        list.forEach(function (l) { l.status = "当前模型不支持"; });
+        setLoraNote("当前模型不支持 LoRA，已选芯片还在 · 点「一键匹配」改选同后端 LoRA 端点（不会静默丢掉）", true);
+        renderLoras();
+        try { syncLoraUi(); } catch (_) {}
+        return;
+      }
     }
     let bad = 0;
     list.forEach(function (l) {
@@ -6195,6 +6262,126 @@
     shot.serviceId = want;
     state._capacityRematchLock = want;
     state._pinFalLoraService = want;
+    return true;
+  }
+
+  // v0821o54: same-backend LoRA-capable rematch (Nano prefer flux-lora / *-lora; never invent ids).
+  function loraCapabilityRematchId(currentIt, poolOpt) {
+    const pool = poolOpt || rematchCandidatePool();
+    if (!pool || !Object.keys(pool).length) return "";
+    const curId = String((currentIt && currentIt.id) || ($("service") && $("service").value) || "");
+    const curBe = String((currentIt && currentIt.backend) || (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "").toLowerCase();
+    const scored = [];
+    Object.keys(pool).forEach(function (cid) {
+      const row = pool[cid];
+      if (!row) return;
+      const rid = String(row.id || cid);
+      if (!rid || rid === curId) return;
+      const be = String(row.backend || curBe || "").toLowerCase();
+      let score = 0;
+      if (be && curBe && be === curBe) score += 100;
+      else if (curBe === "fal" && (be === "fal" || !row.backend)) score += 100;
+      else if ((curBe === "nano-gpt" || curBe === "nanogpt") && (be === "nano-gpt" || be === "nanogpt" || !row.backend)) score += 100;
+      else return;
+      if (!catalogItemSupportsLora(row)) return;
+      const ridL = rid.toLowerCase();
+      const nameL = String(row.name || "").toLowerCase();
+      if (curBe === "nano-gpt" || curBe === "nanogpt" || be === "nano-gpt" || be === "nanogpt") {
+        if (ridL.indexOf("flux-lora") >= 0 || nameL.indexOf("flux-lora") >= 0) score += 100;
+        else if (/\/?[\w.-]*lora\b/i.test(rid) || /-lora\b/i.test(rid) || /\/lora/i.test(rid)) score += 80;
+      }
+      if (curBe === "fal" || be === "fal") {
+        if (typeof FAL_FLUX_LORA_SERVICE !== "undefined" && rid === FAL_FLUX_LORA_SERVICE) score += 90;
+        else if (ridL.indexOf("flux-lora") >= 0) score += 88;
+        if (typeof FAL_LORA_PREF_SERVICE !== "undefined" && rid === FAL_LORA_PREF_SERVICE) score += 85;
+        if (/\/lora\b/i.test(rid) || (typeof falEndpointTakesLora === "function" && falEndpointTakesLora(row))) score += 50;
+      }
+      if (/lora/i.test(rid) || /lora/i.test(nameL)) score += 10;
+      scored.push({ id: rid, score: score });
+    });
+    if (!scored.length) return "";
+    scored.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return scored[0].id;
+  }
+
+  function applyLoraCapabilityRematch() {
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") {
+      setMsg("请先选中分镜再匹配 LoRA 端点", "warn");
+      return false;
+    }
+    const chips = Array.isArray(state.loras) ? state.loras : [];
+    if (!chips.length) {
+      setMsg("没有 LoRA 芯片，无需匹配", "warn");
+      return false;
+    }
+    const it = catalogItemForService();
+    if (catalogItemSupportsLora(it)) {
+      setMsg("当前模型已支持 LoRA，无需匹配", "ok");
+      return false;
+    }
+    const pool = rematchCandidatePool();
+    const want = loraCapabilityRematchId(it, pool);
+    if (!want) {
+      setMsg("目录无同后端支持 LoRA 的模型可匹配（芯片保留，不静默丢掉）", "bad");
+      return false;
+    }
+    const row = pool[want] || (state.catalogById && state.catalogById[want]);
+    if (!row) {
+      setMsg("候选 " + want + " 不在官方目录（不伪造、不静默丢芯片）", "bad");
+      return false;
+    }
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) state.catalogById[want] = row;
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, want);
+    sel.value = want;
+    shot.serviceId = want;
+    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
+      state._pinFalLoraService = want;
+      state._pendingService = want;
+    }
+    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    if (sel.value !== want && state.catalogById[want]) {
+      sel.value = want;
+      shot.serviceId = want;
+    }
+    // keep chips
+    try { renderDock(); } catch (_) {}
+    try { syncParamSurface(); } catch (_) {}
+    try { syncLoraUi(); } catch (_) {}
+    setMsg("已匹配 LoRA 能力：" + ((row && row.name) || want) + " · 芯片保留", "ok");
+    return true;
+  }
+
+  function tryLoraCapabilityRematchAfterServiceChange() {
+    const chips = Array.isArray(state.loras) ? state.loras : [];
+    if (!chips.length) return false;
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return false;
+    const it = catalogItemForService();
+    if (catalogItemSupportsLora(it)) return false;
+    const pool = rematchCandidatePool();
+    const want = loraCapabilityRematchId(it, pool);
+    if (!want) return false;
+    const row = pool[want] || (state.catalogById && state.catalogById[want]);
+    if (!row) return false;
+    if (String(it && it.id) === want) return false;
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) state.catalogById[want] = row;
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, want);
+    sel.value = want;
+    shot.serviceId = want;
+    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
+      state._pinFalLoraService = want;
+    }
+    setMsg("已自动匹配 LoRA 能力：" + ((row && row.name) || want) + " · 芯片保留", "ok");
     return true;
   }
 
@@ -7412,6 +7599,22 @@
       foot.addEventListener("pointerdown", onFoot, true);
     }
       }
+
+  function bindLoraCapabilityRematchClick() {
+    if (bindLoraCapabilityRematchClick._done) return;
+    bindLoraCapabilityRematchClick._done = true;
+    function onAct(ev) {
+      const act = ev.target && ev.target.closest && ev.target.closest('[data-act="lora-capability-rematch"]');
+      if (!act) return;
+      try { ev.preventDefault(); } catch (_) {}
+      applyLoraCapabilityRematch();
+      try { persist(); } catch (_) {}
+    }
+    const block = $("loraBlock");
+    if (block) block.addEventListener("click", onAct);
+    const foot = $("dockFoot");
+    if (foot) foot.addEventListener("click", onAct);
+  }
 
   function bindComposerSendKeys() {
     if (bindComposerSendKeys._done) return;
