@@ -3913,20 +3913,35 @@ def test_v0821o9_fail_zh_lora_honesty():
     assert_true("未填·出站按提供方默认" in rend, "LoRA strength placeholder is outbound-honest")
     assert_true("提供方默认" in rend, "title/placeholder denies invent")
 
-    start = js.find("function humanizeFailText")
-    end = js.find("function formatErrInfo", start)
-    helper = js[start:end]
-    prog = helper + r"""
+    paint = js[js.find("function paintShotFail"):js.find("function paintShotFail") + 900]
+    assert_true("shot._error = info.text" in paint, "paintShotFail card _error is humanized text")
+    assert_true("setMsg(info.text" in paint, "paintShotFail Composer #msg same as card")
+    failblk = js[js.find("function fail(err, status, cls)"):js.find("function fail(err, status, cls)") + 700]
+    assert_true("shot._error = info.text" in failblk, "runShotStep fail card _error is humanized text (not prefix)")
+    assert_true("formatErrInfo(err)" in failblk, "runShotStep fail goes through formatErrInfo")
+    # poll must throw RAW Fal/job error so formatErrInfo can keep English excerpt
+    run = js[js.find("async function runShotStepWork"):js.find("function setSendVisual")]
+    assert_true("throw new Error(detail)" not in run, "poll must not pre-wrap formatErr (loses excerpt)")
+    assert_true("throw (st.error" in run or "throw st.error" in run, "poll throws raw job.error into fail()")
+
+    hs = js.find("function shortErrExcerpt")
+    he = js.find("function formatErr(", hs)
+    helpers = js[hs:he]
+    assert_true("function humanizeFailText" in helpers and "function formatErrInfo" in helpers, "extract humanize+formatErrInfo")
+    prog = helpers + r"""
 const cases = [
   ["body.prompt: The content could not be processed because it contained material flagged by a content checker.", "内容未通过安全审核"],
   ["body.prompt: Field required", "缺少提示词（服务端校验）"],
   ["body.image_url: Field required", "缺少图片输入（服务端校验）"],
   ['{"type":"missing","loc":["body","prompt"],"msg":"Field required"}', "缺少提示词（服务端校验）"],
+  ['{"type":"missing","loc":["body","prompt"]}', "缺少提示词（服务端校验）"],
   ['[{"type":"missing","loc":["body","start_image"],"msg":"Field required"}]', "缺少图片输入（服务端校验）"],
+  ["prompt is required but was not provided", "缺少提示词（服务端校验）"],
   ["content_policy_violation", "内容未通过安全审核"],
   ["flagged by a content checker", "内容未通过安全审核"],
   ["missing dependency in body.build", "missing dependency in body.build"],
   ["User is missing something without body.", "User is missing something without body."],
+  ["The type: missing widget in body.build", "The type: missing widget in body.build"],
   ["The file is missing", "The file is missing"],
   ["此模型需要提示词", "此模型需要提示词"],
   ["File download error", "资源下载失败（链接不可达）"],
@@ -3934,13 +3949,37 @@ const cases = [
 let bad = [];
 for (const [inp, want] of cases) {
   const got = humanizeFailText(inp);
-  if (got !== want) bad.push({inp, want, got});
+  if (got !== want) bad.push({kind:"humanize", inp, want, got});
+}
+const fiCases = [
+  {inp: "body.prompt: Field required", text: "缺少提示词（服务端校验）", excerptHas: ["body.prompt", "Field required"]},
+  {inp: "missing dependency in body.build", text: "missing dependency in body.build", excerptEmpty: true},
+  {inp: "The type: missing widget in body.build", text: "The type: missing widget in body.build", excerptEmpty: true},
+  {inp: '{"type":"missing","loc":["body","prompt"]}', text: "缺少提示词（服务端校验）", excerptHas: ["missing", "body"]},
+  {inp: "body.prompt: The content could not be processed because it contained material flagged by a content checker.", text: "内容未通过安全审核", excerptHas: ["content checker"]},
+  {inp: {error: "body.prompt: Field required"}, text: "缺少提示词（服务端校验）", excerptHas: ["Field required"]},
+];
+for (const c of fiCases) {
+  const fi = formatErrInfo(c.inp);
+  if (fi.text !== c.text) bad.push({kind:"formatErrInfo.text", inp: c.inp, want: c.text, got: fi.text});
+  if (c.excerptEmpty && fi.excerpt) bad.push({kind:"formatErrInfo.excerpt", inp: c.inp, want: "", got: fi.excerpt});
+  if (c.excerptHas) {
+    for (const p of c.excerptHas) {
+      if (!(fi.excerpt || "").includes(p)) bad.push({kind:"formatErrInfo.excerpt", inp: c.inp, need: p, got: fi.excerpt});
+    }
+  }
+  if (fi.text && /[\u4e00-\u9fff]/.test(fi.text) && c.excerptHas) {
+    // mapped ZH must not dump pydantic English into the card/foot text
+    if (fi.text === (typeof c.inp === "string" ? c.inp : JSON.stringify(c.inp))) {
+      bad.push({kind:"zh-not-applied", inp: c.inp, got: fi.text});
+    }
+  }
 }
 if (bad.length) { console.log(JSON.stringify(bad)); process.exit(1); }
 console.log("ok");
 """
     r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)
-    assert_true(r.returncode == 0, "humanizeFailText node eval: %s %s" % (r.stdout, r.stderr))
+    assert_true(r.returncode == 0, "humanizeFailText/formatErrInfo node eval: %s %s" % (r.stdout, r.stderr))
 
     assert_true("fallback == null ? 0.8" not in index, "index clamp must not default 0.8")
     assert_true("clampLoraScale(v.strength != null ? v.strength : v.scale, 0.8)" not in index,

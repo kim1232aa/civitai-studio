@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o11: tighten humanizeFailText — drop bare missing&&body.; quoted type:"missing"; poll throws raw
   // v0821o9: Critiquito P1 — Fal fail 中文 humanize; Composer foot sync _error; LoRA 未填·出站按提供方默认
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
@@ -3245,11 +3246,11 @@
     if (/feature_not_supported/.test(lower) || /\bfeature not supported\b/.test(lower)) {
       return "当前端点不支持该功能";
     }
-    // Field required / pydantic type:"missing" / Fal loc body.<field>: …
+    // Field required / pydantic "type":"missing" / Fal loc body.<field>: Field required.
     // Do NOT use bare \bmissing\b + body. — false-positives prose like
-    // "missing dependency in body.build" or "User is missing … body.".
+    // "missing dependency in body.build" or "The type: missing widget in body.build".
     if (/\bfield required\b/.test(lower)
-        || /\btype["']?\s*:\s*["']?missing\b/.test(lower)
+        || /\btype["']?\s*:\s*["']missing["']/.test(lower)
         || /is required but was not provided/.test(lower)
         || /\bbody\.\w+\s*:\s*field required\b/.test(lower)) {
       if (/prompt/.test(lower)) return "缺少提示词（服务端校验）";
@@ -5065,8 +5066,8 @@
           const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
             || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING";
           if ((st.error || st.status === "failed") && !inFlight) {
-            const detail = formatErr(st.error || (st.wait && st.wait.log) || st.message || "任务失败");
-            throw new Error(detail);
+            // Throw raw so fail() → formatErrInfo keeps English in excerpt.
+            throw (st.error || (st.wait && st.wait.log) || st.message || "任务失败");
           }
           // v0821i: never break on succeeded alone — wait for saved[]/video.url (pickUrl) or keep polling.
           j = st;
