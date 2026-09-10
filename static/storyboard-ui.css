@@ -449,3 +449,13 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .group-bound.flash { animation: none; }
 }
+
+.split-menu{position:absolute;z-index:23;display:none;min-width:168px;padding:6px;background:#141416;
+border:1px solid rgba(255,255,255,.1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.split-menu button{display:flex;justify-content:flex-start;gap:16px;width:100%;border:0;background:transparent;
+color:#e8e8ec;font-size:12px;padding:8px 10px;border-radius:8px}
+.split-menu button:hover{background:rgba(255,255,255,.08)}
+.split-menu button:disabled{opacity:.35;cursor:not-allowed}
+.split-menu button:disabled:hover{background:transparent}
+.node-menu{position:absolute;z-index:30;min-width:132px}
+.node-menu button.danger{color:#ff8d83}

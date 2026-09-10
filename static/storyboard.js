@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o11: deleteNode + 右键菜单 + Delete/Backspace；组用 live pruneGroups
   // v0821o10: mixed LoRA no silent drop; ref cap single-source; model-switch LoRA revalidate
   // v0821o9: LoRA D/E — versionId→AIR, Checkpoint type gate, syncParamChrome, duration gate
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
@@ -124,11 +125,14 @@
     script: { title: "未命名故事", logline: "", scenes: [] },
     editor: { activeShotId: null, playing: false, playIndex: 0, timer: null },
     lastComposerShot: null,
+    selectedEdge: null,
     loras: [],
     _serviceItems: [],
     _providerCaps: {},
   };
   const minimapImages = new WeakMap();
+  let nodeClipboard = null;
+  let nodeMenuPoint = null;
 
   function uid(prefix) { return prefix + "-" + Math.random().toString(36).slice(2, 8); }
   function esc(s) {
@@ -1975,6 +1979,190 @@
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
     if (had) invalidateStageProgress(shot);
   }
+
+  function hideNodeMenu() {
+    const menu = $("nodeContextMenu");
+    if (menu) menu.style.display = "none";
+  }
+
+  function deleteNode(id) {
+    const target = nodeById(id);
+    if (!target) return false;
+    const removedId = id;
+    state.selected = null;
+    state.selectedEdge = null;
+    state.multi = (state.multi || []).filter((x) => x !== removedId);
+    if (state.lastComposerShot === removedId) state.lastComposerShot = null;
+    if (state._scriptShotId === removedId) state._scriptShotId = null;
+    hideNodeMenu();
+    state.edges.filter((e) => e.from === removedId || e.to === removedId).forEach((edge) => {
+      const src = nodeById(edge.from);
+      const dst = nodeById(edge.to);
+      if (src && dst) unlinkAssetFromShot(src, dst);
+    });
+    state.edges = state.edges.filter((e) => e.from !== removedId && e.to !== removedId);
+    state.nodes = state.nodes.filter((n) => n.id !== removedId);
+    state.nodes.forEach((n) => {
+      if (n.firstFrameId === removedId) n.firstFrameId = "";
+      if (n.lastFrameId === removedId) n.lastFrameId = "";
+    });
+    if (state.editor && state.editor.activeShotId === removedId) state.editor.activeShotId = null;
+    pruneGroups();
+    if (state.script && Array.isArray(state.script.scenes)) {
+      state.script.scenes.forEach((scene) => {
+        scene.shotIds = (scene.shotIds || []).filter((sid) => sid !== removedId);
+      });
+    }
+    renderCards();
+    drawWires();
+    renderDock();
+    persist();
+    setMsg("已删除节点", "ok");
+    return true;
+  }
+
+  function copyNode(id) {
+    const node = nodeById(id);
+    if (!node) return false;
+    nodeClipboard = JSON.parse(JSON.stringify(node));
+    setMsg("已复制节点", "ok");
+    return true;
+  }
+
+  function pasteNode(point) {
+    if (!nodeClipboard) return null;
+    const node = JSON.parse(JSON.stringify(nodeClipboard));
+    const prefix = node.kind === "text" ? "text" : node.kind === "shot" ? "shot" : "asset";
+    node.id = uid(prefix);
+    node.x = point && point.x != null ? point.x : Number(node.x || 0) + 48;
+    node.y = point && point.y != null ? point.y : Number(node.y || 0) + 48;
+    if (node.firstFrameId) node.firstFrameId = "";
+    if (node.lastFrameId) node.lastFrameId = "";
+    delete node._busy;
+    delete node._error;
+    delete node._errorDetail;
+    state.nodes.push(node);
+    selectNode(node.id);
+    persist();
+    setMsg("已粘贴节点", "ok");
+    return node;
+  }
+
+  function showNodeMenu(e) {
+    const menu = $("nodeContextMenu");
+    if (!menu || !stage) return;
+    const card = e.target.closest(".card");
+    const edgePath = e.target.closest("path.edge");
+    const ei = edgePath ? Number(edgePath.getAttribute("data-ei")) : NaN;
+    const edge = Number.isFinite(ei) ? state.edges[ei] : null;
+    const targetId = card ? card.dataset.id : "";
+    const targetEdge = edge ? { from: edge.from, to: edge.to, ei: ei } : null;
+    if (targetEdge) {
+      state.selectedEdge = { from: targetEdge.from, to: targetEdge.to, ei: targetEdge.ei };
+      state.selected = null;
+    } else if (targetId && state.selected !== targetId) {
+      state.selectedEdge = null;
+      selectNode(targetId);
+    } else if (!targetId) {
+      state.selectedEdge = null;
+    }
+    nodeMenuPoint = {
+      targetId: targetId,
+      targetEdge: targetEdge,
+      world: clientToWorld(e.clientX, e.clientY),
+    };
+    const copyBtn = menu.querySelector('[data-nodeact="copy"]');
+    const pasteBtn = menu.querySelector('[data-nodeact="paste"]');
+    const deleteButton = menu.querySelector('[data-nodeact="delete"]');
+    if (copyBtn) copyBtn.disabled = !targetId;
+    if (deleteButton) {
+      deleteButton.disabled = !targetId && !targetEdge;
+      deleteButton.textContent = targetEdge ? "删除连线" : "删除";
+    }
+    if (pasteBtn) pasteBtn.disabled = !nodeClipboard;
+    const sr = stage.getBoundingClientRect();
+    menu.style.display = "block";
+    const left = Math.max(6, Math.min(e.clientX - sr.left, sr.width - menu.offsetWidth - 6));
+    const top = Math.max(6, Math.min(e.clientY - sr.top, sr.height - menu.offsetHeight - 6));
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+  }
+
+  function ensureNodeContextMenu() {
+    if ($("nodeContextMenu") || !stage) return;
+    const menu = document.createElement("div");
+    menu.id = "nodeContextMenu";
+    menu.className = "split-menu node-menu";
+    menu.setAttribute("role", "menu");
+    menu.innerHTML =
+      '<button type="button" data-nodeact="copy">复制</button>' +
+      '<button type="button" data-nodeact="paste">粘贴</button>' +
+      '<button type="button" class="danger" data-nodeact="delete">删除</button>';
+    stage.appendChild(menu);
+    menu.addEventListener("pointerdown", (e) => e.stopPropagation());
+  }
+
+  function bindNodeMenuUi() {
+    ensureNodeContextMenu();
+    const nodeMenu = $("nodeContextMenu");
+    if (nodeMenu && !nodeMenu._bound) {
+      nodeMenu._bound = true;
+      nodeMenu.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-nodeact]");
+        if (!btn || btn.disabled) return;
+        const point = nodeMenuPoint;
+        hideNodeMenu();
+        if (btn.dataset.nodeact === "copy") copyNode(point && point.targetId);
+        else if (btn.dataset.nodeact === "paste") pasteNode(point && point.world);
+        else if (btn.dataset.nodeact === "delete") {
+          if (point && point.targetEdge) {
+            const ei = Number.isFinite(point.targetEdge.ei)
+              ? point.targetEdge.ei
+              : state.edges.findIndex((ed) => ed.from === point.targetEdge.from && ed.to === point.targetEdge.to);
+            if (ei >= 0) disconnectEdgeAt(ei);
+          } else deleteNode(point && point.targetId);
+        }
+      });
+    }
+    if (vp && !vp._sekoNodeMenu) {
+      vp._sekoNodeMenu = true;
+      vp.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showNodeMenu(e);
+      });
+    }
+    if (!document._sekoNodeMenuHide) {
+      document._sekoNodeMenuHide = true;
+      document.addEventListener("pointerdown", (e) => {
+        if (!e.target.closest("#nodeContextMenu")) hideNodeMenu();
+      });
+    }
+    if (!document._sekoNodeHotkeys) {
+      document._sekoNodeHotkeys = true;
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Delete" && e.key !== "Backspace") return;
+        if (e.target && e.target.closest &&
+            (e.target.isContentEditable ||
+             e.target.closest("textarea,input,select,[contenteditable]")))
+          return;
+        if (state.selectedEdge) {
+          e.preventDefault();
+          const edge = state.selectedEdge;
+          const ei = Number.isFinite(edge.ei)
+            ? edge.ei
+            : state.edges.findIndex((ed) => ed.from === edge.from && ed.to === edge.to);
+          state.selectedEdge = null;
+          if (ei >= 0) disconnectEdgeAt(ei);
+          return;
+        }
+        if (!state.selected) return;
+        e.preventDefault();
+        deleteNode(state.selected);
+      });
+    }
+  }
+
   function toggleAssetOnShot(asset, shot) {
     if (!asset || !shot || shot.kind !== "shot") return;
     if (state.edges.some((e) => e.from === asset.id && e.to === shot.id)) unlinkAssetFromShot(asset, shot);
@@ -2778,7 +2966,13 @@
   }
   vp.addEventListener("pointercancel", cancelCanvasGesture);
   vp.addEventListener("lostpointercapture", (e) => { if (state.link) cancelCanvasGesture(e); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.link) cancelCanvasGesture(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideNodeMenu();
+      if (state.link) cancelCanvasGesture();
+    }
+  });
+  bindNodeMenuUi();
   vp.addEventListener("wheel", (e) => {
     e.preventDefault();
     const w0 = clientToWorld(e.clientX, e.clientY);
@@ -6966,4 +7160,5 @@
       },
     };
   }
+  window.__sekoDeleteNode = deleteNode;
 })();
