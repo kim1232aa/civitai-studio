@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o54b: LoRA rematch pulls full /api/catalog roster like o53d; import chips auto-rematch; stamp v0821o54b-lora-roster-rematch
   // v0821o54: LoRA capability rematch via supportsLora (chips kept + 一键匹配); stamp v0821o54-lora-capability-match
   // v0821o53d: rematch pool = roster+catalog (not only paged catalogById); stamp v0821o53d-capacity-rematch-roster
   // v0821o53c: wire capacity-rematch click + keep pin on capacity-ok endpoint; stamp v0821o53c-capacity-rematch-click
@@ -5263,7 +5264,7 @@
   function outboundLoraBlockMsg() {
     const list = Array.isArray(state.loras) ? state.loras : [];
     if (list.length && !catalogItemSupportsLora()) {
-      return "当前模型不支持 LoRA，已选 LoRA 不能静默丢掉 · 请点「一键匹配」改选同后端 LoRA 端点，或删除芯片";
+      return "当前模型暂不支持 LoRA · 将自动匹配同后端 LoRA 端点（也可点「一键匹配」或删除芯片，不静默丢掉）";
     }
     const be = currentBackend();
     const mapped = list.map(packLoraRow);
@@ -5298,7 +5299,15 @@
           rematched = !!tryLoraCapabilityRematchAfterServiceChange();
         }
       } catch (_) {}
-      if (!(rematched && catalogItemSupportsLora())) {
+      if (rematched && catalogItemSupportsLora()) {
+        /* sync rematch applied — fall through */
+      } else if (rematched) {
+        // o54b: async roster fetch started — soft note, prefer auto path over red hard gate
+        setLoraNote("正在拉取官方目录匹配 LoRA…（芯片保留，不静默丢掉）", false);
+        renderLoras();
+        try { syncLoraUi(); } catch (_) {}
+        return;
+      } else {
         list.forEach(function (l) { l.status = "当前模型不支持"; });
         setLoraNote("当前模型不支持 LoRA，已选芯片还在 · 点「一键匹配」改选同后端 LoRA 端点（不会静默丢掉）", true);
         renderLoras();
@@ -6307,6 +6316,84 @@
     return scored[0].id;
   }
 
+  const NANO_LORA_HINTS = ["flux-lora", "flux-2-dev-lora", "krea-v2/turbo-lora"];
+  const FAL_LORA_CAPABILITY_HINTS = ["fal-ai/flux-lora", "fal-ai/flux-lora/image-to-image"];
+
+  function pickLoraHintFromPool(pool, be) {
+    const beL = String(be || "").toLowerCase();
+    const hints = (beL === "fal")
+      ? FAL_LORA_CAPABILITY_HINTS
+      : ((beL === "nano-gpt" || beL === "nanogpt") ? NANO_LORA_HINTS : NANO_LORA_HINTS.concat(FAL_LORA_CAPABILITY_HINTS));
+    for (let hi = 0; hi < hints.length; hi++) {
+      const hid = hints[hi];
+      if (pool[hid] && catalogItemSupportsLora(pool[hid])) return hid;
+    }
+    // Also try Nano/Fal hints when backend not strictly matched but present in pool
+    if (beL !== "fal") {
+      for (let hi = 0; hi < NANO_LORA_HINTS.length; hi++) {
+        const hid = NANO_LORA_HINTS[hi];
+        if (pool[hid] && catalogItemSupportsLora(pool[hid])) return hid;
+      }
+    }
+    if (beL === "fal" || !beL) {
+      for (let hi = 0; hi < FAL_LORA_CAPABILITY_HINTS.length; hi++) {
+        const hid = FAL_LORA_CAPABILITY_HINTS[hi];
+        if (pool[hid] && catalogItemSupportsLora(pool[hid])) return hid;
+      }
+    }
+    return "";
+  }
+
+  function applyLoraCapabilityRematchFromWant(want, shot, opts) {
+    if (!want || !shot) return false;
+    const silent = !!(opts && opts.silentChange);
+    const pool = rematchCandidatePool();
+    let row = pool[want] || (state.catalogById && state.catalogById[want]);
+    if (!row) {
+      setMsg("候选 " + want + " 不在官方目录（不伪造、不静默丢芯片）", "bad");
+      return false;
+    }
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) state.catalogById[want] = row;
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, want);
+    sel.value = want;
+    shot.serviceId = want;
+    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
+      state._pinFalLoraService = want;
+      state._pendingService = want;
+    }
+    state._loraRematchLock = want;
+    if (!silent) {
+      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    }
+    if (sel.value !== want && state.catalogById[want]) {
+      sel.value = want;
+      shot.serviceId = want;
+    }
+    // keep chips
+    try { renderDock(); } catch (_) {}
+    try { syncParamSurface(); } catch (_) {}
+    try { syncLoraUi(); } catch (_) {}
+    setMsg("已匹配 LoRA 能力：" + ((row && row.name) || want) + " · 芯片保留", "ok");
+    return true;
+  }
+
+  function fillCatalogRosterFromApi(roster, be) {
+    if (!Array.isArray(roster) || !roster.length) return false;
+    state._catalogRoster = roster.slice();
+    state._catalogRosterBackend = be;
+    roster.forEach(function (row) {
+      const id = row && (row.id || row.name);
+      if (!id) return;
+      if (!state.catalogById) state.catalogById = {};
+      // only add missing — never invent ids
+      if (!state.catalogById[id]) state.catalogById[id] = row;
+    });
+    return true;
+  }
+
   function applyLoraCapabilityRematch() {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") {
@@ -6323,39 +6410,39 @@
       setMsg("当前模型已支持 LoRA，无需匹配", "ok");
       return false;
     }
-    const pool = rematchCandidatePool();
-    const want = loraCapabilityRematchId(it, pool);
-    if (!want) {
-      setMsg("目录无同后端支持 LoRA 的模型可匹配（芯片保留，不静默丢掉）", "bad");
-      return false;
-    }
-    const row = pool[want] || (state.catalogById && state.catalogById[want]);
-    if (!row) {
-      setMsg("候选 " + want + " 不在官方目录（不伪造、不静默丢芯片）", "bad");
-      return false;
-    }
-    if (!state.catalogById) state.catalogById = {};
-    if (!state.catalogById[want]) state.catalogById[want] = row;
-    const sel = $("service");
-    if (!sel) return false;
-    ensureSelectOpt(sel, want);
-    sel.value = want;
-    shot.serviceId = want;
-    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
-      state._pinFalLoraService = want;
-      state._pendingService = want;
-    }
-    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
-    if (sel.value !== want && state.catalogById[want]) {
-      sel.value = want;
-      shot.serviceId = want;
-    }
-    // keep chips
-    try { renderDock(); } catch (_) {}
-    try { syncParamSurface(); } catch (_) {}
-    try { syncLoraUi(); } catch (_) {}
-    setMsg("已匹配 LoRA 能力：" + ((row && row.name) || want) + " · 芯片保留", "ok");
-    return true;
+    let pool = rematchCandidatePool();
+    let want = loraCapabilityRematchId(it, pool);
+    const be = ($("backend") && $("backend").value) || (typeof currentBackend === "function" ? currentBackend() : "") || "";
+    // Prefer known Nano/Fal LoRA hints only if present in pool (never invent)
+    if (!want) want = pickLoraHintFromPool(pool, be);
+    if (want) return applyLoraCapabilityRematchFromWant(want, shot);
+    // o54b: live refresh full /api/catalog roster — same as o53d capacity rematch
+    setMsg("正在拉取官方目录匹配 LoRA…", "warn");
+    state._loraRematchInFlight = true;
+    fetch("/api/catalog?backend=" + encodeURIComponent(be || "nano-gpt"))
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)); })
+      .then(function (j) {
+        state._loraRematchInFlight = false;
+        const roster = j.items || j.models;
+        if (!fillCatalogRosterFromApi(roster, be)) {
+          setMsg("官方目录为空，无法匹配 LoRA（芯片保留，不静默丢掉）", "bad");
+          return;
+        }
+        pool = rematchCandidatePool();
+        want = loraCapabilityRematchId(it, pool);
+        if (!want) want = pickLoraHintFromPool(pool, be);
+        if (!want) {
+          setMsg("目录无同后端支持 LoRA 的模型可匹配（芯片保留，不静默丢掉）", "bad");
+          return;
+        }
+        applyLoraCapabilityRematchFromWant(want, shot);
+        try { persist(); } catch (_) {}
+      })
+      .catch(function (err) {
+        state._loraRematchInFlight = false;
+        setMsg("拉目录匹配 LoRA 失败：" + (err && err.message || err) + "（芯片保留，不静默丢掉）", "bad");
+      });
+    return true; // async in flight — not silent
   }
 
   function tryLoraCapabilityRematchAfterServiceChange() {
@@ -6365,24 +6452,54 @@
     if (!shot || shot.kind !== "shot") return false;
     const it = catalogItemForService();
     if (catalogItemSupportsLora(it)) return false;
-    const pool = rematchCandidatePool();
-    const want = loraCapabilityRematchId(it, pool);
-    if (!want) return false;
-    const row = pool[want] || (state.catalogById && state.catalogById[want]);
-    if (!row) return false;
-    if (String(it && it.id) === want) return false;
-    if (!state.catalogById) state.catalogById = {};
-    if (!state.catalogById[want]) state.catalogById[want] = row;
-    const sel = $("service");
-    if (!sel) return false;
-    ensureSelectOpt(sel, want);
-    sel.value = want;
-    shot.serviceId = want;
-    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
-      state._pinFalLoraService = want;
+    // Avoid change-event / rematch loops
+    if (state._loraRematchLock && String(it && it.id) === String(state._loraRematchLock)) {
+      state._loraRematchLock = "";
+      return false;
     }
-    setMsg("已自动匹配 LoRA 能力：" + ((row && row.name) || want) + " · 芯片保留", "ok");
-    return true;
+    if (state._loraRematchInFlight) return true;
+    let pool = rematchCandidatePool();
+    let want = loraCapabilityRematchId(it, pool);
+    const be = ($("backend") && $("backend").value) || (typeof currentBackend === "function" ? currentBackend() : "") || "";
+    if (!want) want = pickLoraHintFromPool(pool, be);
+    if (want) {
+      const row = pool[want] || (state.catalogById && state.catalogById[want]);
+      if (!row) return false;
+      if (String(it && it.id) === want) return false;
+      // Avoid change-event loop: set value then sync without re-entering via change.
+      return applyLoraCapabilityRematchFromWant(want, shot, { silentChange: true });
+    }
+    // o54b: chips && !supportsLora && !want → kick async roster fetch (not silent forever)
+    setMsg("正在拉取官方目录匹配 LoRA…", "warn");
+    state._loraRematchInFlight = true;
+    fetch("/api/catalog?backend=" + encodeURIComponent(be || "nano-gpt"))
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)); })
+      .then(function (j) {
+        state._loraRematchInFlight = false;
+        const roster = j.items || j.models;
+        if (!fillCatalogRosterFromApi(roster, be)) {
+          setMsg("官方目录为空，无法匹配 LoRA（芯片保留，不静默丢掉）", "bad");
+          return;
+        }
+        const it2 = catalogItemForService();
+        if (catalogItemSupportsLora(it2)) return;
+        pool = rematchCandidatePool();
+        want = loraCapabilityRematchId(it2, pool);
+        if (!want) want = pickLoraHintFromPool(pool, be);
+        if (!want) {
+          setMsg("目录无同后端支持 LoRA 的模型可匹配（芯片保留，不静默丢掉）", "bad");
+          return;
+        }
+        // silentChange to avoid re-entrant infinite rematch on change
+        applyLoraCapabilityRematchFromWant(want, shot, { silentChange: true });
+        try { syncParamChrome(); } catch (_) {}
+        try { persist(); } catch (_) {}
+      })
+      .catch(function (err) {
+        state._loraRematchInFlight = false;
+        setMsg("拉目录匹配 LoRA 失败：" + (err && err.message || err) + "（芯片保留，不静默丢掉）", "bad");
+      });
+    return true; // async started
   }
 
   function refUnusedGateMessage(shot) {
@@ -8745,6 +8862,12 @@
       state.loras = [];
     }
     syncLoraUi();
+    // o54b: imported LoRA chips on !supportsLora model → rematch (roster fetch OK)
+    try {
+      if (Array.isArray(state.loras) && state.loras.length && !catalogItemSupportsLora()) {
+        applyLoraCapabilityRematch();
+      }
+    } catch (_) {}
 
     if (j.kind === "video") state.mode = "video";
     else if (j.kind === "image") state.mode = "image";

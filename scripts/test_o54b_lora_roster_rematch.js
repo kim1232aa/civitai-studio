@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** o54: LoRA capability rematch via supportsLora — never invent ids; never silent-drop chips. */
+/** o54b: LoRA rematch pulls full /api/catalog roster (like o53d); never invent ids; never silent-drop chips. */
 "use strict";
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,16 +10,21 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o54b-lora-roster-rematch") || html.includes("v0821o54-lora-capability-match"), "html stamp");
-assert.ok(html.includes("o54blorarosterrematch") || html.includes("o54loracapabilitymatch"), "cache bust");
-assert.ok(source.includes("正在拉取官方目录匹配 LoRA") || source.includes("_catalogRoster"), "roster path");
+assert.ok(html.includes("v0821o54b-lora-roster-rematch"), "html stamp o54b");
+assert.ok(html.includes("o54blorarosterrematch"), "cache bust o54b");
+assert.ok(source.includes("v0821o54b-lora-roster-rematch"), "js stamp");
 assert.ok(source.includes("loraCapabilityRematchId"), "rematch id");
 assert.ok(source.includes("applyLoraCapabilityRematch"), "apply");
 assert.ok(source.includes("tryLoraCapabilityRematchAfterServiceChange"), "try after change");
+assert.ok(source.includes("正在拉取官方目录匹配 LoRA"), "roster fetch msg");
+assert.ok(source.includes("state._catalogRoster"), "roster fill");
+assert.ok(source.includes("fillCatalogRosterFromApi") || source.includes("_catalogRoster = roster"), "roster assign");
 assert.ok(source.includes('data-act="lora-capability-rematch"') || source.includes("lora-capability-rematch"), "click act");
 assert.ok(source.includes("lora-unsupported"), "unsupported class");
 assert.ok(source.includes("一键匹配"), "CTA copy");
-assert.ok(!/silent.?drop|静默丢/.test("x") || source.includes("不会静默丢") || source.includes("不静默丢"), "no silent drop copy");
+assert.ok(source.includes("o54b: imported LoRA chips"), "import auto-rematch");
+assert.ok(source.includes("NANO_LORA_HINTS") || source.includes("flux-2-dev-lora"), "nano hints");
+assert.ok(source.includes("fal-ai/flux-lora/image-to-image"), "fal hints");
 
 function extract(fnName) {
   const start = source.indexOf("function " + fnName);
@@ -78,4 +83,4 @@ const harness = `
   if (empty) throw new Error("invented id " + empty);
 `;
 vm.runInNewContext(harness, {}, { timeout: 3000 });
-console.log("PASS o54_lora_capability_match");
+console.log("PASS o54b_lora_roster_rematch");
