@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o38: packComfy prefer generate shot; force payload.diffusionModel from shot; applyImport keep dm/cn/eco when j omits; flux1 without dm hard-reject before POST
   // v0821o37: civitai preparing poll ≥720×2.5s≈30min; stillGoing mirrors inFlight (preparing/scheduled/queued/prepared); saved[]→writeback unchanged
   // v0821o36: checkpoint AIR must not enter loras[] — isLoraAir true only :lora:/:lycoris:/…; false :checkpoint:/:diffusionmodel:/:diffuser:; applyImport+pack drop non-LoRA; never invent strength
   // v0821o35: flux1 diffuser AIR — prefer REST air verbatim (flux1:checkpoint); never hand-roll flux:diffusionmodel; never rewrite checkpoint→diffuser; no companion VAE/CLIP/T5 invent
@@ -4191,7 +4192,7 @@
   }
   // Pack UI params onto generate payload — never silently drop. Civitai keeps
   // sampler/steps/cfg; other backends still ship seed / size / token.
-  function packComfyParamsForPayload() {
+  function packComfyParamsForPayload(shotOpt) {
     const p = readComfyParamsFromUi();
     const be = currentBackend();
     if (be === "nano-gpt") {
@@ -4215,8 +4216,10 @@
       delete p.cfgScale;
     }
     // v0821o22: civitai checkpoint AIR from imported shot (fresh hinablue) — never invent default AIR.
+    // v0821o38: prefer generate shot (runShotStepWork) over selected/lastComposerShot — selected can be wrong/empty.
     if (be === "civitai") {
-      const shot = nodeById(state.selected) || nodeById(state.lastComposerShot);
+      const shot = (shotOpt && shotOpt.kind === "shot" ? shotOpt : null)
+        || nodeById(state.selected) || nodeById(state.lastComposerShot);
       const dm = shot && shot.diffusionModel ? String(shot.diffusionModel).trim() : "";
       if (dm) p.diffusionModel = dm;
       const cn = shot && shot.checkpointName ? String(shot.checkpointName).trim() : "";
@@ -5523,11 +5526,16 @@
     }
     // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
     {
-      const packedComfy = packComfyParamsForPayload();
+      // v0821o38: pack from generate shot (not only selected/lastComposerShot)
+      const packedComfy = packComfyParamsForPayload(shot);
       if (packedComfy) {
         Object.keys(packedComfy).forEach(function (k) {
           if (packedComfy[k] != null && packedComfy[k] !== "") payload[k] = packedComfy[k];
         });
+      }
+      // v0821o38: after merge, force payload.diffusionModel from shot when set (no silent drop)
+      if (shot && shot.diffusionModel != null && String(shot.diffusionModel).trim()) {
+        payload.diffusionModel = String(shot.diffusionModel).trim();
       }
       if (usesCivitaiComfyParams()) {
         // v0821o23: imported sdxl serviceId wins over drifted #service / catalog krea2 pref.
@@ -5539,6 +5547,13 @@
         syncCivitaiServiceSelect(sid);
         payload.serviceId = sid;
         // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
+        // v0821o38: flux1 (or sid needing diffuser) without dm → hard reject before POST
+        const sidL = String(sid || "").toLowerCase();
+        const needsDm = /\/flux1\//.test(sidL) || /diffuser|diffusionmodel|sdcpp\/flux/.test(sidL);
+        const dmOut = payload.diffusionModel != null ? String(payload.diffusionModel).trim() : "";
+        if (needsDm && !dmOut) {
+          return fail("缺少 diffusionModel（diffuserModel）· flux1 出站前必须有 checkpoint AIR，禁止假跑", "blocked");
+        }
       }
       // Composer has no negative wire — attach #negative / shot.negativePrompt for every backend.
       const negEl = $("negative");
@@ -6910,20 +6925,15 @@
       if (cfgVal != null) { shot.cfg = cfgVal; shot.cfgScale = cfgVal; }
       else { delete shot.cfg; delete shot.cfgScale; }
       // v0821o22: any hinablue/civitai import — keep checkpoint AIR on shot for outbound (never invent).
+      // v0821o38: do NOT delete dm/cn/eco when j omits the key — only assign when present (prevent wipe races).
       if (j.diffusionModel != null && String(j.diffusionModel).trim()) {
         shot.diffusionModel = String(j.diffusionModel).trim();
-      } else {
-        delete shot.diffusionModel;
       }
       if (j.checkpointName != null && String(j.checkpointName).trim()) {
         shot.checkpointName = String(j.checkpointName).trim();
-      } else {
-        delete shot.checkpointName;
       }
       if (j.ecosystem != null && String(j.ecosystem).trim()) {
         shot.ecosystem = String(j.ecosystem).trim();
-      } else {
-        delete shot.ecosystem;
       }
       // v0821o23: keep import serviceId even if #service later drifts to catalog pref (krea2).
       if (j.serviceId != null && String(j.serviceId).trim()) {
