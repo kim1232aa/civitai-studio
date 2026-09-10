@@ -48,8 +48,8 @@ def main():
 
     html = (ROOT / "static" / "storyboard.html").read_text()
     js = (ROOT / "static" / "storyboard.js").read_text()
-    assert "v0821o47-composer-board-sync" in html
-    assert "20260911-o47composerboardsync" in html
+    assert "v0821o48-hydrate-server-wins" in html
+    assert "20260911-o48hydrateserverwins" in html
     assert "find_local_out_saved" in (ROOT / "server.py").read_text()
     assert "上游失败但本地成片已写回原卡" in js
     assert "localOutResume" in (ROOT / "server.py").read_text()

@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o48: hydrate server shot.url wins over stale localStorage; stamp v0821o48-hydrate-server-wins
   // v0821o47: Composer board sync (Magao maxRefs/seed clamp strip) + adapt cache-bust; stamp v0821o47-composer-board-sync
   // v0821o46b: local /out resume when upstream failed (invalid response format); stamp v0821o46b-local-out-resume
   // v0821o46: resume writeback after tab death (pending jobId↔shotId + boot resume); stamp v0821o46-resume-job-writeback
@@ -1246,7 +1247,10 @@
   function shotsHaveMedia() {
     return (state.nodes || []).some(function (n) { return n && n.kind === "shot" && n.url; });
   }
-  /** Clean profile / empty demo: adopt server graph. Else fill blank shot.url by id. */
+  /** Clean profile / empty demo: adopt server graph.
+   * o48: when local already has media, server shot.url still wins over stale localStorage
+   * (same id + server url non-empty → adopt server). Belt writeback must survive hard refresh.
+   */
   async function hydrateFromServer() {
     try {
       const r = await fetch("/api/storyboard-graph");
@@ -1267,10 +1271,15 @@
       let changed = false;
       for (let i = 0; i < state.nodes.length; i++) {
         const n = state.nodes[i];
-        if (!n || n.url) continue;
+        if (!n || n.kind !== "shot") continue;
         const o = byId[n.id];
-        if (o && o.url) {
-          n.url = o.url;
+        if (!o) continue;
+        const serverUrl = o.url != null ? String(o.url).trim() : "";
+        if (!serverUrl) continue;
+        const localUrl = n.url != null ? String(n.url).trim() : "";
+        // o48: server wins whenever non-empty (fixes OOM writeback then hard-refresh covered by old LS)
+        if (localUrl !== serverUrl) {
+          n.url = serverUrl;
           changed = true;
         }
       }

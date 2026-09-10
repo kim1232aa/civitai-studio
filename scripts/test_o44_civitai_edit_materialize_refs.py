@@ -125,8 +125,8 @@ def test_generate_audit_nrefs_data_lengths_only():
 def test_stamp_and_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    check("v0821o47-composer-board-sync" in html, "html stamp")
-    check("20260911-o47composerboardsync" in html, "cache-bust")
+    check("v0821o48-hydrate-server-wins" in html, "html stamp")
+    check("20260911-o48hydrateserverwins" in html, "cache-bust")
     check("v0821o44" in js, "js header o44")
 
 
