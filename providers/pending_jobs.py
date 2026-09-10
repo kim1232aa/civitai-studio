@@ -140,3 +140,57 @@ def first_saved_url(data: dict | None) -> str:
         if hit:
             return hit
     return ""
+
+
+def find_local_out_saved(job_id: str, out_dir: Path | None = None) -> list[dict]:
+    """If upstream poll fails but materialize already wrote /out, rebuild saved[].
+
+    Naming from save_media_urls: stem = job_id with | and / → _, then `{stem}_{i}.ext`.
+    Also match `{backend}_{opaque}_*` and bare opaque fragment.
+    """
+    from .http import DEFAULT_OUT, parse_job_id
+
+    jid = (job_id or "").strip()
+    if not jid:
+        return []
+    out = Path(out_dir or DEFAULT_OUT)
+    if not out.is_dir():
+        return []
+    backend, opaque = parse_job_id(jid)
+    stem = jid.replace("|", "_").replace("/", "_")
+    opaque_stem = str(opaque or "").replace("|", "_").replace("/", "_")
+    patterns = [f"{stem}_*"]
+    if backend and opaque_stem:
+        patterns.append(f"{backend}_{opaque_stem}_*")
+    if opaque_stem and len(opaque_stem) >= 8:
+        patterns.append(f"*{opaque_stem}_*")
+    media_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"}
+    found: dict[str, Path] = {}
+    for pat in patterns:
+        for fp in out.glob(pat):
+            if not fp.is_file():
+                continue
+            if fp.suffix.lower() not in media_ext:
+                continue
+            # prefer exact stem_N over loose *opaque*
+            key = fp.name
+            if key not in found:
+                found[key] = fp
+    if not found:
+        return []
+    # sort by trailing _N before ext
+    def sort_key(name: str):
+        import re
+        m = re.search(r"_(\d+)\.[^.]+$", name)
+        return (int(m.group(1)) if m else 9999, name)
+    ordered = sorted(found.keys(), key=sort_key)
+    saved = []
+    for name in ordered:
+        saved.append({
+            "file": name,
+            "url": f"/out/{name}",
+            "bytes": found[name].stat().st_size,
+            "kind": "video" if found[name].suffix.lower() in (".mp4", ".webm") else "image",
+            "source": "local-out",
+        })
+    return saved

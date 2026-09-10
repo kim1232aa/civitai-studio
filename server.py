@@ -1422,21 +1422,30 @@ class Handler(BaseHTTPRequestHandler):
                         "saved": data.get("saved"),
                         "error": data.get("error"),
                     }, ensure_ascii=False)[:1500], flush=True)
-                # o46: if pending maps this job→shot and saved[] ready, write shot.url on graph
+                # o46/o46b: pending→shot writeback; if upstream failed but local /out exists, rebuild saved[]
                 from providers import pending_jobs as pj
+                data = dict(data)
                 saved_u = pj.first_saved_url(data)
+                if not saved_u:
+                    local_saved = pj.find_local_out_saved(wf_id)
+                    if local_saved:
+                        data["saved"] = local_saved
+                        data["localOutResume"] = True
+                        saved_u = pj.first_saved_url(data)
+                        print("[web] LOCAL_OUT_RESUME", wf_id, len(local_saved), flush=True)
                 if saved_u:
                     try:
                         applied = apply_pending_job_to_graph(wf_id, saved_u)
                         if applied:
-                            data = dict(data)
                             data["pendingWriteback"] = applied
                             print("[web] PENDING_WB", json.dumps(applied, ensure_ascii=False), flush=True)
                     except Exception as e:
                         print("[web] PENDING_WB skip", e, flush=True)
                 elif st in ("failed", "error"):
+                    # only clear when no local materialize — else keep pending for client resume
                     try:
-                        pj.clear_pending(wf_id)
+                        if not pj.find_local_out_saved(wf_id):
+                            pj.clear_pending(wf_id)
                     except Exception:
                         pass
             return self._json(code, data)
