@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o29: Fal LoRA endpoint by AIR base (flux1→flux-lora; krea2→krea-2/turbo/lora; else 不支持 — never hard-pin wrong family)
   // v0821o27: import strength — trpc null backfill from REST /api/generation/data (28533344→0.7; never invent)
   // v0821o26: Fal 换家 — pinFal rejects civitai/HF serviceId; #backend sync from /api/providers (all enabled)
   // v0821o25: sdcpp sampleMethod map — import dpmpp_2m → outbound dpm++2m (locked); schedule karras keep
@@ -50,6 +51,14 @@
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora";
+  // Official Fal LoRA family by Civitai AIR base (urn:air:{base}:lora:…). Never one-shot all chips to krea-2.
+  const FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora";
+  const FAL_LORA_BY_BASE = {
+    flux1: FAL_FLUX_LORA_SERVICE,
+    flux: FAL_FLUX_LORA_SERVICE,
+    krea2: FAL_LORA_PREF_SERVICE,
+    krea: FAL_LORA_PREF_SERVICE
+  };
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
   const HF_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
@@ -4234,7 +4243,12 @@
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
     }
-    if (be === "fal" || be === "huggingface") return "LoRA 缺 http path，无法出站";
+    if (be === "fal") {
+      const baseMsg = falLoraUnsupportedMsg();
+      if (baseMsg) return baseMsg;
+      return "LoRA 缺 http path，无法出站";
+    }
+    if (be === "huggingface") return "LoRA 缺 http path，无法出站";
     return "LoRA 缺 air，无法出站";
   }
   async function searchLoras() {
@@ -4348,6 +4362,7 @@
     const id = (it && (it.id || it.name)) || "";
     const name = (it && it.name) || id;
     if (id === FAL_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo LoRA · " + id);
+    if (id === FAL_FLUX_LORA_SERVICE) return (name && name !== id ? name + " · " + id : "Flux LoRA · " + id);
     if (id === HF_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : id);
     if (id === MS_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo · " + id);
     return name || id;
@@ -4995,9 +5010,11 @@
       serviceId = MS_LORA_PREF_SERVICE;
     } else if (!serviceId && be !== "civitai") {
       // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
-      // v0821o2: LoRAs present → pin turbo/lora (never empty→flux/schnell→flux-lora sibling)
-      if (op !== "i2v" && falHasLoras()) serviceId = FAL_LORA_PREF_SERVICE;
-      else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+      // v0821o29: LoRAs → endpoint by AIR base (not hard-pin krea-2).
+      if (op !== "i2v" && falHasLoras()) {
+        const resolved = resolveFalLoraEndpointFromChips();
+        serviceId = resolved.endpoint || "";
+      } else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
     }
     if (be === "huggingface") {
       serviceId = pinHfLoraServiceId(serviceId);
@@ -5388,9 +5405,12 @@
       }
       if (packedLoras && packedLoras.length) {
         payload.loras = packedLoras;
-        // v0821o2: outbound serviceId must stay turbo/lora — block flux-lora swap
+        // v0821o29: outbound Fal serviceId by LoRA AIR base (flux1→flux-lora; krea2→krea).
         if (currentBackend() === "fal") {
+          const unsupported = falLoraUnsupportedMsg();
+          if (unsupported) return fail(unsupported, "blocked");
           const pinned = pinFalLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          if (!pinned) return fail(falLoraUnsupportedMsg() || "Fal LoRA 端点不支持（不硬钉错误家族）", "blocked");
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureFalLoraServiceSelected();
@@ -5668,6 +5688,12 @@
     if (chipsLackAirForOutbound()) {
       failUi(outboundLoraBlockMsg());
       return;
+    }
+    if (currentBackend() === "fal" && falHasLoras()) {
+      const falBaseGate = falLoraUnsupportedMsg();
+      if (falBaseGate) { failUi(falBaseGate); return; }
+      const pinnedNow = pinFalLoraServiceId(($("service") && $("service").value) || "");
+      if (!pinnedNow) { failUi(falLoraUnsupportedMsg() || "Fal LoRA 端点不支持"); return; }
     }
     const gate = paramGateMessage();
     if (gate) {
@@ -6253,27 +6279,90 @@
     setMsg("已选择魔搭 Krea 2 Turbo · 未预置 LoRA，请填写与底模兼容的真实 Hub 仓库和权重", "warn");
   }
 
-  // v0821o2: when LoRAs ship, keep z-image/turbo/lora — never empty→flux/schnell→sibling flux-lora
+  // v0821o29: Fal+LoRA endpoint from AIR base — flux1→flux-lora; krea2→krea-2/turbo/lora; else honest 不支持.
   function falHasLoras() {
     return Array.isArray(state.loras) && state.loras.length > 0;
   }
+  function loraAirBase(l) {
+    const air = String((l && (l.air || l.AIR || "")) || "").trim();
+    const m = air.match(/^urn:air:([^:]+):lora:/i);
+    return m ? String(m[1] || "").toLowerCase() : "";
+  }
+  function falLoraBasesFromChips() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    const bases = [];
+    list.forEach(function (l) {
+      const b = loraAirBase(l);
+      if (b && bases.indexOf(b) < 0) bases.push(b);
+    });
+    return bases;
+  }
+  function falLoraEndpointLabel(ep) {
+    if (ep === FAL_FLUX_LORA_SERVICE) return "Flux LoRA · " + ep;
+    if (ep === FAL_LORA_PREF_SERVICE) return "Krea 2 Turbo LoRA · " + ep;
+    return ep;
+  }
+  /** @returns {{endpoint:string, reason:string}} */
+  function resolveFalLoraEndpointFromChips() {
+    if (!falHasLoras()) return { endpoint: "", reason: "" };
+    const bases = falLoraBasesFromChips();
+    if (!bases.length) {
+      return {
+        endpoint: "",
+        reason: "LoRA 无 AIR base · 无法匹配官方 Fal 端点（不硬钉 krea-2）"
+      };
+    }
+    if (bases.length > 1) {
+      return {
+        endpoint: "",
+        reason: "多 LoRA base 不一致（" + bases.join("/") + "）· 不支持一锅端到 krea-2"
+      };
+    }
+    const base = bases[0];
+    const ep = FAL_LORA_BY_BASE[base];
+    if (!ep) {
+      return {
+        endpoint: "",
+        reason: "LoRA base=" + base + " 无官方 Fal LoRA 端点 · 不支持（不硬钉错误家族）"
+      };
+    }
+    return { endpoint: ep, reason: "" };
+  }
+  function falLoraUnsupportedMsg() {
+    const r = resolveFalLoraEndpointFromChips();
+    return r.reason || "";
+  }
   function isFalFluxLoraDrift(sid) {
+    // Legacy name kept for tests: bare t2i / empty defaults that are NOT a LoRA family match.
     const s = String(sid || "").trim();
-    return s === "fal-ai/flux-lora" || s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT;
+    return s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT || s === "fal-ai/flux/dev";
   }
   function pinFalLoraServiceId(sid) {
     const s = String(sid || "").trim();
-    // v0821o26: after Civitai/HF import 换家 → Fal, rewrite foreign serviceIds (mirror pinHf).
-    // Never ship image/comfy/… or Hub ids to Fal outbound.
-    if (looksCivitaiServiceId(s) || looksHfServiceId(s)) {
-      return falHasLoras() ? FAL_LORA_PREF_SERVICE : FAL_T2I_DEFAULT;
+    // No LoRAs: only rewrite foreign civitai/HF ids to Fal t2i default.
+    if (!falHasLoras()) {
+      if (looksCivitaiServiceId(s) || looksHfServiceId(s)) return FAL_T2I_DEFAULT;
+      return s;
     }
-    if (!falHasLoras()) return s;
-    // Explicit turbo → turbo/lora sibling only; never fuzzy to flux-lora
-    if (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora") return FAL_LORA_PREF_SERVICE;
-    if (s === FAL_LORA_PREF_SERVICE) return s;
-    if (!s || isFalFluxLoraDrift(s)) return FAL_LORA_PREF_SERVICE;
-    return s;
+    const resolved = resolveFalLoraEndpointFromChips();
+    state._falLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      // Honest 不支持 — never hard-pin krea-2 / flux-lora wrong family.
+      return "";
+    }
+    const want = resolved.endpoint;
+    // Foreign / empty / t2i drift → official LoRA family for this AIR base.
+    if (!s || looksCivitaiServiceId(s) || looksHfServiceId(s) || isFalFluxLoraDrift(s)) return want;
+    // Same-family turbo sibling → /lora
+    if (want === FAL_LORA_PREF_SERVICE && (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora")) {
+      return want;
+    }
+    if (want === FAL_FLUX_LORA_SERVICE && (s === FAL_FLUX_LORA_SERVICE || s.indexOf("flux-lora") >= 0)) {
+      return FAL_FLUX_LORA_SERVICE;
+    }
+    // Wrong family selected (e.g. krea while chips are flux1) → correct endpoint.
+    if (s !== want) return want;
+    return want;
   }
   function ensureFalLoraServiceSelected() {
     if (!falHasLoras()) return;
@@ -6281,21 +6370,29 @@
     if (be !== "fal") return;
     const sel = $("service");
     if (!sel) return;
-    const want = pinFalLoraServiceId(sel.value);
-    // Visible label: never leave 「默认模型」 when LoRAs mounted
+    const resolved = resolveFalLoraEndpointFromChips();
+    state._falLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      try { setParamWarn(resolved.reason, true); } catch (_) {}
+      state._pinFalLoraService = "";
+      return;
+    }
+    const want = pinFalLoraServiceId(sel.value) || resolved.endpoint;
+    if (!want) return;
     ensureSelectOpt(sel, want);
-    // Prefer a clear option label for the pinned id
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         const t = sel.options[i].textContent || "";
-        if (!t || t === want || t === "默认模型") {
-          sel.options[i].textContent = "Krea 2 Turbo LoRA · " + want;
+        if (!t || t === want || t === "默认模型" || t.indexOf("Krea 2 Turbo LoRA") === 0 || t.indexOf("Flux LoRA") === 0) {
+          sel.options[i].textContent = falLoraEndpointLabel(want);
         }
         break;
       }
     }
     sel.value = want;
-    // Do not fabricate a fake catalog row for a missing Krea / Z-Image id.
+    state._pinFalLoraService = want;
+    state._pendingService = want;
     if (state.catalogById && state.catalogById[want]) return;
   }
 
@@ -6400,12 +6497,25 @@
       if (looksCivitaiServiceId(sid)) {
         hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
       } else {
-        // v0821o2: pin turbo/lora; reject flux-lora drift on fixture/import
-        if (Array.isArray(j.loras) && j.loras.length && isFalFluxLoraDrift(sid)) {
-          sid = FAL_LORA_PREF_SERVICE;
-        }
-        if (Array.isArray(j.loras) && j.loras.length && (sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo" || !sid)) {
-          sid = FAL_LORA_PREF_SERVICE;
+        // v0821o29: if import carries LoRAs, prefer AIR-base endpoint (fixture krea stays krea).
+        if (Array.isArray(j.loras) && j.loras.length) {
+          // Temporarily mirror chips onto state for base resolve (applyImport sets chips later too).
+          const prev = state.loras;
+          state.loras = j.loras;
+          const resolved = resolveFalLoraEndpointFromChips();
+          state.loras = prev;
+          if (resolved.reason) {
+            hardErr = resolved.reason;
+            sid = "";
+            state._pinFalLoraService = "";
+          } else if (resolved.endpoint) {
+            if (!sid || isFalFluxLoraDrift(sid) || looksCivitaiServiceId(sid) || looksHfServiceId(sid)
+                || sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo") {
+              sid = resolved.endpoint;
+            }
+            // Wrong family vs AIR base → correct (never keep krea for flux1).
+            if (sid !== resolved.endpoint) sid = resolved.endpoint;
+          }
         }
         state._pendingService = sid;
         state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid : (state._pinFalLoraService || "");
@@ -6805,14 +6915,20 @@
         (be === "modelscope-ai" || be === "modelscope-cn") ? state._pinMsLoraService : "");
       const pinWant = state._pendingService != null ? state._pendingService
         : (sameCatalog ? prevService : (providerPin || ""));
+      const falResolvedPin = (be === "fal" && falHasLoras()) ? resolveFalLoraEndpointFromChips() : null;
       const needLoraPin = (be === "fal" && state.mode !== "video" && (
-        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === "fal-ai/krea-2/turbo"
+        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === FAL_FLUX_LORA_SERVICE || pinWant === "fal-ai/krea-2/turbo"
       ));
       if (needLoraPin) {
-        const pinId = FAL_LORA_PREF_SERVICE;
-        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
-        if (pinItem) {
-          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+        const pinId = (falResolvedPin && falResolvedPin.endpoint)
+          || state._pinFalLoraService
+          || pinWant
+          || FAL_LORA_PREF_SERVICE;
+        if (pinId) {
+          const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+          if (pinItem) {
+            items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+          }
         }
       }
       const needHfPin = (be === "huggingface" && mode !== "video" && (
@@ -6913,8 +7029,13 @@
       if ((be === "modelscope-ai" || be === "modelscope-cn") && (looksFalServiceId(cur) || looksCivitaiServiceId(cur))) $("service").value = "";
     }
     if (be === "fal" && falHasLoras()) {
-      state._pendingService = FAL_LORA_PREF_SERVICE;
-      state._pinFalLoraService = FAL_LORA_PREF_SERVICE;
+      const resolved = resolveFalLoraEndpointFromChips();
+      state._falLoraUnsupported = resolved.reason || "";
+      state._pendingService = resolved.endpoint || "";
+      state._pinFalLoraService = resolved.endpoint || "";
+      if (resolved.reason) {
+        try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      }
     }
     syncParamSurface();
     const p = loadCatalog();
