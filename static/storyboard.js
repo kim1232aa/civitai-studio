@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o53d: rematch pool = roster+catalog (not only paged catalogById); stamp v0821o53d-capacity-rematch-roster
   // v0821o53c: wire capacity-rematch click + keep pin on capacity-ok endpoint; stamp v0821o53c-capacity-rematch-click
   // v0821o53: capacity rematch when N>maxRefs (catalog eats+cap≥N; no silent unlink); stamp v0821o53-capacity-rematch
   // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
@@ -6014,17 +6015,39 @@
     setMsg("已改选图生图：" + ((sib && sib.name) || editId), "ok");
     return true;
   }
-  // v0821o53: find catalog row that eats refs and maxRefs>=N (never invent outside catalog).
-  function capacityRematchId(nRefs, currentIt) {
+  // v0821o53d: rematch candidates from full roster + catalog — not only filtered catalogById.
+  // Never invent ids outside official roster / catalog / live /api/catalog.
+  const FAL_CAPACITY_HINTS = [
+    "fal-ai/flux-2/edit",
+    "fal-ai/flux-2-pro/edit",
+    "fal-ai/flux-2-flex/edit",
+    "fal-ai/flux-lora/image-to-image",
+  ];
+  function rematchCandidatePool() {
+    const byId = {};
+    function add(it) {
+      if (!it || typeof it !== "object") return;
+      const id = String(it.id || it.name || "").trim();
+      if (!id) return;
+      if (!byId[id]) byId[id] = it;
+    }
+    Object.keys(state.catalogById || {}).forEach(function (k) { add(state.catalogById[k]); });
+    (state.catalog || []).forEach(add);
+    (state._serviceItems || []).forEach(add);
+    (state._catalogRoster || []).forEach(add);
+    return byId;
+  }
+  function capacityRematchId(nRefs, currentIt, poolOpt) {
     const need = Number(nRefs) || 0;
-    if (!(need > 0) || !state.catalogById) return "";
+    const pool = poolOpt || rematchCandidatePool();
+    if (!(need > 0) || !pool || !Object.keys(pool).length) return "";
     const curId = String((currentIt && currentIt.id) || ($("service") && $("service").value) || "");
-    const curBe = String((currentIt && currentIt.backend) || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
+    const curBe = String((currentIt && currentIt.backend) || (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "").toLowerCase();
     const curName = String((currentIt && currentIt.name) || "");
     const curFamily = curId.split("/").slice(0, 2).join("/");
     const scored = [];
-    Object.keys(state.catalogById).forEach(function (cid) {
-      const row = state.catalogById[cid];
+    Object.keys(pool).forEach(function (cid) {
+      const row = pool[cid];
       if (!row) return;
       if (!catalogEatsRefs(row)) return;
       const cap = maxRefCount(row);
@@ -6034,15 +6057,14 @@
       const be = String(row.backend || curBe || "").toLowerCase();
       let score = 0;
       if (be && curBe && be === curBe) score += 100;
-      else return; // o53b: same backend only
+      else if (curBe === "fal" && (be === "fal" || !row.backend)) score += 100;
+      else return;
       if (curFamily && rid.indexOf(curFamily) === 0) score += 40;
       if (curName && String(row.name || "").indexOf(curName.split(" ")[0]) === 0) score += 20;
       if (catalogItemSupportsI2i && catalogItemSupportsI2i(row)) score += 10;
-      // N=1 prefer */image-to-image (flux-lora/image-to-image); N>1 prefer */edit (flux-2/edit)
       if (need === 1 && /\/image-to-image$/.test(rid)) score += 80;
       if (need === 1 && rid.indexOf("flux-lora/image-to-image") >= 0) score += 40;
       if (need > 1 && (/\/edit$/.test(rid) || rid.indexOf("flux-2/edit") >= 0)) score += 80;
-      // Prefer smallest sufficient cap (tight fit) then higher score
       scored.push({ id: rid, score: score, cap: cap });
     });
     if (!scored.length) return "";
@@ -6052,31 +6074,27 @@
     });
     return scored[0].id;
   }
-  function applyCapacityRematch() {
-    const shot = nodeById(state.selected);
-    if (!shot || shot.kind !== "shot") return false;
-    const nRefs = countRefUrls(null, shot).length;
-    const it = catalogItemForService();
-    const resolved = resolveRefCaps(it);
-    if (!(resolved.known && nRefs > resolved.maxRefs)) return false;
-    const want = capacityRematchId(nRefs, it);
-    if (!want || !state.catalogById[want]) {
-      setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 目录无 maxRefs≥" + nRefs + " 的图生图模型可匹配（不静默丢线）", "bad");
+  function applyCapacityRematchFromWant(want, nRefs, shot) {
+    if (!want) return false;
+    const pool = rematchCandidatePool();
+    let row = pool[want] || (state.catalogById && state.catalogById[want]);
+    if (!row) {
+      setMsg("参考图 " + nRefs + " · 候选 " + want + " 不在官方目录（不伪造、不静默丢线）", "bad");
       return false;
     }
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) state.catalogById[want] = row;
     const sel = $("service");
     if (!sel) return false;
     ensureSelectOpt(sel, want);
     sel.value = want;
     shot.serviceId = want;
-    // o53c: keep Fal LoRA pin on capacity-ok endpoint — never re-pin flux-lora over rematch
     if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
       state._pinFalLoraService = want;
       state._pendingService = want;
       state._capacityRematchLock = want;
     }
     try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
-    // If pin path rewrote service back, force rematch target once more
     if (sel.value !== want && state.catalogById[want]) {
       sel.value = want;
       shot.serviceId = want;
@@ -6084,11 +6102,75 @@
     }
     renderDock();
     syncParamSurface();
-    const row = state.catalogById[want];
     setMsg("已匹配容量：" + ((row && row.name) || want) + " · 参考 " + nRefs + "/" + maxRefCount(row), "ok");
     return true;
   }
-  /** On service change: if over-cap, try rematch once. Fail → keep hard gate (no unlink). */
+  function applyCapacityRematch() {
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return false;
+    const nRefs = countRefUrls(null, shot).length;
+    const it = catalogItemForService();
+    const resolved = resolveRefCaps(it);
+    if (!(resolved.known && nRefs > resolved.maxRefs)) {
+      setMsg("当前未超上限（" + nRefs + "/" + (resolved.known ? resolved.maxRefs : "?") + "），无需匹配", "warn");
+      return false;
+    }
+    let pool = rematchCandidatePool();
+    let want = capacityRematchId(nRefs, it, pool);
+    // Prefer known Fal edit hints only if present in pool (never invent)
+    if (!want && (($("backend") && $("backend").value) === "fal")) {
+      for (let hi = 0; hi < FAL_CAPACITY_HINTS.length; hi++) {
+        const hid = FAL_CAPACITY_HINTS[hi];
+        if (pool[hid] && catalogEatsRefs(pool[hid]) && maxRefCount(pool[hid]) >= nRefs) {
+          want = hid;
+          break;
+        }
+      }
+    }
+    if (want) return applyCapacityRematchFromWant(want, nRefs, shot);
+    // Live refresh Fal/Civitai roster once — still only official /api/catalog rows
+    const be = ($("backend") && $("backend").value) || "";
+    setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 正在拉取官方目录匹配…", "warn");
+    fetch("/api/catalog?backend=" + encodeURIComponent(be || "fal"))
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)); })
+      .then(function (j) {
+        const roster = j.items || j.models;
+        if (!Array.isArray(roster) || !roster.length) {
+          setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 官方目录为空，无法匹配（不静默丢线）", "bad");
+          return;
+        }
+        state._catalogRoster = roster.slice();
+        state._catalogRosterBackend = be;
+        roster.forEach(function (row) {
+          const id = row && (row.id || row.name);
+          if (!id) return;
+          if (!state.catalogById) state.catalogById = {};
+          if (!state.catalogById[id]) state.catalogById[id] = row;
+        });
+        pool = rematchCandidatePool();
+        want = capacityRematchId(nRefs, it, pool);
+        if (!want && be === "fal") {
+          for (let hi = 0; hi < FAL_CAPACITY_HINTS.length; hi++) {
+            const hid = FAL_CAPACITY_HINTS[hi];
+            if (pool[hid] && catalogEatsRefs(pool[hid]) && maxRefCount(pool[hid]) >= nRefs) {
+              want = hid;
+              break;
+            }
+          }
+        }
+        if (!want) {
+          setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 目录无 maxRefs≥" + nRefs + " 的图生图可匹配（不静默丢线）", "bad");
+          return;
+        }
+        applyCapacityRematchFromWant(want, nRefs, shot);
+        try { persist(); } catch (_) {}
+      })
+      .catch(function (err) {
+        setMsg("参考图 " + nRefs + "/" + resolved.maxRefs + " · 拉目录失败：" + (err && err.message || err) + "（不静默丢线）", "bad");
+      });
+    return true; // async in flight — not silent
+  }
+
   function tryCapacityRematchAfterServiceChange() {
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return false;
@@ -6097,15 +6179,22 @@
     const it = catalogItemForService();
     const resolved = resolveRefCaps(it);
     if (!(resolved.known && nRefs > resolved.maxRefs)) return false;
-    const want = capacityRematchId(nRefs, it);
-    if (!want || !state.catalogById[want]) return false;
+    const pool = rematchCandidatePool();
+    const want = capacityRematchId(nRefs, it, pool);
+    if (!want) return false;
+    const row = pool[want] || (state.catalogById && state.catalogById[want]);
+    if (!row) return false;
     if (String(it && it.id) === want) return false;
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[want]) state.catalogById[want] = row;
     const sel = $("service");
     if (!sel) return false;
     // Avoid change-event loop: set value then sync without re-entering via change.
     ensureSelectOpt(sel, want);
     sel.value = want;
     shot.serviceId = want;
+    state._capacityRematchLock = want;
+    state._pinFalLoraService = want;
     return true;
   }
 
@@ -8643,6 +8732,9 @@
         const roster = j.items || j.models;
         if (!Array.isArray(roster)) throw new Error("目录响应缺少模型列表");
         let items = roster.slice();
+      // o53d: keep full official roster for capacity rematch (filter may drop flux-2/edit from UI list)
+      state._catalogRoster = roster.slice();
+      state._catalogRosterBackend = be;
       // v0821: mode-filter so video Composer lists i2v services (not silent t2i flux).
       items = filterCatalogForMode(items);
       // v0821o52: import _pendingService must survive i2i filter (t2i krea2 onto shot that still has refs).
