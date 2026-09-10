@@ -104,19 +104,25 @@ header {
 .badge { border-radius: 8px; }
 .port { background: #202024; border-color: #b6bac2; }
 .card:is(:hover, .sel, .multi) .port { border-color: var(--teal); background: #263e39; }
+svg.wires { z-index: 4; overflow: visible; }
 svg.wires path { vector-effect: non-scaling-stroke; }
-svg.wires path.edge { stroke-width: 1.6; opacity: .8; }
-svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
+svg.wires path.edge-glow { stroke-width: 7; opacity: .9; }
+svg.wires path.edge { stroke: #e8edf4; stroke-width: 2.6; opacity: .96; }
+svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; }
 .group-bound { border-width: 1px; background: #5ee0c507; box-shadow: none; }
 .group-bound .gname { color: #c5f4e9; background: #213d35; border: 1px solid #5ee0c560; }
 .selbar { top: 20px; left: 264px; right: 440px; transform: none; width: fit-content; max-width: calc(100% - 704px); flex-wrap: wrap; gap: 6px; }
 .selbar button { padding: 0 10px; }
 
-/* positionDock() anchors the Composer to the selected node, including on resize. */
+/* positionDock() anchors a narrow capsule to the selected node (not a bottom bar). */
 .dock {
-  right: auto; bottom: auto; width: min(640px, calc(100% - 24px)); transform: none;
+  right: auto; bottom: auto; width: min(440px, calc(100% - 300px)); transform: none;
   border-radius: 18px; border-color: #3c3c43; background: #1b1b1ef5;
   box-shadow: 0 12px 36px #0005;
+}
+.chat-rail {
+  right: 14px; top: 20px; bottom: 20px; width: 280px;
+  border-color: #303034; background: #1a1a1ded;
 }
 .dock-hd { min-height: 52px; padding: 10px 12px; gap: 8px; }
 .dock-hd .dock-title { min-width: 0; flex: 1; max-width: none; }
@@ -211,7 +217,7 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 6em; overflow: auto; margin: 6px 0 0;
 }
 
-.composer-chip { right: 20px; bottom: 20px; }
+.composer-chip { right: 308px; bottom: 20px; }
 .skillbox .sk-list { overflow-x: hidden; }
 .skillbox .sk-item { min-width: 0; }
 .skillbox .sk-preview { max-width: 100%; }
@@ -395,6 +401,7 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
   .mode-mini { flex-wrap: wrap; justify-content: end; gap: 3px 10px; }
   .stamp { flex-basis: 100%; text-align: right; }
   .rail { width: 148px; }
+  .chat-rail { width: 240px; }
   .selbar { left: 248px; right: 392px; max-width: calc(100% - 640px); }
   .canvas-tip { left: 310px; transform: none; }
 }
@@ -405,6 +412,7 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3; opacity: 1; }
   .stamp { flex-basis: auto; }
   header { height: 84px; grid-template-rows: 46px 26px; }
   .rail { left: auto; right: 12px; top: 16px; max-height: 156px; }
+  .chat-rail { width: 180px; top: 180px; bottom: 16px; }
   .tools { left: 12px; top: 16px; }
   .minimap { top: 16px; left: 84px; bottom: auto; width: 120px; height: 75px; }
   .selbar { left: 84px; right: 176px; max-width: calc(100% - 260px); top: 104px; }

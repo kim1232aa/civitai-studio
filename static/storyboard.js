@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o17: node capsule + right chat-rail skeleton; visible wires; i2v first-frame slot actions
   // v0821o16: persistServer skip empty + surface PUT fail; orphan reattach; poll wait saved[] not CDN
   // v0821o15: writeback also PUT /api/storyboard-graph; boot hydrate so clean-profile hard refresh keeps card
   // v0821o14: persist→localStorage + QuotaExceeded warn; restore merge prefer-url (session media not clobbered)
@@ -455,7 +456,8 @@
   }
   function addWorkspaceShot() {
     const pos = newShotPosition(shots().length);
-    const shot = { id: uid("shot"), kind: "shot", title: "分镜" + (shots().length + 1), x: pos.x, y: pos.y, url: "", firstFrameId: "", prompt: "" };
+    state.mode = "image";
+    const shot = { id: uid("shot"), kind: "shot", title: "分镜" + (shots().length + 1), x: pos.x, y: pos.y, url: "", firstFrameId: "", prompt: "", mode: "image" };
     state.nodes.push(shot);
     ensureWorkspaceModel();
     const scene = sceneById(state._scriptSceneId) || state.script.scenes[0];
@@ -779,6 +781,7 @@
         url: "",
         firstFrameId: "",
         prompt: "",
+        mode: "image",
       };
       state.nodes.push(shot);
     }
@@ -990,8 +993,10 @@
       url: "",
       firstFrameId: "",
       prompt: "",
+      mode: "image",
     }];
     state.edges = [];
+    state.mode = "image";
   }
 
   function isQuotaErr(e) {
@@ -1231,6 +1236,12 @@
     const dx = Math.max(90, Math.abs(x2 - x1) * 0.5);
     return "M " + x1 + " " + y1 + " C " + (x1 + dx) + " " + y1 + " " + (x2 - dx) + " " + y2 + " " + x2 + " " + y2;
   }
+  function modeLabelOf(mode) {
+    if (mode === "video") return "视频生成";
+    if (mode === "text") return "文本生成";
+    if (mode === "audio") return "音频生成";
+    return "图片生成";
+  }
   function portPos(n, side) {
     const b = box(n);
     const y = n.y + b.h / 2;
@@ -1306,6 +1317,7 @@
         }
       }
     } else {
+      state.mode = (shot.mode === "video" || shot.mode === "text" || shot.mode === "audio") ? shot.mode : "image";
       applyComfyParamsToUi(shot);
       if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
       if (shot.res && $("res")) $("res").value = shot.res;
@@ -1402,20 +1414,28 @@
       const a = nodeById(e.from), b = nodeById(e.to);
       if (!a || !b) return;
       const p1 = portPos(a, "out"), p2 = portPos(b, "in");
-      parts.push('<path class="edge" data-ei="' + i + '" d="' + bezier(p1.x, p1.y, p2.x, p2.y) + '" />');
+      const d = bezier(p1.x, p1.y, p2.x, p2.y);
+      parts.push('<path class="edge-glow" d="' + d + '" fill="none" />');
+      parts.push('<path class="edge" data-ei="' + i + '" d="' + d +
+        '" fill="none" stroke="#e8edf4" stroke-width="2.6" vector-effect="non-scaling-stroke" />');
     });
     if (state.link && state.link.x2 != null) {
       const snap = state.snapTarget;
       const cls = snap ? "snap" : "live";
       const x2 = snap ? snap.x : state.link.x2;
       const y2 = snap ? snap.y : state.link.y2;
-      parts.push('<path class="' + cls + '" d="' + bezier(state.link.x1, state.link.y1, x2, y2) + '" />');
+      parts.push('<path class="' + cls + '" d="' + bezier(state.link.x1, state.link.y1, x2, y2) +
+        '" fill="none" stroke="#ffffff" stroke-width="2.6" />');
     }
-    wires.innerHTML = parts.join("");
-    const maxX = Math.max(2400, ...state.nodes.map((n) => n.x + box(n).w + 400));
-    const maxY = Math.max(2400, ...state.nodes.map((n) => n.y + box(n).h + 400));
-    wires.setAttribute("width", String(maxX));
-    wires.setAttribute("height", String(maxY));
+    if (wires) {
+      wires.style.overflow = "visible";
+      wires.style.zIndex = "4";
+      wires.innerHTML = parts.join("");
+      const xs = state.nodes.map((n) => n.x + box(n).w + 400);
+      const ys = state.nodes.map((n) => n.y + box(n).h + 400);
+      wires.setAttribute("width", String(Math.max(2400, xs.length ? Math.max.apply(null, xs) : 2400)));
+      wires.setAttribute("height", String(Math.max(2400, ys.length ? Math.max.apply(null, ys) : 2400)));
+    }
     updatePortHot();
   }
 
@@ -1666,7 +1686,7 @@
     const r = vp.getBoundingClientRect();
     const narrow = r.width <= 900;
     const area = { left: 12, top: 48, right: r.width - 12, bottom: r.height - (narrow ? 68 : 16) };
-    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar").forEach((el) => {
+    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar,.chat-rail").forEach((el) => {
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height) return;
       // On narrow canvases the tool/asset rail is an overlay, not a top
@@ -1674,6 +1694,8 @@
       // expanded Composer with only a 100px viewport.
       if (el.classList.contains("selbar")) {
         area.top = Math.max(area.top, b.bottom - r.top + 12);
+      } else if (el.classList.contains("chat-rail") || (b.left - r.left) > r.width * 0.55) {
+        area.right = Math.min(area.right, b.left - r.left - 12);
       } else if (!narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
       }
@@ -1687,8 +1709,8 @@
     const area = canvasArea(), b = box(n), gap = 18;
     const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
     const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
-    const width = Math.min(640, area.right - area.left);
-    const height = state.dockMode === "expanded" ? 520 : $("dockHd").offsetHeight + 2;
+    const width = Math.min(440, Math.max(300, Math.min(nw + 28, area.right - area.left)));
+    const height = state.dockMode === "expanded" ? 380 : 160;
     const above = y - 34 * state.cam.s - gap - area.top;
     const below = area.bottom - y - nh - gap;
     const right = area.right - x - nw - gap, leftRoom = x - gap - area.left;
@@ -1796,6 +1818,57 @@
     rail.innerHTML = tabs + body;
   }
 
+  function renderChatRail() {
+    const rail = $("chatRail");
+    if (!rail) return;
+    const shot = nodeById(state.selected);
+    const shotOk = !!(shot && shot.kind === "shot");
+    const stub = isStubMode();
+    const frame = shotOk ? frameAsset(shot) : null;
+    const needFrame = state.mode === "video" && !frame;
+    const ml = modeLabelOf(state.mode);
+    const modeEl = $("chatRailMode");
+    const tagEl = $("chatRailTag");
+    const pathEl = $("chatRailPath");
+    const copyEl = $("chatRailCopy");
+    const actsEl = $("chatRailActs");
+    if (modeEl) {
+      modeEl.textContent = ml;
+      modeEl.classList.toggle("stub", stub);
+    }
+    if (tagEl) tagEl.textContent = stub ? "未接" : (state.mode === "image" ? "默认" : "路径");
+    const sid = ($("service") && $("service").value) || "";
+    const steps = [
+      { on: shotOk, warn: !shotOk, text: shotOk ? ("分镜 · " + (shot.title || "")) : "请先选中分镜" },
+      { on: state.mode === "image" && !stub, warn: stub, text: stub ? (ml + " · 未接") : ("模式 · " + ml) },
+      { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + sid) : "选 Civitai / Fal 等服务（同配方台）" },
+    ];
+    if (state.mode === "video") {
+      steps.push({ on: !!frame, warn: needFrame, text: frame ? "首帧已就绪" : "缺首帧 · 上传或选择" });
+    }
+    if (pathEl) {
+      pathEl.innerHTML = steps.map((s) =>
+        "<li class=\"" + (s.warn ? "warn" : (s.on ? "on" : "")) + "\">" + esc(s.text) + "</li>"
+      ).join("");
+    }
+    if (copyEl) {
+      if (stub) copyEl.textContent = ml + " · 本版未接（诚实空壳，不假装可生成）";
+      else if (needFrame) copyEl.textContent = "视频缺首帧：切到图片生成，或在胶囊里上传/选择首帧。不偷配方台历史。";
+      else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑（同一 /api/generate，无第二套出站）";
+    }
+    if (actsEl) {
+      let acts = "";
+      if (needFrame) {
+        acts += '<button class="chip-btn" type="button" data-act="upload">上传首帧</button>' +
+          '<button class="chip-btn" type="button" data-act="pick">选择首帧</button>';
+      }
+      if (!stub && shotOk) {
+        acts += '<button type="button" class="chat-rail-send" id="chatRailSend" data-testid="composer-send" title="生成">↑</button>';
+      }
+      actsEl.innerHTML = acts;
+    }
+  }
+
 
   function syncCanvasTip() {
     const tip = $("canvasTip");
@@ -1834,6 +1907,7 @@
       if (picker) picker.classList.remove("show");
       syncComposerChip(); syncCanvasTip();
       renderRail();
+      renderChatRail();
       requestAnimationFrame(positionDock);
       return;
     }
@@ -1849,6 +1923,7 @@
       if (picker) picker.classList.remove("show");
       syncComposerChip(); syncCanvasTip();
       renderRail();
+      renderChatRail();
       requestAnimationFrame(positionDock);
       return;
     }
@@ -1858,7 +1933,8 @@
     dock.classList.toggle("expanded", expanded);
     dock.classList.remove("near");
     if ($("dockTitle")) {
-      $("dockTitle").textContent = (n.title || "分镜") + (expanded ? " · Composer" : " · Composer（已折叠）");
+      const ml = modeLabelOf(state.mode) + (isStubMode() ? " · 未接" : "");
+      $("dockTitle").textContent = (n.title || "分镜") + " · " + ml + (expanded ? "" : "（胶囊）");
     }
     $("prompt").value = n.prompt || "";
     if ($("negative")) $("negative").value = n.negativePrompt || "";
@@ -1881,8 +1957,8 @@
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
-      // v0821g: missing-frame is hard stop (red), not yellow warn
-      setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+      // v0821g/o17: missing-frame is hard stop (red); offer 图片生成 or attach frame
+      setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad");
     } else if (unusedMsg) {
       setMsg(unusedMsg, "bad");
     } else if (capMsg) {
@@ -1914,7 +1990,9 @@
               (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") + esc(sourceTitle(a)) + "</button>";
           }).join("") + "</div>";
       } else {
-        frameHtml = '<div class="frame-slot missing">缺首帧</div>';
+        frameHtml = '<div class="frame-slot missing">缺首帧' +
+          '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
+          '<button class="chip-btn" type="button" data-act="pick">选择</button></div>';
       }
     }
     const promoteBtn = n.url
@@ -1944,6 +2022,7 @@
       }).join("");
     syncComposerChip(); syncCanvasTip();
     renderRail();
+    renderChatRail();
     requestAnimationFrame(() => {
       positionDock();
       if (expanded) keepComposerPromptVisible();
@@ -2913,6 +2992,19 @@
     renderCards(); drawWires(); renderDock(); persist();
   }
 
+  if ($("chatRail")) {
+    $("chatRail").addEventListener("click", (e) => {
+      const act = e.target.closest("[data-act]");
+      if (!act) return;
+      if (act.dataset.act === "upload") {
+        if ($("file")) $("file").click();
+        return;
+      }
+      if (act.dataset.act === "pick") {
+        openImportModal();
+      }
+    });
+  }
   if ($("assetRail")) {
     $("assetRail").addEventListener("pointerdown", (e) => {
       if (e.target.closest("[data-act],[data-tab],[data-pin],[data-hist-pin]")) return;
@@ -4902,8 +4994,13 @@
     }
     live.url = url;
     removeUnpromotedFromShot(live.id);
+    const frame = (typeof frameAsset === "function") ? frameAsset(live) : null;
+    if (frame && frame.id && !(state.edges || []).some((e) => e.from === frame.id && e.to === live.id)) {
+      state.edges.push({ from: frame.id, to: live.id });
+    }
     pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
+    if (typeof renderChatRail === "function") renderChatRail();
     try { renderCards(); drawWires(); } catch (_) {}
     persist();
     persistServer();
@@ -5072,7 +5169,7 @@
       return fail((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "blocked", "warn");
     }
     if (state.mode === "video" && !frameAsset(shot)) {
-      return fail("视频需要先连一张首帧图，不能偷配方台", "blocked");
+      return fail("缺首帧 · 切到图片生成，或先上传/选择首帧（视频需要先连一张首帧图，不能偷配方台）", "blocked");
     }
     // v0821b: do not silently run i2v on t2i flux / pure t2v that drops the frame.
     if (state.mode === "video") {
@@ -5411,7 +5508,7 @@
       return;
     }
     if (state.mode === "video" && !frameAsset(n)) {
-      failUi("缺首帧 · 视频需要先连一张首帧图");
+      failUi("缺首帧 · 切到图片生成，或先上传/选择首帧");
       return;
     }
     if (needsPromptBeforeGenerate()) {
@@ -5456,6 +5553,18 @@
       };
       foot.addEventListener("click", onFoot, true);
       foot.addEventListener("pointerdown", onFoot, true);
+    }
+    const chatActs = $("chatRailActs");
+    if (chatActs && chatActs.dataset.nlSendDelegate !== "1") {
+      chatActs.dataset.nlSendDelegate = "1";
+      const onChatSend = function (ev) {
+        const t = ev.target && ev.target.closest && ev.target.closest("[data-testid=\"composer-send\"]");
+        if (!t) return;
+        if (ev._nlSendHandled) return;
+        fireSend(ev);
+      };
+      chatActs.addEventListener("click", onChatSend, true);
+      chatActs.addEventListener("pointerdown", onChatSend, true);
     }
   }
 
@@ -5618,11 +5727,13 @@
     const n = shots().length;
     const id = uid("shot");
     const pos = newShotPosition(n);
+    state.mode = "image";
     state.nodes.push({
       id: id, kind: "shot", title: "分镜" + (n + 1),
       x: pos.x, y: pos.y,
       url: "", firstFrameId: "",
       prompt: "",
+      mode: "image",
     });
     separateOverlappingShots();
     constrainShotsToViewport();
@@ -6039,10 +6150,11 @@
     }
     const id = uid("shot");
     const pos = newShotPosition(shots().length);
+    state.mode = "image";
     const n = {
       id: id, kind: "shot", title: "分镜1",
       x: pos.x, y: pos.y, url: "", firstFrameId: "",
-      prompt: "",
+      prompt: "", mode: "image",
     };
     state.nodes.push(n);
     selectNode(id, { expand: true });

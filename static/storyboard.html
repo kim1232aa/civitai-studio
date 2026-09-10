@@ -42,11 +42,12 @@
   .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
   .grid{position:absolute;inset:-4000px;background-image:radial-gradient(circle, #2a2a32 1px, transparent 1.2px);
     background-size:28px 28px;pointer-events:none;opacity:.55}
-  svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:2}
-  svg.wires path.edge{fill:none;stroke:var(--wire);stroke-width:2.2;opacity:.88;pointer-events:stroke;cursor:pointer}
-  svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:2.6}
-  svg.wires path.live{fill:none;stroke:#fff;stroke-width:2.2;opacity:.95;pointer-events:none}
-  svg.wires path.snap{fill:none;stroke:var(--teal);stroke-width:2.4;opacity:1;pointer-events:none}
+  svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:4}
+  svg.wires path.edge-glow{fill:none;stroke:rgba(94,224,197,.35);stroke-width:7;opacity:.9;pointer-events:none}
+  svg.wires path.edge{fill:none;stroke:#e8edf4;stroke-width:2.6;opacity:.96;pointer-events:stroke;cursor:pointer}
+  svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:3.2}
+  svg.wires path.live{fill:none;stroke:#fff;stroke-width:2.6;opacity:.95;pointer-events:none}
+  svg.wires path.snap{fill:none;stroke:var(--teal);stroke-width:2.8;opacity:1;pointer-events:none}
   .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28);z-index:3}
   .asset{width:132px;border-radius:10px;overflow:visible}
   .asset .thumb,.asset video.thumb{height:176px;background:#0f0f12;display:block;object-fit:cover;width:100%;border-radius:10px 10px 0 0}
@@ -89,13 +90,17 @@
     border:1px solid #2c2c34;background:#121216ee;backdrop-filter:blur(8px);overflow:hidden;cursor:crosshair;
     box-shadow:0 8px 24px rgba(0,0,0,.35)}
   .minimap canvas{display:block;width:100%;height:100%}
-  .dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(720px,calc(100% - 494px));
+  .dock{position:absolute;left:auto;top:auto;right:auto;bottom:auto;transform:none;width:min(440px,calc(100% - 320px));
     z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;padding:0;
     box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(18px);display:none;
     flex-direction:column;max-height:58vh;overflow:hidden}
   .dock.show{display:flex}
+  .dock.near{box-shadow:0 12px 36px rgba(0,0,0,.5),0 0 0 1px rgba(94,224,197,.18)}
   .dock.collapsed{max-height:none;overflow:visible}
-  .dock.collapsed .dock-body{display:none}
+  .dock.collapsed .dock-body{display:flex;flex-direction:column;overflow:visible;padding:8px 12px 10px;min-height:0;flex:0 0 auto}
+  .dock.collapsed .dock-scroll{overflow:visible;flex:0 0 auto}
+  .dock.collapsed .dock-scroll > :not(.modes):not(.refs){display:none}
+  .dock.collapsed .dock-foot{display:none}
   .dock.expanded{max-height:58vh}
   .dock.expanded .dock-body{display:flex;flex-direction:column;overflow:hidden;padding:10px 14px 12px;min-height:0;flex:1}
   /* ONE scroll owner for the whole body */
@@ -134,7 +139,8 @@
   .ref-cap-hint{width:auto;min-width:0;height:auto;padding:6px 10px;border-radius:999px;border:1px solid #2e2e36;background:#1a1a1f;color:#9a9aa3;font-size:11px;display:inline-flex;align-items:center;white-space:nowrap}
   .frame-slot{display:flex;align-items:center;gap:8px;flex:1 0 100%;margin:0 0 2px;color:#9a9aa3;font-size:12px}
   .frame-slot img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #2e2e36}
-  .frame-slot.missing{color:#e85d4c}
+  .frame-slot.missing{color:#e85d4c;flex-wrap:wrap}
+  .frame-slot.missing .chip-btn{width:auto;min-width:44px;padding:0 10px;height:32px}
   .prompt{width:100%;min-height:120px;max-height:180px;resize:vertical;background:#121214;border:1px solid #2a2a30;
     border-radius:12px;padding:10px 12px;color:#e8e8ec}
   #prompt{position:sticky;top:0;z-index:4;background:#121214}
@@ -366,7 +372,7 @@
     background:#16161acc;border:1px solid #2e2e36;color:#9a9aa3;font-size:13px;letter-spacing:.04em;
     box-shadow:0 8px 28px rgba(0,0,0,.35);backdrop-filter:blur(10px);white-space:nowrap}
   .canvas-tip.show{display:block}
-  .composer-chip{position:absolute;right:16px;bottom:18px;z-index:22;display:none;
+  .composer-chip{position:absolute;right:308px;bottom:18px;z-index:22;display:none;
     align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:999px;
     border:1px solid #34343e;background:#16161af2;color:#e8e8ec;font-size:12px;font-weight:600;
     box-shadow:0 8px 24px rgba(0,0,0,.4);backdrop-filter:blur(12px);cursor:pointer}
@@ -374,8 +380,26 @@
   .composer-chip:hover{border-color:rgba(94,224,197,.55);color:#fff}
   .composer-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0}
 
+  .chat-rail{position:absolute;right:14px;top:18px;bottom:18px;z-index:15;width:280px;
+    display:flex;flex-direction:column;gap:10px;padding:12px;overflow:auto;
+    border:1px solid #303034;border-radius:16px;background:#16161af2;
+    box-shadow:0 12px 36px rgba(0,0,0,.35);backdrop-filter:blur(14px)}
+  .chat-rail-hd{display:flex;align-items:baseline;gap:8px}
+  .chat-rail-mode{font-size:14px;font-weight:700;color:#fff}
+  .chat-rail-mode.stub{color:#c8c8d0;font-weight:600}
+  .chat-rail-tag{font-size:10px;color:#8b8b94;border:1px solid #2e2e36;border-radius:999px;padding:2px 7px}
+  .chat-rail-path{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .chat-rail-path li{font-size:12px;color:#c8c8d0;padding:7px 9px;border-radius:10px;background:#1a1a1f;border:1px solid #2a2a30}
+  .chat-rail-path li.on{border-color:rgba(94,224,197,.45);color:#fff}
+  .chat-rail-path li.warn{border-color:rgba(232,93,76,.45);color:#f0aaa2}
+  .chat-rail-copy{margin:0;font-size:12px;color:#9a9aa3;line-height:1.45}
+  .chat-rail-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .chat-rail-acts .chip-btn{width:auto;min-width:44px;height:32px;padding:0 10px}
+  .chat-rail-send{width:40px;height:40px;border:0;border-radius:50%;background:#fff;color:#111;font-size:18px}
+  .chat-rail-send[aria-disabled="true"]{background:#3a3a44;color:#8b8b94}
+
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-merge1">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r17capwire">
 </head>
 <body>
 <div class="app">
@@ -390,7 +414,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o16-persist-skip-empty</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o17-capsule-wires</span>
     </div>
   </header>
   <div class="stage">
@@ -417,6 +441,15 @@
       <button type="button" id="selGroupRun" disabled>▶ 整组</button>
     </div>
     <aside class="rail canvas-only" id="assetRail" aria-label="资产索引"></aside>
+    <aside class="chat-rail canvas-only" id="chatRail" aria-label="生成路径">
+      <div class="chat-rail-hd">
+        <span class="chat-rail-mode" id="chatRailMode">图片生成</span>
+        <span class="chat-rail-tag" id="chatRailTag">路径</span>
+      </div>
+      <ol class="chat-rail-path" id="chatRailPath"></ol>
+      <p class="chat-rail-copy" id="chatRailCopy">选分镜 → 图片生成 → 选服务 → 胶囊 ↑（同一 /api/generate）</p>
+      <div class="chat-rail-acts" id="chatRailActs"></div>
+    </aside>
     <div class="atbox canvas-only" id="atbox"></div>
     <div class="skillbox canvas-only" id="skillbox" aria-label="Skill 选择"></div>
     <div class="viewport canvas-only" id="viewport">
@@ -446,14 +479,14 @@
         <span class="dock-title" id="dockTitle">Composer</span>
         <span class="dock-hint expand-only" id="dockHint">点击展开编辑提示词</span>
         <span class="grow"></span>
-        <button type="button" class="dock-btn collapse-only" id="dockCollapse" title="折叠为底栏">▾ 折叠</button>
+        <button type="button" class="dock-btn collapse-only" id="dockCollapse" title="折叠胶囊">▾ 折叠</button>
         <button type="button" class="dock-btn" id="dockClose" title="关闭 Composer">×</button>
       </div>
       <div class="dock-body" id="dockBody">
       <div class="dock-scroll" id="dockScroll">
       <div class="modes">
         <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本生成<span class="mode-tag">未接</span></button>
-        <button type="button" id="modeImg" data-mode="image">图片生成</button>
+        <button type="button" id="modeImg" class="on" data-mode="image">图片生成</button>
         <button type="button" id="modeVid" data-mode="video">视频生成</button>
         <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频生成<span class="mode-tag">未接</span></button>
       </div>
@@ -569,6 +602,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r16perskip"></script>
+<script src="/static/storyboard.js?v=20260910-r17capwire"></script>
 </body>
 </html>

@@ -23,7 +23,7 @@
   };
   check(location.origin === "http://127.0.0.1:18832" && location.pathname === "/storyboard.html", "correct cloud canvas");
   check([...document.styleSheets].some(s => s.href && s.href.includes("/static/storyboard-ui.css")), "visual stylesheet loaded");
-  check($(".stamp").textContent.trim() === "v0821o16-persist-skip-empty", "C1 stamp preserved");
+  check($(".stamp").textContent.trim() === "v0821o17-capsule-wires", "C1 stamp preserved");
   check(document.documentElement.scrollWidth <= innerWidth + 1, "no document horizontal overflow");
   check(Math.abs(rect(".stage").bottom - innerHeight) < 2, "canvas fills remaining screen");
   check(separate("#btnGroupRun", "#assetRail"), "group run clear of asset rail");
