@@ -424,6 +424,9 @@
       return '<div class="workspace-section"><h3>' + esc(scene.title) + '</h3><span class="muted">' + scene.shotIds.length + ' 镜头</span></div>' +
         (rows || '<div class="editor-empty">本场暂无分镜</div>');
     }).join("");
+    const editorContent = sequence.length
+      ? grouped
+      : '<div class="editor-empty editor-empty-action"><strong>时间线还没有分镜</strong><span>先创建一个分镜，再回到这里编排场次、时长和播放顺序。</span><button type="button" class="workspace-btn primary" data-editor-act="add-shot">＋ 新建分镜</button><button type="button" class="workspace-btn" data-editor-act="open-script">去剧本策划</button></div>';
     panel.innerHTML =
       '<div class="workspace-shell"><div class="workspace-top"><div>' +
       '<div class="workspace-kicker">EDIT TIMELINE</div><h1 class="workspace-title" id="editorWorkspaceTitle">编辑器</h1>' +
@@ -432,11 +435,11 @@
       '<button type="button" class="workspace-btn" data-editor-act="next">下一镜</button><button type="button" class="workspace-btn" data-editor-act="open-canvas">打开画布</button></div></div>' +
       '<div class="editor-layout"><div class="workspace-card editor-timeline"><div class="workspace-card-hd"><h2>时间线</h2><span class="muted">' + sequence.length + ' 镜头</span></div>' +
       '<div class="workspace-card-body"><div class="editor-stats"><span>总时长 <strong>' + esc(formatDuration(total)) + '</strong></span><span>已生成 <strong>' + sequence.filter((item) => !!item.shot.url).length + '/' + sequence.length + '</strong></span></div>' +
-      '<div class="editor-rows">' + (grouped || '<div class="editor-empty">先在剧本策划中创建分镜。</div>') + '</div></div></div>' +
+      '<div class="editor-rows">' + editorContent + '</div></div></div>' +
       '<div class="editor-preview"><div class="editor-preview-head"><strong>' + esc(active ? active.title : "未选择分镜") + '</strong><span class="muted">' + (active ? formatDuration(shotDurationSeconds(active)) : "") + '</span></div>' +
       '<div class="editor-preview-media">' + workspaceMedia(active) + '</div>' +
       activeFields +
-      '<div class="workspace-note">' + + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
+      '<div class="workspace-note">' + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
   }
   function renderWorkspace() {
     ensureWorkspaceModel();
