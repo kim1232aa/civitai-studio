@@ -48,10 +48,12 @@ API 调查报告单独保留在 [`api-usage/`](./api-usage/)，可与本文件�
 
 ## 6. 源站权威入口
 
-Seko 无限画布（老板确认）：
-`https://seko.sensetime.com/infinite-canvas?canvasId=2096017790470868993`
+老板本轮确认入口：
+`https://seko.sensetime.com/my-space?tab=canvas`
 
-原站对照必须用此入口（或老板另行更新的链接）。
+操作：在此页**点击一个有画面的画布**进入无限画布（具体 canvasId/URL 可变）。对照在该画布上做文生图/图生图/图生视频/连线等同流程；不要死锁旧 canvasId。
+
+（历史样例画布仍可参考，但以本入口点进有内容的画布为准。）
 
 ## 7. 原站对照清单（防偏离）
 
