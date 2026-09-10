@@ -3923,12 +3923,12 @@
     const be = currentBackend();
     hits.textContent = "搜…";
     if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
-      addLora({ path: q, name: q });
+      addLora({ path: q, name: q, strength: null });
       hits.textContent = "";
       return;
     }
     if ((be === "fal" || be === "huggingface" || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
-      addLora({ path: q, name: q, strength: 0.8 });
+      addLora({ path: q, name: q, strength: null });
       hits.textContent = "";
       return;
     }
@@ -3942,7 +3942,7 @@
       return;
     }
     if (q.startsWith("urn:air:") || q.includes(":lora:")) {
-      addLora({ air: q, name: q.split(":").pop(), strength: 0.8 });
+      addLora({ air: q, name: q.split(":").pop(), strength: null });
       hits.textContent = "";
       return;
     }
@@ -3964,7 +3964,7 @@
           const name = el.getAttribute("data-name") || "";
           const vid = el.getAttribute("data-vid");
           if (path && (isHttpUrl(path) || isHfRepo(path))) {
-            addLora({ path: path, name: name || path, strength: 0.8 });
+            addLora({ path: path, name: name || path, strength: null });
             return;
           }
           if (be === "civitai" && vid) {
@@ -3979,11 +3979,11 @@
               path: "https://civitai.com/api/download/models/" + vid,
               versionId: String(vid),
               name: name || ("LoRA " + vid),
-              strength: 0.8,
+              strength: null,
             });
             return;
           }
-          if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8 });
+          if (path || name) addLora({ path: path || name, name: name || path, strength: null });
         };
       });
     } catch (_) {
