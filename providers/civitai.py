@@ -1311,6 +1311,68 @@ def _clamp_import_comfy_dim(n, field="height"):
     return value, source, warn
 
 
+
+def fetch_generation_data_rest(image_id: int) -> dict:
+    """Official REST generation params (public). Carries resource.strength when trpc null."""
+    code, data = json_call(
+        f"https://civitai.com/api/generation/data?type=image&id={int(image_id)}",
+        timeout=25,
+    )
+    return data if isinstance(data, dict) else {}
+
+
+def _resource_version_id_for_strength(r: dict):
+    """Match key for REST↔trpc strength merge.
+
+    REST generation/data uses `id` as the model version id; trpc uses modelVersionId/versionId.
+    Prefer explicit version fields, then AIR @version, then bare id.
+    """
+    if not isinstance(r, dict):
+        return None
+    for key in ("modelVersionId", "versionId"):
+        vid = _as_version_id(r.get(key))
+        if vid is not None:
+            return vid
+    air_vid = _version_id_from_air(r.get("air") or "")
+    if air_vid is not None:
+        return air_vid
+    return _as_version_id(r.get("id"))
+
+
+def _backfill_strength_from_rest(resources: list, rest_resources: list) -> list:
+    """When trpc/meta strength is null/missing, copy official REST strength for same versionId.
+
+    NEVER invent 0.8 — only apply a numeric strength present on REST for that version.
+    Explicit trpc numeric strength wins; REST null does nothing.
+    """
+    by_vid = {}
+    for r in rest_resources or []:
+        if not isinstance(r, dict):
+            continue
+        vid = _resource_version_id_for_strength(r)
+        if vid is None:
+            continue
+        raw = r.get("strength") if "strength" in r else r.get("weight")
+        s = _optional_strength(raw)
+        if s is not None:
+            by_vid[vid] = s
+    if not by_vid:
+        return list(resources or [])
+    out = []
+    for r in resources or []:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        row = dict(r)
+        if _optional_strength(_resource_strength_raw(row)) is None:
+            vid = _resource_version_id_for_strength(row)
+            if vid is not None and vid in by_vid:
+                row["strength"] = by_vid[vid]
+                row.pop("strengthMissing", None)
+        out.append(row)
+    return out
+
+
 def import_image(image_id: str) -> dict:
     from . import io_meta
 
@@ -1368,6 +1430,17 @@ def import_image(image_id: str) -> dict:
     ):
         if isinstance(src, list):
             resources.extend(x for x in src if isinstance(x, dict))
+    # o27: trpc often ships strength=null; official REST /api/generation/data has the real weight.
+    # Backfill by versionId only — never invent 0.8 / defaults.
+    need_rest_strength = any(
+        isinstance(r, dict) and _optional_strength(_resource_strength_raw(r)) is None
+        for r in resources
+    )
+    if need_rest_strength:
+        rest = fetch_generation_data_rest(iid)
+        rest_resources = rest.get("resources") if isinstance(rest, dict) else None
+        if isinstance(rest_resources, list) and rest_resources:
+            resources = _backfill_strength_from_rest(resources, rest_resources)
     if not js and not meta and not file_parsed:
         err = gen.get("error") or info.get("error") or ""
         if gen_code == 401 or info_code == 401 or "没有 API Key" in str(err):

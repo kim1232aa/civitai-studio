@@ -657,6 +657,82 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(no_air[0]["versionId"], 3071582)
         self.assertIn("3071582", no_air[0]["path"])
 
+
+    def test_o27_rest_backfill_strength_28533344(self):
+        """Image 28533344: trpc strength=null, REST strength=0.7 for version 823089.
+
+        Official REST /api/generation/data is the original param — never invent 0.8.
+        """
+        trpc = [{
+            "modelVersionId": 823089,
+            "versionId": 823089,
+            "modelType": "LORA",
+            "modelName": "Kolors style Asian face for Flux1 dev",
+            "strength": None,
+        }]
+        rest = [{
+            "id": 823089,
+            "name": "v0.3",
+            "air": "urn:air:flux1:lora:civitai:730162@823089",
+            "strength": 0.7,
+        }]
+        merged = civ._backfill_strength_from_rest(trpc, rest)
+        self.assertEqual(merged[0]["strength"], 0.7)
+        loras = civ._loras_from_import_sources(merged)
+        self.assertEqual(len(loras), 1)
+        self.assertEqual(loras[0]["strength"], 0.7)
+        self.assertNotIn("strengthMissing", loras[0])
+        self.assertEqual(loras[0]["versionId"], 823089)
+        self.assertNotEqual(loras[0]["strength"], 0.8)
+
+        # REST null / missing → still strengthMissing (no invent)
+        still = civ._backfill_strength_from_rest(trpc, [{"id": 823089, "strength": None}])
+        self.assertIsNone(still[0]["strength"])
+        missing = civ._loras_from_import_sources(still)
+        self.assertTrue(missing[0].get("strengthMissing"))
+
+        # Explicit trpc numeric wins over REST
+        explicit = civ._backfill_strength_from_rest(
+            [{"modelVersionId": 823089, "modelType": "LORA", "modelName": "X", "strength": 0.55}],
+            rest,
+        )
+        self.assertEqual(explicit[0]["strength"], 0.55)
+
+        # Full import_image path with mocked trpc + REST (offline)
+        def fake_civitai(url, method="GET", body=None, timeout=90):
+            if "image.getGenerationData" in url:
+                return 200, {"result": {"data": {"json": {
+                    "meta": {"prompt": "o27 fixture", "steps": 20, "cfgScale": 1,
+                             "sampler": "euler", "width": 832, "height": 1216},
+                    "resources": trpc,
+                }}}}
+            if "image.get" in url:
+                return 200, {"result": {"data": {"json": {"type": "image", "url": "https://example.invalid/x", "width": 832, "height": 1216}}}}
+            return 200, {}
+
+        def fake_json_call(url, method="GET", headers=None, body=None, timeout=90):
+            if "/api/generation/data" in url and "28533344" in url:
+                return 200, {"type": "image", "resources": rest, "params": {}}
+            raise AssertionError(f"unexpected json_call {url}")
+
+        with patch.object(civ, "civitai", side_effect=fake_civitai), \
+             patch.object(civ, "json_call", side_effect=fake_json_call), \
+             patch.object(civ, "has_key", return_value=True), \
+             patch.object(civ, "generation_from_page", return_value={}), \
+             patch.object(civ, "public_image_row", return_value={}), \
+             patch.object(civ, "fetch_version_air", return_value={
+                 "id": 823089,
+                 "air": "urn:air:flux1:lora:civitai:730162@823089",
+                 "modelId": 730162,
+                 "model": {"name": "Kolors style Asian face for Flux1 dev", "type": "LORA"},
+                 "files": [{"downloadUrl": "https://civitai.com/api/download/models/823089"}],
+             }), \
+             patch.object(civ, "match_service", return_value={"id": "image/sdcpp/flux/createImage", "name": "flux"}):
+            imported = civ.import_image("28533344")
+        self.assertEqual(imported["loras"][0]["strength"], 0.7)
+        self.assertNotIn("strengthMissing", imported["loras"][0])
+        self.assertEqual(imported["loras"][0]["versionId"], 823089)
+
     def test_prompt_lora_tag_without_weight_is_not_defaulted_to_0_8(self):
         tagged = civ._prompt_lora_tags("<lora:RadianceChrome>")
         self.assertEqual(len(tagged), 1)
