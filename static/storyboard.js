@@ -4,6 +4,7 @@
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   // v0821o53: capacity rematch when N>maxRefs (catalog eats+cap≥N; no silent unlink); stamp v0821o53-capacity-rematch
+  // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
@@ -2538,6 +2539,20 @@
   function linkAssetToShot(asset, shot) {
     if (!canLink(asset, shot)) return false;
     if (!state.edges.some((e) => e.from === asset.id && e.to === shot.id)) {
+      // o53b: refuse NEW ref link when at/over current maxRefs — never cut old links.
+      if (shot && shot.kind === "shot" && typeof isImageSource === "function" && isImageSource(asset)) {
+        const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+        const cap = (typeof maxRefCount === "function") ? maxRefCount(it) : null;
+        if (cap != null && Number(cap) >= 0) {
+          const urls = (typeof countRefUrls === "function") ? countRefUrls(null, shot) : [];
+          const n = urls.length;
+          const u = asset && asset.url ? String(asset.url) : "";
+          if (u && urls.indexOf(u) < 0 && n >= Number(cap)) {
+            try { setMsg("参考已满 " + n + "/" + cap + " · 拒新连线（不砍旧线）", "bad"); } catch (_) {}
+            return false;
+          }
+        }
+      }
       state.edges.push({ from: asset.id, to: shot.id });
       invalidateStageProgress(shot);
     }
@@ -5915,6 +5930,14 @@
     if (it.needsSource) return true;
     if (caps.image_to_image === false) return false;
     const backend = String(it.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
+    // o53b: Fal t2i with empty imageFields (e.g. flux-lora pin) does NOT eat refs → show 一键 Edit.
+    if (backend === "fal") {
+      const rawFields = caps.imageFields || it.imageFields || [];
+      const fields = Array.isArray(rawFields) ? rawFields : [];
+      const id = String(it.id || "").toLowerCase();
+      if (/(?:^|\/)image-to-image(?:$|\/)/.test(id) || /(?:^|\/)edit(?:$|\/)/.test(id)) return true;
+      if (!fields.length) return false;
+    }
     if (backend === "modelscope-ai" || backend === "modelscope-cn" || backend === "modelscope"
         || backend === "huggingface") {
       const task = String(it.task || it.hubTask || "").toLowerCase();
@@ -5931,6 +5954,9 @@
     const candidates = [];
     const slashEdit = id.replace(/\/text-to-image$/, "/edit");
     if (slashEdit !== id) candidates.push(slashEdit);
+    // o53b: Fal flux-lora → flux-lora/image-to-image (must exist in catalog)
+    if (id && state.catalogById[id + "/image-to-image"]) candidates.push(id + "/image-to-image");
+    if (id && state.catalogById[id + "/edit"]) candidates.push(id + "/edit");
     // Nano / common: Foo → Foo Edit, or trailing -edit
     const name = String((it && it.name) || "");
     Object.keys(state.catalogById).forEach(function (cid) {
@@ -5942,6 +5968,7 @@
       if (slashEdit !== id && rid === slashEdit) return; // already in candidates
       if (name && String(row.name || "") === name + " Edit") candidates.push(rid);
       if (id && rid === id + "/edit") candidates.push(rid);
+      if (id && rid === id + "/image-to-image") candidates.push(rid);
     });
     for (let i = 0; i < candidates.length; i++) {
       if (state.catalogById[candidates[i]]) return candidates[i];
@@ -5999,9 +6026,14 @@
       const be = String(row.backend || curBe || "").toLowerCase();
       let score = 0;
       if (be && curBe && be === curBe) score += 100;
+      else return; // o53b: same backend only
       if (curFamily && rid.indexOf(curFamily) === 0) score += 40;
       if (curName && String(row.name || "").indexOf(curName.split(" ")[0]) === 0) score += 20;
       if (catalogItemSupportsI2i && catalogItemSupportsI2i(row)) score += 10;
+      // N=1 prefer */image-to-image (flux-lora/image-to-image); N>1 prefer */edit (flux-2/edit)
+      if (need === 1 && /\/image-to-image$/.test(rid)) score += 80;
+      if (need === 1 && rid.indexOf("flux-lora/image-to-image") >= 0) score += 40;
+      if (need > 1 && (/\/edit$/.test(rid) || rid.indexOf("flux-2/edit") >= 0)) score += 80;
       // Prefer smallest sufficient cap (tight fit) then higher score
       scored.push({ id: rid, score: score, cap: cap });
     });
@@ -8043,6 +8075,21 @@
     sel.value = want;
     state._pinFalLoraService = want;
     state._pendingService = want;
+    const shotPin = nodeById(state.selected);
+    if (shotPin && shotPin.kind === "shot") shotPin.serviceId = want;
+    // o53b: after LoRA pin, if over-cap rematch (same backend); else keep links + hard gate
+    try {
+      if (typeof tryCapacityRematchAfterServiceChange === "function" && tryCapacityRematchAfterServiceChange()) {
+        /* rematched */
+      } else if (shotPin && shotPin.kind === "shot") {
+        const n = countRefUrls(null, shotPin).length;
+        const it = catalogItemForService();
+        const resolved = resolveRefCaps(it);
+        if (resolved.known && n > resolved.maxRefs) {
+          setMsg("参考图 " + n + "/" + resolved.maxRefs + " · pin 模型容量不足，保留连线（不静默丢线）", "bad");
+        }
+      }
+    } catch (_) {}
     if (state.catalogById && state.catalogById[want]) return;
   }
 
