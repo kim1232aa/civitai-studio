@@ -3,7 +3,8 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o39: refs fill-to-cap (expose N==maxRefs empty slots + 灌满测试); t2i+refs one-click apply Edit sibling; stamp v0821o39-refs-fill-smart-match
+  // v0821o40: 灌满+gate same outbound口径 countRefUrls; 成片 chip visual-only (no 6/5); stamp v0821o40-fill-exact-cap
+  // v0821o39: refs fill-to-cap (expose N==maxRefs empty slots + 灌满测试); t2i+refs one-click apply Edit sibling
   // v0821o38: packComfy prefer generate shot; force payload.diffusionModel from shot; applyImport keep dm/cn/eco when j omits; flux1 without dm hard-reject before POST
   // v0821o37: civitai preparing poll ≥720×2.5s≈30min; stillGoing mirrors inFlight (preparing/scheduled/queued/prepared); saved[]→writeback unchanged
   // v0821o36: checkpoint AIR must not enter loras[] — isLoraAir true only :lora:/:lycoris:/…; false :checkpoint:/:diffusionmodel:/:diffuser:; applyImport+pack drop non-LoRA; never invent strength
@@ -2082,8 +2083,9 @@
       : "";
     const refCap = maxRefCount(catalogItemForService());
     // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink.
-    // v0821o22: UI numerator = displayRefUrls (includes 成片 chip); send gates still use countRefUrls.
-    const refCount = displayRefUrls(n).length;
+    // v0821o40: 参考 N/cap + 灌满 + hard-gate share outbound口径 countRefUrls.
+    // 成片 chip stays visual-only (data-self-ref) — must NOT inflate numerator to 6/5 after 灌满.
+    const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - refCount);
     const refHint = refCount > refCap
       ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出，请减少连线</span>'
@@ -3108,7 +3110,7 @@
       renderCards(); drawWires(); renderDock(); persist();
       const cap = maxRefCount(catalogItemForService());
       const n = countRefUrls(null, shot).length;
-      setMsg("灌满参考 " + n + "/" + cap + (added ? (" · 新加 " + added) : " · 已满"), n >= cap ? "ok" : "warn");
+      setMsg("灌满参考 " + n + "/" + cap + (added ? (" · 新加 " + added) : " · 已满"), n > cap ? "bad" : (n >= cap ? "ok" : "warn"));
       return;
     }
     if (act.dataset.act === "promote") {
@@ -5026,7 +5028,10 @@
   // (firstFrame/sourceImage). Optionally mirror onto capabilities.refImagesField
   // for backends that only look there — never sole-write image_urls /
   // input_references / image_url as the only multi-ref bag.
-  // Dev/acceptance: attach distinct local fixture refs until N==cap (灌满). Page path still human-clickable.
+  // Dev/acceptance: attach distinct local fixture refs until outbound N==cap (灌满).
+  // v0821o40: same 口径 as UI hint + hard-gate = countRefUrls (excludes own shot.url).
+  // 成片 chip is visual-only — never stuff into outbound; never let it make 灌满 look 6/5.
+  // Page path still human-clickable.
   function fillRefSlotsToCap(shot) {
     shot = shot || nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return 0;
@@ -5039,7 +5044,7 @@
     while (urls.length < cap) {
       const idx = urls.length + 1;
       const id = uid("fillref");
-      const url = "/out/o39-fill-" + idx + "-" + id.slice(-4) + ".png";
+      const url = "/out/o40-fill-" + idx + "-" + id.slice(-4) + ".png";
       const node = {
         id: id,
         kind: "character",
@@ -5054,6 +5059,7 @@
       n += 1;
       added += 1;
       urls = countRefUrls(null, shot);
+      if (urls.length > cap) break; // never N>cap
     }
     return added;
   }
@@ -7629,6 +7635,7 @@
         const empties = document.querySelectorAll("#refs .ref-slot-empty");
         return {
           n: countRefUrls(null, n).length,
+          displayN: n ? displayRefUrls(n).length : 0,
           cap: maxRefCount(catalogItemForService()),
           msg: refCapGateMessage(n),
           unused: refUnusedGateMessage(n),
@@ -7643,7 +7650,12 @@
         const n = nodeById(state.selected);
         const added = fillRefSlotsToCap(n);
         renderCards(); drawWires(); renderDock();
-        return { added: added, n: countRefUrls(null, n).length, cap: maxRefCount(catalogItemForService()) };
+        return {
+          added: added,
+          n: countRefUrls(null, n).length,
+          displayN: displayRefUrls(n).length,
+          cap: maxRefCount(catalogItemForService()),
+        };
       },
       applyEditSibling: applyEditSibling,
       attachExtraImages: function (payload) {

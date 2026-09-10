@@ -12,9 +12,9 @@ const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/storyboard-ui.css"), "utf8");
 
-assert.ok(html.includes("v0821o39-refs-fill-smart-match"), "html stamp o39");
-assert.ok(html.includes("storyboard.js?v=20260910-o39refsfillsmartmatch"), "cache bust o39");
-assert.ok(html.includes("storyboard-ui.css?v=20260910-o39refsfillsmartmatch"), "css bust o39");
+assert.ok(html.includes("v0821o40-fill-exact-cap"), "html stamp o39");
+assert.ok(html.includes("storyboard.js?v=20260910-o40fillexactcap"), "cache bust o39");
+assert.ok(html.includes("storyboard-ui.css?v=20260910-o40fillexactcap"), "css bust o39");
 assert.ok(source.includes("v0821o39:"), "js header o39");
 assert.ok(source.includes("function editSiblingId"), "editSiblingId");
 assert.ok(source.includes("function applyEditSibling"), "applyEditSibling");
