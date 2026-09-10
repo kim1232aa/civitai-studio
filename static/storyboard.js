@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o13";
-  const STORE_OLDS = ["nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o14";
+  const STORE_OLDS = ["nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o14: persist→localStorage + QuotaExceeded warn; restore merge prefer-url (session media not clobbered)
   // v0821o13: writebackResult persists shot.url to localStorage (hard refresh keeps card); dual-read session migrate
   // v0821o12: civitai writeback — pickUrl steps[].output.images; writebackResult sets shot.url; hist-pin applies to card
   // v0821o11: tighten humanizeFailText — drop bare missing&&body.; quoted type:"missing"; poll throws raw
@@ -991,59 +992,94 @@
     state.edges = [];
   }
 
+  function isQuotaErr(e) {
+    if (!e) return false;
+    const name = e.name || "";
+    return name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014;
+  }
+  function parseStoreRaw(raw) {
+    try { return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+  }
+  /** Prefer local graph shape; fill missing shot.url from session so local cannot blank newer session media. */
+  function mergePreferUrl(localRaw, sessionRaw) {
+    const L = parseStoreRaw(localRaw);
+    const S = parseStoreRaw(sessionRaw);
+    if (!L || !Array.isArray(L.nodes) || !L.nodes.length) return sessionRaw || localRaw || null;
+    if (!S || !Array.isArray(S.nodes) || !S.nodes.length) return localRaw || sessionRaw || null;
+    const sessById = {};
+    for (let i = 0; i < S.nodes.length; i++) {
+      const n = S.nodes[i];
+      if (n && n.id) sessById[n.id] = n;
+    }
+    const nodes = L.nodes.map((n) => {
+      if (!n || !n.id) return n;
+      const o = sessById[n.id];
+      if (!o || !o.url || n.url) return n;
+      return Object.assign({}, n, { url: o.url });
+    });
+    return JSON.stringify(Object.assign({}, L, { nodes: nodes }));
+  }
+  function readStorePair(key) {
+    let local = null;
+    let session = null;
+    try { local = localStorage.getItem(key); } catch (_) {}
+    try { session = sessionStorage.getItem(key); } catch (_) {}
+    return { local: local, session: session };
+  }
+  function graphPayload() {
+    return JSON.stringify({
+      cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
+      railTab: state.railTab,
+      groups: state.groups || [],
+      workspace: state.workspace || "canvas",
+      script: state.script || { title: "未命名故事", logline: "", scenes: [] },
+      editor: {
+        activeShotId: state.editor && state.editor.activeShotId || null,
+        playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
+      },
+      backend: $("backend") && $("backend").value,
+      service: $("service") && $("service").value,
+      duration: $("duration") && $("duration").value,
+      aspect: $("aspect") && $("aspect").value,
+      res: $("res") && $("res").value,
+      width: $("width") && $("width").value,
+      height: $("height") && $("height").value,
+      steps: $("steps") && $("steps").value,
+      cfg: $("cfg") && $("cfg").value,
+      sampler: $("sampler") && $("sampler").value,
+      scheduler: $("scheduler") && $("scheduler").value,
+      seed: $("seed") && $("seed").value,
+      nanoRes: $("nanoRes") && $("nanoRes").value,
+      negative: $("negative") && $("negative").value,
+      loras: Array.isArray(state.loras) ? state.loras : [],
+    });
+  }
   function persist() {
     try {
       saveDisplayedComposer();
-      // v0821o13: localStorage so hard refresh / new tab still restores shot.url (sessionStorage was ephemeral across review contexts).
-      const payload = JSON.stringify({
-        cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
-        railTab: state.railTab,
-        groups: state.groups || [],
-        workspace: state.workspace || "canvas",
-        script: state.script || { title: "未命名故事", logline: "", scenes: [] },
-        editor: {
-          activeShotId: state.editor && state.editor.activeShotId || null,
-          playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
-        },
-        backend: $("backend") && $("backend").value,
-        service: $("service") && $("service").value,
-        duration: $("duration") && $("duration").value,
-        aspect: $("aspect") && $("aspect").value,
-        res: $("res") && $("res").value,
-        width: $("width") && $("width").value,
-        height: $("height") && $("height").value,
-        steps: $("steps") && $("steps").value,
-        cfg: $("cfg") && $("cfg").value,
-        sampler: $("sampler") && $("sampler").value,
-        scheduler: $("scheduler") && $("scheduler").value,
-        seed: $("seed") && $("seed").value,
-        nanoRes: $("nanoRes") && $("nanoRes").value,
-        negative: $("negative") && $("negative").value,
-        loras: Array.isArray(state.loras) ? state.loras : [],
-      });
-      localStorage.setItem(STORE, payload);
+      // v0821o14: localStorage durable; QuotaExceeded surfaces (not silent); session mirror best-effort.
+      const payload = graphPayload();
+      try {
+        localStorage.setItem(STORE, payload);
+      } catch (e) {
+        if (isQuotaErr(e)) {
+          try { setMsg("本地缓存已满，刷新后可能丢失成片", "warn"); } catch (_) {}
+        }
+      }
       try { sessionStorage.setItem(STORE, payload); } catch (_) {}
     } catch (_) {}
   }
   function restore() {
     try {
-      function readStore(key) {
-        try {
-          const a = localStorage.getItem(key);
-          if (a) return a;
-        } catch (_) {}
-        try {
-          return sessionStorage.getItem(key);
-        } catch (_) { return null; }
-      }
-      let raw = readStore(STORE);
-      if (!raw) {
+      let pair = readStorePair(STORE);
+      if (!pair.local && !pair.session) {
         for (let i = 0; i < STORE_OLDS.length; i++) {
-          raw = readStore(STORE_OLDS[i]);
-          if (raw) break;
+          pair = readStorePair(STORE_OLDS[i]);
+          if (pair.local || pair.session) break;
         }
       }
-      const p = JSON.parse(raw || "null");
+      const raw = mergePreferUrl(pair.local, pair.session);
+      const p = parseStoreRaw(raw);
       if (!p || !p.nodes || !p.nodes.length) return false;
       state.cam = p.cam || state.cam;
       if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
@@ -1093,34 +1129,12 @@
       removeUnpromotedFromShot();
       // Re-save under current STORE in localStorage (migrate session/old keys → durable graph).
       try {
-        const payload = JSON.stringify({
-          cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
-          railTab: state.railTab,
-          groups: state.groups || [],
-          workspace: state.workspace || "canvas",
-          script: state.script || { title: "未命名故事", logline: "", scenes: [] },
-          editor: {
-            activeShotId: state.editor && state.editor.activeShotId || null,
-            playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
-          },
-          backend: $("backend") && $("backend").value,
-          service: $("service") && $("service").value,
-          duration: $("duration") && $("duration").value,
-          aspect: $("aspect") && $("aspect").value,
-          res: $("res") && $("res").value,
-          width: $("width") && $("width").value,
-          height: $("height") && $("height").value,
-          steps: $("steps") && $("steps").value,
-          cfg: $("cfg") && $("cfg").value,
-          sampler: $("sampler") && $("sampler").value,
-          scheduler: $("scheduler") && $("scheduler").value,
-          seed: $("seed") && $("seed").value,
-          nanoRes: $("nanoRes") && $("nanoRes").value,
-          negative: $("negative") && $("negative").value,
-          loras: Array.isArray(state.loras) ? state.loras : [],
-        });
-        localStorage.setItem(STORE, payload);
-      } catch (_) {}
+        localStorage.setItem(STORE, graphPayload());
+      } catch (e) {
+        if (isQuotaErr(e)) {
+          try { setMsg("本地缓存已满，刷新后可能丢失成片", "warn"); } catch (_) {}
+        }
+      }
       return true;
     } catch (_) { return false; }
   }
@@ -4806,7 +4820,7 @@
   function writebackResult(shot, url) {
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
-    // v0821o13: persist here so hard refresh keeps card even if caller forgets persist().
+    // v0821o14/o13: persist here so hard refresh keeps card even if caller forgets persist().
     if (!shot || !url) return;
     const live = nodeById(shot.id) || shot;
     live.url = url;
