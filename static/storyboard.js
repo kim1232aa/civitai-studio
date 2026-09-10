@@ -4,7 +4,6 @@
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   // v0821o27: import strength — trpc null backfill from REST /api/generation/data (28533344→0.7; never invent)
-  // v0821o28: Composer inputs adaptive from API field-board skeleton (docs/api-usage); awaiting board align
   // v0821o26: Fal 换家 — pinFal rejects civitai/HF serviceId; #backend sync from /api/providers (all enabled)
   // v0821o25: sdcpp sampleMethod map — import dpmpp_2m → outbound dpm++2m (locked); schedule karras keep
   // v0821o24: capsule/Composer 锚底自适应 — full mode labels; bottom stick; no orphan empty refs
@@ -3902,180 +3901,6 @@
     });
     if (want) ensureSelectOpt(sel, want);
   }
-  // Skeleton from docs/api-usage/REPORT.md + field-board.md + capabilities.py.
-  // Align to authoritative api field board when it arrives — do not invent.
-  // Values: supported | catalog | unsupported | unknown
-  const COMPOSER_FIELD_BOARD = {
-    _meta: { source: "docs/api-usage/field-board.md", status: "skeleton", stamp: "v0821o28-adaptive" },
-    civitai: {
-      negative: "supported", seed: "supported",
-      width: "supported", height: "supported",
-      steps: "supported", cfg: "supported",
-      sampler: "supported", scheduler: "supported",
-      duration: "supported", aspect: "supported", res: "supported",
-      nanoRes: "unsupported",
-      resolutionMode: "free_wh", lora: "air"
-    },
-    fal: {
-      negative: "supported", seed: "supported",
-      width: "supported", height: "supported",
-      steps: "catalog", cfg: "catalog",
-      sampler: "unsupported", scheduler: "catalog",
-      duration: "supported", aspect: "supported", res: "supported",
-      nanoRes: "unsupported",
-      resolutionMode: "free_wh", lora: "path"
-    },
-    huggingface: {
-      negative: "supported", seed: "supported",
-      width: "supported", height: "supported",
-      steps: "catalog", cfg: "catalog",
-      sampler: "unsupported", scheduler: "unsupported",
-      duration: "unsupported", aspect: "unsupported", res: "unsupported",
-      nanoRes: "unsupported",
-      resolutionMode: "free_wh", lora: "path"
-    },
-    "modelscope-ai": {
-      negative: "supported", seed: "supported",
-      width: "supported", height: "supported",
-      steps: "catalog", cfg: "catalog",
-      sampler: "unsupported", scheduler: "unsupported",
-      duration: "unsupported", aspect: "supported", res: "unsupported",
-      nanoRes: "unsupported",
-      resolutionMode: "free_wh", lora: "hub_repo"
-    },
-    "modelscope-cn": {
-      negative: "supported", seed: "supported",
-      width: "supported", height: "supported",
-      steps: "catalog", cfg: "catalog",
-      sampler: "unsupported", scheduler: "unsupported",
-      duration: "unsupported", aspect: "supported", res: "unsupported",
-      nanoRes: "unsupported",
-      resolutionMode: "free_wh", lora: "hub_repo"
-    },
-    "nano-gpt": {
-      negative: "supported", seed: "supported",
-      width: "unsupported", height: "unsupported",
-      steps: "unsupported", cfg: "unsupported",
-      sampler: "unsupported", scheduler: "unsupported",
-      duration: "catalog", aspect: "supported", res: "unsupported",
-      nanoRes: "supported",
-      resolutionMode: "catalog_token", lora: "path"
-    }
-  };
-  const FIELD_SUPPORT_REASONS = {
-    supported: "",
-    catalog: "视模型 schema · 无对应字段则出站省略（不发明默认）",
-    unsupported: "本家不支持 · 出站不会带上（不静默改值 / 不砍入口）",
-    unknown: "field board 未确认（骨架）· 不发明默认；板到达后对齐"
-  };
-  function fieldBoardFor(be) {
-    const id = String(be || "").trim();
-    if (COMPOSER_FIELD_BOARD[id]) return COMPOSER_FIELD_BOARD[id];
-    return {
-      negative: "unknown", seed: "unknown",
-      width: "unknown", height: "unknown",
-      steps: "unknown", cfg: "unknown",
-      sampler: "unknown", scheduler: "unknown",
-      duration: "unknown", aspect: "unknown", res: "unknown",
-      nanoRes: "unknown",
-      resolutionMode: "unknown", lora: "unknown"
-    };
-  }
-  // Merge live caps: catalog/provider may only tighten (supported→catalog/unsupported).
-  function resolveFieldSupport(field) {
-    const be = currentBackend();
-    const board = fieldBoardFor(be);
-    let support = board[field] || "unknown";
-    const caps = catalogCaps();
-    if (field === "negative" && caps.negative === false) support = "unsupported";
-    if (field === "sampler") {
-      if (caps.sampler === true) support = "supported";
-      else if (caps.sampler === false && support === "supported") support = "unsupported";
-    }
-    if (field === "duration" && caps.videoDuration === false) support = "unsupported";
-    if (field === "aspect" && caps.videoAspect === false && state.mode === "video") support = "unsupported";
-    if ((field === "width" || field === "height") && (caps.resolution === "catalog_token" || board.resolutionMode === "catalog_token")) {
-      support = "unsupported";
-    }
-    if (field === "nanoRes" && (caps.resolution === "catalog_token" || board.resolutionMode === "catalog_token")) {
-      support = "supported";
-    }
-    // Live provider sampler flag cannot raise skeleton unsupported→supported except civitai path above.
-    return support;
-  }
-  function applyFieldSupport(el, field, modeHide) {
-    if (!el) return;
-    const wrap = (el.closest && el.closest(".param-field")) || el.parentElement || el;
-    const support = resolveFieldSupport(field);
-    if (modeHide) {
-      el.classList.add("hidden");
-      el.disabled = true;
-      el.setAttribute("aria-disabled", "true");
-      if (wrap && wrap.classList) {
-        wrap.classList.remove("param-unsupported", "param-unknown", "param-catalog");
-        wrap.classList.add("param-mode-hide");
-      }
-      return;
-    }
-    el.classList.remove("hidden");
-    if (wrap && wrap.classList) wrap.classList.remove("param-mode-hide");
-    const reason = FIELD_SUPPORT_REASONS[support] || FIELD_SUPPORT_REASONS.unknown;
-    if (support === "supported") {
-      el.disabled = false;
-      el.removeAttribute("aria-disabled");
-      if (wrap && wrap.classList) wrap.classList.remove("param-unsupported", "param-unknown", "param-catalog");
-      if (reason) el.title = reason;
-      else if (field === "width") el.title = "宽";
-      else if (field === "height") el.title = "高";
-      else if (!el.title || /本家不支持|field board|视模型/.test(String(el.title))) el.title = "";
-    } else if (support === "catalog") {
-      el.disabled = false;
-      el.removeAttribute("aria-disabled");
-      if (wrap && wrap.classList) {
-        wrap.classList.add("param-catalog");
-        wrap.classList.remove("param-unsupported", "param-unknown");
-      }
-      el.title = reason;
-    } else if (support === "unsupported") {
-      el.disabled = true;
-      el.setAttribute("aria-disabled", "true");
-      if (wrap && wrap.classList) {
-        wrap.classList.add("param-unsupported");
-        wrap.classList.remove("param-unknown", "param-catalog");
-      }
-      el.title = reason;
-    } else {
-      el.disabled = false;
-      el.removeAttribute("aria-disabled");
-      if (wrap && wrap.classList) {
-        wrap.classList.add("param-unknown");
-        wrap.classList.remove("param-unsupported", "param-catalog");
-      }
-      el.title = reason;
-    }
-  }
-  function fieldSupportStripText() {
-    const be = currentBackend();
-    const meta = COMPOSER_FIELD_BOARD._meta || {};
-    const board = fieldBoardFor(be);
-    const bits = [];
-    if (meta.status === "skeleton") bits.push("field board 骨架（待对齐）");
-    bits.push(be || "?");
-    if (board.resolutionMode && board.resolutionMode !== "unknown") bits.push("分辨率=" + board.resolutionMode);
-    if (board.lora && board.lora !== "unknown") bits.push("LoRA=" + board.lora);
-    const unsupported = ["sampler", "scheduler", "steps", "cfg", "width", "nanoRes"].filter(function (f) {
-      return resolveFieldSupport(f) === "unsupported";
-    });
-    if (unsupported.length) bits.push("禁用:" + unsupported.join("/"));
-    return bits.join(" · ");
-  }
-  function syncParamSupportStrip() {
-    const el = $("paramSupportStrip");
-    if (!el) return;
-    el.textContent = fieldSupportStripText();
-    el.hidden = false;
-  }
-
   function usesCivitaiComfyParams() {
     return currentBackend() === "civitai";
   }
@@ -4166,23 +3991,6 @@
     } else {
       markOver(nano, false);
     }
-    // Honest: filled-but-unsupported fields will not ship (no silent drop without tip).
-    const filledUnsupported = [];
-    [
-      ["sampler", $("sampler") && $("sampler").value],
-      ["scheduler", $("scheduler") && $("scheduler").value],
-      ["steps", $("steps") && $("steps").value],
-      ["cfg", $("cfg") && $("cfg").value],
-      ["width", $("width") && $("width").value],
-      ["height", $("height") && $("height").value]
-    ].forEach(function (row) {
-      if (!row[1]) return;
-      if (resolveFieldSupport(row[0]) === "unsupported") filledUnsupported.push(row[0]);
-    });
-    if (filledUnsupported.length) {
-      msgs.push("本家不支持 " + filledUnsupported.join("/") + " · 出站不会带上（不静默改值）");
-    }
-    syncParamSupportStrip();
     setParamWarn(msgs[0] || "", !!msgs.length);
     return msgs[0] || "";
   }
@@ -4199,51 +4007,51 @@
     fillSelectOpts(sel, tokens, keep);
   }
   function syncParamSurface() {
-    // v0821o28: drive show/hide/disable from field-board skeleton + live caps (tighten-only).
     const be = currentBackend();
+    const civ = be === "civitai";
     const nano = be === "nano-gpt";
     const vid = state.mode === "video";
-    const textish = state.mode === "text" || state.mode === "audio";
+    const caps = catalogCaps();
     const falBox = $("falParams");
     const comfyBox = $("comfyParams");
     const nanoBox = $("nanoParams");
-    // Keep groups mounted (不砍入口): hide a group only when every field is mode-hidden.
-    const showFalGroup = !textish && (vid || resolveFieldSupport("aspect") !== "unsupported" || resolveFieldSupport("res") !== "unsupported" || resolveFieldSupport("duration") !== "unsupported");
-    const showComfyGroup = true; // seed/size always have an entrance; per-field disable handles honesty
-    const showNanoGroup = nano || resolveFieldSupport("nanoRes") === "supported";
-    if (falBox) falBox.classList.toggle("hidden", !showFalGroup);
-    if (comfyBox) comfyBox.classList.toggle("hidden", !showComfyGroup);
-    if (nanoBox) nanoBox.classList.toggle("hidden", !showNanoGroup);
-
-    applyFieldSupport($("sampler"), "sampler", false);
-    applyFieldSupport($("scheduler"), "scheduler", false);
-    applyFieldSupport($("steps"), "steps", false);
-    applyFieldSupport($("cfg"), "cfg", false);
-    applyFieldSupport($("width"), "width", false);
-    applyFieldSupport($("height"), "height", false);
-    applyFieldSupport($("seed"), "seed", false);
-
+    if (falBox) falBox.classList.toggle("hidden", !!civ || !!nano);
+    if (comfyBox) comfyBox.classList.toggle("hidden", be === "fal");
+    if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
+    const sampler = $("sampler");
+    const scheduler = $("scheduler");
+    const steps = $("steps");
+    const cfg = $("cfg");
+    const width = $("width");
+    const height = $("height");
+    const seed = $("seed");
     const neg = $("negative");
-    if (neg) {
-      const negSup = resolveFieldSupport("negative");
-      if (negSup === "unsupported") {
-        neg.classList.add("hidden");
-        neg.disabled = true;
-        neg.title = FIELD_SUPPORT_REASONS.unsupported;
-      } else {
-        neg.classList.remove("hidden");
-        neg.disabled = false;
-        neg.title = negSup === "catalog" ? FIELD_SUPPORT_REASONS.catalog : (negSup === "unknown" ? FIELD_SUPPORT_REASONS.unknown : "");
-      }
+    const duration = $("duration");
+    const aspect = $("aspect");
+    const res = $("res");
+    if (sampler) sampler.classList.toggle("hidden", !civ && !caps.sampler);
+    if (scheduler) scheduler.classList.toggle("hidden", !civ);
+    if (steps) steps.classList.toggle("hidden", !civ);
+    if (cfg) cfg.classList.toggle("hidden", !civ);
+    if (width) {
+      width.disabled = !!nano;
+      width.title = nano ? "Nano 提交用目录 resolution token" : "宽";
+      width.classList.toggle("hidden", !!nano && !civ);
     }
-
-    applyFieldSupport($("duration"), "duration", !vid);
-    applyFieldSupport($("aspect"), "aspect", textish);
-    applyFieldSupport($("res"), "res", textish || nano);
-    applyFieldSupport($("nanoRes"), "nanoRes", !showNanoGroup);
-
-    if (nano || resolveFieldSupport("nanoRes") === "supported") fillNanoResOptions();
-    syncParamSupportStrip();
+    if (height) {
+      height.disabled = !!nano;
+      height.title = nano ? "Nano 提交用目录 resolution token" : "高";
+      height.classList.toggle("hidden", !!nano && !civ);
+    }
+    if (seed) seed.classList.toggle("hidden", false);
+    if (neg) {
+      const showNeg = caps.negative !== false;
+      neg.classList.toggle("hidden", !showNeg);
+    }
+    if (duration) duration.classList.toggle("hidden", !vid || caps.videoDuration === false);
+    if (aspect) aspect.classList.toggle("hidden", state.mode === "text" || state.mode === "audio" || (caps.videoAspect === false && vid));
+    if (res) res.classList.toggle("hidden", !!nano || state.mode === "text" || state.mode === "audio");
+    if (nano) fillNanoResOptions();
     paramGateMessage();
     if (!syncParamSurface._skipDock) renderDock();
   }
@@ -4302,28 +4110,29 @@
   // Pack UI params onto generate payload — never silently drop. Civitai keeps
   // sampler/steps/cfg; other backends still ship seed / size / token.
   function packComfyParamsForPayload() {
-    // Pack only board-supported/catalog/unknown user-filled values. Never invent; never ship unsupported.
     const p = readComfyParamsFromUi();
     const be = currentBackend();
-    const board = fieldBoardFor(be);
-    function mayPack(field) {
-      const s = resolveFieldSupport(field);
-      return s === "supported" || s === "catalog" || s === "unknown";
-    }
-    if (!mayPack("sampler")) delete p.sampler;
-    if (!mayPack("scheduler")) delete p.scheduler;
-    if (!mayPack("steps")) delete p.steps;
-    if (!mayPack("cfg")) { delete p.cfg; delete p.cfgScale; }
-    if (!mayPack("width")) delete p.width;
-    if (!mayPack("height")) delete p.height;
-    if (!mayPack("seed")) delete p.seed;
-    if (board.resolutionMode === "catalog_token" || be === "nano-gpt") {
+    if (be === "nano-gpt") {
       delete p.width;
       delete p.height;
       const token = $("nanoRes") && $("nanoRes").value;
-      if (token && mayPack("nanoRes")) p.resolution = token;
+      if (token) p.resolution = token;
+    } else if (be === "fal") {
+      delete p.sampler;
+      delete p.scheduler;
+      delete p.steps;
+      delete p.cfg;
+      delete p.cfgScale;
+      delete p.width;
+      delete p.height;
+    } else if (be !== "civitai") {
+      delete p.sampler;
+      delete p.scheduler;
+      delete p.steps;
+      delete p.cfg;
+      delete p.cfgScale;
     }
-    // v0821o22: civitai checkpoint AIR from imported shot — never invent default AIR.
+    // v0821o22: civitai checkpoint AIR from imported shot (fresh hinablue) — never invent default AIR.
     if (be === "civitai") {
       const shot = nodeById(state.selected) || nodeById(state.lastComposerShot);
       const dm = shot && shot.diffusionModel ? String(shot.diffusionModel).trim() : "";
