@@ -32,6 +32,35 @@ FAL_PREFIXES = (
     "lightricks/",
 )
 
+# Official Fal OpenAPI image_urls ceilings (description and/or maxItems).
+# Verified 2026-09-10 against fal.ai queue OpenAPI. Tighten-only from provider 9.
+# flux-2-pro / flux-2-max / flux-2-flex omit a numeric max in schema — leave default.
+# Do not invent lower than official.
+FAL_OPENAPI_MAX_REFS: dict[str, int] = {
+    "fal-ai/flux-2/edit": 4,
+    "fal-ai/flux-2/flash/edit": 4,
+    "fal-ai/flux-2/turbo/edit": 4,
+    "fal-ai/flux-2/lora/edit": 4,
+    "fal-ai/flux-2/klein/4b/edit": 4,
+    "fal-ai/flux-2/klein/4b/edit/lora": 4,
+    "fal-ai/flux-2/klein/4b/base/edit": 4,
+    "fal-ai/flux-2/klein/4b/base/edit/lora": 4,
+    "fal-ai/flux-2/klein/9b/edit": 4,
+    "fal-ai/flux-2/klein/9b/edit/lora": 4,
+    "fal-ai/flux-2/klein/9b/base/edit": 4,
+    "fal-ai/flux-2/klein/9b/base/edit/lora": 4,
+}
+
+
+def fal_openapi_max_refs(endpoint_id: str | None) -> int | None:
+    """Return official OpenAPI maxRefs when known; else None (do not invent)."""
+    e = (endpoint_id or "").strip()
+    if not e:
+        return None
+    if e in FAL_OPENAPI_MAX_REFS:
+        return int(FAL_OPENAPI_MAX_REFS[e])
+    return None
+
 
 def fal_key() -> str:
     try:
@@ -270,11 +299,22 @@ def overlay_image_fields(item: dict) -> dict:
         out["maxRefs"] = 1
         out["maxImages"] = 1
         out["refImagesField"] = "image_url" if (has_first or fields) else out.get("refImagesField") or "image_url"
+    # o43: OpenAPI/catalog overlay may only tighten (e.g. flux-2/edit ≤4)
+    official = fal_openapi_max_refs(eid)
+    if official is not None:
+        cur = int(out.get("maxRefs") or official)
+        out["maxRefs"] = min(cur, official)
+        out["maxImages"] = min(int(out.get("maxImages") or out["maxRefs"]), official)
+        sp = dict(out.get("supported_parameters") or {})
+        sp["max_input_images"] = int(out["maxRefs"])
+        out["supported_parameters"] = sp
     # expose under capabilities for storyboard resolveRefCaps
     caps = dict(out.get("capabilities") or {})
     caps["maxRefs"] = out["maxRefs"]
     caps["maxImages"] = out["maxImages"]
     caps["refImagesField"] = out.get("refImagesField") or caps.get("refImagesField")
+    if official is not None:
+        caps["max_input_images"] = int(out["maxRefs"])
     if "supportsI2v" in out:
         caps["supportsI2v"] = bool(out["supportsI2v"])
     elif is_video:
@@ -608,7 +648,8 @@ def build_fal_input(payload: dict) -> dict:
             raise ValueError(
                 f"端点 {eid} OpenAPI 未验证（404），不能编接口字段：{', '.join(extras)}"
             )
-    spec = find_model(eid) or {}
+    # overlay applies OpenAPI maxRefs tighten (o43 flux-2/edit=4) before clamp
+    spec = overlay_image_fields(dict(find_model(eid) or {"id": eid}))
     fields = list(spec.get("imageFields") or infer_image_fields(eid))
     prompt_key = spec.get("promptField") or "prompt"
     inp = {}

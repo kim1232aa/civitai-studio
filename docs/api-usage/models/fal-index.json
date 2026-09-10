@@ -1455,7 +1455,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -1464,7 +1464,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/lite/image-to-video",
@@ -1975,7 +1982,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -1984,7 +1991,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": true,
-      "notes": "Image-to-image editing with FLUX.2 [dev] from Black Forest Labs. Precise modifications using natural language descriptio"
+      "notes": "Image-to-image editing with FLUX.2 [dev] from Black Forest Labs. Precise modifications using natural language descriptio",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/fast",
@@ -3262,7 +3276,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -3271,7 +3285,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "bytedance/seedance-2.0/fast/text-to-video",
@@ -4090,7 +4111,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -4099,7 +4120,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/fast/first-last-frame-to-video",
@@ -5401,7 +5429,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -5410,7 +5438,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/kling-video/o1/video-to-video/edit",
@@ -6009,7 +6044,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -6018,7 +6053,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/qwen-image-layered",
@@ -7162,7 +7204,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -7171,7 +7213,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "mirelo-ai/sfx-v1.5/video-to-video",
@@ -7720,7 +7769,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -7729,7 +7778,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/kling-video/o3/4k/reference-to-video",
@@ -8295,7 +8351,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -8304,7 +8360,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/ltx-2.3/text-to-video/fast",
@@ -11045,7 +11108,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -11054,7 +11117,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/pixverse/v5/text-to-video",
@@ -13093,7 +13163,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -13102,7 +13172,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/stable-diffusion-v3-medium",
@@ -14236,7 +14313,7 @@
       "imageFields": [
         "image_urls"
       ],
-      "maxRefs": 9,
+      "maxRefs": 4,
       "refImagesField": "image_urls",
       "needsSource": false,
       "needsFirstFrame": false,
@@ -14245,7 +14322,14 @@
       "aspectRatioField": null,
       "durationField": null,
       "hasOpenapiOverlay": false,
-      "notes": ""
+      "notes": "",
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/pixverse/v6/extend",
