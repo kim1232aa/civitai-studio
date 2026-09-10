@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o24: capsule/Composer 锚底自适应 — full mode labels; bottom stick; no orphan empty refs
   // v0821o23: import sdxl serviceId sticks on shot + outbound (forbid silent krea2/turbo); prompt-tag LoRA file-stem dedupe
   // v0821o22: hinablue-generic diffusionModel outbound + CDN writeback honesty; UI 参考 count includes 成片 chip
   // v0821o21: outbound fail surfaces jobId+backend; send-path 参考 excludes own shot.url (visual chip aside)
@@ -1735,47 +1736,51 @@
   }
 
   function positionDock() {
+    // v0821o24: 锚底自适应 — width follows content; stick bottom / selected-node-aware;
+    // never mid-float overlay at area.top; never full-bleed bottom-bar chrome.
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
-    const area = canvasArea(), b = box(n), gap = 18;
+    const area = canvasArea(), b = box(n), gap = 16;
     const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
     const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
-    const width = Math.min(440, Math.max(300, Math.min(nw + 28, area.right - area.left)));
-    const height = state.dockMode === "expanded" ? 380 : 160;
-    const above = y - 34 * state.cam.s - gap - area.top;
-    const below = area.bottom - y - nh - gap;
-    const right = area.right - x - nw - gap, leftRoom = x - gap - area.left;
-    const minHeight = Math.min(height, 260);
-    let dockW = width, maxH, left, top;
-    // Seko's input follows below the selected node; flip only at viewport edges.
-    if (below >= minHeight || (above < minHeight && Math.max(right, leftRoom) < 360 && below >= above)) {
-      maxH = Math.min(height, below);
-      left = x + (nw - dockW) / 2;
-      top = y + nh + gap;
-    } else if (above >= minHeight) {
-      maxH = Math.min(height, above);
-      left = x + (nw - dockW) / 2;
-      top = y - 34 * state.cam.s - gap - maxH;
-    } else {
-      const onRight = right >= 360;
-      if (onRight || leftRoom >= 360) {
-        dockW = Math.min(400, onRight ? right : leftRoom);
-        maxH = Math.min(height, area.bottom - area.top);
-        left = onRight ? x + nw + gap : x - gap - dockW;
-        top = y;
-      } else {
-        // No side/above slot (common on short narrow viewports): overlay the
-        // dock in the usable canvas instead of collapsing it to the 112px
-        // minimum and hiding the reference row.
-        dockW = width;
-        maxH = Math.min(height, area.bottom - area.top);
-        left = area.left;
-        top = area.top;
-      }
+    const expanded = state.dockMode === "expanded";
+    const areaW = Math.max(240, area.right - area.left);
+    // Measure natural content width so 图片生成/视频生成 never ellipsis-clip.
+    const prevW = dock.style.width;
+    const prevMaxW = dock.style.maxWidth;
+    dock.style.width = "max-content";
+    dock.style.maxWidth = areaW + "px";
+    let natural = Math.ceil(dock.getBoundingClientRect().width) || 0;
+    if (!natural) {
+      const modes = dock.querySelector(".modes");
+      natural = modes ? Math.ceil(modes.scrollWidth + 48) : 320;
     }
-    maxH = Math.min(area.bottom - area.top, Math.max(Math.min(height, 112), maxH));
+    dock.style.width = prevW;
+    dock.style.maxWidth = prevMaxW;
+    const minW = expanded ? 360 : 280;
+    const maxW = Math.min(expanded ? 520 : 560, areaW);
+    let dockW = Math.min(maxW, Math.max(minW, natural));
+    const height = expanded ? 380 : Math.max(132, Math.min(200, Math.ceil(dock.scrollHeight || 160)));
+    let maxH = Math.min(height, Math.max(112, area.bottom - area.top));
+    // Horizontal: prefer under selected node, bias bottom-right of usable canvas.
+    let left = x + (nw - dockW) / 2;
+    if (left + dockW > area.right - 8) left = area.right - dockW - 8;
+    if (left < area.left) left = area.left;
+    if (x + nw / 2 > (area.left + area.right) / 2) {
+      left = Math.max(area.left, Math.min(Math.max(left, area.right - dockW - 12), area.right - dockW));
+    }
+    // Vertical: always 锚底 — sit on area.bottom; may hug just under node inside bottom band.
+    const bottomTop = area.bottom - maxH - gap;
+    const belowNode = y + nh + gap;
+    let top = bottomTop;
+    if (belowNode <= bottomTop && belowNode + 80 <= area.bottom) {
+      top = Math.max(belowNode, bottomTop - 24);
+    }
+    const midY = (area.top + area.bottom) / 2;
+    if (top < midY && bottomTop >= area.top) top = bottomTop;
+    maxH = Math.min(area.bottom - area.top, Math.max(112, maxH));
     left = Math.max(area.left, Math.min(left, area.right - dockW));
-    top = Math.max(area.top, Math.min(top, area.bottom - maxH));
+    top = Math.max(area.top, Math.min(top, area.bottom - Math.min(maxH, 112)));
     Object.assign(dock.style, {
       width: dockW + "px", maxHeight: maxH + "px", left: left + "px", top: top + "px",
       right: "auto", bottom: "auto", transform: "none",
@@ -2062,15 +2067,25 @@
       ? '<button class="chip on" type="button" data-self-ref="1" title="成片">' +
           '<img src="' + esc(ownUrl) + '" alt=""></button>'
       : "";
-    $("refs").innerHTML = frameHtml +
-      '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
-      '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-      promoteBtn + refHint + ownChip +
-      chipNodes.map((a) => {
-        const on = linked.some((x) => x.id === a.id) ? " on" : "";
-        return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
-          (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
-      }).join("");
+    const refsEl = $("refs");
+    const hasChips = !!(ownChip || chipNodes.length || frameHtml);
+    // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
+    // Expanded always keeps 上传/选择; collapsed keeps them when pinned or video needs frame.
+    if (!expanded && !hasChips && !needFrame) {
+      refsEl.innerHTML = "";
+      refsEl.classList.add("refs-empty");
+    } else {
+      refsEl.classList.remove("refs-empty");
+      refsEl.innerHTML = frameHtml +
+        '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
+        '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
+        promoteBtn + refHint + ownChip +
+        chipNodes.map((a) => {
+          const on = linked.some((x) => x.id === a.id) ? " on" : "";
+          return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
+            (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
+        }).join("");
+    }
     syncComposerChip(); syncCanvasTip();
     renderRail();
     renderChatRail();

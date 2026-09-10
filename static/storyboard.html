@@ -90,7 +90,8 @@
     border:1px solid #2c2c34;background:#121216ee;backdrop-filter:blur(8px);overflow:hidden;cursor:crosshair;
     box-shadow:0 8px 24px rgba(0,0,0,.35)}
   .minimap canvas{display:block;width:100%;height:100%}
-  .dock{position:absolute;left:auto;top:auto;right:auto;bottom:auto;transform:none;width:min(440px,calc(100% - 320px));
+  /* v0821o24: capsule dock — width follows content; JS anchors bottom (not mid-float / not full bottom-bar) */
+  .dock{position:absolute;left:auto;top:auto;right:auto;bottom:auto;transform:none;width:max-content;min-width:280px;max-width:min(560px,calc(100% - 48px));
     z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;padding:0;
     box-shadow:0 18px 48px rgba(0,0,0,.45);backdrop-filter:blur(18px);display:none;
     flex-direction:column;max-height:58vh;overflow:hidden}
@@ -100,6 +101,8 @@
   .dock.collapsed .dock-body{display:flex;flex-direction:column;overflow:visible;padding:8px 12px 10px;min-height:0;flex:0 0 auto}
   .dock.collapsed .dock-scroll{overflow:visible;flex:0 0 auto}
   .dock.collapsed .dock-scroll > :not(.modes):not(.refs){display:none}
+  .dock.collapsed .refs.refs-empty{display:none}
+  .dock.collapsed .modes{margin-bottom:0}
   /* v0821o19: single ↑ = capsule #send; collapsed keeps dock-foot/#send visible */
   .dock.collapsed .dock-foot{display:flex;flex-direction:column;gap:4px;padding:0 4px 6px;flex:0 0 auto}
   .dock.collapsed .dock-foot .lora-block{display:none}
@@ -130,10 +133,11 @@
   .dock-btn.primary{border-color:rgba(94,224,197,.45);color:#b8f5e6;background:rgba(94,224,197,.10)}
   .dock.collapsed .collapse-only,
   .dock.expanded .expand-only{display:none}
-  .modes{display:flex;gap:4px;margin-bottom:8px;background:#121216;border:1px solid #2a2a32;border-radius:12px;padding:4px;width:100%;max-width:100%;flex-wrap:nowrap;align-items:center}
-  .modes button{border:0;background:transparent;color:#d2d2d8;border-radius:10px;padding:6px 10px;font-size:12px;line-height:1.2;white-space:nowrap;flex:1 1 auto;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis}
+  /* v0821o24: capsule modes — full labels, width follows content (no 图…/视… ellipsis) */
+  .modes{display:flex;gap:4px;margin-bottom:8px;background:#121216;border:1px solid #2a2a32;border-radius:12px;padding:4px;width:max-content;max-width:100%;flex-wrap:nowrap;align-items:center;flex:0 0 auto}
+  .modes button{border:0;background:transparent;color:#d2d2d8;border-radius:10px;padding:6px 12px;font-size:12px;line-height:1.2;white-space:nowrap;flex:0 0 auto;min-width:max-content;text-align:center;overflow:visible;text-overflow:clip}
   .modes button.on{color:#fff;background:#3a3a44;box-shadow:inset 0 0 0 1px #5ee0c5;font-weight:600}
-  .modes button.stub{flex:0 0 auto;min-width:0;padding:4px 8px;font-size:11px;opacity:.72;color:#9a9aa3;background:transparent}
+  .modes button.stub{flex:0 0 auto;min-width:max-content;padding:4px 8px;font-size:11px;opacity:.72;color:#9a9aa3;background:transparent}
   .modes button .mode-tag{display:inline-flex;align-items:center;margin:0 0 0 4px;padding:0 6px;height:16px;border-radius:999px;border:1px solid #2e2e36;background:#1a1a20;font-size:10px;font-weight:400;color:#8b8b94;line-height:1}
   .modes button.on .mode-tag{color:#b8f5e6}
   .refs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
@@ -419,7 +423,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o23-sdxl-service</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o24-capsule</span>
     </div>
   </header>
   <div class="stage">
@@ -489,11 +493,11 @@
       </div>
       <div class="dock-body" id="dockBody">
       <div class="dock-scroll" id="dockScroll">
-      <div class="modes">
+      <div class="modes" id="composerModes">
+        <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本生成<span class="mode-tag">未接</span></button>
         <button type="button" id="modeImg" class="on" data-mode="image">图片生成</button>
         <button type="button" id="modeVid" data-mode="video">视频生成</button>
-        <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本<span class="mode-tag">未接</span></button>
-        <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频<span class="mode-tag">未接</span></button>
+        <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频生成<span class="mode-tag">未接</span></button>
       </div>
       <div class="refs" id="refs"></div>
       <div class="composer-acts" id="composerActs">
@@ -607,6 +611,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r23sdxlsvc"></script>
+<script src="/static/storyboard.js?v=20260910-r24capsule"></script>
 </body>
 </html>
