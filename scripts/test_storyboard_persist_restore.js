@@ -11,8 +11,8 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o21-jobid-writeback"), "html stamp o16");
-assert.ok(html.includes("storyboard.js?v=20260910-r21jobidwb"), "cache bust o16");
+assert.ok(html.includes("v0821o22-hinablue-wb"), "html stamp o16");
+assert.ok(html.includes("storyboard.js?v=20260910-r22hinabluewb"), "cache bust o16");
 assert.ok(source.includes('const STORE = "nl-storyboard-v0821o16"'), "STORE o16");
 assert.ok(source.includes('"nl-storyboard-v0821o15"'), "STORE_OLDS keeps o15");
 assert.ok(source.includes("skip PUT"), "persistServer skips empty nodes");
@@ -24,7 +24,7 @@ assert.ok(source.includes("function hydrateFromServer"), "hydrateFromServer");
 assert.ok(source.includes("/api/storyboard-graph"), "storyboard-graph path");
 assert.ok(source.includes("function pickSavedUrl"), "pickSavedUrl");
 assert.ok(source.includes("pickSavedUrl(st)"), "poll waits for saved");
-assert.ok(source.includes("pickSavedUrl(j) || pickUrl(j)"), "final prefer saved");
+assert.ok(source.includes("const savedUrl = pickSavedUrl(j)") && source.includes("savedUrl || pickUrl(j)"), "final prefer saved");
 assert.ok(!source.includes("if (pickUrl(st)) break;"), "no CDN-only poll break");
 
 function section(from, to) {

@@ -1386,14 +1386,25 @@ def import_image(image_id: str) -> dict:
     if kind == "video":
         engine, operation = "minimax-h3-comfy", "imageToVideo"
     else:
+        # Default krea2/turbo only when blob is empty or krea; never keep krea2 for sdxl/pony/flux/…
         engine, operation, ecosystem, model = "comfy", "createImage", "krea2", "turbo"
         eco = _ecosystem_from_blob(base_blob)
-        if eco == "krea2":
+        if eco == "krea2" or not eco:
             ecosystem = "krea2"
+        elif eco == "sdxl":
+            # Stable Diffusion XL / Pony / Illustrious — sdcpp createImage (not krea2 turbo)
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None
+        elif eco == "flux":
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "flux", None
+        elif eco == "wan":
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "wan", None
         elif eco == "zImage":
-            engine, ecosystem = "sdcpp", "zImage"
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "zImage", None
         elif eco == "qwen":
-            engine, ecosystem = "sdcpp", "qwen"
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "qwen", None
+        else:
+            # Unknown eco from blob — still prefer detected label over silent krea2
+            ecosystem = eco
     svc = match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category=kind)
     denoise = meta.get("denoise") if meta.get("denoise") is not None else file_parsed.get("denoise")
     try:

@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o22: hinablue-generic diffusionModel outbound + CDN writeback honesty; UI 参考 count includes 成片 chip
   // v0821o21: outbound fail surfaces jobId+backend; send-path 参考 excludes own shot.url (visual chip aside)
   // v0821o20: selected image chip / compact 未接 / chatRail product copy (visual P0s ASIDE)
   // v0821o19: 双↑→单↑ (capsule #send only); persistServer keepalive; ensure first-frame edges paint
@@ -160,6 +161,13 @@
     if (isVideoUrl(u) || /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return "";
     if (shot.kind === "shot" && !isImageSource(shot) && mediaKindOf(u, shot.mode || shot.mediaKind) === "video") return "";
     return u;
+  }
+  /** UI-only 参考 URLs: send-path refs + own painted card image (does NOT feed unused-ref / attach). */
+  function displayRefUrls(shot) {
+    const urls = countRefUrls(null, shot).slice();
+    const own = shotResultImageUrl(shot);
+    if (own && urls.indexOf(own) < 0) urls.push(own);
+    return urls;
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
   const SHOT_BOX_LONG = 640;
@@ -2037,8 +2045,8 @@
       : "";
     const refCap = maxRefCount(catalogItemForService());
     // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink.
-    // Hint numerator uses the same URL set as the send gate (countRefUrls), not a stale default cap.
-    const refCount = countRefUrls(null, n).length;
+    // v0821o22: UI numerator = displayRefUrls (includes 成片 chip); send gates still use countRefUrls.
+    const refCount = displayRefUrls(n).length;
     const remain = Math.max(0, refCap - refCount);
     const refHint = refCount > refCap
       ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出，请减少连线</span>'
@@ -4105,6 +4113,16 @@
       delete p.cfg;
       delete p.cfgScale;
     }
+    // v0821o22: civitai checkpoint AIR from imported shot (fresh hinablue) — never invent default AIR.
+    if (be === "civitai") {
+      const shot = nodeById(state.selected) || nodeById(state.lastComposerShot);
+      const dm = shot && shot.diffusionModel ? String(shot.diffusionModel).trim() : "";
+      if (dm) p.diffusionModel = dm;
+      const cn = shot && shot.checkpointName ? String(shot.checkpointName).trim() : "";
+      if (cn) p.checkpointName = cn;
+      const eco = shot && shot.ecosystem ? String(shot.ecosystem).trim() : "";
+      if (eco) p.ecosystem = eco;
+    }
     if (!Object.keys(p).length) return null;
     return p;
   }
@@ -5337,6 +5355,13 @@
       if (list.length && (!packedLoras || !packedLoras.length)) {
         return fail(outboundLoraBlockMsg(), "blocked");
       }
+      // v0821o22: partial drop honesty — some chips lack air/path; do not pretend full pack
+      if (list.length && packedLoras && packedLoras.length && packedLoras.length < list.length) {
+        const dropped = list.length - packedLoras.length;
+        try {
+          setMsg("LoRA 出站 " + packedLoras.length + "/" + list.length + " · 已丢 " + dropped + " 个无 air/path 的芯片（不静默）", "warn");
+        } catch (_) {}
+      }
       if (packedLoras && packedLoras.length) {
         payload.loras = packedLoras;
         // v0821o2: outbound serviceId must stay turbo/lora — block flux-lora swap
@@ -5448,7 +5473,14 @@
         return fail("已中止", "aborted", "warn");
       }
       // Materialized /out preferred; CDN (pickUrl) only as fallback after poll ends.
-      const url = pickSavedUrl(j) || pickUrl(j);
+      const savedUrl = pickSavedUrl(j);
+      const url = savedUrl || pickUrl(j);
+      const durable = !!(savedUrl && String(savedUrl).indexOf("/out/") === 0);
+      if (url && materializing && !durable) {
+        try {
+          setMsg((prefix || "") + "成片暂为 CDN 地址（尚未落 /out）· 硬刷可能丢 · jobId=" + (jobId || "?"), "warn");
+        } catch (_) {}
+      }
       if (url && stage) {
         shot.stageUrls[String(stage.id)] = url;
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
@@ -5464,13 +5496,21 @@
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        if (!durable && materializing) {
+          setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
+        } else {
+          setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        }
       } else if (url) {
         clearShotError(shot);
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        if (!durable && materializing) {
+          setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
+        } else {
+          setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        }
       } else {
         const stillGoing = !!(j && (
           /^(pending|processing|running|in_queue|in_progress)$/i.test(String(j.status || ""))
@@ -6413,6 +6453,22 @@
       const cfgVal = j.cfg != null ? j.cfg : j.cfgScale;
       if (cfgVal != null) { shot.cfg = cfgVal; shot.cfgScale = cfgVal; }
       else { delete shot.cfg; delete shot.cfgScale; }
+      // v0821o22: any hinablue/civitai import — keep checkpoint AIR on shot for outbound (never invent).
+      if (j.diffusionModel != null && String(j.diffusionModel).trim()) {
+        shot.diffusionModel = String(j.diffusionModel).trim();
+      } else {
+        delete shot.diffusionModel;
+      }
+      if (j.checkpointName != null && String(j.checkpointName).trim()) {
+        shot.checkpointName = String(j.checkpointName).trim();
+      } else {
+        delete shot.checkpointName;
+      }
+      if (j.ecosystem != null && String(j.ecosystem).trim()) {
+        shot.ecosystem = String(j.ecosystem).trim();
+      } else {
+        delete shot.ecosystem;
+      }
     }
     // Backend may silently align 1672→1664 ((h//16)*16). Surface it; never treat as success-ok.
     {
