@@ -319,6 +319,12 @@
       esc(shot.prompt ? shot.prompt.slice(0, 80) : "还没有画面提示词") + '</small></span></button>' +
       (extra || "") + '</div>';
   }
+  function deleteWorkspaceShot(shotId) {
+    const shot = nodeById(shotId);
+    if (!shot || shot.kind !== "shot") return;
+    if (!window.confirm("删除「" + (shot.title || "分镜") + "」？\n画布节点、所属场次和时间线记录都会删除。")) return;
+    deleteNode(shotId);
+  }
   function renderScriptWorkspace() {
     const panel = $("scriptWorkspace");
     if (!panel) return;
@@ -369,7 +375,8 @@
         const shot = nodeById(id);
         if (!shot) return "";
         return workspaceShotRow(shot,
-          '<input class="workspace-shot-title" data-shot-title="' + esc(shot.id) + '" value="' + esc(shot.title || "分镜") + '" aria-label="分镜标题">');
+          '<input class="workspace-shot-title" data-shot-title="' + esc(shot.id) + '" value="' + esc(shot.title || "分镜") + '" aria-label="分镜标题">' +
+          '<button type="button" class="workspace-icon-btn danger" data-script-act="delete-shot" data-shot-id="' + esc(shot.id) + '" title="删除分镜">删除</button>');
       }).join("") : '<div class="workspace-empty">这场还没有分镜。可以新建分镜，或把已有分镜加入这里。</div>') +
       '</div>' +
       '<div class="workspace-inline"><select data-script-shot-select aria-label="选择已有分镜"><option value="">选择已有分镜</option>' +
@@ -419,6 +426,7 @@
           '<span class="editor-row-actions">' +
           '<button type="button" class="workspace-icon-btn" data-editor-move="up" data-shot-id="' + esc(shot.id) + '" title="上移"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
           '<button type="button" class="workspace-icon-btn" data-editor-move="down" data-shot-id="' + esc(shot.id) + '" title="下移"' + (i === scene.shotIds.length - 1 ? ' disabled' : '') + '>↓</button>' +
+          '<button type="button" class="workspace-icon-btn danger" data-editor-act="delete-shot" data-shot-id="' + esc(shot.id) + '" title="删除分镜">删除</button>' +
           '</span></div>';
       }).join("");
       return '<div class="workspace-section"><h3>' + esc(scene.title) + '</h3><span class="muted">' + scene.shotIds.length + ' 镜头</span></div>' +
@@ -591,6 +599,7 @@
       if (act.dataset.scriptAct === "add-scene") addWorkspaceScene();
       else if (act.dataset.scriptAct === "add-shot") addWorkspaceShot();
       else if (act.dataset.scriptAct === "delete-scene") deleteWorkspaceScene(act.dataset.sceneId);
+      else if (act.dataset.scriptAct === "delete-shot") deleteWorkspaceShot(act.dataset.shotId);
       else if (act.dataset.scriptAct === "open-canvas") setWorkspace("canvas");
       else if (act.dataset.scriptAct === "assign-shot") {
         const id = script.querySelector("[data-script-shot-select]") && script.querySelector("[data-script-shot-select]").value;
@@ -645,6 +654,7 @@
         else if (act.dataset.editorAct === "open-canvas") setWorkspace("canvas");
         else if (act.dataset.editorAct === "open-script") setWorkspace("script");
         else if (act.dataset.editorAct === "add-shot") addWorkspaceShot();
+        else if (act.dataset.editorAct === "delete-shot") deleteWorkspaceShot(act.dataset.shotId);
         return;
       }
       const move = e.target.closest("[data-editor-move]");
@@ -2105,6 +2115,7 @@
   function deleteNode(id) {
     const target = nodeById(id);
     if (!target) return false;
+    if (target.kind === "shot" && state.editor && state.editor.playing) stopEditorPlayback();
     const removedId = id;
     state.selected = null;
     state.selectedEdge = null;
@@ -2133,6 +2144,7 @@
     renderCards();
     drawWires();
     renderDock();
+    renderWorkspace();
     persist();
     setMsg("已删除节点", "ok");
     return true;
