@@ -11,8 +11,8 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o19-single-up-writeback"), "html stamp o16");
-assert.ok(html.includes("storyboard.js?v=20260910-r19singleup"), "cache bust o16");
+assert.ok(html.includes("v0821o21-jobid-writeback"), "html stamp o16");
+assert.ok(html.includes("storyboard.js?v=20260910-r21jobidwb"), "cache bust o16");
 assert.ok(source.includes('const STORE = "nl-storyboard-v0821o16"'), "STORE o16");
 assert.ok(source.includes('"nl-storyboard-v0821o15"'), "STORE_OLDS keeps o15");
 assert.ok(source.includes("skip PUT"), "persistServer skips empty nodes");
@@ -92,7 +92,7 @@ function harness(opts) {
         const method = String((init && init.method) || "GET").toUpperCase();
         if (method === "PUT") {
           const body = JSON.parse(init.body);
-          puts.push(body);
+          puts.push(Object.assign({}, body, { __keepalive: !!(init && init.keepalive) }));
           if (opts && opts.putFail) {
             return {
               ok: false,
@@ -227,6 +227,7 @@ async function test_writeback_puts_server_and_clean_profile_hydrate() {
   await Promise.resolve();
   await new Promise((r) => setTimeout(r, 0));
   assert.ok(api.__puts.length >= 1, "writeback PUT /api/storyboard-graph");
+  assert.equal(api.__puts[0].__keepalive, true, "writeback PUT uses keepalive");
   assert.equal(api.__server.graph.nodes[0].url, "/out/12100372-20260910081835126_0.jpg");
 
   // Clean profile: wipe local/session/memory (UI审查员 different desktop)
@@ -260,6 +261,7 @@ async function test_persistServer_puts_nonempty_nodes() {
   await new Promise((r) => setTimeout(r, 0));
   assert.ok(api.__puts.length >= 1, "non-empty nodes PUT");
   assert.equal(api.__puts[api.__puts.length - 1].nodes.length, 1);
+  assert.equal(api.__puts[api.__puts.length - 1].__keepalive, true, "persistServer keepalive");
 }
 
 async function test_persistServer_surfaces_http_fail() {
@@ -273,6 +275,28 @@ async function test_persistServer_surfaces_http_fail() {
     api.__msgs.some((m) => m.cls === "bad" && /服务端保存失败 HTTP 400/.test(m.t) && /必须是非空数组/.test(m.t)),
     "HTTP fail surfaces Composer msg: " + JSON.stringify(api.__msgs)
   );
+}
+
+async function test_hydrate_fills_blank_url_by_id_when_other_media_exists() {
+  const api = harness({
+    serverGraph: {
+      cam: { x: 0, y: 0, s: 0.5 },
+      nodes: [
+        { id: "shot-keep", kind: "shot", title: "有图", url: "/out/keep.png", x: 0, y: 0 },
+        { id: "shot-blank", kind: "shot", title: "空卡", url: "/out/from-server.png", x: 10, y: 0 },
+      ],
+      edges: [],
+      mode: "image",
+    },
+  });
+  api.state.nodes = [
+    { id: "shot-keep", kind: "shot", title: "有图", url: "/out/keep.png", x: 0, y: 0 },
+    { id: "shot-blank", kind: "shot", title: "空卡", url: "", x: 10, y: 0 },
+  ];
+  const changed = await api.hydrateFromServer();
+  assert.equal(changed, true, "hydrate fills blank by id");
+  assert.equal(api.state.nodes[0].url, "/out/keep.png", "existing media kept");
+  assert.equal(api.state.nodes[1].url, "/out/from-server.png", "blank card filled from server by id");
 }
 
 async function test_writeback_reattaches_orphan_shot() {
@@ -327,6 +351,7 @@ Promise.all([
   test_persistServer_puts_nonempty_nodes(),
   test_persistServer_surfaces_http_fail(),
   test_writeback_reattaches_orphan_shot(),
+  test_hydrate_fills_blank_url_by_id_when_other_media_exists(),
 ]).then(() => {
   console.log("ok: storyboard persist/restore executable checks passed");
 }).catch((e) => {

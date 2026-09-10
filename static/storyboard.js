@@ -3,6 +3,8 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o21: outbound fail surfaces jobId+backend; send-path 参考 excludes own shot.url (visual chip aside)
+  // v0821o20: selected image chip / compact 未接 / chatRail product copy (visual P0s ASIDE)
   // v0821o19: 双↑→单↑ (capsule #send only); persistServer keepalive; ensure first-frame edges paint
   // v0821o18: P1 chatRail video path on; collapsed keep #send; writeback+i2v first-frame harden
   // v0821o17: node capsule + right chat-rail skeleton; visible wires; i2v first-frame slot actions
@@ -150,6 +152,14 @@
     // Studio uploads are /out/<file>; treat as image unless the path is clearly video/audio.
     if (u.indexOf("/out/") === 0 && !isVideoUrl(u) && !/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return true;
     return mediaKindOf(u, n.kind === "shot" ? n.mode : (n.mediaKind || n.kind)) === "image";
+  }
+  /** Painted result on the shot card itself — count as 参考 when it is an image. */
+  function shotResultImageUrl(shot) {
+    if (!shot || !shot.url) return "";
+    const u = String(shot.url);
+    if (isVideoUrl(u) || /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return "";
+    if (shot.kind === "shot" && !isImageSource(shot) && mediaKindOf(u, shot.mode || shot.mediaKind) === "video") return "";
+    return u;
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
   const SHOT_BOX_LONG = 640;
@@ -1850,10 +1860,21 @@
     }
     if (tagEl) tagEl.textContent = stub ? "未接" : (state.mode === "image" ? "默认" : "路径");
     const sid = ($("service") && $("service").value) || "";
+    let svcLabel = "";
+    if (sid) {
+      const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+      if (it && it.name) svcLabel = String(it.name);
+      else {
+        const sel = $("service");
+        const t = (sel && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex])
+          ? String(sel.options[sel.selectedIndex].textContent || "") : "";
+        svcLabel = (t && t !== sid) ? t.split(" · ")[0] : sid;
+      }
+    }
     const steps = [
       { on: shotOk, warn: !shotOk, text: shotOk ? ("分镜 · " + (shot.title || "")) : "请先选中分镜" },
       { on: !stub && (state.mode === "image" || state.mode === "video"), warn: stub, text: stub ? (ml + " · 未接") : ("模式 · " + ml) },
-      { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + sid) : "选 Civitai / Fal 等服务（同配方台）" },
+      { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + svcLabel) : "选服务后点胶囊 ↑" },
     ];
     if (state.mode === "video") {
       steps.push({ on: !!frame, warn: needFrame, text: frame ? "首帧已就绪" : "缺首帧 · 上传或选择" });
@@ -1864,9 +1885,9 @@
       ).join("");
     }
     if (copyEl) {
-      if (stub) copyEl.textContent = ml + " · 本版未接（诚实空壳，不假装可生成）";
-      else if (needFrame) copyEl.textContent = "视频缺首帧：切到图片生成，或在胶囊里上传/选择首帧。不偷配方台历史。";
-      else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑（同一 /api/generate，无第二套出站）";
+      if (stub) copyEl.textContent = ml + " · 本版未接";
+      else if (needFrame) copyEl.textContent = "缺首帧：切到图片生成，或上传/选择首帧";
+      else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑";
     }
     if (actsEl) {
       // v0821o19 双↑: right rail must NOT mint a second ↑ — only capsule #send is the generate entry.
@@ -1904,8 +1925,14 @@
   }
 
   function renderDock() {
-    const n = nodeById(state.selected);
-    activateShotComposer(n);
+    const selected = nodeById(state.selected);
+    let n = selected;
+    // Keep Composer on the last shot when the user clicks a canvas image source to pin it as 参考.
+    if ((!n || n.kind !== "shot") && selected && isImageSource(selected)) {
+      const remembered = nodeById(state.lastComposerShot);
+      if (remembered && remembered.kind === "shot") n = remembered;
+    }
+    activateShotComposer(n && n.kind === "shot" ? n : selected);
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
       dock.classList.remove("near");
@@ -2021,10 +2048,15 @@
     // Keep them out of this row so the visible count cannot claim 0/n beside
     // a thumbnail that will not be sent.
     const chipNodes = linked;
+    const ownUrl = shotResultImageUrl(n);
+    const ownChip = ownUrl
+      ? '<button class="chip on" type="button" data-self-ref="1" title="成片">' +
+          '<img src="' + esc(ownUrl) + '" alt=""></button>'
+      : "";
     $("refs").innerHTML = frameHtml +
       '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
       '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-      promoteBtn + refHint +
+      promoteBtn + refHint + ownChip +
       chipNodes.map((a) => {
         const on = linked.some((x) => x.id === a.id) ? " on" : "";
         return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
@@ -2049,6 +2081,12 @@
       setMulti(id ? [id] : []);
     }
     const n = nodeById(id);
+    const composer = nodeById(state.lastComposerShot);
+    const dockOpen = state.dockMode === "expanded" || state.dockMode === "collapsed";
+    if (dockOpen && composer && composer.kind === "shot" && n && n.id !== composer.id
+        && !opts.shift && isImageSource(n)) {
+      try { linkAssetToShot(n, composer); } catch (_) {}
+    }
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
       state._scriptShotId = n.id;
@@ -4686,6 +4724,8 @@
     if (!shot) return [];
     const linked = connectedAssets(shot.id);
     const primaryNode = frameAsset(shot);
+    // Send-path refs are inbound edges only. Own painted card url is display-only
+    // (成片 chip) — counting it here would trip t2i unused-ref and block page ↑.
     const primary = (payload && (payload.firstFrame || payload.sourceImage)) || (primaryNode && primaryNode.url) || "";
     const urls = [];
     if (primary) urls.push(primary);
@@ -5160,11 +5200,23 @@
     opts = opts || {};
     const shot = nodeById(shotId);
     const prefix = opts.progressPrefix ? (opts.progressPrefix + " · ") : "";
-    function fail(err, status, cls) {
+    function fail(err, status, cls, meta) {
+      meta = meta || {};
       const info = formatErrInfo(err);
+      const be = String(meta.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "");
+      const jid = String(meta.jobId || "");
+      if (jid || be) {
+        const tag = [be && ("backend=" + be), jid && ("jobId=" + jid)].filter(Boolean).join(" ");
+        if (tag) {
+          info.excerpt = (info.excerpt ? (info.excerpt + "\n") : "") + tag;
+          try { console.warn("[outbound-fail]", { backend: be, jobId: jid, error: info.text }); } catch (_) {}
+        }
+      }
       const text = prefix + info.text;
       if (shot && shot.kind === "shot") {
         shot._error = info.text;
+        if (jid) shot._jobId = jid;
+        if (be) shot._backend = be;
         if (info.excerpt) shot._errorDetail = info.excerpt;
         else delete shot._errorDetail;
       }
@@ -5175,6 +5227,8 @@
       renderCards();
       renderDock();
       const out = { status: status || "blocked", error: text };
+      if (jid) out.jobId = jid;
+      if (be) out.backend = be;
       return out;
     }
     if (!shot || shot.kind !== "shot") {
@@ -5333,15 +5387,21 @@
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     setShotBusy(shot, true);
     shot._error = "";
+    let jobId = "";
+    let bePoll = "";
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       let j = await r.json();
-      if (!r.ok || j.error) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
-      const jobId = j.id || j.jobId || j.workflowId;
-      const bePoll = currentBackend() || (payload && payload.backend) || "";
+      jobId = String((j && (j.id || j.jobId || j.workflowId)) || "");
+      bePoll = currentBackend() || (payload && payload.backend) || "";
+      if (shot) {
+        if (jobId) shot._jobId = jobId;
+        if (bePoll) shot._backend = bePoll;
+      }
+      if (!r.ok || (j && j.error)) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
       // Materializing backends download CDN → /out saved[]; do not treat steps CDN as done.
       const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
         || bePoll === "modelscope-ai" || bePoll === "modelscope-cn";
@@ -5419,10 +5479,11 @@
         ));
         return fail(stillGoing
           ? "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）"
-          : "云端已返回，没有可预览地址", "blocked", stillGoing ? "warn" : "bad");
+          : "云端已返回，没有可预览地址", "blocked", stillGoing ? "warn" : "bad",
+          { jobId: jobId, backend: bePoll });
       }
     } catch (e) {
-      return fail(e, "error");
+      return fail(e, "error", "bad", { jobId: jobId, backend: bePoll || (typeof currentBackend === "function" ? currentBackend() : "") });
     }
     setShotBusy(shot, false);
     if (!opts.keepSend) markSendBusy(false);

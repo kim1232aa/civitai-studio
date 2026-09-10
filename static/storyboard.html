@@ -130,11 +130,11 @@
   .dock-btn.primary{border-color:rgba(94,224,197,.45);color:#b8f5e6;background:rgba(94,224,197,.10)}
   .dock.collapsed .collapse-only,
   .dock.expanded .expand-only{display:none}
-  .modes{display:flex;gap:4px;margin-bottom:10px;background:#121216;border:1px solid #2a2a32;border-radius:12px;padding:4px;width:100%;max-width:100%;flex-wrap:wrap}
-  .modes button{border:0;background:transparent;color:#d2d2d8;border-radius:10px;padding:8px 8px;font-size:12px;line-height:1.25;white-space:normal;flex:1 1 76px;min-width:76px;text-align:center;overflow:visible}
+  .modes{display:flex;gap:4px;margin-bottom:8px;background:#121216;border:1px solid #2a2a32;border-radius:12px;padding:4px;width:100%;max-width:100%;flex-wrap:nowrap;align-items:center}
+  .modes button{border:0;background:transparent;color:#d2d2d8;border-radius:10px;padding:6px 10px;font-size:12px;line-height:1.2;white-space:nowrap;flex:1 1 auto;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis}
   .modes button.on{color:#fff;background:#3a3a44;box-shadow:inset 0 0 0 1px #5ee0c5;font-weight:600}
-  .modes button.stub{opacity:1;color:#c8c8d0;background:#1a1a20}
-  .modes button .mode-tag{display:block;margin-top:2px;font-size:10px;font-weight:400;color:#8b8b94;line-height:1.2}
+  .modes button.stub{flex:0 0 auto;min-width:0;padding:4px 8px;font-size:11px;opacity:.72;color:#9a9aa3;background:transparent}
+  .modes button .mode-tag{display:inline-flex;align-items:center;margin:0 0 0 4px;padding:0 6px;height:16px;border-radius:999px;border:1px solid #2e2e36;background:#1a1a20;font-size:10px;font-weight:400;color:#8b8b94;line-height:1}
   .modes button.on .mode-tag{color:#b8f5e6}
   .refs{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
   .chip-btn,.chip{width:44px;height:44px;border-radius:10px;border:1px solid #2e2e36;background:#1a1a1f;
@@ -404,7 +404,7 @@
   .chat-rail-send{display:none}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r19singleup">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r21jobidwb">
 </head>
 <body>
 <div class="app">
@@ -419,7 +419,7 @@
     <div class="mode-mini">
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o19-single-up-writeback</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o21-jobid-writeback</span>
     </div>
   </header>
   <div class="stage">
@@ -452,7 +452,7 @@
         <span class="chat-rail-tag" id="chatRailTag">路径</span>
       </div>
       <ol class="chat-rail-path" id="chatRailPath"></ol>
-      <p class="chat-rail-copy" id="chatRailCopy">选分镜 → 图片生成 → 选服务 → 胶囊 ↑（同一 /api/generate）</p>
+      <p class="chat-rail-copy" id="chatRailCopy">选分镜 → 图片生成 → 选服务 → 胶囊 ↑</p>
       <div class="chat-rail-acts" id="chatRailActs"></div>
     </aside>
     <div class="atbox canvas-only" id="atbox"></div>
@@ -490,10 +490,10 @@
       <div class="dock-body" id="dockBody">
       <div class="dock-scroll" id="dockScroll">
       <div class="modes">
-        <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本生成<span class="mode-tag">未接</span></button>
         <button type="button" id="modeImg" class="on" data-mode="image">图片生成</button>
         <button type="button" id="modeVid" data-mode="video">视频生成</button>
-        <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频生成<span class="mode-tag">未接</span></button>
+        <button type="button" id="modeText" class="stub" data-mode="text" title="文本生成 · 本版未接">文本<span class="mode-tag">未接</span></button>
+        <button type="button" id="modeAud" class="stub" data-mode="audio" title="音频生成 · 本版未接">音频<span class="mode-tag">未接</span></button>
       </div>
       <div class="refs" id="refs"></div>
       <div class="composer-acts" id="composerActs">
@@ -607,6 +607,6 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-r19singleup"></script>
+<script src="/static/storyboard.js?v=20260910-r21jobidwb"></script>
 </body>
 </html>

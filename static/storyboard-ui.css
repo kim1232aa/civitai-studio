@@ -143,17 +143,24 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
   background: #141416;
 }
 .prompt.neg { position: static; }
-.modes { width: 100%; border-radius: 12px; gap: 4px; flex-wrap: wrap; }
+.modes { width: 100%; border-radius: 12px; gap: 4px; flex-wrap: nowrap; align-items: center; }
 .modes button {
-  flex: 1 1 76px; min-width: 76px; padding: 8px 8px; border-radius: 10px;
-  white-space: normal; font-size: 12px; line-height: 1.25; overflow: visible;
+  flex: 1 1 auto; min-width: 0; padding: 6px 10px; border-radius: 10px;
+  white-space: nowrap; font-size: 12px; line-height: 1.2; overflow: hidden;
   color: #d2d2d8; text-align: center;
 }
 .modes button.on {
   color: #fff; background: #3a3a44; box-shadow: inset 0 0 0 1px #5ee0c5; font-weight: 600;
 }
-.modes button.stub { color: #c8c8d0; opacity: 1; background: #1a1a20; }
-.modes button .mode-tag { display: block; margin-top: 2px; font-size: 10px; font-weight: 400; color: #8b8b94; }
+.modes button.stub {
+  flex: 0 0 auto; min-width: 0; padding: 4px 8px; font-size: 11px;
+  color: #9a9aa3; opacity: .72; background: transparent;
+}
+.modes button .mode-tag {
+  display: inline-flex; align-items: center; margin: 0 0 0 4px; padding: 0 6px;
+  height: 16px; border-radius: 999px; border: 1px solid #2e2e36; background: #1a1a20;
+  font-size: 10px; font-weight: 400; color: #8b8b94;
+}
 .modes button.on .mode-tag { color: #b8f5e6; }
 .refs { gap: 6px; }
 .composer-acts { gap: 6px; }
