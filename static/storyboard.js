@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o23: import sdxl serviceId sticks on shot + outbound (forbid silent krea2/turbo); prompt-tag LoRA file-stem dedupe
   // v0821o22: hinablue-generic diffusionModel outbound + CDN writeback honesty; UI 参考 count includes 成片 chip
   // v0821o21: outbound fail surfaces jobId+backend; send-path 参考 excludes own shot.url (visual chip aside)
   // v0821o20: selected image chip / compact 未接 / chatRail product copy (visual P0s ASIDE)
@@ -4965,7 +4966,10 @@
     // Fal empty-service defaults stay for fal backends only.
     const pickedService = ($("service") && $("service").value) || "";
     let serviceId = pickedService;
-    if (!serviceId && be === "huggingface") {
+    // v0821o23: civitai outbound prefers imported shot.serviceId / sdxl eco — never silent krea2.
+    if (be === "civitai") {
+      serviceId = resolveCivitaiOutboundServiceId(shot);
+    } else if (!serviceId && be === "huggingface") {
       // v0821o4: HF empty → Hub turbo; never fal-ai/.../turbo/lora sibling
       serviceId = HF_LORA_PREF_SERVICE;
     } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
@@ -5279,11 +5283,13 @@
       return fail("此模型需要提示词", "blocked");
     }
     // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
+    // v0821o23: resolve from shot.serviceId / ecosystem when #service drifted to krea2.
     if (currentBackend() === "civitai") {
-      const civSid = ($("service") && $("service").value) || "";
+      const civSid = resolveCivitaiOutboundServiceId(shot);
       if (!civSid) {
         return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
       }
+      syncCivitaiServiceSelect(civSid);
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
@@ -5392,11 +5398,13 @@
         });
       }
       if (usesCivitaiComfyParams()) {
-        // Explicit UI selection only — never CIVITAI_PREF / _civitaiDefaultService soft-fill.
-        const sid = ($("service") && $("service").value) || "";
+        // v0821o23: imported sdxl serviceId wins over drifted #service / catalog krea2 pref.
+        // Never CIVITAI_PREF / _civitaiDefaultService soft-fill when empty.
+        const sid = resolveCivitaiOutboundServiceId(shot);
         if (!sid) {
           return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
         }
+        syncCivitaiServiceSelect(sid);
         payload.serviceId = sid;
         // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
       }
@@ -6073,6 +6081,48 @@
   }
   if ($("btnImport")) $("btnImport").onclick = () => openImportModal();
 
+
+  // v0821o23: keep imported civitai serviceId honest on page↑ (live job 12100372 sent krea2 with sdxl dm).
+  function isCivitaiKrea2TurboService(sid) {
+    const s = String(sid || "").trim();
+    return s === CIVITAI_PREF_SERVICE || s === "image/comfy/krea2/turbo/createImage";
+  }
+  function civitaiServiceIdFromImportShot(shot) {
+    if (!shot) return "";
+    const pinned = String(shot.serviceId || "").trim();
+    if (pinned) return pinned;
+    const eco = String(shot.ecosystem || "").trim();
+    const ecoL = eco.toLowerCase();
+    const dm = String(shot.diffusionModel || "").trim().toLowerCase();
+    const blob = (ecoL + " " + dm).trim();
+    // Mirror providers/civitai.py ~1395 — never invent krea2 for sdxl/pony/illustrious.
+    if (ecoL === "sdxl" || /:sdxl:/.test(dm) || /\b(pony|illustrious|ilxl)\b/.test(blob)) {
+      return "image/sdcpp/sdxl/createImage";
+    }
+    if (ecoL === "flux" || /:flux/.test(dm)) return "image/sdcpp/flux1/createImage";
+    if (ecoL === "wan" || /:wan/.test(dm)) return "image/sdcpp/wan/createImage";
+    if (ecoL === "zimage" || eco === "zImage" || /:zimage/.test(dm)) return "image/sdcpp/zImage/turbo/createImage";
+    if (ecoL === "qwen" || /:qwen/.test(dm)) return "image/sdcpp/qwen/20b/createImage";
+    return "";
+  }
+  function resolveCivitaiOutboundServiceId(shot) {
+    const ui = ($("service") && $("service").value) || "";
+    const fromShot = civitaiServiceIdFromImportShot(shot);
+    if (fromShot) {
+      // Imported sdxl must not silently ship krea2/turbo.
+      if (!ui || (isCivitaiKrea2TurboService(ui) && fromShot !== ui)) return fromShot;
+    }
+    return ui || fromShot || "";
+  }
+  function syncCivitaiServiceSelect(sid) {
+    const s = String(sid || "").trim();
+    if (!s || !$("service")) return;
+    ensureSelectOpt($("service"), s);
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[s]) state.catalogById[s] = { id: s, name: s };
+    $("service").value = s;
+  }
+
   function looksCivitaiServiceId(id) {
     const s = String(id || "");
     return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
@@ -6316,6 +6366,8 @@
         if (!state.catalogById[sid]) {
           state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
         }
+        // v0821o23: persist imported serviceId on shot — #service alone is lost on catalog reload / reselect.
+        if (shot && !hardErr) shot.serviceId = sid;
       }
     } else if (wantFal) {
       if ($("backend")) $("backend").value = "fal";
@@ -6468,6 +6520,10 @@
         shot.ecosystem = String(j.ecosystem).trim();
       } else {
         delete shot.ecosystem;
+      }
+      // v0821o23: keep import serviceId even if #service later drifts to catalog pref (krea2).
+      if (j.serviceId != null && String(j.serviceId).trim()) {
+        shot.serviceId = String(j.serviceId).trim();
       }
     }
     // Backend may silently align 1672→1664 ((h//16)*16). Surface it; never treat as success-ok.

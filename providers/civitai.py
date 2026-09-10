@@ -1028,6 +1028,33 @@ def _strength_fields(raw):
     return out
 
 
+
+def _file_stem(name: str) -> str:
+    """Basename without weight-extension — for prompt <lora:file:str> ↔ version files dedupe."""
+    n = (name or "").strip()
+    if not n:
+        return ""
+    lower = n.lower()
+    for ext in (".safetensors", ".pt", ".ckpt", ".bin", ".pth", ".sft"):
+        if lower.endswith(ext):
+            n = n[: -len(ext)]
+            break
+    return n.strip().lower()
+
+
+def _version_file_stems(ver: dict | None) -> set:
+    stems = set()
+    if not isinstance(ver, dict):
+        return stems
+    for f in (ver.get("files") or []):
+        if not isinstance(f, dict):
+            continue
+        stem = _file_stem(f.get("name") or "")
+        if stem:
+            stems.add(stem)
+    return stems
+
+
 def _prompt_lora_tags(prompt: str) -> list:
     out = []
     seen = set()
@@ -1136,9 +1163,15 @@ def _reconcile_civitai_download_path(path: str, vid) -> str:
 
 
 def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict | None = None) -> list:
-    """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8."""
+    """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8.
+
+    Prompt `<lora:fileStem:w>` often names the version *file* (e.g. hinaSamuraiArmorPony_rev1),
+    while resources carry the model display name + AIR. Dedup by file stem so we do not mint a
+    second no-air chip that outbound must drop (19201654 → LoRA 出站 1/2).
+    """
     loras = []
     seen_lora = set()
+    seen_stems = set()
     versions = versions or {}
     for r in resources or []:
         if not isinstance(r, dict):
@@ -1160,6 +1193,17 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if key in seen_lora:
             continue
         seen_lora.add(key)
+        stems = _version_file_stems(ver)
+        name_stem = _file_stem(name)
+        if name_stem:
+            stems.add(name_stem)
+        # o23: meta.resources often repeats file-stem LoRA without AIR after js.resources @vid chip.
+        if stems and stems.intersection(seen_stems):
+            continue
+        if not air and vid is None:
+            # Filename-only / hash-only rows — do not mint empty-air chips here.
+            continue
+        seen_stems.update(stems)
         item = {
             "air": air,
             "name": name or "LoRA",
@@ -1184,10 +1228,20 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if path:
             item["path"] = path
             item["downloadUrl"] = path
+        if stems:
+            item["fileStems"] = sorted(stems)
         loras.append(item)
     for tag in _prompt_lora_tags(prompt or ""):
         key = tag["name"].lower()
-        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
+        stem = _file_stem(tag["name"])
+        if stem and stem in seen_stems:
+            continue
+        if any(
+            key == str(x.get("name") or "").lower()
+            or key in str(x.get("air") or "").lower()
+            or stem in { _file_stem(s) for s in (x.get("fileStems") or []) }
+            for x in loras
+        ):
             continue
         row = {
             "air": "",
@@ -1197,7 +1251,25 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if tag.get("strengthMissing"):
             row["strengthMissing"] = True
         loras.append(row)
-    return loras
+    # Final honesty pass: drop empty-air chips whose stem matches an AIR chip (no invent).
+    air_stems = set()
+    for x in loras:
+        if not str((x or {}).get("air") or "").strip():
+            continue
+        air_stems.add(_file_stem((x or {}).get("name") or ""))
+        for s in ((x or {}).get("fileStems") or []):
+            air_stems.add(_file_stem(s))
+    air_stems.discard("")
+    out = []
+    for x in loras:
+        if str((x or {}).get("air") or "").strip():
+            out.append(x)
+            continue
+        stem = _file_stem((x or {}).get("name") or "")
+        if stem and stem in air_stems:
+            continue
+        out.append(x)
+    return out
 
 
 _COMFY_IMPORT_DIM_MIN = 64
