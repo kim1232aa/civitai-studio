@@ -386,6 +386,48 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(code, 400, data)
         self.transport.assert_not_called()
 
+
+    def test_sdcpp_sdxl_maps_dpmpp_2m_karras_from_import(self):
+        """19201654 import: dpmpp_2m/karras → sdcpp sampleMethod dpm++2m + schedule karras.
+
+        Locked mapping (api对接助手): dpmpp_2m MUST outbound as exact enum dpm++2m.
+        Checkpoint AIR maps to official sdcpp `model` (OpenAPI), not Comfy diffusionModel.
+        """
+        air = "urn:air:sdxl:lycoris:civitai:518563@633865"
+        ckpt = "urn:air:sdxl:checkpoint:civitai:317902@593760"
+        payload = {
+            "serviceId": "image/sdcpp/sdxl/createImage",
+            "prompt": "score_9, holding sliver sword",
+            "negativePrompt": "score_6, blurry",
+            "width": 1728,
+            "height": 2048,
+            "steps": 30,
+            "cfgScale": 7.0,
+            "seed": 3436905144,
+            "sampler": "dpmpp_2m",
+            "scheduler": "karras",
+            "diffusionModel": ckpt,
+            "loras": [{"air": air, "strength": 0.7}],
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp["engine"], "sdcpp")
+        self.assertEqual(inp["ecosystem"], "sdxl")
+        self.assertEqual(inp["sampleMethod"], "dpm++2m")
+        self.assertEqual(inp["schedule"], "karras")
+        self.assertEqual(inp["model"], ckpt)
+        self.assertNotIn("sampler", inp)
+        self.assertNotIn("scheduler", inp)
+        self.assertNotIn("diffusionModel", inp)
+        self.assertEqual(inp["loras"], {air: 0.7})
+        self.assertEqual(inp["steps"], 30)
+        self.assertEqual(inp["cfgScale"], 7.0)
+        self.assertEqual(inp["width"], 1728)
+        self.assertEqual(inp["height"], 2048)
+        # unknown sampler still rejected (no silent invent)
+        with self.assertRaises(ValueError) as raised:
+            civ.build_workflow(dict(payload, sampler="not_a_real_sampler"))
+        self.assertIn("不在允许列表", str(raised.exception))
+
     def test_fal_engine_krea2_rejects_loras_and_sends_official_fields(self):
         sid = "image/fal/krea2/createImage"
         refs = [{"url": "https://example.invalid/style.jpg", "strength": 1.0}]

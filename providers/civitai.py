@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .base import Provider
 from .http import collect_urls, extract_error, json_call, parse_job_id, save_media_urls
+from . import io_meta
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -625,8 +626,16 @@ def _assign_choice(inp, raw, field, cap=None, aliases=()):
             cons = _constraint(cap, alt)
             if cons:
                 break
-    _check_range(field, raw, cons)
-    inp[field] = raw
+    value = raw
+    enum = cons.get("enum") if cons else None
+    if enum is not None:
+        mapped = io_meta.match_allowed_choice(raw, enum)
+        if not mapped:
+            _check_range(field, raw, cons)  # raises 不在允许列表
+            return
+        value = mapped
+    _check_range(field, value, cons)
+    inp[field] = value
 
 
 def _duration_is_string(cap, field="duration") -> bool:
@@ -801,6 +810,14 @@ def build_workflow(payload: dict) -> dict:
         if dest:
             _assign_by_constraint(inp, value, dest, cap, (key,))
             continue
+        # sdcpp OpenAPI: checkpoint AIR is `model` (not Comfy `diffusionModel`)
+        if key == "diffusionModel":
+            schema = _schema_fields(cap)
+            if "diffusionModel" not in schema and "model" in schema:
+                cur = inp.get("model")
+                if cur in (None, ""):
+                    _assign_by_constraint(inp, value, "model", cap, (key,))
+                    continue
         if key in _KNOWN_UI_FIELDS:
             raise _unsupported_field(sid, key)
     cap = apply_frames(inp, payload, svc) or cap
