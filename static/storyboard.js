@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o39: refs fill-to-cap (expose N==maxRefs empty slots + 灌满测试); t2i+refs one-click apply Edit sibling; stamp v0821o39-refs-fill-smart-match
   // v0821o38: packComfy prefer generate shot; force payload.diffusionModel from shot; applyImport keep dm/cn/eco when j omits; flux1 without dm hard-reject before POST
   // v0821o37: civitai preparing poll ≥720×2.5s≈30min; stillGoing mirrors inFlight (preparing/scheduled/queued/prepared); saved[]→writeback unchanged
   // v0821o36: checkpoint AIR must not enter loras[] — isLoraAir true only :lora:/:lycoris:/…; false :checkpoint:/:diffusionmodel:/:diffuser:; applyImport+pack drop non-LoRA; never invent strength
@@ -2098,8 +2099,26 @@
           '<img src="' + esc(ownUrl) + '" alt=""></button>'
       : "";
     const refsEl = $("refs");
-    const hasChips = !!(ownChip || chipNodes.length || frameHtml);
+    // v0821o39: expose FULL cap slots — empty remain chips so N can reach maxRefs (禁半槽).
+    const emptySlots = [];
+    for (let si = 0; si < remain; si++) {
+      emptySlots.push(
+        '<button class="chip ref-slot-empty" type="button" data-act="upload" title="空槽 ' +
+          (refCount + si + 1) + '/' + refCap + ' · 上传参考" aria-label="空参考槽"></button>'
+      );
+    }
+    const eats = catalogEatsRefs(catalogItemForService());
+    const sibId = (!eats && refCount > 0) ? editSiblingId(catalogItemForService()) : "";
+    const smartBtn = sibId
+      ? '<button class="chip-btn smart-edit" type="button" data-act="apply-edit-sibling" title="一键改选图生图 Edit">一键改选 Edit</button>'
+      : "";
+    // 灌满测试: only when current model eats refs and still has remain capacity
+    const fillBtn = (eats && remain > 0)
+      ? '<button class="chip-btn fill-cap" type="button" data-act="fill-refs-cap" title="灌满至 maxRefs=' + refCap + '">灌满测试</button>'
+      : "";
+    const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || fillBtn);
     // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
+    // v0821o39: empty capacity slots count as chips so cap is always visible when dock open.
     // Expanded always keeps 上传/选择; collapsed keeps them when pinned or video needs frame.
     if (!expanded && !hasChips && !needFrame) {
       refsEl.innerHTML = "";
@@ -2109,12 +2128,12 @@
       refsEl.innerHTML = frameHtml +
         '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
         '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-        promoteBtn + refHint + ownChip +
+        promoteBtn + smartBtn + fillBtn + refHint + ownChip +
         chipNodes.map((a) => {
           const on = linked.some((x) => x.id === a.id) ? " on" : "";
           return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
             (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
-        }).join("");
+        }).join("") + emptySlots.join("");
     }
     syncComposerChip(); syncCanvasTip();
     renderRail();
@@ -3072,6 +3091,26 @@
     if (!act) return;
     if (act.dataset.act === "upload") $("file").click();
     if (act.dataset.act === "pick") openImportModal();
+    if (act.dataset.act === "apply-edit-sibling") {
+      if (!applyEditSibling()) {
+        setMsg(refUnusedGateMessage(nodeById(state.selected)) || "目录无 Edit 兄弟模型，请改选图生图或断开参考（不静默忽略）", "bad");
+      }
+      return;
+    }
+    if (act.dataset.act === "fill-refs-cap") {
+      const shot = nodeById(state.selected);
+      if (!shot || shot.kind !== "shot") return;
+      if (!catalogEatsRefs(catalogItemForService())) {
+        setMsg(refUnusedGateMessage(shot) || "文生图不吃参考，请先一键改选 Edit", "bad");
+        return;
+      }
+      const added = fillRefSlotsToCap(shot);
+      renderCards(); drawWires(); renderDock(); persist();
+      const cap = maxRefCount(catalogItemForService());
+      const n = countRefUrls(null, shot).length;
+      setMsg("灌满参考 " + n + "/" + cap + (added ? (" · 新加 " + added) : " · 已满"), n >= cap ? "ok" : "warn");
+      return;
+    }
     if (act.dataset.act === "promote") {
       const shot = nodeById(state.selected);
       if (shot && shot.url) {
@@ -4917,14 +4956,60 @@
     }
     return true;
   }
-  function editSiblingHint(it) {
+  // Resolve catalog Edit/i2i sibling for a t2i service (no invent — must exist in catalogById).
+  function editSiblingId(it) {
     const id = String((it && it.id) || "");
-    const editId = id.replace(/\/text-to-image$/, "/edit");
-    if (editId !== id && state.catalogById && state.catalogById[editId]) {
+    if (!id || !state.catalogById) return "";
+    const candidates = [];
+    const slashEdit = id.replace(/\/text-to-image$/, "/edit");
+    if (slashEdit !== id) candidates.push(slashEdit);
+    // Nano / common: Foo → Foo Edit, or trailing -edit
+    const name = String((it && it.name) || "");
+    Object.keys(state.catalogById).forEach(function (cid) {
+      const row = state.catalogById[cid];
+      if (!row || !catalogEatsRefs(row)) return;
+      const rid = String(row.id || cid);
+      if (rid === id) return;
+      // same family: id prefix match or name "X Edit" for "X"
+      if (slashEdit !== id && rid === slashEdit) return; // already in candidates
+      if (name && String(row.name || "") === name + " Edit") candidates.push(rid);
+      if (id && rid === id + "/edit") candidates.push(rid);
+    });
+    for (let i = 0; i < candidates.length; i++) {
+      if (state.catalogById[candidates[i]]) return candidates[i];
+    }
+    return "";
+  }
+  function editSiblingHint(it) {
+    const editId = editSiblingId(it);
+    if (editId) {
       const sib = state.catalogById[editId];
-      return "请改选 " + (sib.name || editId) + "，或断开参考连线";
+      return "可一键改选 " + ((sib && sib.name) || editId) + "，或断开参考连线";
     }
     return "请改选带 Edit 的图生图模型，或断开参考连线";
+  }
+  // One-click apply Edit sibling (catalog must already have it — never invent).
+  function applyEditSibling() {
+    const it = catalogItemForService();
+    const editId = editSiblingId(it);
+    if (!editId) return false;
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, editId);
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[editId]) {
+      // should already exist; refuse invent
+      return false;
+    }
+    sel.value = editId;
+    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    const shot = nodeById(state.selected);
+    if (shot && shot.kind === "shot") shot.serviceId = editId;
+    renderDock();
+    syncParamSurface();
+    const sib = state.catalogById[editId];
+    setMsg("已改选图生图：" + ((sib && sib.name) || editId), "ok");
+    return true;
   }
   function refUnusedGateMessage(shot) {
     if (!shot || shot.kind !== "shot") return "";
@@ -4941,6 +5026,38 @@
   // (firstFrame/sourceImage). Optionally mirror onto capabilities.refImagesField
   // for backends that only look there — never sole-write image_urls /
   // input_references / image_url as the only multi-ref bag.
+  // Dev/acceptance: attach distinct local fixture refs until N==cap (灌满). Page path still human-clickable.
+  function fillRefSlotsToCap(shot) {
+    shot = shot || nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return 0;
+    const it = catalogItemForService();
+    if (!catalogEatsRefs(it)) return 0; // refuse fill on t2i — use Edit sibling first
+    const cap = maxRefCount(it);
+    let urls = countRefUrls(null, shot);
+    let added = 0;
+    let n = assets().length;
+    while (urls.length < cap) {
+      const idx = urls.length + 1;
+      const id = uid("fillref");
+      const url = "/out/o39-fill-" + idx + "-" + id.slice(-4) + ".png";
+      const node = {
+        id: id,
+        kind: "character",
+        title: "灌满" + idx,
+        x: (shot.x || 0) - 160,
+        y: (shot.y || 0) + n * 36,
+        url: url,
+        fillFixture: true,
+      };
+      state.nodes.push(node);
+      linkAssetToShot(node, shot);
+      n += 1;
+      added += 1;
+      urls = countRefUrls(null, shot);
+    }
+    return added;
+  }
+
   function attachExtraImages(payload, shot) {
     if (!payload || !shot) return payload;
     const linked = connectedAssets(shot.id);
@@ -7509,13 +7626,29 @@
       refCap: function () {
         const n = nodeById(state.selected);
         const hint = document.querySelector(".ref-cap-hint");
+        const empties = document.querySelectorAll("#refs .ref-slot-empty");
         return {
           n: countRefUrls(null, n).length,
           cap: maxRefCount(catalogItemForService()),
           msg: refCapGateMessage(n),
+          unused: refUnusedGateMessage(n),
           hint: hint ? String(hint.textContent || "") : "",
+          emptySlots: empties ? empties.length : 0,
+          siblingId: editSiblingId(catalogItemForService()),
+          eatsRefs: catalogEatsRefs(catalogItemForService()),
           sendReason: $("send") ? $("send").getAttribute("data-reason") : "",
         };
+      },
+      fillRefsToCap: function () {
+        const n = nodeById(state.selected);
+        const added = fillRefSlotsToCap(n);
+        renderCards(); drawWires(); renderDock();
+        return { added: added, n: countRefUrls(null, n).length, cap: maxRefCount(catalogItemForService()) };
+      },
+      applyEditSibling: applyEditSibling,
+      attachExtraImages: function (payload) {
+        const n = nodeById(state.selected);
+        return attachExtraImages(payload || {}, n);
       },
     };
   }

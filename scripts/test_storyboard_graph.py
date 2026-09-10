@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "stamp must be v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "stamp must be v0821o39-refs-fill-smart-match")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -364,7 +364,7 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -424,7 +424,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "stamp v0821o39-refs-fill-smart-match")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -483,7 +483,7 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -601,10 +601,10 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o38-dm-pack-shot: unmention/link helpers still present."""
+    """v0817b lineage under v0821o39-refs-fill-smart-match: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -621,10 +621,10 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o38-dm-pack-shot: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o39-refs-fill-smart-match: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -667,7 +667,7 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -741,7 +741,7 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -776,7 +776,7 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -802,7 +802,7 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -842,7 +842,7 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -902,7 +902,7 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -973,7 +973,7 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
@@ -1037,7 +1037,7 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -1127,7 +1127,7 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
@@ -1210,7 +1210,7 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp v0821o38-dm-pack-shot")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1332,7 +1332,7 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1420,7 +1420,7 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -1484,12 +1484,12 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o38-dm-pack-shot: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o39-refs-fill-smart-match: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1542,12 +1542,12 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o38-dm-pack-shot: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o39-refs-fill-smart-match: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1608,7 +1608,7 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821o7"' in js, "STORE_OLDS keeps v0821o7")
@@ -1732,9 +1732,9 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1863,9 +1863,9 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2060,9 +2060,9 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2217,7 +2217,7 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
@@ -2235,7 +2235,7 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -2304,7 +2304,7 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -2427,22 +2427,22 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2466,10 +2466,10 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2634,10 +2634,10 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2701,10 +2701,10 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2863,10 +2863,10 @@ def test_v0821o4_hf_turbo_lora():
     PATH = "https://civitai.com/api/download/models/3231694"
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3094,10 +3094,10 @@ def test_v0821o5_hf_no_wavespeed():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3252,7 +3252,7 @@ def test_v0821o6_modelscope_hub_lora():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o38-dm-pack-shot"
+    STAMP = "v0821o39-refs-fill-smart-match"
     HUB = "krea/Krea-2-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3261,8 +3261,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3628,7 +3628,7 @@ def test_v0821o6b_ms_lora_shape():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o38-dm-pack-shot"
+    STAMP = "v0821o39-refs-fill-smart-match"
     HUB = "Tongyi-MAI/Z-Image-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3636,15 +3636,15 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true("nanogpt" not in STAMP and "nano-gpt" not in STAMP, "stamp stays Magao, not Nano")
-    assert_true("v0821o38-dm-pack-shot" in html and "nano" not in "v0821o38-dm-pack-shot", "html must not drift onto Nano stamps")
-    assert_true("v0821o38-dm-pack-shot" in html, "o7 param-surface stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html and "nano" not in "v0821o39-refs-fill-smart-match", "html must not drift onto Nano stamps")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "o7 param-surface stamp")
 
     fi = js.find("function msLoraFixtureImport")
     fj = js.find("async function mountMsLoraFixture", fi)
@@ -3763,9 +3763,9 @@ def test_v0821o7_param_surface():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o7")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3834,7 +3834,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-o38dmpackshot">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-o39refsfillsmartmatch">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3990,8 +3990,8 @@ def test_v0821o9_fail_zh_lora_honesty():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     index = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust")
     assert_true("function humanizeFailText" in js, "humanizeFailText helper")
     assert_true('/\\bmissing\\b/.test(lower) && /body\\./.test(lower)' not in js,
                 "no bare missing&&body. false-positive clause")
@@ -4108,12 +4108,12 @@ def test_v0821o15_server_writeback_executable():
     """v0821o15: local persist + PUT /api/storyboard-graph; clean-profile hydrate keeps shot.url."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o15")
     assert_true('"nl-storyboard-v0821o14"' in js, "STORE_OLDS keeps o14")
     assert_true('"nl-storyboard-v0821o13"' in js, "STORE_OLDS keeps o13")
     assert_true('"nl-storyboard-v0821o12"' in js, "STORE_OLDS keeps o12")
-    assert_true("storyboard.js?v=20260910-o38dmpackshot" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o39refsfillsmartmatch" in html, "js cache bust")
     assert_true("function mergePreferUrl" in js, "mergePreferUrl helper")
     assert_true("function isQuotaErr" in js, "isQuotaErr helper")
     assert_true("function persistServer" in js, "persistServer helper")
@@ -4163,8 +4163,8 @@ def test_v0821o19_single_up_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o19")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "js cache-bust o19")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o19")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "js cache-bust o19")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
     assert_true('"nl-storyboard-v0821o16"' in js, "STORE_OLDS still knows o16")
 
@@ -4236,9 +4236,9 @@ def test_v0821o20_visual_p0():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o20")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "js cache-bust o20")
-    assert_true('href="/static/storyboard-ui.css?v=20260910-o38dmpackshot"' in html, "css cache-bust o20")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o20")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "js cache-bust o20")
+    assert_true('href="/static/storyboard-ui.css?v=20260910-o39refsfillsmartmatch"' in html, "css cache-bust o20")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
 
@@ -4282,8 +4282,8 @@ def test_v0821o22_hinablue_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o23 (o22 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "js cache-bust o23")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o23 (o22 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive kept")
@@ -4334,8 +4334,8 @@ def test_v0821o23_sdxl_service_stick():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o23")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "js cache-bust o23")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o23")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("function resolveCivitaiOutboundServiceId" in js, "resolve helper")
@@ -4398,8 +4398,8 @@ def test_v0821o21_outbound_jobid_writeback():
     """o21 lineage under o22: fail surfaces jobId+backend; single generate; persist keepalive (no fixture lock)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o23 (o21 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "js cache-bust o23")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o23 (o21 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive")
@@ -4435,8 +4435,8 @@ def test_v0821o26_fal_swap_dropdown():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     init = (ROOT / "providers" / "__init__.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o26")
-    assert_true("20260910-o38dmpackshot" in html, "js cache-bust o26")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o26")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "js cache-bust o26")
     assert_true("v0821o26:" in js[:5000] or "v0821o29:" in js[:5000], "js knife banner lineage")
 
     # Static HTML lists every registered backend (honest fallback before /api/providers)
@@ -4522,7 +4522,7 @@ def test_v0821o28_composer_adaptive():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
-    assert_true("v0821o38-dm-pack-shot" in html, "html tip stamp o30")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html tip stamp o30")
     assert_true("v0821o28-composer-adaptive" in adapt, "adapt module stamp o28 kept")
     assert_true("composer-field-adapt.js" in html, "adapt script included")
     assert_true("composer-field-adapt.css" in html, "adapt css included")
@@ -4546,8 +4546,8 @@ def test_v0821o29_fal_lora_base():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     # stamp advanced by o28 tip; o29 behavior still required in storyboard.js
-    assert_true("v0821o38-dm-pack-shot" in html, "html tip stamp o31 (keeps o29 behavior)")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust current tip")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html tip stamp o31 (keeps o29 behavior)")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust current tip")
     assert_true("v0821o29:" in js[:5000], "js o29 banner preserved")
 
     assert_true("function resolveFalLoraEndpointFromChips" in js, "resolver")
@@ -4597,8 +4597,8 @@ def test_v0821o31_hf_lora_base():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust")
     assert_true("v0821o31:" in js[:5000], "js o31 banner")
     assert_true("HF_LORA_BY_BASE" in js, "HF_LORA_BY_BASE")
     assert_true("function resolveHfLoraEndpointFromChips" in js, "resolver")
@@ -4672,8 +4672,8 @@ def test_v0821o32_hf_fal_lora_transport():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust")
     assert_true("v0821o32:" in js[:5000], "js o32 banner retained")
     assert_true("_submit_hf_fal_lora_via_fal" in hf, "Fal transport helper retained")
     assert_true("_needs_fal_lora_transport" in hf, "transport gate")
@@ -4771,8 +4771,8 @@ def test_v0821o33_hf_router_honest():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust")
     assert_true("v0821o33:" in js[:5000], "js o33 banner")
     assert_true("HF_ROUTER_FAL_LORA_MSG" in js, "Composer msg const")
     assert_true("HF Router 不托管该 Fal LoRA 端点，请换家 Fal" in js, "Composer exact copy")
@@ -4832,8 +4832,8 @@ def test_v0821o30_send_gate():
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
     ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust")
     assert_true("v0821o30:" in js[:5000], "js o30 banner")
 
     # clickability / z-index above zoom/minimap (22)
@@ -4875,10 +4875,10 @@ def test_v0821o36_checkpoint_not_lora():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o36")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o36")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust o36")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust o36")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust o36")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust o36")
     assert_true("v0821o36:" in js[:5000], "js o36 banner")
 
     assert_true("function isLoraAir" in js, "isLoraAir helper")
@@ -4959,10 +4959,10 @@ def test_v0821o37_poll_preparing_wb():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o37")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o37")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust o37")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust o37")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust o37")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust o37")
     assert_true("v0821o37:" in js[:5000], "js o37 banner")
 
     run_i = js.find("async function runShotStep")
@@ -5071,10 +5071,10 @@ def test_v0821o38_dm_pack_shot():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o38-dm-pack-shot" in html, "html stamp o38")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp o38")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("20260910-o38dmpackshot" in html, "cache-bust o38")
-    assert_true('src="/static/storyboard.js?v=20260910-o38dmpackshot"' in html, "script cache-bust o38")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust o38")
+    assert_true('src="/static/storyboard.js?v=20260910-o39refsfillsmartmatch"' in html, "script cache-bust o38")
     assert_true("v0821o38:" in js[:5000], "js o38 banner")
 
     pack_i = js.find("function packComfyParamsForPayload")
@@ -5243,6 +5243,7 @@ def main():
         test_v0821o36_checkpoint_not_lora,
         test_v0821o37_poll_preparing_wb,
         test_v0821o38_dm_pack_shot,
+        test_o39_refs_fill_smart_match_static,
         test_v0821o30_send_gate,
         test_import_19201654_original_params,
         # test_import_142210587_original_params  # optional fixture; NOT acceptance
@@ -5257,6 +5258,27 @@ def main():
             print("FAIL", fn.__name__, e)
     print("result", len(tests) - failed, "/", len(tests))
     return 1 if failed else 0
+
+
+
+def test_o39_refs_fill_smart_match_static():
+    """o39 tip: full cap slots + Edit sibling one-click + stamp."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0821o39-refs-fill-smart-match" in html, "html stamp v0821o39-refs-fill-smart-match")
+    assert_true("20260910-o39refsfillsmartmatch" in html, "cache-bust o39")
+    assert_true("v0821o39:" in js, "js header o39")
+    assert_true("function editSiblingId" in js, "editSiblingId")
+    assert_true("function applyEditSibling" in js, "applyEditSibling")
+    assert_true("function fillRefSlotsToCap" in js, "fillRefSlotsToCap")
+    assert_true("ref-slot-empty" in js and "ref-slot-empty" in css, "empty cap slots")
+    assert_true('data-act="apply-edit-sibling"' in js, "one-click Edit act")
+    assert_true('data-act="fill-refs-cap"' in js, "灌满测试 act")
+    assert_true("for (let si = 0; si < remain; si++)" in js, "expose remain empty slots")
+    # unused gate still hard-blocks; apply path present
+    assert_true("function refUnusedGateMessage" in js, "unused gate kept")
+    assert_true("不静默忽略" in js, "no silent ignore copy")
 
 
 if __name__ == "__main__":

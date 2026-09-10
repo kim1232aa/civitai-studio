@@ -462,3 +462,14 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
 .send::before { inset: -14px; }
 .dock.collapsed .dock-foot .bar { display: flex !important; justify-content: flex-end; }
 .dock-foot .send-toast:not([hidden]) { display: block !important; }
+
+/* o39: empty capacity slots — full maxRefs visible, not half-cut */
+.refs .chip.ref-slot-empty {
+  width: 36px; height: 36px; min-width: 36px;
+  border: 1px dashed rgba(255,255,255,.35);
+  background: transparent; opacity: .7;
+  padding: 0;
+}
+.refs .chip.ref-slot-empty:hover { opacity: 1; border-color: rgba(120,180,255,.7); }
+.refs .chip-btn.smart-edit { border-color: rgba(120,200,120,.55); }
+.refs .chip-btn.fill-cap { border-color: rgba(220,180,80,.55); }
