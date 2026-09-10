@@ -23,8 +23,8 @@ PROVIDER_MAX_REFS: dict[str, int] = {
     "civitai": 9,
     "fal": 9,
     "nano-gpt": 5,
-    "modelscope-ai": 1,
-    "modelscope-cn": 1,
+    "modelscope-ai": 3,
+    "modelscope-cn": 3,
     "huggingface": 9,
 }
 
@@ -60,7 +60,10 @@ def max_refs(
     Prefer smaller (stricter) when several sources disagree.
     """
     candidates: list[int] = []
-    for src in (item, payload, caps):
+    item_caps = None
+    if isinstance(item, dict) and isinstance(item.get("capabilities"), dict):
+        item_caps = item["capabilities"]
+    for src in (item_caps, item, payload, caps):
         if not isinstance(src, dict):
             continue
         for key in ("maxRefs", "maxImages", "maxRefImages"):
@@ -71,13 +74,28 @@ def max_refs(
     prov_default = PROVIDER_MAX_REFS.get((backend or "").strip(), 9)
     if default is not None:
         prov_default = int(default)
-    # Fal (and friends): single image_url schema cannot take N refs
+    # Fal (and friends): single image_url schema cannot take N refs —
+    # unless catalog already advertises maxRefs>1 (Magao Edit-2509: image_url list 1–3).
     if isinstance(item, dict):
-        fields = item.get("imageFields") or []
-        if fields and "image_urls" not in fields and "input_references" not in fields:
-            # only singular official slots → ceiling 1
-            prov_default = min(prov_default, 1)
-            candidates = [min(c, 1) for c in candidates] or [1]
+        fields = (
+            item.get("imageFields")
+            or (item_caps.get("imageFields") if isinstance(item_caps, dict) else None)
+            or []
+        )
+        item_cap = None
+        for key in ("maxRefs", "maxImages", "maxRefImages"):
+            for src in (item_caps, item):
+                n = _positive_int(src.get(key)) if isinstance(src, dict) else None
+                if n is not None:
+                    item_cap = n
+                    break
+            if item_cap is not None:
+                break
+        if fields and "image_urls" not in fields and "input_references" not in fields and "images" not in fields:
+            if item_cap is None or item_cap <= 1:
+                # only singular official slots → ceiling 1
+                prov_default = min(prov_default, 1)
+                candidates = [min(c, 1) for c in candidates] or [1]
     if not candidates:
         return prov_default
     return min(min(candidates), prov_default)

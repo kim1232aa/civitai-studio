@@ -11,8 +11,8 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o44-civitai-edit-materialize-refs"), "html stamp o41");
-assert.ok(html.includes("storyboard.js?v=20260910-o44civitaimaterializerefs"), "cache bust o41");
+assert.ok(html.includes("v0821o45-magao-edit2509-refs3"), "html stamp o41");
+assert.ok(html.includes("storyboard.js?v=20260910-o45magaoedit2509refs3"), "cache bust o41");
 assert.ok(source.includes("v0821o41:"), "js header o41");
 assert.ok(source.includes("v0821o40:"), "js header o40 lineage");
 assert.ok(source.includes("function fillRefSlotsToCap"), "fillRefSlotsToCap");

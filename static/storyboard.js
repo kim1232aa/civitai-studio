@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o45: Magao Edit-2509 maxRefs=3 (provider ceiling 3; catalog tightens); stamp v0821o45-magao-edit2509-refs3
   // v0821o44: civitai editImage materialize /out → data URL before POST; stamp v0821o44-civitai-edit-materialize-refs
   // v0821o43: fal flux-2/edit OpenAPI maxRefs=4 (siblings with official ≤4); stamp v0821o43-fal-flux2-edit-maxrefs4
   // v0821o42: nano edit refs → imageDataUrls on OAI/edit endpoints; stamp v0821o42-nano-edit-refs
@@ -4836,14 +4837,14 @@
   }
 
     // Provider defaults (capabilities): catalog may only tighten, never raise.
-  // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope=1+image_url.
+  // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope ceiling=3+image_url (catalog tightens; 2509=3).
   const PROVIDER_REF_CAPS = {
     civitai: { maxRefs: 9, refImagesField: "images" },
     fal: { maxRefs: 9, refImagesField: "image_urls" },
     huggingface: { maxRefs: 9, refImagesField: "image_urls" },
     "nano-gpt": { maxRefs: 5, refImagesField: "input_references" },
-    "modelscope-ai": { maxRefs: 1, refImagesField: "image_url" },
-    "modelscope-cn": { maxRefs: 1, refImagesField: "image_url" },
+    "modelscope-ai": { maxRefs: 3, refImagesField: "image_url" },
+    "modelscope-cn": { maxRefs: 3, refImagesField: "image_url" },
   };
 
   function providerRefDefaults() {
@@ -4878,8 +4879,10 @@
     if (fields.length) {
       const hasMulti = fields.some((f) => MULTI_REF_FIELDS.indexOf(f) >= 0);
       const hasSingularFirst = fields.some((f) => SINGULAR_FIRST_FIELDS.indexOf(f) >= 0);
-      // No multi bag + singular FIRST (or any non-multi schema) → maxRefs=1 (catalog tighten).
-      if (!hasMulti && (hasSingularFirst || fields.length > 0)) max = Math.min(max, 1);
+      // No multi bag + singular FIRST → maxRefs=1, unless catalog already says maxRefs>1
+      // (Magao Edit-2509: official image_url list 1–3 — same field name, multi values).
+      const catalogAllowsList = Number(caps.maxRefs) > 1 || Number(caps.maxImages) > 1;
+      if (!hasMulti && (hasSingularFirst || fields.length > 0) && !catalogAllowsList) max = Math.min(max, 1);
     }
     const field = (caps.refImagesField || (it && it.refImagesField) || prov.refImagesField || "images");
     return { maxRefs: max, refImagesField: String(field) };
