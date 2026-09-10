@@ -297,17 +297,55 @@ def _is_civitai_air(s: str) -> bool:
     return False
 
 
+_CIVITAI_DL_RE = re.compile(
+    r"(https?://(?:www\.)?civitai\.com/api/download/models/)(\d+)(.*)$",
+    re.I,
+)
+
+
+def _fal_lora_version_id(item: dict) -> str:
+    """Canonical Civitai modelVersionId for Fal download URLs.
+
+    Prefer explicit versionId / modelVersionId, then AIR `@version`.
+    Never let a bare `id` (search-hit modelId, or sibling version) beat AIR —
+    model 2323765 ships both 3071582 (Krea2) and 2653078 (z_image_turbo).
+    """
+    if not isinstance(item, dict):
+        return ""
+
+    def _as_vid(raw):
+        if raw is None:
+            return ""
+        s = str(raw).strip()
+        return s if s.isdigit() else ""
+
+    for key in ("versionId", "modelVersionId"):
+        vid = _as_vid(item.get(key))
+        if vid:
+            return vid
+    air = (item.get("air") or "").strip()
+    if air:
+        m = re.search(r"@(\d+)\s*$", air) or re.search(r"civitai:\d+@(\d+)", air, re.I)
+        if m:
+            return m.group(1)
+    return _as_vid(item.get("id"))
+
+
 def _fal_lora_path(item: dict) -> str:
     if not isinstance(item, dict):
         return ""
+    vid = _fal_lora_version_id(item)
     for k in ("path", "url", "downloadUrl", "download_url"):
         v = item.get(k)
         if isinstance(v, str):
             v = v.strip()
             if v and not _is_civitai_air(v):
+                m = _CIVITAI_DL_RE.match(v)
+                # Stale sibling path (2653078) must not beat AIR/versionId (3071582).
+                if m and vid and m.group(2) != vid:
+                    return f"{m.group(1)}{vid}{m.group(3)}"
                 return v
-    vid = item.get("versionId") or item.get("modelVersionId") or item.get("id")
-    if vid and (isinstance(vid, int) or str(vid).isdigit()):
+    if vid:
         return f"https://civitai.com/api/download/models/{vid}"
     return ""
 

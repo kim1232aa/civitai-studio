@@ -3285,16 +3285,25 @@
   }
   function loraDownloadUrl(v) {
     if (!v) return "";
-    if (v.path && !looksAir(v.path)) return v.path;
-    if (v.downloadUrl && !looksAir(v.downloadUrl)) return v.downloadUrl;
-    if (v.url && !looksAir(v.url) && isHttpUrl(v.url)) return v.url;
+    const vid = loraVersionId(v);
+    function reconcile(url) {
+      const u = String(url || "");
+      const m = u.match(/^(https?:\/\/(?:www\.)?civitai\.com\/api\/download\/models\/)(\d+)(.*)$/i);
+      // Prefer AIR/versionId over a stale sibling download path (2653078 vs 3071582).
+      if (m && vid && String(m[2]) !== String(vid)) return m[1] + vid + m[3];
+      return u;
+    }
+    if (v.path && !looksAir(v.path)) return reconcile(v.path);
+    if (v.downloadUrl && !looksAir(v.downloadUrl)) return reconcile(v.downloadUrl);
+    if (v.url && !looksAir(v.url) && isHttpUrl(v.url)) return reconcile(v.url);
     const files = v.files || [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      if (f && f.downloadUrl && !looksAir(f.downloadUrl)) return f.downloadUrl;
+      if (f && f.downloadUrl && !looksAir(f.downloadUrl)) return reconcile(f.downloadUrl);
     }
+    // versionId / AIR @version before bare id (search-hit id is modelId).
+    if (vid && /^\d+$/.test(String(vid))) return "https://civitai.com/api/download/models/" + vid;
     if (v.id && /^\d+$/.test(String(v.id))) return "https://civitai.com/api/download/models/" + v.id;
-    if (v.versionId && /^\d+$/.test(String(v.versionId))) return "https://civitai.com/api/download/models/" + v.versionId;
     return "";
   }
   function loraVersionId(l) {
@@ -3773,6 +3782,10 @@
     const mapped = list.map(function (l) {
       let path = l.path || l.downloadUrl || l.url || "";
       const versionId = l.versionId || loraVersionId(l) || "";
+      if (path && !looksAir(path) && versionId && /^\d+$/.test(String(versionId))) {
+        const m = String(path).match(/^(https?:\/\/(?:www\.)?civitai\.com\/api\/download\/models\/)(\d+)(.*)$/i);
+        if (m && String(m[2]) !== String(versionId)) path = m[1] + versionId + m[3];
+      }
       if ((!path || looksAir(path)) && versionId && /^\d+$/.test(String(versionId))) {
         path = "https://civitai.com/api/download/models/" + versionId;
       }

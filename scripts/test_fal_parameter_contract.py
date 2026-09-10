@@ -180,8 +180,9 @@ class FalContract(unittest.TestCase):
         self.assertEqual(z["loras"], inp["loras"])
 
     def test_air_only_lora_is_not_silently_dropped(self):
+        # AIR without @version still cannot invent a download URL.
         payload = flux_lora_payload(loras=[
-            {"air": "urn:air:krea2:lora:civitai:2823254@3184845", "strength": 0.8},
+            {"air": "urn:air:krea2:lora:civitai:2823254", "strength": 0.8},
         ])
         self.transport.reset_mock()
         with self.assertRaises(ValueError) as raised:
@@ -191,6 +192,52 @@ class FalContract(unittest.TestCase):
         code, data = fal.FalProvider().generate(payload)
         self.assertEqual(code, 400, data)
         self.transport.assert_not_called()
+
+    def test_air_at_version_builds_download_path(self):
+        payload = flux_lora_payload(loras=[
+            {"air": "urn:air:krea2:lora:civitai:2823254@3184845", "strength": 0.8},
+        ])
+        inp = fal.build_fal_input(payload)
+        self.assertEqual(
+            inp["loras"],
+            [{"path": "https://civitai.com/api/download/models/3184845", "scale": 0.8}],
+        )
+
+    def test_fixture_134923572_fal_pack_uses_3071582_not_2653078(self):
+        """Sample post LoRA AIR @3071582 must win over sibling path/id 2653078."""
+        air = "urn:air:krea2:lora:civitai:2323765@3071582"
+        cases = [
+            {"air": air, "strength": None},
+            {"air": air, "versionId": 3071582, "id": 2653078, "strength": None},
+            {
+                "air": air,
+                "versionId": 3071582,
+                "path": "https://civitai.com/api/download/models/2653078",
+                "strength": None,
+            },
+            {
+                "air": air,
+                "path": "https://civitai.com/api/download/models/2653078?fileId=1",
+                "downloadUrl": "https://civitai.com/api/download/models/2653078?fileId=1",
+                "strength": None,
+            },
+            {"air": air, "id": 2653078, "strength": None},
+        ]
+        for row in cases:
+            with self.subTest(row=row):
+                path = fal._fal_lora_path(row)
+                self.assertIn("3071582", path, path)
+                self.assertNotIn("2653078", path, path)
+                payload = {
+                    "serviceId": KREA_LORA,
+                    "prompt": PROMPT,
+                    "loras": [row],
+                }
+                inp = fal.build_fal_input(payload)
+                self.assertEqual(len(inp["loras"]), 1)
+                self.assertIn("3071582", inp["loras"][0]["path"])
+                self.assertNotIn("2653078", inp["loras"][0]["path"])
+                self.assertNotIn("scale", inp["loras"][0])  # strength=null → omit, no invent 1.0
 
     def test_invalid_lora_scale_is_not_defaulted(self):
         for scale in ("oops", True, float("nan")):
