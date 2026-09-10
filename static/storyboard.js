@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o7";
-  const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o12";
+  const STORE_OLDS = ["nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o12: civitai writeback — pickUrl steps[].output.images; writebackResult sets shot.url; hist-pin applies to card
   // v0821o11: tighten humanizeFailText — drop bare missing&&body.; quoted type:"missing"; poll throws raw
   // v0821o9: Critiquito P1 — Fal fail 中文 humanize; Composer foot sync _error; LoRA 未填·出站按提供方默认
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
@@ -2847,9 +2848,10 @@
       if (histPin) {
         const item = railHistory()[Number(histPin.dataset.histPin)];
         const shot = nodeById(state.selected);
-        if (item && shot && shot.kind === "shot") {
-          const node = spawnHistoryAt(item, shot.x - 180, shot.y + 40);
-          linkAssetToShot(node, shot);
+        if (item && item.url && shot && shot.kind === "shot") {
+          // 接到此镜 → write media onto the selected shot card (same as auto writeback).
+          // Keep History row; do not require a canvas clone for the card face.
+          writebackResult(shot, item.url);
           renderCards(); drawWires(); renderDock(); persist();
         }
       }
@@ -4759,22 +4761,25 @@
     return true;
   }
   function writebackResult(shot, url) {
-    // Generated media stays on the target shot. Do not spawn a canvas clone.
-    // History rail may record the url; canvas copies require 入库 / 拖到画布.
+    // Hard gate: media lands on the originating shot card (shot.url). History stays;
+    // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
     if (!shot || !url) return;
-    removeUnpromotedFromShot(shot.id);
-    pushHistoryItem(url, (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
+    const live = nodeById(shot.id) || shot;
+    live.url = url;
+    removeUnpromotedFromShot(live.id);
+    pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
   }
 
     function pickUrl(data) {
-    // v0821i/v0821c: prefer local saved[] /out/*.mp4 over ephemeral CDN result.video.url.
+    // v0821i/v0821c/v0821o12: prefer local saved[] /out; then civitai steps[].output; CDN fallback.
     if (!data) return "";
     const first = (arr) => {
       if (!arr || !arr[0]) return "";
       const x = arr[0];
       if (typeof x === "string") return x;
-      return (x && (x.url || x.path)) || "";
+      // civitai blobs expose url and/or previewUrl
+      return (x && (x.url || x.path || x.previewUrl)) || "";
     };
     // 1) materialized /out (or any saved/files) — survives refresh
     const savedHit = first(data.saved) || first(data.files);
@@ -4782,6 +4787,23 @@
     if (data.result && typeof data.result === "object") {
       const rs = first(data.result.saved) || first(data.result.files);
       if (rs) return rs;
+    }
+    // 1b) civitai orchestration: steps[].output.images[].url (same class as i2v missing shape)
+    if (Array.isArray(data.steps)) {
+      for (let si = 0; si < data.steps.length; si++) {
+        const out = data.steps[si] && data.steps[si].output;
+        if (!out || typeof out !== "object") continue;
+        const stepHit = first(out.images) || first(out.videos) || first(out.blobs) || first(out.files);
+        if (stepHit) return stepHit;
+        if (out.image) {
+          const iu = out.image.url || out.image.previewUrl || (typeof out.image === "string" ? out.image : "");
+          if (iu) return iu;
+        }
+        if (out.video) {
+          const vu = out.video.url || (typeof out.video === "string" ? out.video : "");
+          if (vu) return vu;
+        }
+      }
     }
     // 2) video / image bags (CDN ok as fallback)
     const fromList = first(data.urls) || first(data.videos) || first(data.images);
@@ -5053,7 +5075,8 @@
         let pollMax = isVideoPoll ? 180 : 40;
         const pollMs = isVideoPoll ? 3000 : 2500;
         const bePoll = currentBackend() || (payload && payload.backend) || "";
-        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface" || bePoll === "fal")) {
+        // v0821o12: civitai comfy (krea2) same class as fal/hub — allow materialize+download ticks
+        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface" || bePoll === "fal" || bePoll === "civitai")) {
           pollMax = 120;
         }
         for (let i = 0; i < pollMax; i++) {
@@ -5063,8 +5086,10 @@
           await new Promise((res) => setTimeout(res, pollMs));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
           const stStatus = String((st && st.status) || "").toUpperCase();
+          // civitai submit lands as preparing — not a terminal error
           const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
-            || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING";
+            || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING"
+            || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED";
           if ((st.error || st.status === "failed") && !inFlight) {
             // Throw raw so fail() → formatErrInfo keeps English in excerpt.
             throw (st.error || (st.wait && st.wait.log) || st.message || "任务失败");
