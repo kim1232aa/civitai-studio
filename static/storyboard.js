@@ -1016,6 +1016,116 @@
     return false;
   }
 
+  // Old sessions could persist UTF-8 bytes decoded as latin1/cp1252 before the
+  // static response charset was fixed. Repair only text that decodes to CJK;
+  // ids, URLs, and graph references must never be rewritten.
+  const CP1252_BYTES = {
+    0x20ac: 0x80, 0x201a: 0x82, 0x192: 0x83, 0x201e: 0x84, 0x2026: 0x85,
+    0x2020: 0x86, 0x2021: 0x87, 0x2c6: 0x88, 0x2030: 0x89, 0x160: 0x8a,
+    0x2039: 0x8b, 0x152: 0x8c, 0x17d: 0x8e, 0x2018: 0x91, 0x2019: 0x92,
+    0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+    0x2dc: 0x98, 0x2122: 0x99, 0x161: 0x9a, 0x203a: 0x9b, 0x153: 0x9c,
+    0x17e: 0x9e, 0x178: 0x9f,
+  };
+  const STORED_ID_KEYS = new Set([
+    "id", "from", "to", "url", "path", "key", "source", "kind", "mode",
+    "backend", "service", "workspace", "railTab", "activeShotId", "firstFrameId",
+    "memberIds", "shotIds", "assetIds", "selected", "selectedEdge",
+  ]);
+
+  function storedTextKeyCanChange(key) {
+    const name = String(key || "");
+    return !STORED_ID_KEYS.has(name) && !/(?:Id|Ids)$/.test(name);
+  }
+
+  function mojibakeScore(text) {
+    const markers = "ÃÂâåæçèéêëìíîïð";
+    let score = 0;
+    for (let i = 0; i < text.length; i++) {
+      const cp = text.charCodeAt(i);
+      if (markers.indexOf(text[i]) >= 0) score += 1;
+      if (cp >= 0x80 && cp <= 0x9f) score += 2;
+    }
+    return score;
+  }
+
+  function decodeUtf8Bytes(bytes) {
+    try {
+      if (typeof TextDecoder === "function") {
+        return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+      }
+    } catch (_) {}
+    return "";
+  }
+
+  function decodeMojibakeSegment(segment) {
+    if (!segment || mojibakeScore(segment) === 0) return segment;
+    const latinBytes = [];
+    const cp1252Bytes = [];
+    for (let i = 0; i < segment.length; i++) {
+      const cp = segment.charCodeAt(i);
+      if (cp > 0xff && CP1252_BYTES[cp] == null) return segment;
+      latinBytes.push(cp);
+      cp1252Bytes.push(cp <= 0xff ? cp : CP1252_BYTES[cp]);
+    }
+    const candidates = [decodeUtf8Bytes(latinBytes), decodeUtf8Bytes(cp1252Bytes)]
+      .filter((candidate, index, all) => candidate && all.indexOf(candidate) === index && candidate !== segment)
+      .filter((candidate) => /[\u3400-\u9fff]/.test(candidate))
+      .sort((a, b) => mojibakeScore(a) - mojibakeScore(b));
+    return candidates.length ? candidates[0] : segment;
+  }
+
+  function repairMojibakeText(value) {
+    if (typeof value !== "string" || !value) return value;
+    let output = "";
+    let segment = "";
+    let changed = false;
+    const flush = () => {
+      if (!segment) return;
+      const repaired = decodeMojibakeSegment(segment);
+      output += repaired;
+      changed = changed || repaired !== segment;
+      segment = "";
+    };
+    for (let i = 0; i < value.length; i++) {
+      const cp = value.charCodeAt(i);
+      if (cp <= 0xff || CP1252_BYTES[cp] != null) segment += value[i];
+      else {
+        flush();
+        output += value[i];
+      }
+    }
+    flush();
+    return changed ? output : value;
+  }
+
+  function repairPersistedText(value, key) {
+    if (typeof value === "string") return repairMojibakeText(value);
+    if (!value || typeof value !== "object" || !storedTextKeyCanChange(key)) return false;
+    let changed = false;
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== "object" || value[i] === null) continue;
+        if (repairPersistedText(value[i], key)) changed = true;
+      }
+      return changed;
+    }
+    Object.keys(value).forEach((name) => {
+      if (!storedTextKeyCanChange(name)) return;
+      const current = value[name];
+      if (typeof current === "string") {
+        const repaired = repairMojibakeText(current);
+        if (repaired !== current) {
+          value[name] = repaired;
+          changed = true;
+        }
+      } else if (current && typeof current === "object" && repairPersistedText(current, name)) {
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   /** Seko-aligned empty canvas: one blank shot, no cast assets. */
   function loadDemo() {
     state.nodes = [{
@@ -1065,6 +1175,7 @@
   function restore() {
     try {
       let raw = null;
+      let legacyStorage = false;
       try { raw = localStorage.getItem(STORE); } catch (_) {}
       if (!raw) {
         try { raw = sessionStorage.getItem(STORE); } catch (_) {}
@@ -1075,10 +1186,12 @@
           if (!raw) {
             try { raw = sessionStorage.getItem(STORE_OLDS[i]); } catch (_) {}
           }
+          if (raw) legacyStorage = true;
         }
       }
       const p = JSON.parse(raw || "null");
       if (!p || (!Array.isArray(p.nodes) && (!p.script || typeof p.script !== "object"))) return false;
+      const repairedStorageText = repairPersistedText(p);
       state.cam = p.cam || state.cam;
       if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
       state.nodes = Array.isArray(p.nodes) ? p.nodes : [];
@@ -1125,6 +1238,7 @@
         return false;
       }
       removeUnpromotedFromShot();
+      if (repairedStorageText || legacyStorage) persist();
       return true;
     } catch (_) { return false; }
   }
