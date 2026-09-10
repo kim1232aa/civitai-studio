@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .base import Provider
 from .http import collect_urls, extract_error, json_call, parse_job_id, save_media_urls
+from . import io_meta
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -153,15 +154,19 @@ def find_service(service_id: str):
 def match_service(engine=None, operation=None, ecosystem=None, model=None, category=None):
     items, _, _ = catalog_items()
     scored = []
+    want_eco = _catalog_ecosystem(ecosystem) if ecosystem else None
     for it in items:
         if category and it.get("category") != category:
+            continue
+        # When ecosystem is requested, wrong-eco must not win via available(+2).
+        if want_eco and not _ecosystems_compatible(it.get("ecosystem"), want_eco):
             continue
         s = 0
         if engine and it.get("engine") == engine:
             s += 4
         if operation and it.get("operation") == operation:
             s += 3
-        if ecosystem and it.get("ecosystem") == ecosystem:
+        if want_eco and _ecosystems_compatible(it.get("ecosystem"), want_eco):
             s += 2
         if model and it.get("model") == model:
             s += 1
@@ -552,7 +557,7 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
                 f"Civitai 不接受 Fal 字段 {key}，请用官方首尾帧字段，不会静默改名或丢掉"
             )
     frames = list((cap or {}).get("frameFields") or [])
-    from .ref_images import payload_ref_images, max_refs
+    from .ref_images import payload_ref_images, max_refs, materialize_local_ref, materialize_local_refs
     from .capabilities import get_provider_capabilities
     caps = get_provider_capabilities("civitai")
     first = ""
@@ -632,6 +637,17 @@ def apply_frames(inp: dict, payload: dict, svc: dict | None):
             inp[name] = payload["videoUrl"]
         elif name == "maskImage" and payload.get("maskImage"):
             inp[name] = payload["maskImage"]
+    # o44: Civitai cannot fetch studio /out — materialize to data URLs (same as Fal/Nano).
+    # Fail-closed on missing local files; never silent-drop.
+    for key in ("images", "referenceImages"):
+        if key in inp and isinstance(inp[key], list):
+            inp[key] = materialize_local_refs(inp[key])
+    for key in (
+        "sourceImage", "firstFrame", "startImage", "firstFrameImage", "image", "sourceImageUrl",
+        "lastFrame", "endImage", "endSourceImage", "lastFrameImage", "maskImage",
+    ):
+        if key in inp and isinstance(inp[key], str) and inp[key].strip():
+            inp[key] = materialize_local_ref(inp[key])
     schema = _schema_fields(cap)
     if payload.get("turbo") is not None and "turbo" in schema:
         inp["turbo"] = bool(payload.get("turbo"))
@@ -722,8 +738,16 @@ def _assign_choice(inp, raw, field, cap=None, aliases=()):
             cons = _constraint(cap, alt)
             if cons:
                 break
-    _check_range(field, raw, cons)
-    inp[field] = raw
+    value = raw
+    enum = cons.get("enum") if cons else None
+    if enum is not None:
+        mapped = io_meta.match_allowed_choice(raw, enum)
+        if not mapped:
+            _check_range(field, raw, cons)  # raises 不在允许列表
+            return
+        value = mapped
+    _check_range(field, value, cons)
+    inp[field] = value
 
 
 def _duration_is_string(cap, field="duration") -> bool:
@@ -844,6 +868,27 @@ _FRAME_KEYS = {
 }
 
 
+_FLUX_BROKEN_DIFFUSIONMODEL_AIR_RE = re.compile(
+    r"^urn:air:flux:diffusionmodel:civitai:(\d+)@(\d+)$", re.I
+)
+
+
+def _normalize_sdcpp_flux1_diffuser_air(air: str) -> str:
+    """Outbound value for flux1 diffuserModel.
+
+    Prefer REST/model-versions air verbatim. Rewrite only the known-broken
+    `_air_from_ids` shape `flux:diffusionmodel` → `flux1:checkpoint` (same mid@version).
+    FORBIDDEN: unilaterally rewrite site `checkpoint` → `diffuser`.
+    Official `flux1:diffuser` resource AIRs pass through unchanged.
+    """
+    s = str(air or "").strip()
+    m = _FLUX_BROKEN_DIFFUSIONMODEL_AIR_RE.match(s)
+    if m:
+        return f"urn:air:flux1:checkpoint:civitai:{m.group(1)}@{m.group(2)}"
+    return s
+
+
+
 def build_workflow(payload: dict) -> dict:
     payload = payload or {}
     sid = (payload.get("serviceId") or "").strip()
@@ -898,6 +943,24 @@ def build_workflow(payload: dict) -> dict:
         if dest:
             _assign_by_constraint(inp, value, dest, cap, (key,))
             continue
+        # Outbound checkpoint AIR: prefer official diffuserModel; else model (SDXL precedent).
+        # Never silently drop diffusionModel; wrong service stays honest 400.
+        if key == "diffusionModel":
+            schema = _schema_fields(cap)
+            if "diffuserModel" in schema:
+                out_val = value
+                # o35: sdcpp flux1 only — fix broken flux:diffusionmodel mint; never checkpoint→diffuser
+                eco = _catalog_ecosystem(inp.get("ecosystem") or (svc.get("ecosystem") if svc else "") or "")
+                sid_l = str(sid or "").lower()
+                if eco == "flux1" or "/flux1/" in sid_l:
+                    out_val = _normalize_sdcpp_flux1_diffuser_air(value)
+                _assign_by_constraint(inp, out_val, "diffuserModel", cap, (key,))
+                continue
+            if "diffusionModel" not in schema and "model" in schema:
+                cur = inp.get("model")
+                if cur in (None, "") or _is_recipe_short_model(cur):
+                    _assign_by_constraint(inp, value, "model", cap, (key,))
+                    continue
         if key in _KNOWN_UI_FIELDS:
             raise _unsupported_field(sid, key)
     cap = apply_frames(inp, payload, svc) or cap
@@ -940,6 +1003,9 @@ def _ecosystem_from_blob(*parts) -> str:
         return "zImage"
     if "qwen" in blob:
         return "qwen"
+    # o35: flux.1 / flux1 before bare flux (AIR eco = flux1; catalog still aliases flux→flux1)
+    if "flux.1" in blob or "flux1" in blob:
+        return "flux1"
     if "flux" in blob:
         return "flux"
     if "wan" in blob:
@@ -949,14 +1015,46 @@ def _ecosystem_from_blob(*parts) -> str:
     return ""
 
 
+def _catalog_ecosystem(eco) -> str:
+    """Map blob/AIR eco labels onto catalog ecosystem ids (flux → flux1)."""
+    e = str(eco or "").strip()
+    if e == "flux":
+        return "flux1"
+    return e
+
+
+def _ecosystems_compatible(a, b) -> bool:
+    if not a or not b:
+        return False
+    return _catalog_ecosystem(a) == _catalog_ecosystem(b)
+
+
+def _is_recipe_short_model(cur) -> bool:
+    """True for recipe distillation slots (turbo/base) — not family ids or AIR URNs."""
+    s = str(cur or "").strip()
+    if not s or s.lower().startswith("urn:air:"):
+        return False
+    return s in {"turbo", "base"}
+
+
 def _air_from_ids(model_id, version_id, typ="", base="", name=""):
+    """Mint AIR only when REST `air` is absent.
+
+    o35: never hand-roll `urn:air:flux:diffusionmodel:…`. Flux family → eco=flux1;
+    non-LoRA checkpoints use kind=`checkpoint` (REST truth). Prefer model-versions `air` verbatim upstream.
+    """
     try:
         mid = int(model_id)
         vid = int(version_id)
     except (TypeError, ValueError):
         return ""
-    eco = _ecosystem_from_blob(base, name, typ) or "krea2"
-    kind = "lora" if _is_lora_resource(typ, "", name or "") else "diffusionmodel"
+    eco = _catalog_ecosystem(_ecosystem_from_blob(base, name, typ) or "krea2") or "krea2"
+    if _is_lora_resource(typ, "", name or ""):
+        kind = "lora"
+    elif eco == "flux1":
+        kind = "checkpoint"
+    else:
+        kind = "diffusionmodel"
     return f"urn:air:{eco}:{kind}:civitai:{mid}@{vid}"
 
 
@@ -1132,6 +1230,33 @@ def _strength_fields(raw):
     return out
 
 
+
+def _file_stem(name: str) -> str:
+    """Basename without weight-extension — for prompt <lora:file:str> ↔ version files dedupe."""
+    n = (name or "").strip()
+    if not n:
+        return ""
+    lower = n.lower()
+    for ext in (".safetensors", ".pt", ".ckpt", ".bin", ".pth", ".sft"):
+        if lower.endswith(ext):
+            n = n[: -len(ext)]
+            break
+    return n.strip().lower()
+
+
+def _version_file_stems(ver: dict | None) -> set:
+    stems = set()
+    if not isinstance(ver, dict):
+        return stems
+    for f in (ver.get("files") or []):
+        if not isinstance(f, dict):
+            continue
+        stem = _file_stem(f.get("name") or "")
+        if stem:
+            stems.add(stem)
+    return stems
+
+
 def _prompt_lora_tags(prompt: str) -> list:
     out = []
     seen = set()
@@ -1180,17 +1305,80 @@ def fetch_version_air(vid, timeout=20):
     return ver if isinstance(ver, dict) else {}
 
 
+_AIR_AT_VERSION_RE = re.compile(r"@(\d+)\s*$")
+_AIR_CIVITAI_VERSION_RE = re.compile(r"civitai:\d+@(\d+)", re.I)
+_CIVITAI_DL_MODELS_RE = re.compile(
+    r"(https?://(?:www\.)?civitai\.com/api/download/models/)(\d+)(.*)$",
+    re.I,
+)
+
+
+def _as_version_id(raw):
+    """Positive digit version id, or None. Rejects bools and non-numeric strings."""
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw > 0 else None
+    s = str(raw).strip()
+    if s.isdigit():
+        n = int(s)
+        return n if n > 0 else None
+    return None
+
+
+def _version_id_from_air(air: str):
+    """Parse `@version` / `civitai:model@version` from an AIR URN."""
+    air = (air or "").strip()
+    if not air:
+        return None
+    m = _AIR_AT_VERSION_RE.search(air) or _AIR_CIVITAI_VERSION_RE.search(air)
+    return int(m.group(1)) if m else None
+
+
+def _import_lora_version_id(r: dict):
+    """Canonical modelVersionId for import chips.
+
+    Prefer AIR `@version`, then `versionId`, then `modelVersionId`.
+    Never let bare `id` (search-hit modelId or sibling version like 2653078)
+    beat AIR `@3071582`.
+    """
+    if not isinstance(r, dict):
+        return None
+    air_vid = _version_id_from_air(r.get("air") or "")
+    if air_vid is not None:
+        return air_vid
+    for key in ("versionId", "modelVersionId"):
+        vid = _as_version_id(r.get(key))
+        if vid is not None:
+            return vid
+    return _as_version_id(r.get("id"))
+
+
+def _reconcile_civitai_download_path(path: str, vid) -> str:
+    """Rewrite stale sibling download URLs to match canonical versionId."""
+    if not path or vid is None:
+        return path or ""
+    m = _CIVITAI_DL_MODELS_RE.match(str(path).strip())
+    if m and m.group(2) != str(vid):
+        return f"{m.group(1)}{vid}{m.group(3)}"
+    return path
+
+
 def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict | None = None) -> list:
-    """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8."""
+    """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8.
+
+    Prompt `<lora:fileStem:w>` often names the version *file* (e.g. hinaSamuraiArmorPony_rev1),
+    while resources carry the model display name + AIR. Dedup by file stem so we do not mint a
+    second no-air chip that outbound must drop (19201654 → LoRA 出站 1/2).
+    """
     loras = []
     seen_lora = set()
+    seen_stems = set()
     versions = versions or {}
     for r in resources or []:
         if not isinstance(r, dict):
             continue
-        vid = r.get("modelVersionId") or r.get("versionId") or r.get("id")
-        if vid and not (isinstance(vid, int) or str(vid).isdigit()):
-            vid = r.get("modelVersionId") or r.get("versionId")
+        vid = _import_lora_version_id(r)
         ver = versions.get(vid) or _version_from_cache(vid) or {}
         air = (r.get("air") or ver.get("air") or "").strip()
         typ = r.get("modelType") or r.get("type") or (ver.get("model") or {}).get("type") or ""
@@ -1198,33 +1386,64 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if not air:
             mid = r.get("modelId") or ver.get("modelId")
             air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
+            # AIR may have been minted above; prefer its @version if id fields were empty.
+            if vid is None:
+                vid = _version_id_from_air(air)
         if not _is_lora_resource(typ, air, name):
             continue
         key = str(vid or air or name).lower()
         if key in seen_lora:
             continue
         seen_lora.add(key)
+        stems = _version_file_stems(ver)
+        name_stem = _file_stem(name)
+        if name_stem:
+            stems.add(name_stem)
+        # o23: meta.resources often repeats file-stem LoRA without AIR after js.resources @vid chip.
+        if stems and stems.intersection(seen_stems):
+            continue
+        if not air and vid is None:
+            # Filename-only / hash-only rows — do not mint empty-air chips here.
+            continue
+        seen_stems.update(stems)
         item = {
             "air": air,
             "name": name or "LoRA",
         }
         item.update(_strength_fields(_resource_strength_raw(r)))
-        if vid:
+        if vid is not None:
             item["versionId"] = vid
         path = ""
         for f in (ver.get("files") or []):
             if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
                 path = f.get("downloadUrl") or f.get("download_url")
                 break
-        if not path and vid:
+        if not path:
+            for k in ("path", "downloadUrl", "download_url", "url"):
+                raw = r.get(k)
+                if isinstance(raw, str) and raw.strip() and "civitai.com/api/download/models/" in raw:
+                    path = raw.strip()
+                    break
+        if not path and vid is not None:
             path = f"https://civitai.com/api/download/models/{vid}"
+        path = _reconcile_civitai_download_path(path, vid)
         if path:
             item["path"] = path
             item["downloadUrl"] = path
+        if stems:
+            item["fileStems"] = sorted(stems)
         loras.append(item)
     for tag in _prompt_lora_tags(prompt or ""):
         key = tag["name"].lower()
-        if any(key == str(x.get("name") or "").lower() or key in str(x.get("air") or "").lower() for x in loras):
+        stem = _file_stem(tag["name"])
+        if stem and stem in seen_stems:
+            continue
+        if any(
+            key == str(x.get("name") or "").lower()
+            or key in str(x.get("air") or "").lower()
+            or stem in { _file_stem(s) for s in (x.get("fileStems") or []) }
+            for x in loras
+        ):
             continue
         row = {
             "air": "",
@@ -1234,7 +1453,25 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if tag.get("strengthMissing"):
             row["strengthMissing"] = True
         loras.append(row)
-    return loras
+    # Final honesty pass: drop empty-air chips whose stem matches an AIR chip (no invent).
+    air_stems = set()
+    for x in loras:
+        if not str((x or {}).get("air") or "").strip():
+            continue
+        air_stems.add(_file_stem((x or {}).get("name") or ""))
+        for s in ((x or {}).get("fileStems") or []):
+            air_stems.add(_file_stem(s))
+    air_stems.discard("")
+    out = []
+    for x in loras:
+        if str((x or {}).get("air") or "").strip():
+            out.append(x)
+            continue
+        stem = _file_stem((x or {}).get("name") or "")
+        if stem and stem in air_stems:
+            continue
+        out.append(x)
+    return out
 
 
 _COMFY_IMPORT_DIM_MIN = 64
@@ -1257,6 +1494,68 @@ def _clamp_import_comfy_dim(n, field="height"):
             "（不是 /16 对齐）"
         )
     return value, source, warn
+
+
+
+def fetch_generation_data_rest(image_id: int) -> dict:
+    """Official REST generation params (public). Carries resource.strength when trpc null."""
+    code, data = json_call(
+        f"https://civitai.com/api/generation/data?type=image&id={int(image_id)}",
+        timeout=25,
+    )
+    return data if isinstance(data, dict) else {}
+
+
+def _resource_version_id_for_strength(r: dict):
+    """Match key for REST↔trpc strength merge.
+
+    REST generation/data uses `id` as the model version id; trpc uses modelVersionId/versionId.
+    Prefer explicit version fields, then AIR @version, then bare id.
+    """
+    if not isinstance(r, dict):
+        return None
+    for key in ("modelVersionId", "versionId"):
+        vid = _as_version_id(r.get(key))
+        if vid is not None:
+            return vid
+    air_vid = _version_id_from_air(r.get("air") or "")
+    if air_vid is not None:
+        return air_vid
+    return _as_version_id(r.get("id"))
+
+
+def _backfill_strength_from_rest(resources: list, rest_resources: list) -> list:
+    """When trpc/meta strength is null/missing, copy official REST strength for same versionId.
+
+    NEVER invent 0.8 — only apply a numeric strength present on REST for that version.
+    Explicit trpc numeric strength wins; REST null does nothing.
+    """
+    by_vid = {}
+    for r in rest_resources or []:
+        if not isinstance(r, dict):
+            continue
+        vid = _resource_version_id_for_strength(r)
+        if vid is None:
+            continue
+        raw = r.get("strength") if "strength" in r else r.get("weight")
+        s = _optional_strength(raw)
+        if s is not None:
+            by_vid[vid] = s
+    if not by_vid:
+        return list(resources or [])
+    out = []
+    for r in resources or []:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        row = dict(r)
+        if _optional_strength(_resource_strength_raw(row)) is None:
+            vid = _resource_version_id_for_strength(row)
+            if vid is not None and vid in by_vid:
+                row["strength"] = by_vid[vid]
+                row.pop("strengthMissing", None)
+        out.append(row)
+    return out
 
 
 def import_image(image_id: str) -> dict:
@@ -1316,6 +1615,17 @@ def import_image(image_id: str) -> dict:
     ):
         if isinstance(src, list):
             resources.extend(x for x in src if isinstance(x, dict))
+    # o27: trpc often ships strength=null; official REST /api/generation/data has the real weight.
+    # Backfill by versionId only — never invent 0.8 / defaults.
+    need_rest_strength = any(
+        isinstance(r, dict) and _optional_strength(_resource_strength_raw(r)) is None
+        for r in resources
+    )
+    if need_rest_strength:
+        rest = fetch_generation_data_rest(iid)
+        rest_resources = rest.get("resources") if isinstance(rest, dict) else None
+        if isinstance(rest_resources, list) and rest_resources:
+            resources = _backfill_strength_from_rest(resources, rest_resources)
     if not js and not meta and not file_parsed:
         err = gen.get("error") or info.get("error") or ""
         if gen_code == 401 or info_code == 401 or "没有 API Key" in str(err):
@@ -1423,14 +1733,26 @@ def import_image(image_id: str) -> dict:
     if kind == "video":
         engine, operation = "minimax-h3-comfy", "imageToVideo"
     else:
+        # Default krea2/turbo only when blob is empty or krea; never keep krea2 for sdxl/pony/flux/…
         engine, operation, ecosystem, model = "comfy", "createImage", "krea2", "turbo"
         eco = _ecosystem_from_blob(base_blob)
-        if eco == "krea2":
+        if eco == "krea2" or not eco:
             ecosystem = "krea2"
+        elif eco == "sdxl":
+            # Stable Diffusion XL / Pony / Illustrious — sdcpp createImage (not krea2 turbo)
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None
+        elif eco in ("flux", "flux1"):
+            # Catalog id is flux1 (blob/AIR often say "flux" / "flux.1"); never leave eco=flux for match_service.
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "flux1", None
+        elif eco == "wan":
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "wan", None
         elif eco == "zImage":
-            engine, ecosystem = "sdcpp", "zImage"
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "zImage", None
         elif eco == "qwen":
-            engine, ecosystem = "sdcpp", "qwen"
+            engine, operation, ecosystem, model = "sdcpp", "createImage", "qwen", None
+        else:
+            # Unknown eco from blob — still prefer detected label over silent krea2
+            ecosystem = _catalog_ecosystem(eco) or eco
     svc = match_service(engine=engine, operation=operation, ecosystem=ecosystem, model=model, category=kind)
     denoise = meta.get("denoise") if meta.get("denoise") is not None else file_parsed.get("denoise")
     try:
@@ -1702,6 +2024,37 @@ def caption_media(media_url: str, model: str = "joy-caption") -> tuple[int, dict
     }
 
 
+
+def _civitai_media_ref_audit(inp: dict | None) -> dict:
+    """Lengths only — never dump data URL bytes. Used for generate audit / 核."""
+    inp = inp if isinstance(inp, dict) else {}
+    imgs = inp.get("images")
+    if not isinstance(imgs, list):
+        imgs = inp.get("referenceImages") if isinstance(inp.get("referenceImages"), list) else []
+    n_data = 0
+    n_http = 0
+    n_out = 0
+    lenses: list[int] = []
+    for u in imgs:
+        if not isinstance(u, str):
+            lenses.append(0)
+            continue
+        lenses.append(len(u))
+        if u.startswith("data:"):
+            n_data += 1
+        elif u.startswith(("http://", "https://")):
+            n_http += 1
+        elif u.startswith("/out/") or (u and not u.startswith(("http://", "https://", "data:"))):
+            n_out += 1
+    return {
+        "nRefs": len(imgs),
+        "nDataUrls": n_data,
+        "nHttpUrls": n_http,
+        "nOutPaths": n_out,
+        "imageUrlLens": lenses,
+    }
+
+
 class CivitaiProvider(Provider):
     id = "civitai"
     label = "Civitai"
@@ -1779,6 +2132,16 @@ class CivitaiProvider(Provider):
             submitted["serviceId"] = meta.get("serviceId")
             data["submittedInput"] = submitted
             data["backend"] = "civitai"
+            audit = _civitai_media_ref_audit(inp)
+            data.update(audit)
+            print(
+                "[civitai] generate-audit",
+                json.dumps({
+                    "serviceId": meta.get("serviceId"),
+                    **audit,
+                }, ensure_ascii=False)[:800],
+                flush=True,
+            )
             if not data.get("id"):
                 data["id"] = data.get("workflowId") or data.get("token")
         return code, data
@@ -1799,6 +2162,8 @@ class CivitaiProvider(Provider):
             submitted["serviceId"] = meta.get("serviceId")
             data["submittedInput"] = submitted
             data["backend"] = "civitai"
+            audit = _civitai_media_ref_audit(inp)
+            data.update(audit)
         return code, data
 
     def job_status(self, job_id: str):

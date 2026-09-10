@@ -544,7 +544,15 @@
       "status": "active",
       "schemaSource": "post-body",
       "durationField": null,
-      "aspectRatioField": null
+      "aspectRatioField": null,
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/flux-2-pro",

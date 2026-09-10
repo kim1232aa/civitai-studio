@@ -28,6 +28,16 @@ def main() -> int:
     assert _fal_lora_path({"air": "urn:air:krea2:lora:civitai:1@3184845", "versionId": 3184845}) == (
         "https://civitai.com/api/download/models/3184845"
     )
+    # Fixture 134923572: AIR @3071582 beats sibling id/path 2653078
+    assert "3071582" in _fal_lora_path({
+        "air": "urn:air:krea2:lora:civitai:2323765@3071582",
+        "id": 2653078,
+        "path": "https://civitai.com/api/download/models/2653078",
+    })
+    assert "2653078" not in _fal_lora_path({
+        "air": "urn:air:krea2:lora:civitai:2323765@3071582",
+        "id": 2653078,
+    })
     inp = {}
     apply_fal_loras(
         inp,

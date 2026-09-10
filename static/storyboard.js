@@ -1,11 +1,56 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o7";
-  const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o16";
+  const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
+  // v0821o50: nano LoRA omit null scale (never invent 1.0); tip with o49b
+  // v0821o49: harness stamp align (persist/restore + graph); stamp v0821o49-harness-stamp-o48
+  // v0821o48: hydrate server shot.url wins over stale localStorage; stamp v0821o48-hydrate-server-wins
+  // o49b freshness supersedes blind o48 unconditional win
+  // v0821o47: Composer board sync (Magao maxRefs/seed clamp strip) + adapt cache-bust; stamp v0821o47-composer-board-sync
+  // v0821o46b: local /out resume when upstream failed (invalid response format); stamp v0821o46b-local-out-resume
+  // v0821o46: resume writeback after tab death (pending jobId↔shotId + boot resume); stamp v0821o46-resume-job-writeback
+  // v0821o45: Magao Edit-2509 maxRefs=3 (provider ceiling 3; catalog tightens); stamp v0821o45-magao-edit2509-refs3
+  // v0821o44: civitai editImage materialize /out → data URL before POST; stamp v0821o44-civitai-edit-materialize-refs
+  // v0821o43: fal flux-2/edit OpenAPI maxRefs=4 (siblings with official ≤4); stamp v0821o43-fal-flux2-edit-maxrefs4
+  // v0821o42: nano edit refs → imageDataUrls on OAI/edit endpoints; stamp v0821o42-nano-edit-refs
+  // v0821o41: fillRefSlotsToCap real /out/fill-cap-{i}.jpg (never phantom o40-fill); stamp v0821o41-fill-real-fixtures
+  // v0821o40: 灌满+gate same outbound口径 countRefUrls; 成片 chip visual-only (no 6/5)
+  // v0821o39: refs fill-to-cap (expose N==maxRefs empty slots + 灌满测试); t2i+refs one-click apply Edit sibling
+  // v0821o38: packComfy prefer generate shot; force payload.diffusionModel from shot; applyImport keep dm/cn/eco when j omits; flux1 without dm hard-reject before POST
+  // v0821o37: civitai preparing poll ≥720×2.5s≈30min; stillGoing mirrors inFlight (preparing/scheduled/queued/prepared); saved[]→writeback unchanged
+  // v0821o36: checkpoint AIR must not enter loras[] — isLoraAir true only :lora:/:lycoris:/…; false :checkpoint:/:diffusionmodel:/:diffuser:; applyImport+pack drop non-LoRA; never invent strength
+  // v0821o35: flux1 diffuser AIR — prefer REST air verbatim (flux1:checkpoint); never hand-roll flux:diffusionmodel; never rewrite checkpoint→diffuser; no companion VAE/CLIP/T5 invent
+  // v0821o34: flux import match — pin image/sdcpp/flux1/createImage (flux→flux1); diffusionModel→diffuserModel|model; never keep zImage for Flux
+  // v0821o33: HF+Fal /lora → Composer「HF Router 不托管该 Fal LoRA 端点，请换家 Fal」(Path A 不计 HF 分; debug HF_ALLOW_FAL_TRANSPORT only)
+  // v0821o32: (superseded for score) Path A Fal key under HF — transport=fal; NOT HF closed-loop
+  // v0821o31: HF LoRA AIR base map kept for Fal-sibling hint; o33 does not pin as HF outbound
+  // v0821o30: send-gate — #send clickability (z-index/hit); failUi never silent in capsule; unsupported filled = warn-only (keep o28/o29)
+  // v0821o29: Fal LoRA endpoint by AIR base (flux1→flux-lora; krea2→krea-2/turbo/lora; else 不支持 — never hard-pin wrong family)
+  // v0821o28: Composer field adapt — board show/disable/「不支持」+ strength「未填」(static/composer-field-adapt.js; no Fal pin)
+  // v0821o27: import strength — trpc null backfill from REST /api/generation/data (28533344→0.7; never invent)
+  // v0821o26: Fal 换家 — pinFal rejects civitai/HF serviceId; #backend sync from /api/providers (all enabled)
+  // v0821o25: sdcpp sampleMethod map — import dpmpp_2m → outbound dpm++2m (locked); schedule karras keep
+  // v0821o24: capsule/Composer 锚底自适应 — full mode labels; bottom stick; no orphan empty refs
+  // v0821o23: import sdxl serviceId sticks on shot + outbound (forbid silent krea2/turbo); prompt-tag LoRA file-stem dedupe
+  // v0821o22: hinablue-generic diffusionModel outbound + CDN writeback honesty; UI 参考 count includes 成片 chip
+  // v0821o21: outbound fail surfaces jobId+backend; send-path 参考 excludes own shot.url (visual chip aside)
+  // v0821o20: selected image chip / compact 未接 / chatRail product copy (visual P0s ASIDE)
+  // v0821o19: 双↑→单↑ (capsule #send only); persistServer keepalive; ensure first-frame edges paint
+  // v0821o18: P1 chatRail video path on; collapsed keep #send; writeback+i2v first-frame harden
+  // v0821o17: node capsule + right chat-rail skeleton; visible wires; i2v first-frame slot actions
+  // v0821o16: persistServer skip empty + surface PUT fail; orphan reattach; poll wait saved[] not CDN
+  // v0821o15: writeback also PUT /api/storyboard-graph; boot hydrate so clean-profile hard refresh keeps card
+  // v0821o14: persist→localStorage + QuotaExceeded warn; restore merge prefer-url (session media not clobbered)
+  // v0821o13: writebackResult persists shot.url to localStorage (hard refresh keeps card); dual-read session migrate
+  // v0821o12: civitai writeback — pickUrl steps[].output.images; writebackResult sets shot.url; hist-pin applies to card
+  // v0821o11: tighten humanizeFailText — drop bare missing&&body.; quoted type:"missing"; poll throws raw
+  // v0821o9: Critiquito P1 — Fal fail 中文 humanize; Composer foot sync _error; LoRA 未填·出站按提供方默认
   // v0821o11: deleteNode + 右键菜单 + Delete/Backspace；组用 live pruneGroups
   // v0821o10: mixed LoRA no silent drop; ref cap single-source; model-switch LoRA revalidate
   // v0821o9: LoRA D/E — versionId→AIR, Checkpoint type gate, syncParamChrome, duration gate
+
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
   // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
@@ -35,10 +80,27 @@
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora";
+  // Official Fal LoRA family by Civitai AIR base (urn:air:{base}:lora:…). Never one-shot all chips to krea-2.
+  const FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora";
+  const FAL_LORA_BY_BASE = {
+    flux1: FAL_FLUX_LORA_SERVICE,
+    flux: FAL_FLUX_LORA_SERVICE,
+    krea2: FAL_LORA_PREF_SERVICE,
+    krea: FAL_LORA_PREF_SERVICE
+  };
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
   const HF_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
   const HF_I2I_PREF_SERVICE = "Qwen/Qwen-Image-Edit";
+  // v0821o31 map kept as Fal-sibling hint only. v0821o33: do NOT pin as HF outbound / HF score.
+  const HF_ROUTER_FAL_LORA_MSG = "HF Router 不托管该 Fal LoRA 端点，请换家 Fal";
+  const HF_LORA_BY_BASE = {
+    flux1: FAL_FLUX_LORA_SERVICE,
+    flux: FAL_FLUX_LORA_SERVICE,
+    krea2: FAL_LORA_PREF_SERVICE,
+    krea: FAL_LORA_PREF_SERVICE
+  };
+
   const MS_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
@@ -148,6 +210,21 @@
     // Studio uploads are /out/<file>; treat as image unless the path is clearly video/audio.
     if (u.indexOf("/out/") === 0 && !isVideoUrl(u) && !/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return true;
     return mediaKindOf(u, n.kind === "shot" ? n.mode : (n.mediaKind || n.kind)) === "image";
+  }
+  /** Painted result on the shot card itself — count as 参考 when it is an image. */
+  function shotResultImageUrl(shot) {
+    if (!shot || !shot.url) return "";
+    const u = String(shot.url);
+    if (isVideoUrl(u) || /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(u)) return "";
+    if (shot.kind === "shot" && !isImageSource(shot) && mediaKindOf(u, shot.mode || shot.mediaKind) === "video") return "";
+    return u;
+  }
+  /** UI-only 参考 URLs: send-path refs + own painted card image (does NOT feed unused-ref / attach). */
+  function displayRefUrls(shot) {
+    const urls = countRefUrls(null, shot).slice();
+    const own = shotResultImageUrl(shot);
+    if (own && urls.indexOf(own) < 0) urls.push(own);
+    return urls;
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
   const SHOT_BOX_LONG = 640;
@@ -479,7 +556,8 @@
   }
   function addWorkspaceShot() {
     const pos = newShotPosition(shots().length);
-    const shot = { id: uid("shot"), kind: "shot", title: "分镜" + (shots().length + 1), x: pos.x, y: pos.y, url: "", firstFrameId: "", prompt: "" };
+    state.mode = "image";
+    const shot = { id: uid("shot"), kind: "shot", title: "分镜" + (shots().length + 1), x: pos.x, y: pos.y, url: "", firstFrameId: "", prompt: "", mode: "image" };
     state.nodes.push(shot);
     ensureWorkspaceModel();
     const scene = sceneById(state._scriptSceneId) || state.script.scenes[0];
@@ -826,6 +904,7 @@
         url: "",
         firstFrameId: "",
         prompt: "",
+        mode: "image",
       };
       state.nodes.push(shot);
     }
@@ -1147,110 +1226,326 @@
       url: "",
       firstFrameId: "",
       prompt: "",
+      mode: "image",
     }];
     state.edges = [];
+    state.mode = "image";
   }
 
+  function isQuotaErr(e) {
+    if (!e) return false;
+    const name = e.name || "";
+    return name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014;
+  }
+  function parseStoreRaw(raw) {
+    try { return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+  }
+  /** Prefer local graph shape; fill missing shot.url from session so local cannot blank newer session media. */
+  function mergePreferUrl(localRaw, sessionRaw) {
+    const L = parseStoreRaw(localRaw);
+    const S = parseStoreRaw(sessionRaw);
+    if (!L || !Array.isArray(L.nodes) || !L.nodes.length) return sessionRaw || localRaw || null;
+    if (!S || !Array.isArray(S.nodes) || !S.nodes.length) return localRaw || sessionRaw || null;
+    const sessById = {};
+    for (let i = 0; i < S.nodes.length; i++) {
+      const n = S.nodes[i];
+      if (n && n.id) sessById[n.id] = n;
+    }
+    const nodes = L.nodes.map((n) => {
+      if (!n || !n.id) return n;
+      const o = sessById[n.id];
+      if (!o || !o.url || n.url) return n;
+      return Object.assign({}, n, { url: o.url });
+    });
+    return JSON.stringify(Object.assign({}, L, { nodes: nodes }));
+  }
+  function readStorePair(key) {
+    let local = null;
+    let session = null;
+    try { local = localStorage.getItem(key); } catch (_) {}
+    try { session = sessionStorage.getItem(key); } catch (_) {}
+    return { local: local, session: session };
+  }
+  function graphPayload() {
+    return JSON.stringify({
+      cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
+      railTab: state.railTab,
+      groups: state.groups || [],
+      workspace: state.workspace || "canvas",
+      script: state.script || { title: "未命名故事", logline: "", scenes: [] },
+      editor: {
+        activeShotId: state.editor && state.editor.activeShotId || null,
+        playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
+      },
+      backend: $("backend") && $("backend").value,
+      service: $("service") && $("service").value,
+      duration: $("duration") && $("duration").value,
+      aspect: $("aspect") && $("aspect").value,
+      res: $("res") && $("res").value,
+      width: $("width") && $("width").value,
+      height: $("height") && $("height").value,
+      steps: $("steps") && $("steps").value,
+      cfg: $("cfg") && $("cfg").value,
+      sampler: $("sampler") && $("sampler").value,
+      scheduler: $("scheduler") && $("scheduler").value,
+      seed: $("seed") && $("seed").value,
+      nanoRes: $("nanoRes") && $("nanoRes").value,
+      negative: $("negative") && $("negative").value,
+      loras: Array.isArray(state.loras) ? state.loras : [],
+    });
+  }
   function persist() {
     try {
       saveDisplayedComposer();
-      localStorage.setItem(STORE, JSON.stringify({
-        cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
-        railTab: state.railTab,
-        groups: state.groups || [],
-        workspace: state.workspace || "canvas",
-        script: state.script || { title: "未命名故事", logline: "", scenes: [] },
-        editor: {
-          activeShotId: state.editor && state.editor.activeShotId || null,
-          playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
-        },
-        backend: $("backend") && $("backend").value,
-        service: $("service") && $("service").value,
-        duration: $("duration") && $("duration").value,
-        aspect: $("aspect") && $("aspect").value,
-        res: $("res") && $("res").value,
-        width: $("width") && $("width").value,
-        height: $("height") && $("height").value,
-        steps: $("steps") && $("steps").value,
-        cfg: $("cfg") && $("cfg").value,
-        sampler: $("sampler") && $("sampler").value,
-        scheduler: $("scheduler") && $("scheduler").value,
-        seed: $("seed") && $("seed").value,
-        nanoRes: $("nanoRes") && $("nanoRes").value,
-        negative: $("negative") && $("negative").value,
-        loras: Array.isArray(state.loras) ? state.loras : [],
-      }));
+      // v0821o14: localStorage durable; QuotaExceeded surfaces (not silent); session mirror best-effort.
+      const payload = graphPayload();
+      try {
+        localStorage.setItem(STORE, payload);
+      } catch (e) {
+        if (isQuotaErr(e)) {
+          try { setMsg("本地缓存已满，刷新后可能丢失成片", "warn"); } catch (_) {}
+        }
+      }
+      try { sessionStorage.setItem(STORE, payload); } catch (_) {}
     } catch (_) {}
+  }
+  /** Apply a parsed graph object into live state. Returns false if empty/robot-demo discarded. */
+  function applyGraph(p) {
+    if (!p || !p.nodes || !p.nodes.length) return false;
+    state.cam = p.cam || state.cam;
+    if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
+    state.nodes = p.nodes;
+    state.edges = p.edges || [];
+    state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
+    state.railTab = p.railTab || "assets";
+    state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
+    state.script = p.script && typeof p.script === "object"
+      ? p.script
+      : { title: "未命名故事", logline: "", scenes: [] };
+    state.editor = Object.assign(state.editor || {}, p.editor || {});
+    state.editor.timer = null;
+    state.editor.playing = false;
+    state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
+      id: g.id || uid("grp"),
+      name: g.name || "组",
+      memberIds: Array.isArray(g.memberIds) ? g.memberIds.slice() : [],
+    })).filter((g) => g.memberIds.length) : [];
+    if (p.backend && $("backend")) $("backend").value = p.backend;
+    if (p.duration && $("duration")) $("duration").value = p.duration;
+    if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
+    if (p.res && $("res")) $("res").value = p.res;
+    if (p.width != null && $("width")) $("width").value = p.width;
+    if (p.height != null && $("height")) $("height").value = p.height;
+    if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
+    if (p.steps != null && $("steps")) $("steps").value = p.steps;
+    if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
+    if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
+    if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
+    if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
+    if (p.seed != null && $("seed")) {
+      $("seed").value = p.seed;
+      $("seed").title = String(p.seed);
+    }
+    if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
+    if (p.negative != null && $("negative")) $("negative").value = p.negative;
+    state._pendingService = p.service || "";
+    state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
+    if (isClassicRobotDemo(state.nodes)) {
+      // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
+      state.nodes = [];
+      state.edges = [];
+      state.groups = [];
+      return false;
+    }
+    removeUnpromotedFromShot();
+    return true;
   }
   function restore() {
     try {
-      let raw = null;
+      let pair = readStorePair(STORE);
       let legacyStorage = false;
-      try { raw = localStorage.getItem(STORE); } catch (_) {}
-      if (!raw) {
-        try { raw = sessionStorage.getItem(STORE); } catch (_) {}
-      }
-      if (!raw) {
-        for (let i = 0; i < STORE_OLDS.length && !raw; i++) {
-          try { raw = localStorage.getItem(STORE_OLDS[i]); } catch (_) {}
-          if (!raw) {
-            try { raw = sessionStorage.getItem(STORE_OLDS[i]); } catch (_) {}
-          }
-          if (raw) legacyStorage = true;
+      if (!pair.local && !pair.session) {
+        for (let i = 0; i < STORE_OLDS.length; i++) {
+          pair = readStorePair(STORE_OLDS[i]);
+          if (pair.local || pair.session) { legacyStorage = true; break; }
         }
       }
-      const p = JSON.parse(raw || "null");
+      const raw = mergePreferUrl(pair.local, pair.session);
+      const p = parseStoreRaw(raw);
       if (!p || (!Array.isArray(p.nodes) && (!p.script || typeof p.script !== "object"))) return false;
-      const repairedStorageText = repairPersistedText(p);
-      state.cam = p.cam || state.cam;
-      if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
-      state.nodes = Array.isArray(p.nodes) ? p.nodes : [];
-      state.edges = p.edges || [];
-      state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
-      state.railTab = p.railTab || "assets";
-      state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
-      state.script = p.script && typeof p.script === "object"
-        ? p.script
-        : { title: "未命名故事", logline: "", scenes: [] };
-      state.editor = Object.assign(state.editor || {}, p.editor || {});
-      state.editor.timer = null;
-      state.editor.playing = false;
-      state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
-        id: g.id || uid("grp"),
-        name: g.name || "组",
-        memberIds: Array.isArray(g.memberIds) ? g.memberIds.slice() : [],
-      })).filter((g) => g.memberIds.length) : [];
-      if (p.backend && $("backend")) $("backend").value = p.backend;
-      if (p.duration && $("duration")) $("duration").value = p.duration;
-      if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
-      if (p.res && $("res")) $("res").value = p.res;
-      if (p.width != null && $("width")) $("width").value = p.width;
-      if (p.height != null && $("height")) $("height").value = p.height;
-      if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
-      if (p.steps != null && $("steps")) $("steps").value = p.steps;
-      if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
-      if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
-      if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
-      if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
-      if (p.seed != null && $("seed")) {
-        $("seed").value = p.seed;
-        $("seed").title = String(p.seed);
+      if (!Array.isArray(p.nodes)) p.nodes = [];
+      let repairedStorageText = false;
+      try {
+        if (typeof repairPersistedText === "function") repairedStorageText = !!repairPersistedText(p);
+      } catch (_) {}
+      if (p.nodes.length) {
+        if (!applyGraph(p)) return false;
+      } else {
+        // main planner: script-only restore
+        state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
+        state.script = p.script && typeof p.script === "object"
+          ? p.script
+          : { title: "未命名故事", logline: "", scenes: [] };
+        state.editor = Object.assign(state.editor || {}, p.editor || {});
+        state.editor.timer = null;
+        state.editor.playing = false;
+        if (p.backend && $("backend")) $("backend").value = p.backend;
+        if (p.negative != null && $("negative")) $("negative").value = p.negative;
+        state._pendingService = p.service || "";
+        state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
       }
-      if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
-      if (p.negative != null && $("negative")) $("negative").value = p.negative;
-      state._pendingService = p.service || "";
-      state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
-      if (isClassicRobotDemo(state.nodes)) {
-        // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
-        state.nodes = [];
-        state.edges = [];
-        state.groups = [];
-        return false;
+      // Re-save under current STORE in localStorage (migrate session/old keys → durable graph).
+      try {
+        localStorage.setItem(STORE, graphPayload());
+      } catch (e) {
+        if (isQuotaErr(e)) {
+          try { setMsg("本地缓存已满，刷新后可能丢失成片", "warn"); } catch (_) {}
+        }
       }
-      removeUnpromotedFromShot();
-      if (repairedStorageText || legacyStorage) persist();
+      if ((repairedStorageText || legacyStorage) && typeof persist === "function") {
+        try { persist(); } catch (_) {}
+      }
       return true;
     } catch (_) { return false; }
+  }
+  /** v0821o16: shared-studio writeback — skip empty nodes; surface PUT failures on Composer. */
+  function persistServer() {
+    try {
+      const payload = graphPayload();
+      let parsed = null;
+      try { parsed = JSON.parse(payload); } catch (_) { return; }
+      const nodes = parsed && parsed.nodes;
+      if (!Array.isArray(nodes) || !nodes.length) {
+        try { console.warn("persistServer: skip PUT — nodes empty/missing"); } catch (_) {}
+        return;
+      }
+      // o49b: prefer not sending blank url overwrites (server merge is source of truth)
+      const pendingIds = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (!n || n.kind !== "shot") continue;
+        const u = n.url != null ? String(n.url).trim() : "";
+        if (!u) {
+          try { delete n.url; } catch (_) { n.url = undefined; }
+        } else {
+          pendingIds.push(n.id);
+        }
+      }
+      for (let i = 0; i < (state.nodes || []).length; i++) {
+        const live = state.nodes[i];
+        if (!live || live.kind !== "shot") continue;
+        if (pendingIds.indexOf(live.id) >= 0) {
+          live._pendingPut = true;
+          live.pendingPut = true;
+        }
+      }
+      const body = JSON.stringify(parsed);
+      // v0821o19: keepalive so writeback PUT survives hard-refresh / tab close race
+      fetch("/api/storyboard-graph", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: body,
+        keepalive: true,
+      }).then(async function (r) {
+        for (let i = 0; i < (state.nodes || []).length; i++) {
+          const live = state.nodes[i];
+          if (!live || pendingIds.indexOf(live.id) < 0) continue;
+          try { delete live._pendingPut; } catch (_) { live._pendingPut = false; }
+          try { delete live.pendingPut; } catch (_) { live.pendingPut = false; }
+        }
+        if (r.ok) return;
+        let errText = "";
+        try { errText = await r.text(); } catch (_) {}
+        try {
+          setMsg("服务端保存失败 HTTP " + r.status + (errText ? ": " + errText : ""), "bad");
+        } catch (_) {}
+      }).catch(function (e) {
+        for (let i = 0; i < (state.nodes || []).length; i++) {
+          const live = state.nodes[i];
+          if (!live || pendingIds.indexOf(live.id) < 0) continue;
+          try { delete live._pendingPut; } catch (_) { live._pendingPut = false; }
+          try { delete live.pendingPut; } catch (_) { live.pendingPut = false; }
+        }
+        try {
+          setMsg("服务端保存失败: " + (e && e.message ? e.message : String(e || "network")), "bad");
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+  function shotsHaveMedia() {
+    return (state.nodes || []).some(function (n) { return n && n.kind === "shot" && n.url; });
+  }
+  /** Clean profile / empty demo: adopt server graph.
+   * o49b freshness supersedes blind o48 unconditional win:
+   * keep local when pendingPut / newer urlUpdatedAt / local media newer than server;
+   * adopt server when local url empty OR local clearly stale (no pending, older/missing mtime).
+   * Server still wins when fresher (belt writeback survives hard refresh).
+   */
+  function shotUrlMtime(n) {
+    if (!n) return 0;
+    const v = (n._urlUpdatedAt != null && n._urlUpdatedAt !== "") ? n._urlUpdatedAt
+      : ((n.urlUpdatedAt != null && n.urlUpdatedAt !== "") ? n.urlUpdatedAt : 0);
+    if (v === 0 || v == null || v === "") return 0;
+    const t = typeof v === "number" ? v : Date.parse(String(v));
+    return Number.isFinite(t) ? t : 0;
+  }
+  async function hydrateFromServer() {
+    try {
+      const r = await fetch("/api/storyboard-graph");
+      if (!r.ok) return false;
+      const j = await r.json();
+      const p = j && (j.graph || j);
+      if (!p || !Array.isArray(p.nodes) || !p.nodes.length) return false;
+      if (!shotsHaveMedia()) {
+        if (!applyGraph(p)) return false;
+        persist();
+        return true;
+      }
+      const byId = {};
+      for (let i = 0; i < p.nodes.length; i++) {
+        const n = p.nodes[i];
+        if (n && n.id) byId[n.id] = n;
+      }
+      let changed = false;
+      for (let i = 0; i < state.nodes.length; i++) {
+        const n = state.nodes[i];
+        if (!n || n.kind !== "shot") continue;
+        const o = byId[n.id];
+        if (!o) continue;
+        const serverUrl = o.url != null ? String(o.url).trim() : "";
+        if (!serverUrl) continue;
+        const localUrl = n.url != null ? String(n.url).trim() : "";
+        if (!localUrl) {
+          n.url = serverUrl;
+          const stm = shotUrlMtime(o);
+          if (stm) {
+            n._urlUpdatedAt = o._urlUpdatedAt != null ? o._urlUpdatedAt : o.urlUpdatedAt;
+            n.urlUpdatedAt = n._urlUpdatedAt;
+          }
+          changed = true;
+          continue;
+        }
+        if (localUrl === serverUrl) continue;
+        // Keep local: pending PUT in flight
+        if (n._pendingPut || n.pendingPut) continue;
+        const localTs = shotUrlMtime(n);
+        const serverTs = shotUrlMtime(o);
+        // Keep local when newer than server, or local has mtime and server looks older/missing
+        if (localTs > serverTs) continue;
+        if (localTs > 0 && serverTs === 0) continue;
+        // Adopt server when fresher, or both missing mtime (stale LS → server wins when fresher/unknown)
+        n.url = serverUrl;
+        if (serverTs) {
+          n._urlUpdatedAt = o._urlUpdatedAt != null ? o._urlUpdatedAt : o.urlUpdatedAt;
+          n.urlUpdatedAt = n._urlUpdatedAt;
+        }
+        changed = true;
+      }
+      if (changed) persist();
+      return changed;
+    } catch (_) {
+      return false;
+    }
   }
 
   function applyCam() {
@@ -1271,6 +1566,12 @@
   function bezier(x1, y1, x2, y2) {
     const dx = Math.max(90, Math.abs(x2 - x1) * 0.5);
     return "M " + x1 + " " + y1 + " C " + (x1 + dx) + " " + y1 + " " + (x2 - dx) + " " + y2 + " " + x2 + " " + y2;
+  }
+  function modeLabelOf(mode) {
+    if (mode === "video") return "视频生成";
+    if (mode === "text") return "文本生成";
+    if (mode === "audio") return "音频生成";
+    return "图片生成";
   }
   function portPos(n, side) {
     const b = box(n);
@@ -1347,6 +1648,7 @@
         }
       }
     } else {
+      state.mode = (shot.mode === "video" || shot.mode === "text" || shot.mode === "audio") ? shot.mode : "image";
       applyComfyParamsToUi(shot);
       if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
       if (shot.res && $("res")) $("res").value = shot.res;
@@ -1438,25 +1740,41 @@
   }
 
   function drawWires() {
+    // v0821o19: if firstFrameId set but edge dropped, re-emit so path.edge actually paints
+    (state.nodes || []).forEach(function (n) {
+      if (!n || n.kind !== "shot" || !n.firstFrameId) return;
+      if (!nodeById(n.firstFrameId)) return;
+      if (!(state.edges || []).some(function (e) { return e && e.from === n.firstFrameId && e.to === n.id; })) {
+        state.edges.push({ from: n.firstFrameId, to: n.id });
+      }
+    });
     const parts = ["<defs></defs>"];
     state.edges.forEach((e, i) => {
       const a = nodeById(e.from), b = nodeById(e.to);
       if (!a || !b) return;
       const p1 = portPos(a, "out"), p2 = portPos(b, "in");
-      parts.push('<path class="edge" data-ei="' + i + '" d="' + bezier(p1.x, p1.y, p2.x, p2.y) + '" />');
+      const d = bezier(p1.x, p1.y, p2.x, p2.y);
+      parts.push('<path class="edge-glow" d="' + d + '" fill="none" />');
+      parts.push('<path class="edge" data-ei="' + i + '" d="' + d +
+        '" fill="none" stroke="#e8edf4" stroke-width="2.6" vector-effect="non-scaling-stroke" />');
     });
     if (state.link && state.link.x2 != null) {
       const snap = state.snapTarget;
       const cls = snap ? "snap" : "live";
       const x2 = snap ? snap.x : state.link.x2;
       const y2 = snap ? snap.y : state.link.y2;
-      parts.push('<path class="' + cls + '" d="' + bezier(state.link.x1, state.link.y1, x2, y2) + '" />');
+      parts.push('<path class="' + cls + '" d="' + bezier(state.link.x1, state.link.y1, x2, y2) +
+        '" fill="none" stroke="#ffffff" stroke-width="2.6" />');
     }
-    wires.innerHTML = parts.join("");
-    const maxX = Math.max(2400, ...state.nodes.map((n) => n.x + box(n).w + 400));
-    const maxY = Math.max(2400, ...state.nodes.map((n) => n.y + box(n).h + 400));
-    wires.setAttribute("width", String(maxX));
-    wires.setAttribute("height", String(maxY));
+    if (wires) {
+      wires.style.overflow = "visible";
+      wires.style.zIndex = "4";
+      wires.innerHTML = parts.join("");
+      const xs = state.nodes.map((n) => n.x + box(n).w + 400);
+      const ys = state.nodes.map((n) => n.y + box(n).h + 400);
+      wires.setAttribute("width", String(Math.max(2400, xs.length ? Math.max.apply(null, xs) : 2400)));
+      wires.setAttribute("height", String(Math.max(2400, ys.length ? Math.max.apply(null, ys) : 2400)));
+    }
     updatePortHot();
   }
 
@@ -1721,7 +2039,7 @@
     const r = vp.getBoundingClientRect();
     const narrow = r.width <= 900;
     const area = { left: 12, top: 48, right: r.width - 12, bottom: r.height - (narrow ? 68 : 16) };
-    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar").forEach((el) => {
+    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar,.chat-rail").forEach((el) => {
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height) return;
       // On narrow canvases the tool/asset rail is an overlay, not a top
@@ -1729,6 +2047,8 @@
       // expanded Composer with only a 100px viewport.
       if (el.classList.contains("selbar")) {
         area.top = Math.max(area.top, b.bottom - r.top + 12);
+      } else if (el.classList.contains("chat-rail") || (b.left - r.left) > r.width * 0.55) {
+        area.right = Math.min(area.right, b.left - r.left - 12);
       } else if (!narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
       }
@@ -1737,48 +2057,52 @@
   }
 
   function positionDock() {
+    // v0821o24: 锚底自适应 — width follows content; stick bottom / selected-node-aware;
+    // never mid-float overlay at area.top; never full-bleed bottom-bar chrome.
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
     const area = canvasArea(), b = box(n), gap = 18;
     const expanded = state.dockMode === "expanded";
     const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
     const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
-    const width = Math.min(640, area.right - area.left);
-    const height = state.dockMode === "expanded" ? 520 : $("dockHd").offsetHeight + 2;
-    const above = y - 34 * state.cam.s - gap - area.top;
-    const below = area.bottom - y - nh - gap;
-    const right = area.right - x - nw - gap, leftRoom = x - gap - area.left;
-    const minHeight = Math.min(height, 260);
-    let dockW = width, maxH, left, top;
-    // Seko's input follows below the selected node; flip only at viewport edges.
-    if (below >= minHeight || (above < minHeight && Math.max(right, leftRoom) < 360 && below >= above)) {
-      maxH = Math.min(height, below);
-      left = x + (nw - dockW) / 2;
-      top = y + nh + gap;
-    } else if (above >= minHeight) {
-      maxH = Math.min(height, above);
-      left = x + (nw - dockW) / 2;
-      top = y - 34 * state.cam.s - gap - maxH;
-    } else {
-      const onRight = right >= 360;
-      if (onRight || leftRoom >= 360) {
-        dockW = Math.min(400, onRight ? right : leftRoom);
-        maxH = Math.min(height, area.bottom - area.top);
-        left = onRight ? x + nw + gap : x - gap - dockW;
-        top = y;
-      } else {
-        // No side/above slot (common on short narrow viewports): overlay the
-        // dock in the usable canvas instead of collapsing it to the 112px
-        // minimum and hiding the reference row.
-        dockW = width;
-        maxH = Math.min(height, area.bottom - area.top);
-        left = area.left;
-        top = area.top;
-      }
+    const expanded = state.dockMode === "expanded";
+    const areaW = Math.max(240, area.right - area.left);
+    // Measure natural content width so 图片生成/视频生成 never ellipsis-clip.
+    const prevW = dock.style.width;
+    const prevMaxW = dock.style.maxWidth;
+    dock.style.width = "max-content";
+    dock.style.maxWidth = areaW + "px";
+    let natural = Math.ceil(dock.getBoundingClientRect().width) || 0;
+    if (!natural) {
+      const modes = dock.querySelector(".modes");
+      natural = modes ? Math.ceil(modes.scrollWidth + 48) : 320;
     }
-    maxH = Math.min(area.bottom - area.top, Math.max(Math.min(height, 112), maxH));
+    dock.style.width = prevW;
+    dock.style.maxWidth = prevMaxW;
+    const minW = expanded ? 360 : 280;
+    const maxW = Math.min(expanded ? 520 : 560, areaW);
+    let dockW = Math.min(maxW, Math.max(minW, natural));
+    const height = expanded ? 380 : Math.max(132, Math.min(200, Math.ceil(dock.scrollHeight || 160)));
+    let maxH = Math.min(height, Math.max(112, area.bottom - area.top));
+    // Horizontal: prefer under selected node, bias bottom-right of usable canvas.
+    let left = x + (nw - dockW) / 2;
+    if (left + dockW > area.right - 8) left = area.right - dockW - 8;
+    if (left < area.left) left = area.left;
+    if (x + nw / 2 > (area.left + area.right) / 2) {
+      left = Math.max(area.left, Math.min(Math.max(left, area.right - dockW - 12), area.right - dockW));
+    }
+    // Vertical: always 锚底 — sit on area.bottom; may hug just under node inside bottom band.
+    const bottomTop = area.bottom - maxH - gap;
+    const belowNode = y + nh + gap;
+    let top = bottomTop;
+    if (belowNode <= bottomTop && belowNode + 80 <= area.bottom) {
+      top = Math.max(belowNode, bottomTop - 24);
+    }
+    const midY = (area.top + area.bottom) / 2;
+    if (top < midY && bottomTop >= area.top) top = bottomTop;
+    maxH = Math.min(area.bottom - area.top, Math.max(112, maxH));
     left = Math.max(area.left, Math.min(left, area.right - dockW));
-    top = Math.max(area.top, Math.min(top, area.bottom - maxH));
+    top = Math.max(area.top, Math.min(top, area.bottom - Math.min(maxH, 112)));
     Object.assign(dock.style, {
       width: dockW + "px", height: expanded ? maxH + "px" : "auto", maxHeight: maxH + "px",
       left: left + "px", top: top + "px",
@@ -1853,6 +2177,66 @@
     rail.innerHTML = tabs + body;
   }
 
+  function renderChatRail() {
+    const rail = $("chatRail");
+    if (!rail) return;
+    const shot = nodeById(state.selected);
+    const shotOk = !!(shot && shot.kind === "shot");
+    const stub = isStubMode();
+    const frame = shotOk ? frameAsset(shot) : null;
+    const needFrame = state.mode === "video" && !frame;
+    const ml = modeLabelOf(state.mode);
+    const modeEl = $("chatRailMode");
+    const tagEl = $("chatRailTag");
+    const pathEl = $("chatRailPath");
+    const copyEl = $("chatRailCopy");
+    const actsEl = $("chatRailActs");
+    if (modeEl) {
+      modeEl.textContent = ml;
+      modeEl.classList.toggle("stub", stub);
+    }
+    if (tagEl) tagEl.textContent = stub ? "未接" : (state.mode === "image" ? "默认" : "路径");
+    const sid = ($("service") && $("service").value) || "";
+    let svcLabel = "";
+    if (sid) {
+      const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+      if (it && it.name) svcLabel = String(it.name);
+      else {
+        const sel = $("service");
+        const t = (sel && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex])
+          ? String(sel.options[sel.selectedIndex].textContent || "") : "";
+        svcLabel = (t && t !== sid) ? t.split(" · ")[0] : sid;
+      }
+    }
+    const steps = [
+      { on: shotOk, warn: !shotOk, text: shotOk ? ("分镜 · " + (shot.title || "")) : "请先选中分镜" },
+      { on: !stub && (state.mode === "image" || state.mode === "video"), warn: stub, text: stub ? (ml + " · 未接") : ("模式 · " + ml) },
+      { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + svcLabel) : "选服务后点胶囊 ↑" },
+    ];
+    if (state.mode === "video") {
+      steps.push({ on: !!frame, warn: needFrame, text: frame ? "首帧已就绪" : "缺首帧 · 上传或选择" });
+    }
+    if (pathEl) {
+      pathEl.innerHTML = steps.map((s) =>
+        "<li class=\"" + (s.warn ? "warn" : (s.on ? "on" : "")) + "\">" + esc(s.text) + "</li>"
+      ).join("");
+    }
+    if (copyEl) {
+      if (stub) copyEl.textContent = ml + " · 本版未接";
+      else if (needFrame) copyEl.textContent = "缺首帧：切到图片生成，或上传/选择首帧";
+      else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑";
+    }
+    if (actsEl) {
+      // v0821o19 双↑: right rail must NOT mint a second ↑ — only capsule #send is the generate entry.
+      let acts = "";
+      if (needFrame) {
+        acts += '<button class="chip-btn" type="button" data-act="upload">上传首帧</button>' +
+          '<button class="chip-btn" type="button" data-act="pick">选择首帧</button>';
+      }
+      actsEl.innerHTML = acts;
+    }
+  }
+
 
   function syncCanvasTip() {
     const tip = $("canvasTip");
@@ -1878,8 +2262,14 @@
   }
 
   function renderDock() {
-    const n = nodeById(state.selected);
-    activateShotComposer(n);
+    const selected = nodeById(state.selected);
+    let n = selected;
+    // Keep Composer on the last shot when the user clicks a canvas image source to pin it as 参考.
+    if ((!n || n.kind !== "shot") && selected && isImageSource(selected)) {
+      const remembered = nodeById(state.lastComposerShot);
+      if (remembered && remembered.kind === "shot") n = remembered;
+    }
+    activateShotComposer(n && n.kind === "shot" ? n : selected);
     if (!n || n.kind !== "shot") {
       dock.classList.remove("show");
       dock.classList.remove("near");
@@ -1891,6 +2281,7 @@
       if (picker) picker.classList.remove("show");
       syncComposerChip(); syncCanvasTip();
       renderRail();
+      renderChatRail();
       requestAnimationFrame(positionDock);
       return;
     }
@@ -1906,6 +2297,7 @@
       if (picker) picker.classList.remove("show");
       syncComposerChip(); syncCanvasTip();
       renderRail();
+      renderChatRail();
       requestAnimationFrame(positionDock);
       return;
     }
@@ -1915,7 +2307,8 @@
     dock.classList.toggle("expanded", expanded);
     dock.classList.remove("near");
     if ($("dockTitle")) {
-      $("dockTitle").textContent = (n.title || "分镜") + (expanded ? " · Composer" : " · Composer（已折叠）");
+      const ml = modeLabelOf(state.mode) + (isStubMode() ? " · 未接" : "");
+      $("dockTitle").textContent = (n.title || "分镜") + " · " + ml + (expanded ? "" : "（胶囊）");
     }
     $("prompt").value = n.prompt || "";
     if ($("negative")) $("negative").value = n.negativePrompt || "";
@@ -1938,12 +2331,15 @@
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
-      // v0821g: missing-frame is hard stop (red), not yellow warn
-      setMsg("缺首帧 · 视频需要先连一张首帧图", "bad");
+      // v0821g/o17: missing-frame is hard stop (red); offer 图片生成 or attach frame
+      setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad");
     } else if (unusedMsg) {
       setMsg(unusedMsg, "bad");
     } else if (capMsg) {
       setMsg(capMsg, "bad");
+    } else if (n._error) {
+      // v0821o9: card 生成失败 + reason must mirror on Composer foot (not card-only)
+      setMsg(n._error, "bad", n._errorDetail || "");
     } else if (state.mode !== "video") {
       const msgEl = $("msg");
       const t = (msgEl && msgEl.textContent) || "";
@@ -1968,7 +2364,9 @@
               (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") + esc(sourceTitle(a)) + "</button>";
           }).join("") + "</div>";
       } else {
-        frameHtml = '<div class="frame-slot missing">缺首帧</div>';
+        frameHtml = '<div class="frame-slot missing">缺首帧' +
+          '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
+          '<button class="chip-btn" type="button" data-act="pick">选择</button></div>';
       }
     }
     const promoteBtn = n.url
@@ -1976,7 +2374,8 @@
       : "";
     const refCap = maxRefCount(catalogItemForService());
     // v0821: always show capacity; show ALL linked chips (even over-cap) so user can unlink.
-    // Hint numerator uses the same URL set as the send gate (countRefUrls), not a stale default cap.
+    // v0821o40: 参考 N/cap + 灌满 + hard-gate share outbound口径 countRefUrls.
+    // 成片 chip stays visual-only (data-self-ref) — must NOT inflate numerator to 6/5 after 灌满.
     const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - refCount);
     const refHint = refCount > refCap
@@ -1987,17 +2386,51 @@
     // Keep them out of this row so the visible count cannot claim 0/n beside
     // a thumbnail that will not be sent.
     const chipNodes = linked;
-    $("refs").innerHTML = frameHtml +
-      '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
-      '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
-      promoteBtn + refHint +
-      chipNodes.map((a) => {
-        const on = linked.some((x) => x.id === a.id) ? " on" : "";
-        return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
-          (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
-      }).join("");
+    const ownUrl = shotResultImageUrl(n);
+    const ownChip = ownUrl
+      ? '<button class="chip on" type="button" data-self-ref="1" title="成片">' +
+          '<img src="' + esc(ownUrl) + '" alt=""></button>'
+      : "";
+    const refsEl = $("refs");
+    // v0821o39: expose FULL cap slots — empty remain chips so N can reach maxRefs (禁半槽).
+    const emptySlots = [];
+    for (let si = 0; si < remain; si++) {
+      emptySlots.push(
+        '<button class="chip ref-slot-empty" type="button" data-act="upload" title="空槽 ' +
+          (refCount + si + 1) + '/' + refCap + ' · 上传参考" aria-label="空参考槽"></button>'
+      );
+    }
+    const eats = catalogEatsRefs(catalogItemForService());
+    const sibId = (!eats && refCount > 0) ? editSiblingId(catalogItemForService()) : "";
+    const smartBtn = sibId
+      ? '<button class="chip-btn smart-edit" type="button" data-act="apply-edit-sibling" title="一键改选图生图 Edit">一键改选 Edit</button>'
+      : "";
+    // 灌满测试: only when current model eats refs and still has remain capacity
+    const fillBtn = (eats && remain > 0)
+      ? '<button class="chip-btn fill-cap" type="button" data-act="fill-refs-cap" title="灌满至 maxRefs=' + refCap + '">灌满测试</button>'
+      : "";
+    const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || fillBtn);
+    // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
+    // v0821o39: empty capacity slots count as chips so cap is always visible when dock open.
+    // Expanded always keeps 上传/选择; collapsed keeps them when pinned or video needs frame.
+    if (!expanded && !hasChips && !needFrame) {
+      refsEl.innerHTML = "";
+      refsEl.classList.add("refs-empty");
+    } else {
+      refsEl.classList.remove("refs-empty");
+      refsEl.innerHTML = frameHtml +
+        '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
+        '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
+        promoteBtn + smartBtn + fillBtn + refHint + ownChip +
+        chipNodes.map((a) => {
+          const on = linked.some((x) => x.id === a.id) ? " on" : "";
+          return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
+            (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
+        }).join("") + emptySlots.join("");
+    }
     syncComposerChip(); syncCanvasTip();
     renderRail();
+    renderChatRail();
     requestAnimationFrame(() => {
       positionDock();
       if (expanded) keepComposerPromptVisible();
@@ -2014,6 +2447,12 @@
       setMulti(id ? [id] : []);
     }
     const n = nodeById(id);
+    const composer = nodeById(state.lastComposerShot);
+    const dockOpen = state.dockMode === "expanded" || state.dockMode === "collapsed";
+    if (dockOpen && composer && composer.kind === "shot" && n && n.id !== composer.id
+        && !opts.shift && isImageSource(n)) {
+      try { linkAssetToShot(n, composer); } catch (_) {}
+    }
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
       state._scriptShotId = n.id;
@@ -2095,6 +2534,11 @@
     }
     mention(asset, shot);
     if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    // v0821o18: explicit attach only — never steal recipe-desk history; announce when video first frame lands
+    if (shot && shot.kind === "shot" && state.mode === "video" && isImageSource(asset) && shot.firstFrameId === asset.id) {
+      try { setMsg("首帧已就绪 · 可生成", "ok"); } catch (_) {}
+      try { if (typeof renderChatRail === "function") renderChatRail(); } catch (_) {}
+    }
     return true;
   }
   function unlinkAssetFromShot(asset, shot) {
@@ -3163,6 +3607,26 @@
     if (!act) return;
     if (act.dataset.act === "upload") $("file").click();
     if (act.dataset.act === "pick") openImportModal();
+    if (act.dataset.act === "apply-edit-sibling") {
+      if (!applyEditSibling()) {
+        setMsg(refUnusedGateMessage(nodeById(state.selected)) || "目录无 Edit 兄弟模型，请改选图生图或断开参考（不静默忽略）", "bad");
+      }
+      return;
+    }
+    if (act.dataset.act === "fill-refs-cap") {
+      const shot = nodeById(state.selected);
+      if (!shot || shot.kind !== "shot") return;
+      if (!catalogEatsRefs(catalogItemForService())) {
+        setMsg(refUnusedGateMessage(shot) || "文生图不吃参考，请先一键改选 Edit", "bad");
+        return;
+      }
+      const added = fillRefSlotsToCap(shot);
+      renderCards(); drawWires(); renderDock(); persist();
+      const cap = maxRefCount(catalogItemForService());
+      const n = countRefUrls(null, shot).length;
+      setMsg("灌满参考 " + n + "/" + cap + (added ? (" · 新加 " + added) : " · 已满"), n > cap ? "bad" : (n >= cap ? "ok" : "warn"));
+      return;
+    }
     if (act.dataset.act === "promote") {
       const shot = nodeById(state.selected);
       if (shot && shot.url) {
@@ -3190,6 +3654,19 @@
     renderCards(); drawWires(); renderDock(); persist();
   }
 
+  if ($("chatRail")) {
+    $("chatRail").addEventListener("click", (e) => {
+      const act = e.target.closest("[data-act]");
+      if (!act) return;
+      if (act.dataset.act === "upload") {
+        if ($("file")) $("file").click();
+        return;
+      }
+      if (act.dataset.act === "pick") {
+        openImportModal();
+      }
+    });
+  }
   if ($("assetRail")) {
     $("assetRail").addEventListener("pointerdown", (e) => {
       if (e.target.closest("[data-act],[data-tab],[data-pin],[data-hist-pin]")) return;
@@ -3255,9 +3732,10 @@
       if (histPin) {
         const item = railHistory()[Number(histPin.dataset.histPin)];
         const shot = nodeById(state.selected);
-        if (item && shot && shot.kind === "shot") {
-          const node = spawnHistoryAt(item, shot.x - 180, shot.y + 40);
-          linkAssetToShot(node, shot);
+        if (item && item.url && shot && shot.kind === "shot") {
+          // 接到此镜 → write media onto the selected shot card (same as auto writeback).
+          // Keep History row; do not require a canvas clone for the card face.
+          writebackResult(shot, item.url);
           renderCards(); drawWires(); renderDock(); persist();
         }
       }
@@ -3295,9 +3773,15 @@
       } else if (created.length) {
         selectNode(created[created.length - 1].id);
       }
-      renderCards(); drawWires(); renderDock(); persist();
+      renderCards(); drawWires(); renderDock();
+      if (typeof renderChatRail === "function") renderChatRail();
+      persist();
+      persistServer();
       if (created.length) {
-        setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
+        const live = nodeById(state.selected);
+        const frameReady = !!(live && live.kind === "shot" && state.mode === "video" && typeof frameAsset === "function" && frameAsset(live));
+        if (frameReady) setMsg("首帧已就绪 · 可生成", "ok");
+        else setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
       }
       if ($("importModal") && $("importModal").classList.contains("show")) {
         refreshImportLibrary().then(() => renderImportModal());
@@ -3608,15 +4092,86 @@
     }
     return String(e);
   }
+  function humanizeFailText(raw) {
+    const t = String(raw == null ? "" : raw).replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    // Already short Chinese user copy — keep.
+    if (/^[\u4e00-\u9fff]/.test(t) && !/[A-Za-z]{4,}/.test(t)) return t;
+    const lower = t.toLowerCase();
+    // Fal content_policy_violation / content checker (often "body.prompt: …")
+    if (/content_policy_violation/.test(lower)
+        || /flagged by a content checker/.test(lower)
+        || /contained material flagged/.test(lower)
+        || (/content.?policy/.test(lower) && /violat/.test(lower))) {
+      return "内容未通过安全审核";
+    }
+    if (/no_media_generated/.test(lower)
+        || /did not generate the expected output/.test(lower)) {
+      return "模型未产出可用结果";
+    }
+    if (/file_download_error/.test(lower) || /\bfile download error\b/.test(lower)) {
+      return "资源下载失败（链接不可达）";
+    }
+    if (/image_load_error/.test(lower) || /\bimage load error\b/.test(lower)) {
+      return "图片加载失败";
+    }
+    if (/image_too_large/.test(lower) || /\bimage too large\b/.test(lower)) {
+      return "图片尺寸过大";
+    }
+    if (/image_too_small/.test(lower) || /\bimage too small\b/.test(lower)) {
+      return "图片尺寸过小";
+    }
+    if (/face_detection_error/.test(lower) || /could not detect face/.test(lower)) {
+      return "未检测到人脸";
+    }
+    if (/generation_timeout/.test(lower) || /\bgeneration timeout\b/.test(lower)) {
+      return "生成超时";
+    }
+    if (/downstream_service_unavailable/.test(lower)) {
+      return "下游服务暂不可用";
+    }
+    if (/downstream_service_error/.test(lower)) {
+      return "下游服务错误";
+    }
+    if (/internal_server_error/.test(lower) || /\binternal server error\b/.test(lower)) {
+      return "服务端内部错误";
+    }
+    if (/feature_not_supported/.test(lower) || /\bfeature not supported\b/.test(lower)) {
+      return "当前端点不支持该功能";
+    }
+    // Field required / pydantic "type":"missing" / Fal loc body.<field>: Field required.
+    // Do NOT use bare \bmissing\b + body. — false-positives prose like
+    // "missing dependency in body.build" or "The type: missing widget in body.build".
+    if (/\bfield required\b/.test(lower)
+        || /\btype["']?\s*:\s*["']missing["']/.test(lower)
+        || /is required but was not provided/.test(lower)
+        || /\bbody\.\w+\s*:\s*field required\b/.test(lower)) {
+      if (/prompt/.test(lower)) return "缺少提示词（服务端校验）";
+      if (/image|frame|start_image|first_frame/.test(lower)) return "缺少图片输入（服务端校验）";
+      return "请求字段缺失（服务端校验）";
+    }
+    // Strip body.loc noise when remaining msg is still English noise
+    const locm = t.match(/^body(?:\.[A-Za-z0-9_]+)*:\s*(.+)$/i);
+    if (locm) {
+      const rest = locm[1].trim();
+      const mapped = humanizeFailText(rest);
+      if (mapped && mapped !== rest) return mapped;
+      if (/^field required$/i.test(rest)) return "请求字段缺失（服务端校验）";
+    }
+    return t;
+  }
   function formatErrInfo(e) {
     const raw = unwrapErrText(e, 0) || "未知错误";
     const billing = isBillingErrText(raw) || (e && typeof e === "object" && (e.status === 402 || e.statusCode === 402));
     if (billing) {
       return { text: "额度不足或账单错误", excerpt: shortErrExcerpt(raw, 180), billing: true };
     }
-    const human = raw.length > 240 ? (raw.slice(0, 240) + "…") : raw;
-    const excerpt = raw.length > 240 ? shortErrExcerpt(raw, 180) : "";
-    return { text: human || "未知错误", excerpt: excerpt, billing: false };
+    const mapped = humanizeFailText(raw);
+    const text = (mapped && mapped !== raw) ? mapped : (raw.length > 240 ? (raw.slice(0, 240) + "…") : raw);
+    let excerpt = "";
+    if (mapped && mapped !== raw) excerpt = shortErrExcerpt(raw, 220);
+    else if (raw.length > 240) excerpt = shortErrExcerpt(raw, 180);
+    return { text: text || "未知错误", excerpt: excerpt, billing: false };
   }
   function formatErr(e) {
     return formatErrInfo(e).text;
@@ -3697,27 +4252,63 @@
     const t = String(s || "");
     return /^urn:air:/i.test(t) || /:lora:/i.test(t);
   }
+  // v0821o36: LoRA-family AIR only. Checkpoint / diffusionmodel / diffuser never count as LoRA chips.
+  function isLoraAir(air) {
+    const s = String(air || "").trim();
+    if (!s) return false;
+    const low = s.toLowerCase();
+    // Mirror providers/civitai._LORA_TYPES resource tokens in AIR (urn:air:{eco}:{type}:…).
+    if (/:(lora|lycoris|locon|loha|lokr|dora)(:|\||$)/i.test(low)) return true;
+    if (/:(textualinversion|embedding)(:|\||$)/i.test(low)) return true;
+    return false;
+  }
+  function isNonLoraModelAir(air) {
+    const s = String(air || "").trim();
+    if (!s) return false;
+    return /:(checkpoint|diffusionmodel|diffuser)(:|\||$)/i.test(s);
+  }
+  /** True when an AIR-shaped string must not live in state.loras / outbound loras[]. */
+  function shouldDropNonLoraAir(air, diffusionModel) {
+    const a = String(air || "").trim();
+    if (!a) return false;
+    const dm = String(diffusionModel || "").trim();
+    if (dm && a === dm) return true;
+    if (isNonLoraModelAir(a)) return true;
+    if ((/^urn:air:/i.test(a) || looksAir(a)) && !isLoraAir(a)) return true;
+    return false;
+  }
   function loraDownloadUrl(v) {
     if (!v) return "";
-    if (v.path && !looksAir(v.path)) return v.path;
-    if (v.downloadUrl && !looksAir(v.downloadUrl)) return v.downloadUrl;
-    if (v.url && !looksAir(v.url) && isHttpUrl(v.url)) return v.url;
+    const vid = loraVersionId(v);
+    function reconcile(url) {
+      const u = String(url || "");
+      const m = u.match(/^(https?:\/\/(?:www\.)?civitai\.com\/api\/download\/models\/)(\d+)(.*)$/i);
+      // Prefer AIR/versionId over a stale sibling download path (2653078 vs 3071582).
+      if (m && vid && String(m[2]) !== String(vid)) return m[1] + vid + m[3];
+      return u;
+    }
+    if (v.path && !looksAir(v.path)) return reconcile(v.path);
+    if (v.downloadUrl && !looksAir(v.downloadUrl)) return reconcile(v.downloadUrl);
+    if (v.url && !looksAir(v.url) && isHttpUrl(v.url)) return reconcile(v.url);
     const files = v.files || [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      if (f && f.downloadUrl && !looksAir(f.downloadUrl)) return f.downloadUrl;
+      if (f && f.downloadUrl && !looksAir(f.downloadUrl)) return reconcile(f.downloadUrl);
     }
+    // versionId / AIR @version before bare id (search-hit id is modelId).
+    if (vid && /^\d+$/.test(String(vid))) return "https://civitai.com/api/download/models/" + vid;
     if (v.id && /^\d+$/.test(String(v.id))) return "https://civitai.com/api/download/models/" + v.id;
-    if (v.versionId && /^\d+$/.test(String(v.versionId))) return "https://civitai.com/api/download/models/" + v.versionId;
     return "";
   }
   function loraVersionId(l) {
     if (!l) return "";
-    if (l.versionId) return String(l.versionId);
-    if (l.modelVersionId) return String(l.modelVersionId);
+    // Prefer AIR @version over stale sibling versionId/path (2653078 vs 3071582).
     const air = String(l.air || "");
     const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
-    return m ? m[1] : "";
+    if (m) return m[1];
+    if (l.versionId != null && /^\d+$/.test(String(l.versionId).trim())) return String(l.versionId).trim();
+    if (l.modelVersionId != null && /^\d+$/.test(String(l.modelVersionId).trim())) return String(l.modelVersionId).trim();
+    return "";
   }
   function loraModelId(l) {
     if (!l) return "";
@@ -3869,26 +4460,36 @@
     const q = $("loraQ");
     const lbl = $("loraQLbl");
     const hint = $("loraHint");
+    const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+    const shape = adapt && typeof adapt.loraShape === "function" ? adapt.loraShape(be) : "";
     if (be === "fal" || isNanogptBe() || be === "huggingface") {
       if (q) q.placeholder = "URL、HF owner/name、名字或 version id";
-      if (lbl) lbl.textContent = "LoRA · 搜索名字 / URL / HF / version id";
+      if (lbl) lbl.textContent = (shape === "path") ? "LoRA · path/scale" : "LoRA · 搜索名字 / URL / HF / version id";
     } else if (isModelscopeBe()) {
       if (q) q.placeholder = "魔搭 owner/repo，例如 Qwen/Qwen-Image";
-      if (lbl) lbl.textContent = "LoRA · 魔搭 Hub owner/repo";
+      if (lbl) lbl.textContent = "LoRA · Hub owner/repo";
     } else {
       if (q) q.placeholder = "名字 / version id / AIR";
-      if (lbl) lbl.textContent = "LoRA · 搜索名字 / version id / AIR";
+      if (lbl) lbl.textContent = shape === "air" ? "LoRA · air+strength" : "LoRA · 搜索名字 / version id / AIR";
     }
     if (hint) {
       if (isModelscopeBe()) {
         hint.textContent = "请填写魔搭仓库名，例如 Qwen/Qwen-Image";
         hint.classList.add("show");
+        hint.classList.remove("lora-unverified");
       } else if (be === "huggingface") {
-        hint.textContent = "可搜索模型名，或粘贴 Hugging Face 仓库 / 直链";
+        const shapeHint = adapt && adapt.loraShapeHintText ? adapt.loraShapeHintText(be) : "";
+        hint.textContent = shapeHint || "可搜索模型名，或粘贴 Hugging Face 仓库 / 直链 · unverified";
         hint.classList.add("show");
+        hint.classList.add("lora-unverified");
+      } else if (adapt && typeof adapt.loraShapeHintText === "function") {
+        hint.textContent = adapt.loraShapeHintText(be);
+        hint.classList.add("show");
+        hint.classList.remove("lora-unverified");
       } else {
         hint.textContent = "";
         hint.classList.remove("show");
+        hint.classList.remove("lora-unverified");
       }
     }
   }
@@ -3931,7 +4532,15 @@
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
           esc(strVal) +
-          '" placeholder="未填" data-lora-str="' + i + '" title="strength 未填则留空" aria-label="strength">' +
+          '" placeholder="' +
+          ((typeof window !== "undefined" && window.ComposerFieldAdapt &&
+            typeof window.ComposerFieldAdapt.strengthPlaceholder === "function")
+            ? window.ComposerFieldAdapt.strengthPlaceholder() : "未填") +
+          '" data-lora-str="' + i + '" title="' +
+          ((typeof window !== "undefined" && window.ComposerFieldAdapt &&
+            typeof window.ComposerFieldAdapt.strengthTitle === "function")
+            ? window.ComposerFieldAdapt.strengthTitle() : "strength 未填：出站省略数值（不写 1.0/0.8）") +
+          '" aria-label="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
     }).join("");
@@ -4032,6 +4641,11 @@
       return false;
     }
     if (!row.air && !row.path && !row.versionId) return false;
+    if (shouldDropNonLoraAir(row.air)) {
+      setLoraNote("已拒绝非 LoRA AIR（checkpoint/diffuser 不进 loras[]）", true);
+      return false;
+    }
+
     const be = currentBackend();
     if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
     if (!Array.isArray(state.loras)) state.loras = [];
@@ -4276,7 +4890,36 @@
     }
     const durMsg = durationGateMessage();
     if (durMsg) msgs.push(durMsg);
-    setParamWarn(msgs[0] || "", !!msgs.length);
+    // v0821o28/o30: unsupported filled fields — warn-only for omitable (sampler/…);
+    // hard-block only true capability gaps (i2v). 铁律8: no silent / no 多余门阀.
+    let adaptWarn = "";
+    try {
+      const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+      const ctxAdapt = {
+        $: $,
+        backend: currentBackend(),
+        mode: state.mode,
+        caps: caps
+      };
+      if (adapt && typeof adapt.blockingUnsupportedMessages === "function") {
+        const blocks = adapt.blockingUnsupportedMessages(ctxAdapt) || [];
+        blocks.forEach(function (m) { if (m) msgs.push(m); });
+      } else if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
+        // legacy: only keep i2v-ish as block
+        (adapt.filledUnsupportedMessages(ctxAdapt) || []).forEach(function (m) {
+          if (m && /不支持 i2v/.test(m)) msgs.push(m);
+        });
+      }
+      if (adapt && typeof adapt.filledUnsupportedWarnings === "function") {
+        const warns = adapt.filledUnsupportedWarnings(ctxAdapt) || [];
+        if (warns[0]) adaptWarn = warns[0];
+      } else if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
+        const all = adapt.filledUnsupportedMessages(ctxAdapt) || [];
+        const w = all.filter(function (m) { return m && !/不支持 i2v/.test(m); })[0];
+        if (w) adaptWarn = w;
+      }
+    } catch (_) {}
+    setParamWarn(msgs[0] || adaptWarn || "", !!(msgs.length || adaptWarn));
     return msgs[0] || "";
   }
   function fillNanoResOptions() {
@@ -4292,53 +4935,30 @@
     fillSelectOpts(sel, tokens, keep);
   }
   function syncParamSurface() {
-    const be = currentBackend();
-    const civ = be === "civitai";
-    const nano = be === "nano-gpt";
-    const vid = state.mode === "video";
-    const caps = catalogCaps();
-    const falBox = $("falParams");
-    const comfyBox = $("comfyParams");
-    const nanoBox = $("nanoParams");
-    // Duration lives in #falParams. Civitai video still has duration constraints,
-    // so do not hide the whole group in video mode — individual fields keep their own hidden flags.
-    if (falBox) falBox.classList.toggle("hidden", (!!civ || !!nano) && !vid);
-    if (comfyBox) comfyBox.classList.toggle("hidden", be === "fal");
-    if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
-    const sampler = $("sampler");
-    const scheduler = $("scheduler");
-    const steps = $("steps");
-    const cfg = $("cfg");
-    const width = $("width");
-    const height = $("height");
-    const seed = $("seed");
-    const neg = $("negative");
-    const duration = $("duration");
-    const aspect = $("aspect");
-    const res = $("res");
-    if (sampler) sampler.classList.toggle("hidden", !civ && !caps.sampler);
-    if (scheduler) scheduler.classList.toggle("hidden", !civ);
-    if (steps) steps.classList.toggle("hidden", !civ);
-    if (cfg) cfg.classList.toggle("hidden", !civ);
-    if (width) {
-      width.disabled = !!nano;
-      width.title = nano ? "Nano 提交用目录 resolution token" : "宽";
-      width.classList.toggle("hidden", !!nano && !civ);
+    // v0821o28: delegate show/disable/「不支持」to ComposerFieldAdapt (board + live caps tighten-only).
+    const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+    const ctx = {
+      $: $,
+      backend: currentBackend(),
+      mode: state.mode,
+      caps: catalogCaps(),
+      fillNanoResOptions: fillNanoResOptions
+    };
+    if (adapt && typeof adapt.applyToSurface === "function") {
+      adapt.applyToSurface(ctx);
+    } else {
+      // Fallback if adapt script missing — keep fields visible; never pretend supported by hiding.
+      const be = currentBackend();
+      const nano = be === "nano-gpt";
+      const vid = state.mode === "video";
+      const falBox = $("falParams");
+      const comfyBox = $("comfyParams");
+      const nanoBox = $("nanoParams");
+      if (falBox) falBox.classList.toggle("hidden", state.mode === "text" || state.mode === "audio");
+      if (comfyBox) comfyBox.classList.toggle("hidden", false);
+      if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
+      if (nano) fillNanoResOptions();
     }
-    if (height) {
-      height.disabled = !!nano;
-      height.title = nano ? "Nano 提交用目录 resolution token" : "高";
-      height.classList.toggle("hidden", !!nano && !civ);
-    }
-    if (seed) seed.classList.toggle("hidden", false);
-    if (neg) {
-      const showNeg = caps.negative !== false;
-      neg.classList.toggle("hidden", !showNeg);
-    }
-    if (duration) duration.classList.toggle("hidden", !vid || caps.videoDuration === false);
-    if (aspect) aspect.classList.toggle("hidden", state.mode === "text" || state.mode === "audio" || (caps.videoAspect === false && vid));
-    if (res) res.classList.toggle("hidden", !!nano || state.mode === "text" || state.mode === "audio");
-    if (nano) fillNanoResOptions();
     paramGateMessage();
     if (!syncParamSurface._skipDock) renderDock();
   }
@@ -4406,7 +5026,7 @@
   }
   // Pack UI params onto generate payload — never silently drop. Civitai keeps
   // sampler/steps/cfg; other backends still ship seed / size / token.
-  function packComfyParamsForPayload() {
+  function packComfyParamsForPayload(shotOpt) {
     const p = readComfyParamsFromUi();
     const be = currentBackend();
     if (be === "nano-gpt") {
@@ -4428,6 +5048,18 @@
       delete p.steps;
       delete p.cfg;
       delete p.cfgScale;
+    }
+    // v0821o22: civitai checkpoint AIR from imported shot (fresh hinablue) — never invent default AIR.
+    // v0821o38: prefer generate shot (runShotStepWork) over selected/lastComposerShot — selected can be wrong/empty.
+    if (be === "civitai") {
+      const shot = (shotOpt && shotOpt.kind === "shot" ? shotOpt : null)
+        || nodeById(state.selected) || nodeById(state.lastComposerShot);
+      const dm = shot && shot.diffusionModel ? String(shot.diffusionModel).trim() : "";
+      if (dm) p.diffusionModel = dm;
+      const cn = shot && shot.checkpointName ? String(shot.checkpointName).trim() : "";
+      if (cn) p.checkpointName = cn;
+      const eco = shot && shot.ecosystem ? String(shot.ecosystem).trim() : "";
+      if (eco) p.ecosystem = eco;
     }
     if (!Object.keys(p).length) return null;
     return p;
@@ -4515,6 +5147,7 @@
     const be = currentBackend();
     const mapped = list.map(packLoraRow);
     for (let i = 0; i < mapped.length; i++) {
+      if (shouldDropNonLoraAir(mapped[i].air)) return null;
       if (!loraRowCanOutbound(mapped[i], be)) return null;
     }
     return mapped.length ? mapped : null;
@@ -4546,7 +5179,12 @@
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
     }
-    if (be === "fal" || be === "huggingface") return "LoRA 缺 http path，无法出站";
+    if (be === "fal") {
+      const baseMsg = falLoraUnsupportedMsg();
+      if (baseMsg) return baseMsg;
+      return "LoRA 缺 http path，无法出站";
+    }
+    if (be === "huggingface") return "LoRA 缺 http path，无法出站";
     return "LoRA 缺 air，无法出站";
   }
   function revalidateLorasForService() {
@@ -4581,12 +5219,12 @@
     const be = currentBackend();
     hits.textContent = "搜…";
     if (isModelscopeBe() && isHfRepo(q) && !isHttpUrl(q)) {
-      addLora({ path: q, name: q });
+      addLora({ path: q, name: q, strength: null });
       hits.textContent = "";
       return;
     }
     if ((be === "fal" || be === "huggingface" || isNanogptBe()) && (isHttpUrl(q) || isHfRepo(q))) {
-      addLora({ path: q, name: q, strength: 0.8 });
+      addLora({ path: q, name: q, strength: null });
       hits.textContent = "";
       return;
     }
@@ -4601,8 +5239,14 @@
       } catch (_) { hits.textContent = "没找到这个 version"; }
       return;
     }
-    if (q.startsWith("urn:air:") || q.includes(":lora:")) {
-      addLora({ air: q, name: q.split(":").pop(), strength: 0.8 });
+    if (q.startsWith("urn:air:") || q.includes(":lora:") || q.includes(":lycoris:")) {
+      // v0821o36: checkpoint/diffuser AIR paste must not become a LoRA chip
+      if (shouldDropNonLoraAir(q) || (q.startsWith("urn:air:") && !isLoraAir(q))) {
+        hits.textContent = "不是 LoRA AIR（checkpoint/diffuser 请走底模）";
+        try { setMsg("已拒绝非 LoRA AIR（checkpoint/diffuser 不进 loras[]）", "warn"); } catch (_) {}
+        return;
+      }
+      addLora({ air: q, name: q.split(":").pop(), strength: null });
       hits.textContent = "";
       return;
     }
@@ -4628,7 +5272,7 @@
           const mid = el.getAttribute("data-mid") || "";
           const typ = el.getAttribute("data-type") || "";
           if (path && (isHttpUrl(path) || isHfRepo(path))) {
-            addLora({ path: path, name: name || path, strength: 0.8, type: typ, modelId: mid });
+            addLora({ path: path, name: name || path, strength: null, type: typ, modelId: mid });
             return;
           }
           if (be === "civitai" && vid) {
@@ -4648,11 +5292,11 @@
               modelId: mid,
               type: typ,
               name: name || ("LoRA " + vid),
-              strength: 0.8,
+              strength: null,
             });
             return;
           }
-          if (path || name) addLora({ path: path || name, name: name || path, strength: 0.8, type: typ, modelId: mid });
+          if (path || name) addLora({ path: path || name, name: name || path, strength: null, type: typ, modelId: mid });
         };
       });
     } catch (_) {
@@ -4694,6 +5338,7 @@
     const id = (it && (it.id || it.name)) || "";
     const name = (it && it.name) || id;
     if (id === FAL_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo LoRA · " + id);
+    if (id === FAL_FLUX_LORA_SERVICE) return (name && name !== id ? name + " · " + id : "Flux LoRA · " + id);
     if (id === HF_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : id);
     if (id === MS_LORA_PREF_SERVICE) return (name && name !== id ? name + " · " + id : "Krea 2 Turbo · " + id);
     return name || id;
@@ -5055,14 +5700,14 @@
   }
 
     // Provider defaults (capabilities): catalog may only tighten, never raise.
-  // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope=1+image_url.
+  // Civitai/Fal/HF=9; Nano=5+input_references; Modelscope ceiling=3+image_url (catalog tightens; 2509=3).
   const PROVIDER_REF_CAPS = {
     civitai: { maxRefs: 9, refImagesField: "images" },
     fal: { maxRefs: 9, refImagesField: "image_urls" },
     huggingface: { maxRefs: 9, refImagesField: "image_urls" },
     "nano-gpt": { maxRefs: 5, refImagesField: "input_references" },
-    "modelscope-ai": { maxRefs: 1, refImagesField: "image_url" },
-    "modelscope-cn": { maxRefs: 1, refImagesField: "image_url" },
+    "modelscope-ai": { maxRefs: 3, refImagesField: "image_url" },
+    "modelscope-cn": { maxRefs: 3, refImagesField: "image_url" },
   };
 
   function providerRefDefaults() {
@@ -5144,7 +5789,10 @@
     if (fields.length) {
       const hasMulti = fields.some((f) => MULTI_REF_FIELDS.indexOf(f) >= 0);
       const hasSingularFirst = fields.some((f) => SINGULAR_FIRST_FIELDS.indexOf(f) >= 0);
-      if (!hasMulti && (hasSingularFirst || fields.length > 0)) {
+      // No multi bag + singular FIRST → maxRefs=1, unless catalog already says maxRefs>1
+      // (Magao Edit-2509: official image_url list 1–3 — same field name, multi values).
+      const catalogAllowsList = Number(caps.maxRefs) > 1 || Number(caps.maxImages) > 1;
+      if (!hasMulti && (hasSingularFirst || fields.length > 0) && !catalogAllowsList) {
         declared = (declared == null) ? 1 : Math.min(declared, 1);
       }
     }
@@ -5203,6 +5851,8 @@
     if (!shot) return [];
     const linked = connectedAssets(shot.id);
     const primaryNode = frameAsset(shot);
+    // Send-path refs are inbound edges only. Own painted card url is display-only
+    // (成片 chip) — counting it here would trip t2i unused-ref and block page ↑.
     const primary = (payload && (payload.firstFrame || payload.sourceImage)) || (primaryNode && primaryNode.url) || "";
     const urls = [];
     if (primary) urls.push(primary);
@@ -5252,14 +5902,60 @@
     }
     return true;
   }
-  function editSiblingHint(it) {
+  // Resolve catalog Edit/i2i sibling for a t2i service (no invent — must exist in catalogById).
+  function editSiblingId(it) {
     const id = String((it && it.id) || "");
-    const editId = id.replace(/\/text-to-image$/, "/edit");
-    if (editId !== id && state.catalogById && state.catalogById[editId]) {
+    if (!id || !state.catalogById) return "";
+    const candidates = [];
+    const slashEdit = id.replace(/\/text-to-image$/, "/edit");
+    if (slashEdit !== id) candidates.push(slashEdit);
+    // Nano / common: Foo → Foo Edit, or trailing -edit
+    const name = String((it && it.name) || "");
+    Object.keys(state.catalogById).forEach(function (cid) {
+      const row = state.catalogById[cid];
+      if (!row || !catalogEatsRefs(row)) return;
+      const rid = String(row.id || cid);
+      if (rid === id) return;
+      // same family: id prefix match or name "X Edit" for "X"
+      if (slashEdit !== id && rid === slashEdit) return; // already in candidates
+      if (name && String(row.name || "") === name + " Edit") candidates.push(rid);
+      if (id && rid === id + "/edit") candidates.push(rid);
+    });
+    for (let i = 0; i < candidates.length; i++) {
+      if (state.catalogById[candidates[i]]) return candidates[i];
+    }
+    return "";
+  }
+  function editSiblingHint(it) {
+    const editId = editSiblingId(it);
+    if (editId) {
       const sib = state.catalogById[editId];
-      return "请改选 " + (sib.name || editId) + "，或断开参考连线";
+      return "可一键改选 " + ((sib && sib.name) || editId) + "，或断开参考连线";
     }
     return "请改选带 Edit 的图生图模型，或断开参考连线";
+  }
+  // One-click apply Edit sibling (catalog must already have it — never invent).
+  function applyEditSibling() {
+    const it = catalogItemForService();
+    const editId = editSiblingId(it);
+    if (!editId) return false;
+    const sel = $("service");
+    if (!sel) return false;
+    ensureSelectOpt(sel, editId);
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[editId]) {
+      // should already exist; refuse invent
+      return false;
+    }
+    sel.value = editId;
+    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    const shot = nodeById(state.selected);
+    if (shot && shot.kind === "shot") shot.serviceId = editId;
+    renderDock();
+    syncParamSurface();
+    const sib = state.catalogById[editId];
+    setMsg("已改选图生图：" + ((sib && sib.name) || editId), "ok");
+    return true;
   }
   function refUnusedGateMessage(shot) {
     if (!shot || shot.kind !== "shot") return "";
@@ -5276,6 +5972,44 @@
   // (firstFrame/sourceImage). Optionally mirror onto capabilities.refImagesField
   // for backends that only look there — never sole-write image_urls /
   // input_references / image_url as the only multi-ref bag.
+  // Dev/acceptance: attach distinct local fixture refs until outbound N==cap (灌满).
+  // v0821o40: same 口径 as UI hint + hard-gate = countRefUrls (excludes own shot.url).
+  // 成片 chip is visual-only — never stuff into outbound; never let it make 灌满 look 6/5.
+  // Page path still human-clickable.
+  function fillRefSlotsToCap(shot) {
+    shot = shot || nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") return 0;
+    const it = catalogItemForService();
+    if (!catalogEatsRefs(it)) return 0; // refuse fill on t2i — use Edit sibling first
+    const cap = maxRefCount(it);
+    let urls = countRefUrls(null, shot);
+    let added = 0;
+    let n = assets().length;
+    // v0821o41: use real staged fixtures /out/fill-cap-{i}.jpg (never phantom o40-fill-*.png)
+    while (urls.length < cap) {
+      const idx = urls.length + 1;
+      if (idx > 9) break; // only 9 staged fixtures
+      const id = uid("fillref");
+      const url = "/out/fill-cap-" + idx + ".jpg";
+      const node = {
+        id: id,
+        kind: "character",
+        title: "灌满" + idx,
+        x: (shot.x || 0) - 160,
+        y: (shot.y || 0) + n * 36,
+        url: url,
+        fillFixture: true,
+      };
+      state.nodes.push(node);
+      linkAssetToShot(node, shot);
+      n += 1;
+      added += 1;
+      urls = countRefUrls(null, shot);
+      if (urls.length > cap) break; // never N>cap
+    }
+    return added;
+  }
+
   function attachExtraImages(payload, shot) {
     if (!payload || !shot) return payload;
     const linked = connectedAssets(shot.id);
@@ -5426,7 +6160,10 @@
     // Fal empty-service defaults stay for fal backends only.
     const pickedService = ($("service") && $("service").value) || "";
     let serviceId = pickedService;
-    if (!serviceId && be === "huggingface") {
+    // v0821o23: civitai outbound prefers imported shot.serviceId / sdxl eco — never silent krea2.
+    if (be === "civitai") {
+      serviceId = resolveCivitaiOutboundServiceId(shot);
+    } else if (!serviceId && be === "huggingface") {
       // t2i empty → Hub turbo; i2i empty → Qwen-Image-Edit. Never t2i turbo on 图生图.
       serviceId = (op === "i2i" ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE);
     } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
@@ -5434,9 +6171,11 @@
       serviceId = MS_LORA_PREF_SERVICE;
     } else if (!serviceId && be !== "civitai") {
       // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
-      // v0821o2: LoRAs present → pin turbo/lora (never empty→flux/schnell→flux-lora sibling)
-      if (op !== "i2v" && falHasLoras()) serviceId = FAL_LORA_PREF_SERVICE;
-      else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+      // v0821o29: LoRAs → endpoint by AIR base (not hard-pin krea-2).
+      if (op !== "i2v" && falHasLoras()) {
+        const resolved = resolveFalLoraEndpointFromChips();
+        serviceId = resolved.endpoint || "";
+      } else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
     }
     if (be === "huggingface") {
       serviceId = pinHfLoraServiceId(serviceId, op);
@@ -5523,30 +6262,268 @@
     state.multi = (state.multi || []).filter((id) => !removed.has(id));
     return true;
   }
-  function writebackResult(shot, url) {
-    // Generated media stays on the target shot. Do not spawn a canvas clone.
-    // History rail may record the url; canvas copies require 入库 / 拖到画布.
-    if (!shot || !url) return;
-    removeUnpromotedFromShot(shot.id);
-    pushHistoryItem(url, (shot.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
-    renderRail();
+
+  // v0821o46: pending jobId↔shotId — survives tab OOM so boot can resume writeback
+  const PENDING_JOBS_KEY = "nl-pending-jobs-v0821o46";
+  function readLocalPending() {
+    try {
+      const raw = localStorage.getItem(PENDING_JOBS_KEY);
+      const j = raw ? JSON.parse(raw) : {};
+      return (j && typeof j === "object" && j.jobs && typeof j.jobs === "object") ? j.jobs : {};
+    } catch (_) { return {}; }
+  }
+  function writeLocalPending(jobs) {
+    try { localStorage.setItem(PENDING_JOBS_KEY, JSON.stringify({ jobs: jobs || {} })); } catch (_) {}
+  }
+  function registerPendingJob(jobId, shotId, backend) {
+    const jid = String(jobId || "").trim();
+    const sid = String(shotId || "").trim();
+    if (!jid || !sid) return;
+    const jobs = readLocalPending();
+    // o49b: retire other jobIds mapped to same shotId (local + DELETE server)
+    const retire = [];
+    for (const oldId of Object.keys(jobs)) {
+      if (oldId === jid) continue;
+      const rec = jobs[oldId];
+      if (rec && String(rec.shotId || "") === sid) retire.push(oldId);
+    }
+    for (let i = 0; i < retire.length; i++) {
+      const oldId = retire[i];
+      delete jobs[oldId];
+      try {
+        fetch("/api/pending-jobs/" + encodeURIComponent(oldId), { method: "DELETE", keepalive: true }).catch(function () {});
+      } catch (_) {}
+    }
+    jobs[jid] = { shotId: sid, backend: String(backend || ""), startedAt: Date.now() };
+    writeLocalPending(jobs);
+    try {
+      fetch("/api/pending-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: jid, shotId: sid, backend: backend || "" }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (_) {}
+  }
+  function clearPendingJob(jobId) {
+    const jid = String(jobId || "").trim();
+    if (!jid) return;
+    const jobs = readLocalPending();
+    if (jobs[jid]) {
+      delete jobs[jid];
+      writeLocalPending(jobs);
+    }
+    try {
+      fetch("/api/pending-jobs/" + encodeURIComponent(jid), { method: "DELETE", keepalive: true }).catch(function () {});
+    } catch (_) {}
+  }
+  async function mergeServerPending() {
+    try {
+      const r = await fetch("/api/pending-jobs");
+      if (!r.ok) return readLocalPending();
+      const j = await r.json();
+      const list = (j && j.jobs) || [];
+      const jobs = readLocalPending();
+      for (let i = 0; i < list.length; i++) {
+        const row = list[i];
+        if (!row || !row.jobId || !row.shotId) continue;
+        if (!jobs[row.jobId]) {
+          jobs[row.jobId] = { shotId: row.shotId, backend: row.backend || "", startedAt: Date.now() };
+        }
+      }
+      writeLocalPending(jobs);
+      return jobs;
+    } catch (_) {
+      return readLocalPending();
+    }
+  }
+  async function resumeOnePending(jobId, rec) {
+    const jid = String(jobId || "").trim();
+    const sid = rec && rec.shotId;
+    if (!jid || !sid) return;
+    let shot = nodeById(sid);
+    if (!shot || shot.kind !== "shot") {
+      // graph may have shot after hydrate; try again from state
+      shot = (state.nodes || []).find(function (n) { return n && n.id === sid && n.kind === "shot"; });
+    }
+    if (!shot) {
+      clearPendingJob(jid);
+      return;
+    }
+    // o49b: do not write old /out onto a card that already moved on
+    if (shot._jobId && String(shot._jobId) !== jid) {
+      clearPendingJob(jid);
+      return;
+    }
+    const existingUrl = shot.url != null ? String(shot.url).trim() : "";
+    if (existingUrl && String(shot._jobId || "") !== jid) {
+      clearPendingJob(jid);
+      return;
+    }
+    const bePoll = String((rec && rec.backend) || shot._backend || "").trim();
+    const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
+      || bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || !bePoll;
+    try {
+      setShotBusy(shot, true);
+      setMsg("恢复任务写回 · " + jid.slice(0, 12) + "…", "warn");
+      let j = null;
+      const pollMax = (bePoll === "civitai") ? 720 : 180;
+      const pollMs = 2500;
+      for (let i = 0; i < pollMax; i++) {
+        const st = await (await fetch("/api/jobs/" + encodeURIComponent(jid))).json();
+        j = st;
+        const stStatus = String((st && st.status) || "").toUpperCase();
+        const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
+          || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING"
+          || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED"
+          || stStatus === "SCHEDULED";
+        // o46b: upstream failed but local /out (server injects saved[] / localOutResume) → still writeback
+        if ((st.error || st.status === "failed") && !inFlight) {
+          const failSaved = (st && st.pendingWriteback && st.pendingWriteback.url)
+            || pickSavedUrl(st);
+          if (failSaved) {
+            writebackResult(shot, failSaved);
+            clearPendingJob(jid);
+            setShotBusy(shot, false);
+            setMsg("上游失败但本地成片已写回原卡", "ok");
+            try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+            return;
+          }
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("恢复失败: " + (st.error || st.message || "任务失败"), "bad");
+          return;
+        }
+        // Server belt may already have written shot.url via pendingWriteback
+        if (st && st.pendingWriteback && st.pendingWriteback.url) {
+          writebackResult(shot, st.pendingWriteback.url);
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡（服务端）", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        const savedUrl = pickSavedUrl(st);
+        if (savedUrl) {
+          writebackResult(shot, savedUrl);
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        if (!materializing && pickUrl(st)) {
+          writebackResult(shot, pickUrl(st));
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        if (i === 0) {
+          // also check if hydrate already has newer url containing job fragment
+          continue;
+        }
+        await new Promise(function (res) { setTimeout(res, pollMs); });
+        setMsg("恢复写回轮询 " + (i + 1) + "/" + pollMax, "warn");
+      }
+      setShotBusy(shot, false);
+      setMsg("恢复写回超时 · job 仍 pending: " + jid, "warn");
+    } catch (e) {
+      try { setShotBusy(shot, false); } catch (_) {}
+      setMsg("恢复写回异常: " + (e && e.message ? e.message : String(e)), "bad");
+    }
+  }
+  async function resumePendingJobs() {
+    const jobs = await mergeServerPending();
+    const ids = Object.keys(jobs || {});
+    if (!ids.length) return;
+    for (let i = 0; i < ids.length; i++) {
+      await resumeOnePending(ids[i], jobs[ids[i]]);
+    }
   }
 
-    function pickUrl(data) {
-    // v0821i/v0821c: prefer local saved[] /out/*.mp4 over ephemeral CDN result.video.url.
+  function writebackResult(shot, url) {
+    // Hard gate: media lands on the originating shot card (shot.url). History stays;
+    // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
+    // v0821o16: re-attach orphan shot into state.nodes before persist/PUT (avoid empty nodes 400).
+    // v0821o18: keep live.url even if a later hydrate races; always refresh dock/chat after card write.
+    if (!shot || !url) return;
+    let live = nodeById(shot.id);
+    if (!live) {
+      if (shot.kind === "shot") state.nodes.push(shot);
+      live = shot;
+    }
+    live.url = url;
+    shot.url = url; // keep caller reference in sync (poll path may hold stale shot obj)
+    const nowTs = Date.now();
+    live._urlUpdatedAt = nowTs;
+    live.urlUpdatedAt = nowTs;
+    shot._urlUpdatedAt = nowTs;
+    shot.urlUpdatedAt = nowTs;
+    removeUnpromotedFromShot(live.id);
+    const frame = (typeof frameAsset === "function") ? frameAsset(live) : null;
+    if (frame && frame.id && !(state.edges || []).some((e) => e.from === frame.id && e.to === live.id)) {
+      state.edges.push({ from: frame.id, to: live.id });
+    }
+    pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
+    renderRail();
+    if (typeof renderChatRail === "function") renderChatRail();
+    try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+    persist();
+    persistServer();
+    if (live && live._jobId) clearPendingJob(live._jobId);
+    else if (shot && shot._jobId) clearPendingJob(shot._jobId);
+  }
+
+  function pickSavedUrl(data) {
+    // v0821o16: ONLY materialized saved[]/files (and result.saved/files) — never steps CDN.
     if (!data) return "";
     const first = (arr) => {
       if (!arr || !arr[0]) return "";
       const x = arr[0];
       if (typeof x === "string") return x;
-      return (x && (x.url || x.path)) || "";
+      return (x && (x.url || x.path || x.previewUrl)) || "";
     };
-    // 1) materialized /out (or any saved/files) — survives refresh
     const savedHit = first(data.saved) || first(data.files);
     if (savedHit) return savedHit;
     if (data.result && typeof data.result === "object") {
       const rs = first(data.result.saved) || first(data.result.files);
       if (rs) return rs;
+    }
+    return "";
+  }
+
+    function pickUrl(data) {
+    // v0821i/v0821c/v0821o12: prefer local saved[] /out; then civitai steps[].output; CDN fallback.
+    if (!data) return "";
+    const first = (arr) => {
+      if (!arr || !arr[0]) return "";
+      const x = arr[0];
+      if (typeof x === "string") return x;
+      // civitai blobs expose url and/or previewUrl
+      return (x && (x.url || x.path || x.previewUrl)) || "";
+    };
+    // 1) materialized /out (or any saved/files) — survives refresh
+    const savedHit = pickSavedUrl(data);
+    if (savedHit) return savedHit;
+    // pickSavedUrl already checked result.saved/files — keep CDN path below
+    // 1b) civitai orchestration: steps[].output.images[].url (same class as i2v missing shape)
+    if (Array.isArray(data.steps)) {
+      for (let si = 0; si < data.steps.length; si++) {
+        const out = data.steps[si] && data.steps[si].output;
+        if (!out || typeof out !== "object") continue;
+        const stepHit = first(out.images) || first(out.videos) || first(out.blobs) || first(out.files);
+        if (stepHit) return stepHit;
+        if (out.image) {
+          const iu = out.image.url || out.image.previewUrl || (typeof out.image === "string" ? out.image : "");
+          if (iu) return iu;
+        }
+        if (out.video) {
+          const vu = out.video.url || (typeof out.video === "string" ? out.video : "");
+          if (vu) return vu;
+        }
+      }
     }
     // 2) video / image bags (CDN ok as fallback)
     const fromList = first(data.urls) || first(data.videos) || first(data.images);
@@ -5630,11 +6607,23 @@
     opts = opts || {};
     const shot = nodeById(shotId);
     const prefix = opts.progressPrefix ? (opts.progressPrefix + " · ") : "";
-    function fail(err, status, cls) {
+    function fail(err, status, cls, meta) {
+      meta = meta || {};
       const info = formatErrInfo(err);
+      const be = String(meta.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "");
+      const jid = String(meta.jobId || "");
+      if (jid || be) {
+        const tag = [be && ("backend=" + be), jid && ("jobId=" + jid)].filter(Boolean).join(" ");
+        if (tag) {
+          info.excerpt = (info.excerpt ? (info.excerpt + "\n") : "") + tag;
+          try { console.warn("[outbound-fail]", { backend: be, jobId: jid, error: info.text }); } catch (_) {}
+        }
+      }
       const text = prefix + info.text;
       if (shot && shot.kind === "shot") {
         shot._error = info.text;
+        if (jid) shot._jobId = jid;
+        if (be) shot._backend = be;
         if (info.excerpt) shot._errorDetail = info.excerpt;
         else delete shot._errorDetail;
       }
@@ -5644,7 +6633,13 @@
       state.dockMode = "expanded";
       renderCards();
       renderDock();
+      // o46: clear pending only on terminal fail — keep on wait-timeout/abort so boot can resume
+      if (jid && (status === "error" || (cls || "bad") === "bad")) {
+        try { clearPendingJob(jid); } catch (_) {}
+      }
       const out = { status: status || "blocked", error: text };
+      if (jid) out.jobId = jid;
+      if (be) out.backend = be;
       return out;
     }
     if (!shot || shot.kind !== "shot") {
@@ -5662,7 +6657,7 @@
       return fail((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "blocked", "warn");
     }
     if (state.mode === "video" && !frameAsset(shot)) {
-      return fail("视频需要先连一张首帧图，不能偷配方台", "blocked");
+      return fail("缺首帧 · 切到图片生成，或先上传/选择首帧（视频需要先连一张首帧图，不能偷配方台）", "blocked");
     }
     // v0821b: do not silently run i2v on t2i flux / pure t2v that drops the frame.
     if (state.mode === "video") {
@@ -5677,11 +6672,13 @@
       return fail("此模型需要提示词", "blocked");
     }
     // v0820c-hard-service: empty civitai #service → hard error, abort (no Krea2 soft-fill).
+    // v0821o23: resolve from shot.serviceId / ecosystem when #service drifted to krea2.
     if (currentBackend() === "civitai") {
-      const civSid = ($("service") && $("service").value) || "";
+      const civSid = resolveCivitaiOutboundServiceId(shot);
       if (!civSid) {
         return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
       }
+      syncCivitaiServiceSelect(civSid);
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
@@ -5756,16 +6753,29 @@
       if (list.length && (!packedLoras || !packedLoras.length)) {
         return fail(outboundLoraBlockMsg(), "blocked");
       }
+      // v0821o22: partial drop honesty — some chips lack air/path; do not pretend full pack
+      if (list.length && packedLoras && packedLoras.length && packedLoras.length < list.length) {
+        const dropped = list.length - packedLoras.length;
+        try {
+          setMsg("LoRA 出站 " + packedLoras.length + "/" + list.length + " · 已丢 " + dropped + " 个无 air/path 的芯片（不静默）", "warn");
+        } catch (_) {}
+      }
       if (packedLoras && packedLoras.length) {
         payload.loras = packedLoras;
-        // v0821o2: outbound serviceId must stay turbo/lora — block flux-lora swap
+        // v0821o29: outbound Fal serviceId by LoRA AIR base (flux1→flux-lora; krea2→krea).
         if (currentBackend() === "fal") {
+          const unsupported = falLoraUnsupportedMsg();
+          if (unsupported) return fail(unsupported, "blocked");
           const pinned = pinFalLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          if (!pinned) return fail(falLoraUnsupportedMsg() || "Fal LoRA 端点不支持（不硬钉错误家族）", "blocked");
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureFalLoraServiceSelected();
         } else if (currentBackend() === "huggingface") {
+          const unsupported = hfLoraUnsupportedMsg();
+          if (unsupported) return fail(unsupported, "blocked");
           const pinned = pinHfLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "", currentGraphOp());
+          if (!pinned) return fail(hfLoraUnsupportedMsg() || "HF LoRA 端点不支持（不硬钉无 LoRA 的 Hub turbo）", "blocked");
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureHfLoraServiceSelected();
@@ -5779,20 +6789,34 @@
     }
     // v0820-civitai-comfy-params: merge steps/cfg/sampler/scheduler/seed/size — no silent drop
     {
-      const packedComfy = packComfyParamsForPayload();
+      // v0821o38: pack from generate shot (not only selected/lastComposerShot)
+      const packedComfy = packComfyParamsForPayload(shot);
       if (packedComfy) {
         Object.keys(packedComfy).forEach(function (k) {
           if (packedComfy[k] != null && packedComfy[k] !== "") payload[k] = packedComfy[k];
         });
       }
+      // v0821o38: after merge, force payload.diffusionModel from shot when set (no silent drop)
+      if (shot && shot.diffusionModel != null && String(shot.diffusionModel).trim()) {
+        payload.diffusionModel = String(shot.diffusionModel).trim();
+      }
       if (usesCivitaiComfyParams()) {
-        // Explicit UI selection only — never CIVITAI_PREF / _civitaiDefaultService soft-fill.
-        const sid = ($("service") && $("service").value) || "";
+        // v0821o23: imported sdxl serviceId wins over drifted #service / catalog krea2 pref.
+        // Never CIVITAI_PREF / _civitaiDefaultService soft-fill when empty.
+        const sid = resolveCivitaiOutboundServiceId(shot);
         if (!sid) {
           return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
         }
+        syncCivitaiServiceSelect(sid);
         payload.serviceId = sid;
         // seed: keep full numeric (no int32 clamp) — Civitai seeds can exceed 2^31-1
+        // v0821o38: flux1 (or sid needing diffuser) without dm → hard reject before POST
+        const sidL = String(sid || "").toLowerCase();
+        const needsDm = /\/flux1\//.test(sidL) || /diffuser|diffusionmodel|sdcpp\/flux/.test(sidL);
+        const dmOut = payload.diffusionModel != null ? String(payload.diffusionModel).trim() : "";
+        if (needsDm && !dmOut) {
+          return fail("缺少 diffusionModel（diffuserModel）· flux1 出站前必须有 checkpoint AIR，禁止假跑", "blocked");
+        }
       }
       // Composer has no negative wire — attach #negative / shot.negativePrompt for every backend.
       const negEl = $("negative");
@@ -5806,23 +6830,39 @@
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     setShotBusy(shot, true);
     shot._error = "";
+    let jobId = "";
+    let bePoll = "";
     try {
       const r = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       let j = await r.json();
-      if (!r.ok || j.error) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
-      const jobId = j.id || j.jobId || j.workflowId;
-      if (jobId && !pickUrl(j)) {
+      jobId = String((j && (j.id || j.jobId || j.workflowId)) || "");
+      bePoll = currentBackend() || (payload && payload.backend) || "";
+      if (shot) {
+        if (jobId) shot._jobId = jobId;
+        if (bePoll) shot._backend = bePoll;
+      }
+      if (jobId && shot && shot.id) registerPendingJob(jobId, shot.id, bePoll);
+      if (!r.ok || (j && j.error)) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
+      // Materializing backends download CDN → /out saved[]; do not treat steps CDN as done.
+      const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
+        || bePoll === "modelscope-ai" || bePoll === "modelscope-cn";
+      // Enter poll unless we already have saved[] (materializing) or any url (others).
+      if (jobId && !(materializing ? pickSavedUrl(j) : pickUrl(j))) {
         // v0821m: MiniMax i2v success ~7min; old 40×2.5s=100s → false「没有可预览地址」while Fal IN_PROGRESS.
         // Hub image (魔搭 AI) routinely exceeds 100s — keep "? 180 : 40" then extend Hub ticks.
         const isVideoPoll = (state.mode === "video" || (payload && payload.kind === "video") || (stageOp === "i2v"));
         let pollMax = isVideoPoll ? 180 : 40;
         const pollMs = isVideoPoll ? 3000 : 2500;
-        const bePoll = currentBackend() || (payload && payload.backend) || "";
-        if (!isVideoPoll && (bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || bePoll === "huggingface" || bePoll === "fal")) {
+        // v0821o12: civitai comfy (krea2) same class as fal/hub — allow materialize+download ticks
+        if (!isVideoPoll && materializing) {
           pollMax = 120;
+          // v0821o37: civitai image preparing can exceed 5min (sample ~29min) — ≥720 @ 2.5s ≈30min
+          if (bePoll === "civitai") {
+            pollMax = 720;
+          }
         }
         for (let i = 0; i < pollMax; i++) {
           if (state.groupRunAbort) {
@@ -5831,15 +6871,22 @@
           await new Promise((res) => setTimeout(res, pollMs));
           const st = await (await fetch("/api/jobs/" + encodeURIComponent(jobId))).json();
           const stStatus = String((st && st.status) || "").toUpperCase();
+          // civitai submit lands as preparing — not a terminal error
           const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
-            || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING";
+            || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING"
+            || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED"
+            || stStatus === "SCHEDULED";
           if ((st.error || st.status === "failed") && !inFlight) {
-            const detail = formatErr(st.error || (st.wait && st.wait.log) || st.message || "任务失败");
-            throw new Error(detail);
+            // Throw raw so fail() → formatErrInfo keeps English in excerpt.
+            throw (st.error || (st.wait && st.wait.log) || st.message || "任务失败");
           }
-          // v0821i: never break on succeeded alone — wait for saved[]/video.url (pickUrl) or keep polling.
+          // v0821o16: materializing → break only on saved[]; else CDN/pickUrl ok for early break.
           j = st;
-          if (pickUrl(st)) break;
+          if (materializing) {
+            if (pickSavedUrl(st)) break;
+          } else if (pickSavedUrl(st) || pickUrl(st)) {
+            break;
+          }
           const doneish = st.status === "done" || st.status === "succeeded" || st.status === "completed";
           const tick = (i + 1) + "/" + pollMax;
           if (prefix) setMsg(prefix + (doneish ? "成片落盘中 " : "云端进行中 ") + tick);
@@ -5849,7 +6896,15 @@
       if (state.groupRunAbort) {
         return fail("已中止", "aborted", "warn");
       }
-      const url = pickUrl(j);
+      // Materialized /out preferred; CDN (pickUrl) only as fallback after poll ends.
+      const savedUrl = pickSavedUrl(j);
+      const url = savedUrl || pickUrl(j);
+      const durable = !!(savedUrl && String(savedUrl).indexOf("/out/") === 0);
+      if (url && materializing && !durable) {
+        try {
+          setMsg((prefix || "") + "成片暂为 CDN 地址（尚未落 /out）· 硬刷可能丢 · jobId=" + (jobId || "?"), "warn");
+        } catch (_) {}
+      }
       if (url && stage) {
         shot.stageUrls[String(stage.id)] = url;
         const nxt = nextRunnableStage(compiled, shot.stageUrls);
@@ -5865,25 +6920,35 @@
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        if (!durable && materializing) {
+          setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
+        } else {
+          setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        }
       } else if (url) {
         clearShotError(shot);
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
-        setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        if (!durable && materializing) {
+          setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
+        } else {
+          setMsg(prefix + "此镜完成，已写入卡片", "ok");
+        }
       } else {
+        // v0821o37: stillGoing must mirror inFlight (preparing/scheduled/queued/prepared)
         const stillGoing = !!(j && (
-          /^(pending|processing|running|in_queue|in_progress)$/i.test(String(j.status || ""))
+          /^(pending|processing|running|in_queue|in_progress|preparing|prepared|scheduled|queued)$/i.test(String(j.status || ""))
           || j.status === "IN_QUEUE" || j.status === "IN_PROGRESS"
           || !j.status
         ));
         return fail(stillGoing
           ? "等待超时，云端任务仍在进行中（可稍后用任务 id 再查）"
-          : "云端已返回，没有可预览地址", "blocked", stillGoing ? "warn" : "bad");
+          : "云端已返回，没有可预览地址", "blocked", stillGoing ? "warn" : "bad",
+          { jobId: jobId, backend: bePoll });
       }
     } catch (e) {
-      return fail(e, "error");
+      return fail(e, "error", "bad", { jobId: jobId, backend: bePoll || (typeof currentBackend === "function" ? currentBackend() : "") });
     }
     setShotBusy(shot, false);
     if (!opts.keepSend) markSendBusy(false);
@@ -5891,6 +6956,51 @@
     return { status: "done", stageOp: stageOp };
   }
 
+  function showSendToast(text, cls) {
+    const foot = $("dockFoot");
+    if (!foot) return;
+    let el = $("sendToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "sendToast";
+      el.className = "send-toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "assertive");
+      foot.insertBefore(el, foot.firstChild);
+    }
+    el.hidden = false;
+    el.className = "send-toast" + (cls ? (" " + cls) : "");
+    el.textContent = text == null ? "" : String(text);
+    try { el.setAttribute("data-send-toast", "1"); } catch (_) {}
+    if (showSendToast._timer) clearTimeout(showSendToast._timer);
+    // Keep reject toasts until next success ack; soft acks auto-clear.
+    if (cls !== "bad" && cls !== "warn") {
+      showSendToast._timer = setTimeout(function () {
+        if (el && el.className.indexOf("bad") < 0 && el.className.indexOf("warn") < 0) el.hidden = true;
+      }, 4200);
+    }
+  }
+  function surfaceSendReject(err, cls, shot) {
+    const tone = cls || "bad";
+    const text = err == null ? "无法生成" : String(err);
+    try {
+      const btn = $("send");
+      if (btn) {
+        btn.setAttribute("data-last-reject", text.slice(0, 180));
+        btn.setAttribute("data-send-fired", "1");
+      }
+    } catch (_) {}
+    if (shot && shot.kind === "shot" && typeof paintShotFail === "function") {
+      paintShotFail(shot, text, tone);
+    } else {
+      setMsg(text, tone);
+      state.dockMode = "expanded";
+      try { renderDock(); } catch (_) {}
+    }
+    showSendToast(text, tone);
+    try { setParamWarn(text, true); } catch (_) {}
+    return text;
+  }
   function setSendVisual(blocked, reason) {
     const btn = $("send");
     if (!btn) return;
@@ -5977,14 +7087,22 @@
     if (e) {
       try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
     }
+    // v0821o30: prove click reached fireSend (even if a gate rejects next)
+    try {
+      btn.setAttribute("data-send-fired", "1");
+      btn.setAttribute("data-send-fired-at", String(now));
+    } catch (_) {}
     // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
     const n = nodeById(state.selected);
     if (!n || n.kind !== "shot") {
-      setMsg("请先选中分镜再生成", "bad");
+      if (typeof surfaceSendReject === "function") surfaceSendReject("请先选中分镜再生成", "bad", null);
+      else setMsg("请先选中分镜再生成", "bad");
       return;
     }
     const failUi = function (err) {
-      if (typeof paintShotFail === "function") paintShotFail(n, err, "bad");
+      // v0821o30: never silent — expand capsule, keep collapsed .msg.bad visible, toast near ↑
+      if (typeof surfaceSendReject === "function") surfaceSendReject(err, "bad", n);
+      else if (typeof paintShotFail === "function") paintShotFail(n, err, "bad");
       else setMsg(err, "bad");
     };
     if (isStubMode()) {
@@ -5992,7 +7110,7 @@
       return;
     }
     if (state.mode === "video" && !frameAsset(n)) {
-      failUi("缺首帧 · 视频需要先连一张首帧图");
+      failUi("缺首帧 · 切到图片生成，或先上传/选择首帧");
       return;
     }
     if (needsPromptBeforeGenerate()) {
@@ -6003,6 +7121,18 @@
       failUi(outboundLoraBlockMsg());
       return;
     }
+    if (currentBackend() === "fal" && falHasLoras()) {
+      const falBaseGate = falLoraUnsupportedMsg();
+      if (falBaseGate) { failUi(falBaseGate); return; }
+      const pinnedNow = pinFalLoraServiceId(($("service") && $("service").value) || "");
+      if (!pinnedNow) { failUi(falLoraUnsupportedMsg() || "Fal LoRA 端点不支持"); return; }
+    }
+    if (currentBackend() === "huggingface" && hfHasLoras()) {
+      const hfBaseGate = hfLoraUnsupportedMsg();
+      if (hfBaseGate) { failUi(hfBaseGate); return; }
+      const pinnedHf = pinHfLoraServiceId(($("service") && $("service").value) || "");
+      if (!pinnedHf) { failUi(hfLoraUnsupportedMsg() || "HF LoRA 端点不支持"); return; }
+    }
     const gate = paramGateMessage();
     if (gate) {
       failUi(gate);
@@ -6010,6 +7140,8 @@
     }
     // v0821l: only ack when proceeding to generate()
     setMsg("已点生成");
+    if (typeof showSendToast === "function") showSendToast("已点生成", "ok");
+    try { btn.removeAttribute("data-last-reject"); } catch (_) {}
     generate();
   }
 
@@ -6038,7 +7170,7 @@
       foot.addEventListener("click", onFoot, true);
       foot.addEventListener("pointerdown", onFoot, true);
     }
-  }
+      }
 
   function bindComposerSendKeys() {
     if (bindComposerSendKeys._done) return;
@@ -6199,11 +7331,13 @@
     const n = shots().length;
     const id = uid("shot");
     const pos = newShotPosition(n);
+    state.mode = "image";
     state.nodes.push({
       id: id, kind: "shot", title: "分镜" + (n + 1),
       x: pos.x, y: pos.y,
       url: "", firstFrameId: "",
       prompt: "",
+      mode: "image",
     });
     separateOverlappingShots();
     compactShotsAt100();
@@ -6432,6 +7566,48 @@
   }
   if ($("btnImport")) $("btnImport").onclick = () => openImportModal();
 
+
+  // v0821o23: keep imported civitai serviceId honest on page↑ (live job 12100372 sent krea2 with sdxl dm).
+  function isCivitaiKrea2TurboService(sid) {
+    const s = String(sid || "").trim();
+    return s === CIVITAI_PREF_SERVICE || s === "image/comfy/krea2/turbo/createImage";
+  }
+  function civitaiServiceIdFromImportShot(shot) {
+    if (!shot) return "";
+    const pinned = String(shot.serviceId || "").trim();
+    if (pinned) return pinned;
+    const eco = String(shot.ecosystem || "").trim();
+    const ecoL = eco.toLowerCase();
+    const dm = String(shot.diffusionModel || "").trim().toLowerCase();
+    const blob = (ecoL + " " + dm).trim();
+    // Mirror providers/civitai.py ~1395 — never invent krea2 for sdxl/pony/illustrious.
+    if (ecoL === "sdxl" || /:sdxl:/.test(dm) || /\b(pony|illustrious|ilxl)\b/.test(blob)) {
+      return "image/sdcpp/sdxl/createImage";
+    }
+    if (ecoL === "flux" || /:flux/.test(dm)) return "image/sdcpp/flux1/createImage";
+    if (ecoL === "wan" || /:wan/.test(dm)) return "image/sdcpp/wan/createImage";
+    if (ecoL === "zimage" || eco === "zImage" || /:zimage/.test(dm)) return "image/sdcpp/zImage/turbo/createImage";
+    if (ecoL === "qwen" || /:qwen/.test(dm)) return "image/sdcpp/qwen/20b/createImage";
+    return "";
+  }
+  function resolveCivitaiOutboundServiceId(shot) {
+    const ui = ($("service") && $("service").value) || "";
+    const fromShot = civitaiServiceIdFromImportShot(shot);
+    if (fromShot) {
+      // Imported sdxl must not silently ship krea2/turbo.
+      if (!ui || (isCivitaiKrea2TurboService(ui) && fromShot !== ui)) return fromShot;
+    }
+    return ui || fromShot || "";
+  }
+  function syncCivitaiServiceSelect(sid) {
+    const s = String(sid || "").trim();
+    if (!s || !$("service")) return;
+    ensureSelectOpt($("service"), s);
+    if (!state.catalogById) state.catalogById = {};
+    if (!state.catalogById[s]) state.catalogById[s] = { id: s, name: s };
+    $("service").value = s;
+  }
+
   function looksCivitaiServiceId(id) {
     const s = String(id || "");
     return /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
@@ -6447,45 +7623,147 @@
     if (/^hf\//i.test(s) || /^huggingface\//i.test(s)) return true;
     return isHfRepo(s);
   }
+  function hfHasLoras() {
+    return Array.isArray(state.loras) && state.loras.length > 0;
+  }
+  function hfLoraBasesFromChips() {
+    return falLoraBasesFromChips();
+  }
+  function hfLoraEndpointLabel(ep) {
+    // o33: Fal /lora under HF is not an HF score path — label as Fal sibling / 请换家.
+    if (ep === FAL_FLUX_LORA_SERVICE) return "Flux LoRA · " + ep + " · 请换家 Fal（不计 HF 分）";
+    if (ep === FAL_LORA_PREF_SERVICE) return "Krea 2 Turbo LoRA · " + ep + " · 请换家 Fal（不计 HF 分）";
+    return ep;
+  }
+  /** @returns {{endpoint:string, reason:string, falSibling?:string, scoresAsHf?:boolean}} */
+  function resolveHfLoraEndpointFromChips() {
+    if (!hfHasLoras()) return { endpoint: "", reason: "", scoresAsHf: true };
+    const bases = hfLoraBasesFromChips();
+    if (!bases.length) {
+      return {
+        endpoint: "",
+        reason: "LoRA 无 AIR base · 无法匹配 HF Hub 路径（不硬钉 Krea-2-Turbo；Civitai LoRA 请换家 Fal）",
+        scoresAsHf: false
+      };
+    }
+    if (bases.length > 1) {
+      return {
+        endpoint: "",
+        reason: "多 LoRA base 不一致（" + bases.join("/") + "）· HF 不支持；请换家 Fal",
+        scoresAsHf: false
+      };
+    }
+    const base = bases[0];
+    const ep = HF_LORA_BY_BASE[base];
+    if (!ep) {
+      return {
+        endpoint: "",
+        reason: "LoRA base=" + base + " 无 HF Hub LoRA 路径 · " + HF_ROUTER_FAL_LORA_MSG,
+        scoresAsHf: false
+      };
+    }
+    // v0821o33: Fal /lora sibling exists but HF Router does not host it — NOT HF closed-loop.
+    // Keep chips; do not pin fal-ai/*lora as HF outbound. User must 换家 Fal (or Hub mid without Civitai LoRA).
+    return {
+      endpoint: "",
+      reason: HF_ROUTER_FAL_LORA_MSG,
+      falSibling: ep,
+      scoresAsHf: false
+    };
+  }
+  function hfLoraUnsupportedMsg() {
+    const r = resolveHfLoraEndpointFromChips();
+    return r.reason || "";
+  }
+  function isHfNoLoraHubDrift(sid) {
+    // Hub mids that map to fal-ai/*/turbo or flux/dev without loras[] — never keep when chips present.
+    const s = String(sid || "").trim();
+    if (!s) return true;
+    if (s === HF_LORA_PREF_SERVICE) return true;
+    if (looksHfServiceId(s)) return true;
+    return false;
+  }
   function pinHfLoraServiceId(sid, op) {
     const s = String(sid || "").trim();
-    const wantI2i = op === "i2i";
-    const pref = wantI2i ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE;
-    // Empty / Fal sibling / Civitai image/… → Hub pref for this op.
+    const wantI2i = op === "i2i" || (op == null && typeof currentGraphOp === "function" && currentGraphOp() === "i2i");
+    // No LoRAs: foreign Fal/Civitai → Hub pref for this op (t2i turbo / i2i Qwen-Edit).
     // Never rewrite Hub → fal-ai/.../lora. Turbo is the t2i pref; rewrite only that to i2i pref.
-    if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return pref;
-    if (wantI2i && s === HF_LORA_PREF_SERVICE) return HF_I2I_PREF_SERVICE;
-    return s;
+    if (!hfHasLoras()) {
+      const pref = wantI2i ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE;
+      if (!s || looksFalServiceId(s) || looksCivitaiServiceId(s)) return pref;
+      if (wantI2i && s === HF_LORA_PREF_SERVICE) return HF_I2I_PREF_SERVICE;
+      return s;
+    }
+    const resolved = resolveHfLoraEndpointFromChips();
+    state._hfLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      // Honest 不支持 — never hard-pin Hub turbo / wrong family.
+      return "";
+    }
+    const want = resolved.endpoint;
+    // Empty / Civitai / Hub no-LoRA / Fal t2i drift / wrong Fal family → official LoRA endpoint for AIR base.
+    if (!s || looksCivitaiServiceId(s) || isHfNoLoraHubDrift(s) || isFalFluxLoraDrift(s)) return want;
+    if (looksFalServiceId(s) && s !== want) return want;
+    if (s !== want) return want;
+    return want;
   }
   function ensureHfLoraServiceSelected() {
     const be = ($("backend") && $("backend").value) || "";
     if (be !== "huggingface") return;
     const sel = $("service");
     if (!sel) return;
-    const want = pinHfLoraServiceId(sel.value || state._pinHfLoraService || "", currentGraphOp());
+    if (!hfHasLoras()) {
+      const want = pinHfLoraServiceId(sel.value || state._pinHfLoraService || "", currentGraphOp());
+      ensureSelectOpt(sel, want);
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === want) {
+          const t = sel.options[i].textContent || "";
+          if (want === HF_LORA_PREF_SERVICE && (!t || t === want || t === "默认模型" || t.indexOf(want) < 0)) {
+            sel.options[i].textContent = "Krea 2 Turbo · " + want;
+          }
+          break;
+        }
+      }
+      sel.value = want;
+      if (state.catalogById && state.catalogById[want]) return;
+      return;
+    }
+    const resolved = resolveHfLoraEndpointFromChips();
+    state._hfLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      try { setParamWarn(resolved.reason, true); } catch (_) {}
+      state._pinHfLoraService = "";
+      // Keep chips — never delete LoRA on unsupported base.
+      return;
+    }
+    const want = pinHfLoraServiceId(sel.value) || resolved.endpoint;
+    if (!want) return;
     ensureSelectOpt(sel, want);
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         const t = sel.options[i].textContent || "";
-        if (want === HF_LORA_PREF_SERVICE && (!t || t === want || t === "默认模型" || t.indexOf(want) < 0)) {
-          sel.options[i].textContent = "Krea 2 Turbo · " + want;
+        if (!t || t === want || t === "默认模型" || t.indexOf("Flux LoRA") === 0 || t.indexOf("Krea 2 Turbo LoRA") === 0) {
+          sel.options[i].textContent = hfLoraEndpointLabel(want);
         }
         break;
       }
     }
     sel.value = want;
-    // Do not fabricate a fake catalog row — only pin a real / already-listed id.
+    state._pinHfLoraService = want;
+    state._pendingService = want;
     if (state.catalogById && state.catalogById[want]) return;
   }
   function hfLoraFixtureImport() {
     return {
       backend: "huggingface",
-      serviceId: "krea/Krea-2-Turbo",
-      serviceName: "Krea 2 Turbo",
+      serviceId: FAL_LORA_PREF_SERVICE,
+      serviceName: "Krea 2 Turbo LoRA",
       kind: "image",
       prompt: "portrait, soft light, detailed face, cinematic",
       loras: [{
         versionId: 3231694,
+        air: "urn:air:krea2:lora:civitai:fixture@3231694",
         path: "https://civitai.com/api/download/models/3231694",
         downloadUrl: "https://civitai.com/api/download/models/3231694",
         url: "https://civitai.com/api/download/models/3231694",
@@ -6497,7 +7775,10 @@
   }
   async function mountHfLoraFixture() {
     closeImportModal();
-    return applyImport(hfLoraFixtureImport());
+    state._pinHfLoraService = FAL_LORA_PREF_SERVICE;
+    const ok = await applyImport(hfLoraFixtureImport());
+    ensureHfLoraServiceSelected();
+    return ok;
   }
 
   function pinMsLoraServiceId(sid) {
@@ -6548,22 +7829,90 @@
     setMsg("已选择魔搭 Krea 2 Turbo · 未预置 LoRA，请填写与底模兼容的真实 Hub 仓库和权重", "warn");
   }
 
-  // v0821o2: when LoRAs ship, keep z-image/turbo/lora — never empty→flux/schnell→sibling flux-lora
+  // v0821o29: Fal+LoRA endpoint from AIR base — flux1→flux-lora; krea2→krea-2/turbo/lora; else honest 不支持.
   function falHasLoras() {
     return Array.isArray(state.loras) && state.loras.length > 0;
   }
+  function loraAirBase(l) {
+    const air = String((l && (l.air || l.AIR || "")) || "").trim();
+    const m = air.match(/^urn:air:([^:]+):lora:/i);
+    return m ? String(m[1] || "").toLowerCase() : "";
+  }
+  function falLoraBasesFromChips() {
+    const list = Array.isArray(state.loras) ? state.loras : [];
+    const bases = [];
+    list.forEach(function (l) {
+      const b = loraAirBase(l);
+      if (b && bases.indexOf(b) < 0) bases.push(b);
+    });
+    return bases;
+  }
+  function falLoraEndpointLabel(ep) {
+    if (ep === FAL_FLUX_LORA_SERVICE) return "Flux LoRA · " + ep;
+    if (ep === FAL_LORA_PREF_SERVICE) return "Krea 2 Turbo LoRA · " + ep;
+    return ep;
+  }
+  /** @returns {{endpoint:string, reason:string}} */
+  function resolveFalLoraEndpointFromChips() {
+    if (!falHasLoras()) return { endpoint: "", reason: "" };
+    const bases = falLoraBasesFromChips();
+    if (!bases.length) {
+      return {
+        endpoint: "",
+        reason: "LoRA 无 AIR base · 无法匹配官方 Fal 端点（不硬钉 krea-2）"
+      };
+    }
+    if (bases.length > 1) {
+      return {
+        endpoint: "",
+        reason: "多 LoRA base 不一致（" + bases.join("/") + "）· 不支持一锅端到 krea-2"
+      };
+    }
+    const base = bases[0];
+    const ep = FAL_LORA_BY_BASE[base];
+    if (!ep) {
+      return {
+        endpoint: "",
+        reason: "LoRA base=" + base + " 无官方 Fal LoRA 端点 · 不支持（不硬钉错误家族）"
+      };
+    }
+    return { endpoint: ep, reason: "" };
+  }
+  function falLoraUnsupportedMsg() {
+    const r = resolveFalLoraEndpointFromChips();
+    return r.reason || "";
+  }
   function isFalFluxLoraDrift(sid) {
+    // Legacy name kept for tests: bare t2i / empty defaults that are NOT a LoRA family match.
     const s = String(sid || "").trim();
-    return s === "fal-ai/flux-lora" || s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT;
+    return s === "fal-ai/flux/schnell" || s === FAL_T2I_DEFAULT || s === "fal-ai/flux/dev";
   }
   function pinFalLoraServiceId(sid) {
     const s = String(sid || "").trim();
-    if (!falHasLoras()) return s;
-    // Explicit turbo → turbo/lora sibling only; never fuzzy to flux-lora
-    if (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora") return FAL_LORA_PREF_SERVICE;
-    if (s === FAL_LORA_PREF_SERVICE) return s;
-    if (!s || isFalFluxLoraDrift(s)) return FAL_LORA_PREF_SERVICE;
-    return s;
+    // No LoRAs: only rewrite foreign civitai/HF ids to Fal t2i default.
+    if (!falHasLoras()) {
+      if (looksCivitaiServiceId(s) || looksHfServiceId(s)) return FAL_T2I_DEFAULT;
+      return s;
+    }
+    const resolved = resolveFalLoraEndpointFromChips();
+    state._falLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      // Honest 不支持 — never hard-pin krea-2 / flux-lora wrong family.
+      return "";
+    }
+    const want = resolved.endpoint;
+    // Foreign / empty / t2i drift → official LoRA family for this AIR base.
+    if (!s || looksCivitaiServiceId(s) || looksHfServiceId(s) || isFalFluxLoraDrift(s)) return want;
+    // Same-family turbo sibling → /lora
+    if (want === FAL_LORA_PREF_SERVICE && (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora")) {
+      return want;
+    }
+    if (want === FAL_FLUX_LORA_SERVICE && (s === FAL_FLUX_LORA_SERVICE || s.indexOf("flux-lora") >= 0)) {
+      return FAL_FLUX_LORA_SERVICE;
+    }
+    // Wrong family selected (e.g. krea while chips are flux1) → correct endpoint.
+    if (s !== want) return want;
+    return want;
   }
   function ensureFalLoraServiceSelected() {
     if (!falHasLoras()) return;
@@ -6571,21 +7920,29 @@
     if (be !== "fal") return;
     const sel = $("service");
     if (!sel) return;
-    const want = pinFalLoraServiceId(sel.value);
-    // Visible label: never leave 「默认模型」 when LoRAs mounted
+    const resolved = resolveFalLoraEndpointFromChips();
+    state._falLoraUnsupported = resolved.reason || "";
+    if (resolved.reason) {
+      try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      try { setParamWarn(resolved.reason, true); } catch (_) {}
+      state._pinFalLoraService = "";
+      return;
+    }
+    const want = pinFalLoraServiceId(sel.value) || resolved.endpoint;
+    if (!want) return;
     ensureSelectOpt(sel, want);
-    // Prefer a clear option label for the pinned id
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         const t = sel.options[i].textContent || "";
-        if (!t || t === want || t === "默认模型") {
-          sel.options[i].textContent = "Krea 2 Turbo LoRA · " + want;
+        if (!t || t === want || t === "默认模型" || t.indexOf("Krea 2 Turbo LoRA") === 0 || t.indexOf("Flux LoRA") === 0) {
+          sel.options[i].textContent = falLoraEndpointLabel(want);
         }
         break;
       }
     }
     sel.value = want;
-    // Do not fabricate a fake catalog row for a missing Krea / Z-Image id.
+    state._pinFalLoraService = want;
+    state._pendingService = want;
     if (state.catalogById && state.catalogById[want]) return;
   }
 
@@ -6625,10 +7982,11 @@
     }
     const id = uid("shot");
     const pos = newShotPosition(shots().length);
+    state.mode = "image";
     const n = {
       id: id, kind: "shot", title: "分镜1",
       x: pos.x, y: pos.y, url: "", firstFrameId: "",
-      prompt: "",
+      prompt: "", mode: "image",
     };
     state.nodes.push(n);
     selectNode(id, { expand: true });
@@ -6678,6 +8036,8 @@
         if (!state.catalogById[sid]) {
           state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
         }
+        // v0821o23: persist imported serviceId on shot — #service alone is lost on catalog reload / reselect.
+        if (shot && !hardErr) shot.serviceId = sid;
       }
     } else if (wantFal) {
       if ($("backend")) $("backend").value = "fal";
@@ -6687,12 +8047,25 @@
       if (looksCivitaiServiceId(sid)) {
         hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
       } else {
-        // v0821o2: pin turbo/lora; reject flux-lora drift on fixture/import
-        if (Array.isArray(j.loras) && j.loras.length && isFalFluxLoraDrift(sid)) {
-          sid = FAL_LORA_PREF_SERVICE;
-        }
-        if (Array.isArray(j.loras) && j.loras.length && (sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo" || !sid)) {
-          sid = FAL_LORA_PREF_SERVICE;
+        // v0821o29: if import carries LoRAs, prefer AIR-base endpoint (fixture krea stays krea).
+        if (Array.isArray(j.loras) && j.loras.length) {
+          // Temporarily mirror chips onto state for base resolve (applyImport sets chips later too).
+          const prev = state.loras;
+          state.loras = j.loras;
+          const resolved = resolveFalLoraEndpointFromChips();
+          state.loras = prev;
+          if (resolved.reason) {
+            hardErr = resolved.reason;
+            sid = "";
+            state._pinFalLoraService = "";
+          } else if (resolved.endpoint) {
+            if (!sid || isFalFluxLoraDrift(sid) || looksCivitaiServiceId(sid) || looksHfServiceId(sid)
+                || sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo") {
+              sid = resolved.endpoint;
+            }
+            // Wrong family vs AIR base → correct (never keep krea for flux1).
+            if (sid !== resolved.endpoint) sid = resolved.endpoint;
+          }
         }
         state._pendingService = sid;
         state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid : (state._pinFalLoraService || "");
@@ -6722,9 +8095,14 @@
       if ($("backend")) $("backend").value = "huggingface";
       syncParamSurface();
       let sid = String(j.serviceId || "").trim() || HF_LORA_PREF_SERVICE;
-      // Forbid drift to Civitai image/… or fal-ai/… (Router has no /lora sibling)
-      if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
-        hardErr = "Hugging Face 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
+      // v0821o31: allow official Fal LoRA endpoints (flux-lora / krea-2/turbo/lora) when import carries loras[].
+      // Still reject Civitai image/… and bare no-LoRA fal-ai/*/turbo (Router must not silent-swap sibling).
+      const importHasLoras = Array.isArray(j.loras) && j.loras.length > 0;
+      const falLoraOk = looksFalServiceId(sid) && importHasLoras && (
+        sid === FAL_FLUX_LORA_SERVICE || sid === FAL_LORA_PREF_SERVICE || /\/lora\b/i.test(sid) || sid.indexOf("flux-lora") >= 0
+      );
+      if (looksCivitaiServiceId(sid) || (looksFalServiceId(sid) && !falLoraOk)) {
+        hardErr = "Hugging Face 导入拒绝 Fal/Civitai 无 LoRA serviceId " + sid + "（有 LoRA 时请用 fal-ai/flux-lora 等）";
         sid = "";
         state._pinHfLoraService = "";
       }
@@ -6815,6 +8193,21 @@
       const cfgVal = j.cfg != null ? j.cfg : j.cfgScale;
       if (cfgVal != null) { shot.cfg = cfgVal; shot.cfgScale = cfgVal; }
       else { delete shot.cfg; delete shot.cfgScale; }
+      // v0821o22: any hinablue/civitai import — keep checkpoint AIR on shot for outbound (never invent).
+      // v0821o38: do NOT delete dm/cn/eco when j omits the key — only assign when present (prevent wipe races).
+      if (j.diffusionModel != null && String(j.diffusionModel).trim()) {
+        shot.diffusionModel = String(j.diffusionModel).trim();
+      }
+      if (j.checkpointName != null && String(j.checkpointName).trim()) {
+        shot.checkpointName = String(j.checkpointName).trim();
+      }
+      if (j.ecosystem != null && String(j.ecosystem).trim()) {
+        shot.ecosystem = String(j.ecosystem).trim();
+      }
+      // v0821o23: keep import serviceId even if #service later drifts to catalog pref (krea2).
+      if (j.serviceId != null && String(j.serviceId).trim()) {
+        shot.serviceId = String(j.serviceId).trim();
+      }
     }
     // Backend may silently align 1672→1664 ((h//16)*16). Surface it; never treat as success-ok.
     {
@@ -6840,18 +8233,39 @@
     // v0821o3: missing loras[] clears chips for Fal and all backends (was wantCivitai-only; reviewer ~3589)
     if (Array.isArray(j.loras)) {
       // v0821n3-import-air: copy air/name/strength/versionId/path onto chips (normalizeLora + reaffirm air)
+      // v0821o36: drop non-LoRA AIRs (esp. equals j.diffusionModel); never invent strength
+      const dmAir = (j.diffusionModel != null) ? String(j.diffusionModel).trim() : "";
+      let droppedCkpt = 0;
       state.loras = j.loras.map(function (row) {
         const n = normalizeLora(row || {});
         if (row && row.air) n.air = String(row.air).trim();
-        if (row && row.versionId != null && String(row.versionId).trim() !== "") {
-          n.versionId = String(row.versionId);
-        }
-        if (row && (row.path || row.downloadUrl) && !n.path) {
-          n.path = row.path || row.downloadUrl || n.path;
-          n.downloadUrl = row.downloadUrl || n.path;
+        // AIR @version wins over wrong sibling versionId/path from import JSON.
+        const vid = loraVersionId({
+          air: n.air,
+          versionId: row && row.versionId,
+          modelVersionId: row && row.modelVersionId,
+        }) || loraVersionId(n);
+        if (vid) {
+          n.versionId = String(vid);
+          const reconciled = loraDownloadUrl(n);
+          if (reconciled) {
+            n.path = reconciled;
+            n.downloadUrl = reconciled;
+          }
         }
         return n;
+      }).filter(function (n) {
+        if (shouldDropNonLoraAir(n && n.air, dmAir)) {
+          droppedCkpt++;
+          return false;
+        }
+        return true;
       });
+      if (droppedCkpt > 0) {
+        try {
+          setMsg("导入已丢弃 " + droppedCkpt + " 个非 LoRA AIR（checkpoint 只留 diffusionModel）", "warn");
+        } catch (_) {}
+      }
     } else {
       state.loras = [];
     }
@@ -7065,28 +8479,47 @@
         (be === "modelscope-ai" || be === "modelscope-cn") ? state._pinMsLoraService : "");
       const pinWant = state._pendingService != null ? state._pendingService
         : (sameCatalog ? prevService : (providerPin || ""));
+      const falResolvedPin = (be === "fal" && falHasLoras()) ? resolveFalLoraEndpointFromChips() : null;
       const needLoraPin = (be === "fal" && state.mode !== "video" && (
-        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === "fal-ai/krea-2/turbo"
+        falHasLoras() || pinWant === FAL_LORA_PREF_SERVICE || pinWant === FAL_FLUX_LORA_SERVICE || pinWant === "fal-ai/krea-2/turbo"
       ));
       if (needLoraPin) {
-        const pinId = FAL_LORA_PREF_SERVICE;
-        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
-        if (pinItem) {
-          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+        const pinId = (falResolvedPin && falResolvedPin.endpoint)
+          || state._pinFalLoraService
+          || pinWant
+          || FAL_LORA_PREF_SERVICE;
+        if (pinId) {
+          const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+          if (pinItem) {
+            items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+          }
         }
       }
       const hfPref = selectedShotWantsI2i() ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE;
+      const hfResolvedPin = (be === "huggingface" && hfHasLoras()) ? resolveHfLoraEndpointFromChips() : null;
       const needHfPin = (be === "huggingface" && mode !== "video" && (
         (Array.isArray(state.loras) && state.loras.length)
         || pinWant === HF_LORA_PREF_SERVICE
         || pinWant === HF_I2I_PREF_SERVICE
+        || pinWant === FAL_FLUX_LORA_SERVICE
+        || pinWant === FAL_LORA_PREF_SERVICE
         || state._pinHfLoraService
       ));
       if (needHfPin) {
-        const pinId = state._pinHfLoraService || hfPref;
-        const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
-        if (pinItem) {
-          items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+        // o33: with LoRA chips, do NOT inject fal-ai/*lora into HF catalog as if it scored HF.
+        // Surface honest 请换家 Fal via ensureHfLoraServiceSelected / gates; Hub mid only when no chips.
+        const pinId = (hfResolvedPin && hfResolvedPin.endpoint)
+          || state._pinHfLoraService
+          || (hfHasLoras() ? "" : hfPref);
+        if (pinId && !(hfHasLoras() && looksFalServiceId(pinId))) {
+          const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
+          if (pinItem) {
+            items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));
+          }
+        }
+        if (hfHasLoras() && hfResolvedPin && hfResolvedPin.reason) {
+          try { setMsg(hfResolvedPin.reason, "bad"); } catch (_) {}
+          try { setParamWarn(hfResolvedPin.reason, true); } catch (_) {}
         }
       }
       const needMsPin = (mode !== "video" && (be === "modelscope-ai" || be === "modelscope-cn") && (
@@ -7164,8 +8597,41 @@
   $("backend").onchange = function () {
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
-    applyServiceConstraints();
-    loadCatalog().then(function () { applyServiceConstraints(); });
+    const be = ($("backend") && $("backend").value) || "";
+    // v0821o26: drop foreign #service when 换家 so catalog keep= does not re-select civitai/HF id on Fal.
+    if ($("service")) {
+      const cur = String($("service").value || "").trim();
+      if (be === "fal" && (looksCivitaiServiceId(cur) || looksHfServiceId(cur))) $("service").value = "";
+      if (be === "civitai" && (looksFalServiceId(cur) || looksHfServiceId(cur))) $("service").value = "";
+      if (be === "huggingface" && (looksFalServiceId(cur) || looksCivitaiServiceId(cur))) $("service").value = "";
+      if ((be === "modelscope-ai" || be === "modelscope-cn") && (looksFalServiceId(cur) || looksCivitaiServiceId(cur))) $("service").value = "";
+    }
+    if (be === "fal" && falHasLoras()) {
+      const resolved = resolveFalLoraEndpointFromChips();
+      state._falLoraUnsupported = resolved.reason || "";
+      state._pendingService = resolved.endpoint || "";
+      state._pinFalLoraService = resolved.endpoint || "";
+      if (resolved.reason) {
+        try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      }
+    }
+    if (be === "huggingface" && hfHasLoras()) {
+      const resolved = resolveHfLoraEndpointFromChips();
+      state._hfLoraUnsupported = resolved.reason || "";
+      state._pendingService = resolved.endpoint || "";
+      state._pinHfLoraService = resolved.endpoint || "";
+      if (resolved.reason) {
+        try { setMsg(resolved.reason, "bad"); } catch (_) {}
+      }
+    }
+    syncParamSurface();
+    const p = loadCatalog();
+    Promise.resolve(p).then(function () {
+      if (be === "fal") ensureFalLoraServiceSelected();
+      else if (be === "huggingface") ensureHfLoraServiceSelected();
+      else if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
+      syncLoraUi();
+    }).catch(function () { syncLoraUi(); });
   };
   if ($("catalogMore")) {
     $("catalogMore").addEventListener("click", function () {
@@ -7209,15 +8675,41 @@
   if ($("nanoRes")) {
     $("nanoRes").addEventListener("change", function () { persist(); paramGateMessage(); });
   }
+  // v0821o26: rebuild #backend from /api/providers — every registered provider, honest labels.
+  // Never filter to hasKey-only (铁律: 禁止隐藏 API 已支持能力 / 禁止单家盯梢).
+  function syncBackendOptionsFromProviders(items) {
+    const sel = $("backend");
+    if (!sel || !Array.isArray(items) || !items.length) return;
+    const keep = String(sel.value || "").trim();
+    const seen = {};
+    const rows = [];
+    items.forEach(function (it) {
+      if (!it || !it.id || seen[it.id]) return;
+      seen[it.id] = true;
+      rows.push({ id: String(it.id), label: String(it.label || it.id) });
+    });
+    if (!rows.length) return;
+    sel.innerHTML = "";
+    rows.forEach(function (row) {
+      const o = document.createElement("option");
+      o.value = row.id;
+      o.textContent = row.label;
+      sel.appendChild(o);
+    });
+    if (keep && seen[keep]) sel.value = keep;
+    else if (!sel.value && rows[0]) sel.value = rows[0].id;
+  }
   async function loadProviderCaps() {
     try {
       const r = await fetch("/api/providers");
       const j = await r.json();
       const map = {};
-      (j.items || []).forEach(function (it) {
+      const items = j.items || [];
+      items.forEach(function (it) {
         if (it && it.id) map[it.id] = it.capabilities || {};
       });
       state._providerCaps = map;
+      syncBackendOptionsFromProviders(items);
     } catch (_) {}
     try {
       const r = await fetch("/api/capabilities");
@@ -7235,6 +8727,25 @@
   separateOverlappingShots();
   if (state.cam.s >= 1) compactShotsAt100();
   ensureWorkspaceModel();
+  // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
+  hydrateFromServer().then(function (changed) {
+    if (changed) {
+      try {
+        separateOverlappingShots();
+        ensureWorkspaceModel();
+        applyCam();
+        renderCards();
+        drawWires();
+        renderRail();
+        const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
+        selectNode(state.selected || (firstShot && firstShot.id) || "shot-1", { collapsed: true });
+        renderWorkspace();
+        if (typeof renderDock === "function") renderDock();
+      } catch (_) {}
+    }
+    // v0821o46: always try resume pending jobs after hydrate (tab death / OOM mid-poll)
+    return resumePendingJobs();
+  }).catch(function () {});
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
   let _wantHfLoraFixture = false;
@@ -7279,13 +8790,35 @@
       refCap: function () {
         const n = nodeById(state.selected);
         const hint = document.querySelector(".ref-cap-hint");
+        const empties = document.querySelectorAll("#refs .ref-slot-empty");
         return {
           n: countRefUrls(null, n).length,
+          displayN: n ? displayRefUrls(n).length : 0,
           cap: maxRefCount(catalogItemForService()),
           msg: refCapGateMessage(n),
+          unused: refUnusedGateMessage(n),
           hint: hint ? String(hint.textContent || "") : "",
+          emptySlots: empties ? empties.length : 0,
+          siblingId: editSiblingId(catalogItemForService()),
+          eatsRefs: catalogEatsRefs(catalogItemForService()),
           sendReason: $("send") ? $("send").getAttribute("data-reason") : "",
         };
+      },
+      fillRefsToCap: function () {
+        const n = nodeById(state.selected);
+        const added = fillRefSlotsToCap(n);
+        renderCards(); drawWires(); renderDock();
+        return {
+          added: added,
+          n: countRefUrls(null, n).length,
+          displayN: displayRefUrls(n).length,
+          cap: maxRefCount(catalogItemForService()),
+        };
+      },
+      applyEditSibling: applyEditSibling,
+      attachExtraImages: function (payload) {
+        const n = nodeById(state.selected);
+        return attachExtraImages(payload || {}, n);
       },
     };
   }

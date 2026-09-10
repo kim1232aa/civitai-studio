@@ -236,6 +236,67 @@ def normalize_scheduler(name: str, allowed: list | tuple | None = None) -> str:
     return canon
 
 
+
+# Studio/Comfy import names → sdcpp official sampleMethod tokens (capabilities enum).
+# Locked (api对接助手): dpmpp_2m → dpm++2m. Do not invent strength / silent krea2.
+_SAMPLER_TO_SDCPP = {
+    "dpmpp_2m": "dpm++2m",
+    "dpm++2m": "dpm++2m",
+    "dpmpp2m": "dpm++2m",
+    "dpmpp_2s_ancestral": "dpm++2s_a",
+    "dpm++2s_a": "dpm++2s_a",
+    "dpm_2": "dpm2",
+    "dpm2": "dpm2",
+    "euler_ancestral": "euler_a",
+    "euler_a": "euler_a",
+    "eulera": "euler_a",
+}
+
+
+def _compact_fold(name: str) -> str:
+    """Fold for enum match: dpm++2m and dpmpp_2m both → dpmpp2m."""
+    s = _fold_name(name)
+    return s.replace("_", "")
+
+
+def match_allowed_choice(raw, allowed) -> str:
+    """Map a studio/import choice onto an exact allowlisted enum token, or "".
+
+    Prefer exact official names. Never invent a substitute outside the allowlist.
+    """
+    if allowed is None:
+        return str(raw or "").strip()
+    allow = [str(x) for x in allowed]
+    allow_set = set(allow)
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    if value in allow_set:
+        return value
+    folded = _fold_name(value)
+    if folded in allow_set:
+        return folded
+    # Explicit honest aliases (Comfy ↔ sdcpp)
+    alias = _SAMPLER_TO_SDCPP.get(folded) or _SAMPLER_TO_SDCPP.get(value)
+    if alias and alias in allow_set:
+        return alias
+    # Compact fold: dpmpp_2m ↔ dpm++2m
+    compact = _compact_fold(value)
+    for item in allow:
+        if _compact_fold(item) == compact:
+            return item
+    # Scheduler / other fields: canon then compact
+    canon = SCHEDULER_CANON.get(folded) or SAMPLER_CANON.get(folded)
+    if canon and canon in allow_set:
+        return canon
+    if canon:
+        cfold = _compact_fold(canon)
+        for item in allow:
+            if _compact_fold(item) == cfold:
+                return item
+    return ""
+
+
 def split_sampler_scheduler(sampler: str, scheduler: str = "") -> tuple[str, str]:
     samp = (sampler or "").strip()
     sched = (scheduler or "").strip()

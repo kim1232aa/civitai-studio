@@ -30,6 +30,8 @@ IMG_MODELS = API + "/images/models"
 VID_MODELS = API + "/video-models?detailed=true"
 GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
+GEN_IMAGES_EDIT = API + "/images/edit"
+GEN_IMAGES_EDITS = API + "/images/edits"
 GEN_VIDEO = BASE + "/api/generate-video"
 VIDEO_STATUS = BASE + "/api/video/status"
 TEXT_MODELS = API + "/models?detailed=true"
@@ -460,7 +462,9 @@ def sanitize_submitted_for_persist(body: dict, lora_meta: list | None = None) ->
             m = meta[i] if i < len(meta) and isinstance(meta[i], dict) else {}
             vid = m.get("versionId") or civitai_version_id(it) or civitai_version_id(m)
             path = persist_safe_lora_path(it.get("path") or "", vid)
-            row = {"path": path, "scale": it.get("scale")}
+            row = {"path": path}
+            if it.get("scale") not in (None, ""):
+                row["scale"] = it.get("scale")
             if m.get("name"):
                 row["name"] = m.get("name")
             if vid:
@@ -505,6 +509,35 @@ def model_supports_lora(spec: dict | None, mid: str = "") -> bool:
     return "lora" in blob
 
 
+def _nano_lora_scale_field(it) -> float | None:
+    """Fal-aligned: null/missing strength → omit scale (never invent 1.0).
+
+    Plain string LoRA entries omit scale. Invalid non-numeric → ValueError.
+    Clip only when a real numeric scale is provided.
+    """
+    if isinstance(it, str):
+        return None
+    if not isinstance(it, dict):
+        return None
+    if "scale" in it:
+        raw_s = it.get("scale")
+    elif "strength" in it:
+        raw_s = it.get("strength")
+    else:
+        return None
+    if raw_s in (None, ""):
+        return None
+    try:
+        if isinstance(raw_s, bool):
+            raise ValueError()
+        scale = float(raw_s)
+        if not math.isfinite(scale):
+            raise ValueError()
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"lora scale 必须是有限数值，收到 {raw_s!r}，不能缺省为 1.0") from None
+    return max(0.0, min(4.0, scale))
+
+
 def resolve_nano_loras(payload: dict, *, timeout: float = 30):
     """Resolve ≤3 LoRAs to clean B2 signed paths at generate time. Fail closed.
 
@@ -534,21 +567,25 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
     failed = []
     out = []
     for it in raw:
+        scale = None
         if isinstance(it, str):
             name = it.strip() or "LoRA"
-            scale = 1.0
+            # o50: plain string → omit scale (do not invent 1.0)
+            try:
+                scale = _nano_lora_scale_field(it)
+            except ValueError as e:
+                failed.append({"name": name, "error": str(e)})
+                continue
             vid = civitai_version_id(it)
             dl = civitai_download_api_url(it)
             path_hint = it.strip()
         elif isinstance(it, dict):
             name = str(it.get("name") or it.get("path") or it.get("air") or "LoRA")
             try:
-                raw_s = it.get("scale")
-                if raw_s is None:
-                    raw_s = it.get("strength")
-                scale = float(raw_s) if raw_s not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                scale = 1.0
+                scale = _nano_lora_scale_field(it)
+            except ValueError as e:
+                failed.append({"name": name, "error": str(e)})
+                continue
             vid = civitai_version_id(it)
             dl = civitai_download_api_url(it)
             path_hint = (
@@ -561,7 +598,6 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
             failed.append({"name": "LoRA", "error": "条目格式无效"})
             continue
 
-        scale = max(0.0, min(4.0, scale))
         try:
             if not path_hint or path_hint.lower().startswith("urn:"):
                 raise ValueError("无下载链 / versionId（无直链）")
@@ -608,13 +644,15 @@ def resolve_nano_loras(payload: dict, *, timeout: float = 30):
             if "civitai.com/api/download" in resolved.lower() and "authorization=" not in resolved.lower():
                 # Still the API URL — Nano may not follow with our key; fail closed
                 raise ValueError("未拿到 B2 直链")
-            out.append({
+            row = {
                 "path": resolved,
-                "scale": scale,
                 "name": name,
                 "versionId": vid or "",
                 "downloadUrl": dl or (f"https://civitai.com/api/download/models/{vid}" if vid else ""),
-            })
+            }
+            if scale is not None:
+                row["scale"] = scale
+            out.append(row)
         except Exception as e:
             failed.append({
                 "name": name,
@@ -640,25 +678,22 @@ def _loras(payload: dict) -> list:
     for it in raw if isinstance(raw, list) else []:
         if isinstance(it, str):
             path = it.strip()
-            scale = 1.0
             name = path
+            scale = _nano_lora_scale_field(it)  # None → omit
         elif isinstance(it, dict):
             path = (it.get("path") or it.get("downloadUrl") or it.get("url") or it.get("air") or "").strip()
             name = it.get("name") or path
-            try:
-                raw_s = it.get("scale")
-                if raw_s is None:
-                    raw_s = it.get("strength")
-                scale = float(raw_s) if raw_s not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                scale = 1.0
+            scale = _nano_lora_scale_field(it)  # ValueError fail-closed; None omit
             if (not path or path.lower().startswith("urn:")) and str(it.get("versionId") or "").isdigit():
                 path = "https://civitai.com/api/download/models/" + str(it.get("versionId"))
         else:
             continue
         if not path or path.lower().startswith("urn:"):
             continue
-        out.append({"path": path, "scale": max(0.0, min(4.0, scale)), "name": name})
+        row = {"path": path, "name": name}
+        if scale is not None:
+            row["scale"] = scale
+        out.append(row)
         if len(out) >= 3:
             break
     return out
@@ -931,23 +966,94 @@ def _image_body(payload: dict, spec: dict) -> dict:
         body["guidance_scale"] = _finite_number(cfg, "cfgScale")
     loras = _loras(payload)
     if loras:
-        body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
+        packed = []
+        for x in loras:
+            row = {"path": x["path"]}
+            if "scale" in x:
+                row["scale"] = x["scale"]
+            packed.append(row)
+        body["loras"] = packed
         for i, item in enumerate(loras, 1):
             body[f"lora_{i}_url"] = item["path"]
-            body[f"lora_{i}_scale"] = item["scale"]
+            if "scale" in item:
+                body[f"lora_{i}_scale"] = item["scale"]
     if payload.get("allowMatureContent"):
         body["enable_safety_checker"] = False
     return body
 
 
 def _core_image_body(full: dict) -> dict:
+    """OAI / generations + edit JSON body: imageDataUrl(s) only — never mix input_references.
+
+    Normalized POST /api/v1/images keeps input_references on `full`. This helper is for
+    OpenAI-compatible routes that expect imageDataUrl / imageDataUrls instead.
+    """
     keep = (
         "model", "prompt", "n", "nImages", "resolution", "size", "aspect_ratio",
-        "seed", "negative_prompt", "input_references", "imageDataUrl", "imageUrl",
-        "image", "strength", "loras", "guidance_scale", "num_inference_steps",
-        "response_format",
+        "seed", "negative_prompt", "strength", "loras", "guidance_scale",
+        "num_inference_steps", "response_format",
     )
-    return {k: full[k] for k in keep if k in full}
+    body = {k: full[k] for k in keep if k in full}
+    refs = full.get("input_references")
+    if isinstance(refs, list) and refs:
+        body["imageDataUrls"] = list(refs)
+        body["imageDataUrl"] = refs[0]
+    else:
+        # Pass through explicit OAI fields only when no input_references bag.
+        for k in ("imageDataUrls", "imageDataUrl", "imageUrl", "image"):
+            if k in full:
+                body[k] = full[k]
+    return body
+
+
+def _edit_image_body(full: dict) -> dict:
+    """Edit endpoint JSON: same imageDataUrl(s) shape as OAI, never input_references."""
+    return _core_image_body(full)
+
+
+def _is_empty_input_images_error(err) -> bool:
+    """True for upstream 'requires between 1 and N input images' (refs never arrived)."""
+    if isinstance(err, dict):
+        msg = str(err.get("error") or err.get("message") or err)
+    else:
+        msg = str(err or "")
+    low = msg.lower()
+    if "input image" not in low and "input_image" not in low:
+        return False
+    return ("requires between" in low) or ("between 1 and" in low) or ("at least 1" in low)
+
+
+def _image_body_audit(body: dict | None) -> dict:
+    """Lengths only — never dump data URLs."""
+    body = body if isinstance(body, dict) else {}
+    refs = body.get("input_references")
+    urls = body.get("imageDataUrls")
+    n_refs = len(refs) if isinstance(refs, list) else 0
+    n_urls = len(urls) if isinstance(urls, list) else (1 if body.get("imageDataUrl") else 0)
+    return {
+        "nInputReferences": n_refs,
+        "nImageDataUrls": n_urls,
+        "hasImageDataUrl": bool(body.get("imageDataUrl")),
+    }
+
+
+def _image_endpoint_candidates(spec: dict | None, full: dict) -> list:
+    """Ordered (url, body) attempts. Edit models prefer /images/edit(s) + imageDataUrls."""
+    norm = dict(full)  # keeps input_references only style from _image_body
+    oai = _core_image_body(full)
+    edit = _edit_image_body(full)
+    if _looks_like_required_edit((spec or {}).get("id") or "", (spec or {}).get("name") or ""):
+        return [
+            (GEN_IMAGES_EDITS, edit),
+            (GEN_IMAGES_EDIT, edit),
+            (GEN_IMAGES, norm),
+            (GEN_IMAGES_OAI, oai),
+        ]
+    return [
+        (GEN_IMAGES, norm),
+        (GEN_IMAGES_OAI, oai),
+    ]
+
 
 
 def _save_result(data, jid, meta) -> list:
@@ -1069,10 +1175,17 @@ def _video_body(payload: dict, spec: dict) -> dict:
         body["last_image"] = last
     loras = _loras(payload)
     if loras:
-        body["loras"] = [{"path": x["path"], "scale": x["scale"]} for x in loras]
+        packed = []
+        for x in loras:
+            row = {"path": x["path"]}
+            if "scale" in x:
+                row["scale"] = x["scale"]
+            packed.append(row)
+        body["loras"] = packed
         for i, item in enumerate(loras, 1):
             body[f"lora_{i}_url"] = item["path"]
-            body[f"lora_{i}_scale"] = item["scale"]
+            if "scale" in item:
+                body[f"lora_{i}_scale"] = item["scale"]
     return body
 
 
@@ -1214,16 +1327,35 @@ class NanoGptProvider(Provider):
         }
         headers = _auth()
         last = (502, {"error": "NanoGPT 出图失败"})
-        for url, body in (
-            (GEN_IMAGES, full),
-            (GEN_IMAGES_OAI, _core_image_body(full)),
-        ):
+        local_refs = full.get("input_references") if isinstance(full.get("input_references"), list) else []
+        local_n_refs = len(local_refs)
+        endpoint_tried: list = []
+        saw_empty_image = False
+        for url, body in _image_endpoint_candidates(spec, full):
+            audit = _image_body_audit(body)
+            endpoint_tried.append({
+                "url": url,
+                "nInputReferences": audit["nInputReferences"],
+                "nImageDataUrls": audit["nImageDataUrls"],
+            })
+            print(
+                "[nano] image-attempt",
+                json.dumps({
+                    "serviceId": mid,
+                    "nRefs": local_n_refs,
+                    "endpointTried": url,
+                    **audit,
+                }, ensure_ascii=False)[:800],
+                flush=True,
+            )
             code, data = json_call(url, method="POST", headers=headers, body=body, timeout=180)
             if not isinstance(data, dict):
                 last = (code if code >= 400 else 502, {"error": str(data)})
                 continue
             if code >= 400:
                 data.setdefault("error", extract_error(data, f"HTTP {code}"))
+                if _is_empty_input_images_error(data):
+                    saw_empty_image = True
                 last = (code, data)
                 continue
             resp_seed = _response_seed(data)
@@ -1240,9 +1372,32 @@ class NanoGptProvider(Provider):
                     "submittedInput": sanitize_submitted_for_persist(body, lora_meta),
                     "seed": used_seed,
                     "cost": data.get("cost"),
+                    "nRefs": local_n_refs,
+                    "endpointTried": [e["url"] for e in endpoint_tried],
                 }
                 return 200, out
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})
+        # Fail-closed: local bag had refs but every path claimed 0 input images.
+        if saw_empty_image and local_n_refs >= 1:
+            code, data = last
+            if not isinstance(data, dict):
+                data = {"error": str(data)}
+            else:
+                data = dict(data)
+            upstream = data.get("error") or "upstream rejected input images"
+            tried_urls = [e["url"] for e in endpoint_tried]
+            data["error"] = (
+                f"{upstream} · local_nRefs={local_n_refs} but upstream saw 0 "
+                f"(endpoints={tried_urls})"
+            )
+            data["local_nRefs"] = local_n_refs
+            data["endpointTried"] = tried_urls
+            data["nRefs"] = local_n_refs
+            data["refAudit"] = endpoint_tried
+            return (code if code >= 400 else 400), data
+        if isinstance(last[1], dict):
+            last[1].setdefault("nRefs", local_n_refs)
+            last[1].setdefault("endpointTried", [e["url"] for e in endpoint_tried])
         return last
 
     def _generate_video(self, payload, spec, mid):

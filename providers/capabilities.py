@@ -110,8 +110,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
-        "maxRefs": 1,
-        "maxImages": 1,
+        "maxRefs": 3,
+        "maxImages": 3,
         "refImagesField": "image_url",
     },
     "modelscope-cn": {
@@ -131,8 +131,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": True,
-        "maxRefs": 1,
-        "maxImages": 1,
+        "maxRefs": 3,
+        "maxImages": 3,
         "refImagesField": "image_url",
     },
     "nano-gpt": {
@@ -362,9 +362,9 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
 #   https://www.modelscope.cn/models/Qwen/Qwen-Image-Edit-2509
 #   https://www.modelscope.cn/learn/2577
 #
-# Provider maxRefs stays 1 (fail-closed). Do NOT copy Nano's 5: that is a
-# different API (input_references). Catalog may only tighten; 2509's official
-# 3 is recorded on the item but cannot raise the provider ceiling.
+# Provider maxRefs ceiling = 3 (official max for image_url list / Edit-2509).
+# Do NOT copy Nano's 5 (different API: input_references). Catalog may only
+# tighten per model (Edit=1, t2i=1, Edit-2509=3).
 MODELSCOPE_REF_POLICY: dict[str, dict[str, Any]] = {
     "Qwen/Qwen-Image": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
     "Qwen/Qwen-Image-Edit": {"task": "image-to-image", "image_to_image": True, "maxRefs": 1},

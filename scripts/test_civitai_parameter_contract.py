@@ -386,6 +386,48 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(code, 400, data)
         self.transport.assert_not_called()
 
+
+    def test_sdcpp_sdxl_maps_dpmpp_2m_karras_from_import(self):
+        """19201654 import: dpmpp_2m/karras → sdcpp sampleMethod dpm++2m + schedule karras.
+
+        Locked mapping (api对接助手): dpmpp_2m MUST outbound as exact enum dpm++2m.
+        Checkpoint AIR maps to official sdcpp `model` (OpenAPI), not Comfy diffusionModel.
+        """
+        air = "urn:air:sdxl:lycoris:civitai:518563@633865"
+        ckpt = "urn:air:sdxl:checkpoint:civitai:317902@593760"
+        payload = {
+            "serviceId": "image/sdcpp/sdxl/createImage",
+            "prompt": "score_9, holding sliver sword",
+            "negativePrompt": "score_6, blurry",
+            "width": 1728,
+            "height": 2048,
+            "steps": 30,
+            "cfgScale": 7.0,
+            "seed": 3436905144,
+            "sampler": "dpmpp_2m",
+            "scheduler": "karras",
+            "diffusionModel": ckpt,
+            "loras": [{"air": air, "strength": 0.7}],
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp["engine"], "sdcpp")
+        self.assertEqual(inp["ecosystem"], "sdxl")
+        self.assertEqual(inp["sampleMethod"], "dpm++2m")
+        self.assertEqual(inp["schedule"], "karras")
+        self.assertEqual(inp["model"], ckpt)
+        self.assertNotIn("sampler", inp)
+        self.assertNotIn("scheduler", inp)
+        self.assertNotIn("diffusionModel", inp)
+        self.assertEqual(inp["loras"], {air: 0.7})
+        self.assertEqual(inp["steps"], 30)
+        self.assertEqual(inp["cfgScale"], 7.0)
+        self.assertEqual(inp["width"], 1728)
+        self.assertEqual(inp["height"], 2048)
+        # unknown sampler still rejected (no silent invent)
+        with self.assertRaises(ValueError) as raised:
+            civ.build_workflow(dict(payload, sampler="not_a_real_sampler"))
+        self.assertIn("不在允许列表", str(raised.exception))
+
     def test_fal_engine_krea2_rejects_loras_and_sends_official_fields(self):
         sid = "image/fal/krea2/createImage"
         refs = [{"url": "https://example.invalid/style.jpg", "strength": 1.0}]
@@ -573,6 +615,123 @@ class CivitaiContract(unittest.TestCase):
         code, data = civ.CivitaiProvider().generate(payload)
         self.assertEqual(code, 400, data)
         self.transport.assert_not_called()
+
+    def test_import_air_at_version_beats_sibling_id_path_2653078(self):
+        """Fixture 134923572: AIR @3071582 must land on chips, not sibling 2653078."""
+        air = "urn:air:krea2:lora:civitai:2323765@3071582"
+        cases = [
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "id": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "versionId": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "modelVersionId": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "id": 2653078,
+             "path": "https://civitai.com/api/download/models/2653078",
+             "downloadUrl": "https://civitai.com/api/download/models/2653078",
+             "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "modelVersionId": 3071582, "id": 2653078, "strength": None},
+        ]
+        for resources in ([[c] for c in cases]):
+            with self.subTest(resources=resources):
+                loras = civ._loras_from_import_sources(resources)
+                self.assertEqual(len(loras), 1)
+                row = loras[0]
+                self.assertEqual(row["air"], air)
+                self.assertEqual(row["versionId"], 3071582)
+                self.assertIn("3071582", row.get("path") or "")
+                self.assertNotIn("2653078", row.get("path") or "")
+                self.assertNotIn("2653078", row.get("downloadUrl") or "")
+                self.assertEqual(row["versionId"], civ._version_id_from_air(air))
+
+        # No AIR @version: explicit versionId still wins over bare id.
+        no_air = civ._loras_from_import_sources([{
+            "modelType": "LORA",
+            "modelName": "X",
+            "versionId": 3071582,
+            "id": 2653078,
+            "strength": 0.8,
+        }])
+        self.assertEqual(no_air[0]["versionId"], 3071582)
+        self.assertIn("3071582", no_air[0]["path"])
+
+
+    def test_o27_rest_backfill_strength_28533344(self):
+        """Image 28533344: trpc strength=null, REST strength=0.7 for version 823089.
+
+        Official REST /api/generation/data is the original param — never invent 0.8.
+        """
+        trpc = [{
+            "modelVersionId": 823089,
+            "versionId": 823089,
+            "modelType": "LORA",
+            "modelName": "Kolors style Asian face for Flux1 dev",
+            "strength": None,
+        }]
+        rest = [{
+            "id": 823089,
+            "name": "v0.3",
+            "air": "urn:air:flux1:lora:civitai:730162@823089",
+            "strength": 0.7,
+        }]
+        merged = civ._backfill_strength_from_rest(trpc, rest)
+        self.assertEqual(merged[0]["strength"], 0.7)
+        loras = civ._loras_from_import_sources(merged)
+        self.assertEqual(len(loras), 1)
+        self.assertEqual(loras[0]["strength"], 0.7)
+        self.assertNotIn("strengthMissing", loras[0])
+        self.assertEqual(loras[0]["versionId"], 823089)
+        self.assertNotEqual(loras[0]["strength"], 0.8)
+
+        # REST null / missing → still strengthMissing (no invent)
+        still = civ._backfill_strength_from_rest(trpc, [{"id": 823089, "strength": None}])
+        self.assertIsNone(still[0]["strength"])
+        missing = civ._loras_from_import_sources(still)
+        self.assertTrue(missing[0].get("strengthMissing"))
+
+        # Explicit trpc numeric wins over REST
+        explicit = civ._backfill_strength_from_rest(
+            [{"modelVersionId": 823089, "modelType": "LORA", "modelName": "X", "strength": 0.55}],
+            rest,
+        )
+        self.assertEqual(explicit[0]["strength"], 0.55)
+
+        # Full import_image path with mocked trpc + REST (offline)
+        def fake_civitai(url, method="GET", body=None, timeout=90):
+            if "image.getGenerationData" in url:
+                return 200, {"result": {"data": {"json": {
+                    "meta": {"prompt": "o27 fixture", "steps": 20, "cfgScale": 1,
+                             "sampler": "euler", "width": 832, "height": 1216},
+                    "resources": trpc,
+                }}}}
+            if "image.get" in url:
+                return 200, {"result": {"data": {"json": {"type": "image", "url": "https://example.invalid/x", "width": 832, "height": 1216}}}}
+            return 200, {}
+
+        def fake_json_call(url, method="GET", headers=None, body=None, timeout=90):
+            if "/api/generation/data" in url and "28533344" in url:
+                return 200, {"type": "image", "resources": rest, "params": {}}
+            raise AssertionError(f"unexpected json_call {url}")
+
+        with patch.object(civ, "civitai", side_effect=fake_civitai), \
+             patch.object(civ, "json_call", side_effect=fake_json_call), \
+             patch.object(civ, "has_key", return_value=True), \
+             patch.object(civ, "generation_from_page", return_value={}), \
+             patch.object(civ, "public_image_row", return_value={}), \
+             patch.object(civ, "fetch_version_air", return_value={
+                 "id": 823089,
+                 "air": "urn:air:flux1:lora:civitai:730162@823089",
+                 "modelId": 730162,
+                 "model": {"name": "Kolors style Asian face for Flux1 dev", "type": "LORA"},
+                 "files": [{"downloadUrl": "https://civitai.com/api/download/models/823089"}],
+             }), \
+             patch.object(civ, "match_service", return_value={"id": "image/sdcpp/flux/createImage", "name": "flux"}):
+            imported = civ.import_image("28533344")
+        self.assertEqual(imported["loras"][0]["strength"], 0.7)
+        self.assertNotIn("strengthMissing", imported["loras"][0])
+        self.assertEqual(imported["loras"][0]["versionId"], 823089)
 
     def test_prompt_lora_tag_without_weight_is_not_defaulted_to_0_8(self):
         tagged = civ._prompt_lora_tags("<lora:RadianceChrome>")
@@ -846,6 +1005,245 @@ class CivitaiContract(unittest.TestCase):
         args, kwargs = self.transport.call_args
         self.assertIn("/v2/consumer/workflows/wf-offline", args[0])
         self.assertEqual(kwargs.get("method") or args[1], "DELETE")
+
+
+    def test_o34_match_service_flux1_beats_available_zimage(self):
+        """ecosystem=flux1 must pin flux1/createImage; available zImage must not win."""
+        hit = civ.match_service(engine="sdcpp", operation="createImage", ecosystem="flux1")
+        self.assertIsNotNone(hit)
+        self.assertTrue(str(hit.get("id") or "").endswith("flux1/createImage"), hit)
+        self.assertNotIn("zImage", str(hit.get("id") or ""))
+        self.assertEqual(hit.get("ecosystem"), "flux1")
+
+        # catalog alias: blob/label "flux" must also resolve to flux1, not zImage
+        hit_flux = civ.match_service(engine="sdcpp", operation="createImage", ecosystem="flux")
+        self.assertIsNotNone(hit_flux)
+        self.assertTrue(str(hit_flux.get("id") or "").endswith("flux1/createImage"), hit_flux)
+        self.assertNotIn("zImage", str(hit_flux.get("id") or ""))
+
+    def test_o34_catalog_ecosystem_alias_flux_to_flux1(self):
+        self.assertEqual(civ._catalog_ecosystem("flux"), "flux1")
+        self.assertEqual(civ._catalog_ecosystem("flux1"), "flux1")
+        self.assertEqual(civ._catalog_ecosystem("zImage"), "zImage")
+        # o35: flux.1 / flux1 → flux1 first (not bare flux)
+        self.assertEqual(civ._ecosystem_from_blob("Flux1.D"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux.1 D"), "flux1")
+        self.assertEqual(civ._catalog_ecosystem(civ._ecosystem_from_blob("Flux1.D")), "flux1")
+
+    def test_o34_flux1_build_workflow_maps_diffusionModel_to_diffuserModel(self):
+        """28533250-shaped: flux1 service + ckpt AIR + LoRA @0.7 → diffuserModel, loras only.
+
+        o35: broken flux:diffusionmodel normalizes to flux1:checkpoint (same mid@version);
+        never rewrite site checkpoint → diffuser.
+        """
+        legacy = "urn:air:flux:diffusionmodel:civitai:999@888"
+        expect = "urn:air:flux1:checkpoint:civitai:999@888"
+        lora = "urn:air:flux1:lora:civitai:730162@823089"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "x" * 446,
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 42,
+            "diffusionModel": legacy,
+            "loras": [{"air": lora, "strength": 0.7}],
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("ecosystem"), "flux1")
+        self.assertEqual(inp.get("diffuserModel"), expect)
+        self.assertNotIn("diffusionModel", inp)
+        # do not leave checkpoint AIR stuffed into recipe `model`
+        self.assertNotEqual(inp.get("model"), expect)
+        self.assertEqual(inp.get("loras"), {lora: 0.7})
+        self.assertNotIn("additionalNetworks", inp)
+        self.assertEqual(len(payload["prompt"]), 446)
+
+    def test_o34_diffusionModel_to_diffuserModel_even_when_model_prefilled_turbo(self):
+        """Generic remap: zImage schema uses diffuserModel; prefilled model=turbo must not block AIR."""
+        ckpt = "urn:air:zImage:diffusionmodel:civitai:1@2"
+        payload = {
+            "serviceId": "image/sdcpp/zImage/turbo/createImage",
+            "prompt": "z remap",
+            "width": 1024,
+            "height": 1024,
+            "steps": 8,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertEqual(inp.get("model"), "turbo")
+        self.assertNotIn("diffusionModel", inp)
+        self.assertNotIn("additionalNetworks", inp)
+
+    def test_o34_wrong_service_without_diffuser_or_replaceable_model_stays_honest_400(self):
+        """If diffusionModel cannot map (no diffuserModel; model occupied by non-default), honest 400."""
+        # krea2 turbo already has diffusionModel in schema — pick a service that rejects unknown UI field
+        # Use fal krea2 which has neither diffuserModel nor empty model slot for AIR overwrite.
+        sid = "image/fal/krea2/createImage"
+        refs = [{"url": "https://example.invalid/style.jpg", "strength": 1.0}]
+        payload = {
+            "serviceId": sid,
+            "prompt": "no dm",
+            "quantity": 1,
+            "aspectRatio": "9:16",
+            "creativity": "raw",
+            "size": "large",
+            "imageStyleReferences": refs,
+            "diffusionModel": "urn:air:flux:diffusionmodel:civitai:1@2",
+        }
+        with self.assertRaises(ValueError) as raised:
+            civ.build_workflow(payload)
+        msg = str(raised.exception)
+        # Honest reject (unsupported field) — never silent drop of diffusionModel.
+        self.assertIn("diffusionModel", msg)
+        self.assertIn("不接受", msg)
+
+
+
+
+    def test_o35_ecosystem_flux1_before_bare_flux(self):
+        self.assertEqual(civ._ecosystem_from_blob("flux1"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux.1"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("FLUX.1 D"), "flux1")
+        self.assertEqual(civ._ecosystem_from_blob("Flux"), "flux")
+        self.assertEqual(civ._catalog_ecosystem("flux"), "flux1")
+
+    def test_o35_air_from_ids_flux_checkpoint_not_diffusionmodel(self):
+        """FORBIDDEN: hand-roll urn:air:flux:diffusionmodel — mint flux1:checkpoint instead."""
+        air = civ._air_from_ids(1752722, 1983609, "Checkpoint", "Flux.1 D", "Sample")
+        self.assertEqual(air, "urn:air:flux1:checkpoint:civitai:1752722@1983609")
+        air_bare = civ._air_from_ids(1752722, 1983609, "Checkpoint", "Flux", "Sample")
+        self.assertEqual(air_bare, "urn:air:flux1:checkpoint:civitai:1752722@1983609")
+        self.assertNotIn(":flux:diffusionmodel:", air)
+        self.assertNotIn(":flux:diffusionmodel:", air_bare)
+        # LoRA still lora kind
+        lora = civ._air_from_ids(730162, 823089, "LORA", "Flux.1 D", "face")
+        self.assertEqual(lora, "urn:air:flux1:lora:civitai:730162@823089")
+        # non-flux unchanged
+        krea = civ._air_from_ids(2782456, 3146785, "Checkpoint", "Krea", "k")
+        self.assertEqual(krea, "urn:air:krea2:diffusionmodel:civitai:2782456@3146785")
+
+    def test_o35_prefer_rest_air_over_air_from_ids(self):
+        """Import checkpoint uses REST air verbatim; never overwrite with _air_from_ids."""
+        rest_air = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        resources = [{
+            "modelVersionId": 1983609,
+            "modelId": 1752722,
+            "modelType": "Checkpoint",
+            "modelName": "Flux sample",
+            "baseModel": "Flux.1 D",
+            # no air on resource — must come from fetch_version_air
+        }]
+
+        def fake_civitai(url, method="GET", body=None, timeout=90):
+            if "image.getGenerationData" in url:
+                return 200, {"result": {"data": {"json": {
+                    "meta": {"prompt": "o35", "steps": 20, "cfgScale": 1,
+                             "sampler": "euler", "width": 832, "height": 1216},
+                    "resources": resources,
+                }}}}
+            if "image.get" in url:
+                return 200, {"result": {"data": {"json": {
+                    "type": "image", "url": "https://example.invalid/x",
+                    "width": 832, "height": 1216,
+                }}}}
+            return 200, {}
+
+        def fake_json_call(url, method="GET", headers=None, body=None, timeout=90):
+            if "/api/generation/data" in url and "28533250" in url:
+                return 200, {"type": "image", "resources": [], "params": {}}
+            raise AssertionError(f"unexpected json_call {url}")
+
+        with patch.object(civ, "civitai", side_effect=fake_civitai), \
+             patch.object(civ, "json_call", side_effect=fake_json_call), \
+             patch.object(civ, "has_key", return_value=True), \
+             patch.object(civ, "generation_from_page", return_value={}), \
+             patch.object(civ, "public_image_row", return_value={}), \
+             patch.object(civ, "fetch_version_air", return_value={
+                 "id": 1983609,
+                 "air": rest_air,
+                 "modelId": 1752722,
+                 "baseModel": "Flux.1 D",
+                 "model": {"name": "Flux sample", "type": "Checkpoint"},
+             }):
+            imported = civ.import_image("28533250")
+        self.assertEqual(imported.get("diffusionModel"), rest_air)
+        self.assertNotIn(":flux:diffusionmodel:", imported.get("diffusionModel") or "")
+        self.assertTrue(str(imported.get("serviceId") or "").endswith("flux1/createImage"), imported.get("serviceId"))
+
+    def test_o35_flux1_outbound_checkpoint_air_verbatim_no_companion(self):
+        """Field diffuserModel; value = REST checkpoint air. No companion inject. No checkpoint→diffuser."""
+        ckpt = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "o35 sample",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
+        self.assertNotIn("flux1:diffuser:", inp.get("diffuserModel") or "")
+        self.assertNotIn("vaeModel", inp)
+        self.assertNotIn("clipLModel", inp)
+        self.assertNotIn("t5XXLModel", inp)
+        self.assertNotIn("diffusionModel", inp)
+
+    def test_o35_flux1_outbound_legacy_diffusionmodel_to_checkpoint(self):
+        """Known-broken _air_from_ids shape → flux1:checkpoint same mid@version (not diffuser)."""
+        legacy = "urn:air:flux:diffusionmodel:civitai:1752722@1983609"
+        expect = "urn:air:flux1:checkpoint:civitai:1752722@1983609"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "legacy",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 2,
+            "diffusionModel": legacy,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), expect)
+        self.assertNotIn(":diffuser:", inp.get("diffuserModel") or "")
+
+    def test_o35_official_diffuser_air_passthrough(self):
+        """Real flux1:diffuser resource AIR (official example) passes through unchanged."""
+        official = "urn:air:flux1:diffuser:civitai:618692@691639"
+        payload = {
+            "serviceId": "image/sdcpp/flux1/createImage",
+            "prompt": "official diffuser",
+            "width": 832,
+            "height": 1216,
+            "steps": 20,
+            "cfgScale": 1,
+            "seed": 3,
+            "diffusionModel": official,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), official)
+
+    def test_o35_non_flux1_unchanged_zimage(self):
+        ckpt = "urn:air:zImage:diffusionmodel:civitai:1@2"
+        payload = {
+            "serviceId": "image/sdcpp/zImage/turbo/createImage",
+            "prompt": "z",
+            "width": 1024,
+            "height": 1024,
+            "steps": 8,
+            "cfgScale": 1,
+            "seed": 1,
+            "diffusionModel": ckpt,
+        }
+        inp = step_input(civ.build_workflow(payload))
+        self.assertEqual(inp.get("diffuserModel"), ckpt)
 
 
 if __name__ == "__main__":

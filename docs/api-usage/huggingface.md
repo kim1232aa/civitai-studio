@@ -106,3 +106,11 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 - 图：`text_to_image(prompt, model=…)`；可选 `provider="auto"|"fal-ai"|"replicate"|…`。
 - 常见参数：`negative_prompt`、`num_inference_steps`、`guidance_scale`、`target_size`（部分 provider）。
 - Studio 走 **Router**（`router.huggingface.co`）映射通道，不是裸 Hub widget；`loraConfidence=unverified` 仍成立——官方 client 示例也不保证 LoRA sibling。
+
+## v0821o33 HF score honesty
+
+- HF Router **does not** host official Fal `/lora` apps (`fal-ai/flux-lora`, `fal-ai/krea-2/turbo/lora`, …).
+- Default: `backend=huggingface` + those sids → **400** `HF Router 不托管该 Fal LoRA 端点，请换家 Fal`；`scoresAsHfClosedLoop=false`；chips kept in Composer.
+- Debug only: `HF_ALLOW_FAL_TRANSPORT=1` re-enables o32 Path A (Fal key → `queue.fal.run`); still `transport=fal` / **not** HF closed-loop score.
+- Real HF outbound: Hub mid → `router.huggingface.co` + HF token；`submittedInput` must **not** carry `transport=fal`.
+

@@ -28,9 +28,9 @@ def check(cond, msg):
 
 
 def main():
-    check(get_provider_capabilities("modelscope-cn")["maxRefs"] == 1, "provider ceiling stays 1")
-    check(get_provider_capabilities("modelscope-ai")["maxRefs"] == 1, "AI ceiling stays 1")
-    check(max_refs("modelscope-cn", get_provider_capabilities("modelscope-cn")) == 1, "max_refs default 1")
+    check(get_provider_capabilities("modelscope-cn")["maxRefs"] == 3, "provider ceiling 3 (Edit-2509 official)")
+    check(get_provider_capabilities("modelscope-ai")["maxRefs"] == 3, "AI ceiling 3")
+    check(max_refs("modelscope-cn", get_provider_capabilities("modelscope-cn")) == 3, "max_refs default 3")
 
     krea = overlay_modelscope_catalog_item({"id": "krea/Krea-2-Raw", "task": "text-to-image", "tags": ["t2i"]})
     check(krea["capabilities"]["image_to_image"] is False, krea)
@@ -47,9 +47,9 @@ def main():
     multi = overlay_modelscope_catalog_item({"id": "Qwen/Qwen-Image-Edit-2509"})
     check(multi["capabilities"]["image_to_image"] is True, multi)
     check(multi["capabilities"]["maxRefs"] == 3, "official 2509 is 1–3 on the item")
-    # Catalog may only tighten: provider ceiling 1 still wins.
-    check(max_refs("modelscope-cn", get_provider_capabilities("modelscope-cn"), item=multi) == 1,
-          "2509 cannot raise provider ceiling")
+    # Provider ceiling 3 + catalog 3 → resolve 3 (no longer clamped to 1).
+    check(max_refs("modelscope-cn", get_provider_capabilities("modelscope-cn"), item=multi) == 3,
+          "2509 resolves to official 3")
 
     hub_t2i = overlay_modelscope_catalog_item({"id": "someone/unknown-t2i", "task": "text-to-image", "tags": ["t2i"]})
     check(hub_t2i["capabilities"]["image_to_image"] is False, hub_t2i)

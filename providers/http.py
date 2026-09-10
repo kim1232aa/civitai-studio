@@ -156,6 +156,7 @@ def _looks_media(u: str) -> bool:
         "fal.media", "v3.fal.media", "v3b.fal.media", "/files/",
         "nano-gpt.com", "nanogpt", "wavespeed.ai",
         "modelscope", "aliyuncs.com", "aliyun", "oss-",
+        "orchestration.civitai.com", "orchestration-new.civitai.com", "/consumer/blobs/",
     )):
         return True
     return False

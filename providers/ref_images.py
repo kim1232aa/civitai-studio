@@ -206,7 +206,6 @@ def max_refs(
         return None
     return ceil
 
-
 def ref_images_field(backend: str | None = None, caps: dict | None = None) -> str:
     if isinstance(caps, dict):
         for key in ("refImagesField", "refField"):

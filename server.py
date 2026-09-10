@@ -6,6 +6,8 @@ import json
 import re
 import mimetypes
 import os
+import shutil
+import tempfile
 import threading
 import time
 import urllib.error
@@ -32,11 +34,170 @@ PORT = int(os.environ.get("PORT", "8765"))
 OUT.mkdir(parents=True, exist_ok=True)
 DOCS.mkdir(parents=True, exist_ok=True)
 
+
+FILL_FIXTURE_SRC = DOCS / "review-shots" / "closed-loop" / "fal-refs-fill-9"
+
+
+def ensure_fill_cap_fixtures() -> int:
+    """Copy docs fal-refs-fill-9/ref-{1..9}.jpg -> out/fill-cap-{i}.jpg when missing (o41)."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for i in range(1, 10):
+        dest = OUT / f"fill-cap-{i}.jpg"
+        if dest.is_file() and dest.stat().st_size > 0:
+            continue
+        src = FILL_FIXTURE_SRC / f"ref-{i}.jpg"
+        if not src.is_file():
+            continue
+        shutil.copy2(src, dest)
+        copied += 1
+    return copied
+
+
+
 CANVAS_STORE_PATH = Path(
     os.environ.get("CANVAS_STORE_PATH", str(ROOT / "data" / "canvas_projects.json"))
 )
 CANVAS_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
 canvas_store = CanvasStore(CANVAS_STORE_PATH)
+
+# Shared storyboard graph (shot.url writeback survives hard refresh across browser profiles).
+STORYBOARD_GRAPH_PATH = Path(
+    os.environ.get("STORYBOARD_GRAPH_PATH", str(ROOT / "data" / "storyboard_graph.json"))
+)
+STORYBOARD_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
+_storyboard_graph_lock = threading.Lock()
+
+
+def read_storyboard_graph() -> dict | None:
+    with _storyboard_graph_lock:
+        if not STORYBOARD_GRAPH_PATH.exists():
+            return None
+        try:
+            data = json.loads(STORYBOARD_GRAPH_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
+
+
+def write_storyboard_graph(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        raise ValueError("storyboard graph 必须是对象")
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise ValueError("storyboard graph.nodes 必须是非空数组")
+    STORYBOARD_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _storyboard_graph_lock:
+        # o49b: empty/missing incoming url must not wipe existing non-empty url (same shot id)
+        existing = None
+        if STORYBOARD_GRAPH_PATH.exists():
+            try:
+                existing = json.loads(STORYBOARD_GRAPH_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                existing = None
+        if isinstance(existing, dict) and isinstance(existing.get("nodes"), list):
+            by_id = {}
+            for en in existing["nodes"]:
+                if isinstance(en, dict) and en.get("id"):
+                    by_id[en["id"]] = en
+            for n in nodes:
+                if not isinstance(n, dict) or n.get("kind") != "shot":
+                    continue
+                nid = n.get("id")
+                if not nid or nid not in by_id:
+                    continue
+                old = by_id[nid]
+                incoming_url = str(n.get("url") or "").strip()
+                old_url = str(old.get("url") or "").strip()
+                if not incoming_url and old_url:
+                    n["url"] = old.get("url")
+                    if old.get("urlUpdatedAt") not in (None, "") and n.get("urlUpdatedAt") in (None, ""):
+                        n["urlUpdatedAt"] = old.get("urlUpdatedAt")
+                    if old.get("_urlUpdatedAt") not in (None, "") and n.get("_urlUpdatedAt") in (None, ""):
+                        n["_urlUpdatedAt"] = old.get("_urlUpdatedAt")
+        raw = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{STORYBOARD_GRAPH_PATH.name}.",
+            suffix=".tmp",
+            dir=STORYBOARD_GRAPH_PATH.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, STORYBOARD_GRAPH_PATH)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+    return payload
+
+def apply_pending_job_to_graph(job_id: str, url: str) -> dict | None:
+    """Belt: when job materializes saved[], bind url onto pending shot in graph.
+
+    o49b: if pending missing (retired) → no-op; if shot already moved on to a
+    different _jobId / newer url for another job → clear stale pending, do not overwrite.
+    """
+    from providers import pending_jobs as pj
+    jid = (job_id or "").strip()
+    u = (url or "").strip()
+    if not jid or not u:
+        return None
+    pending = pj.get_pending(jid)
+    if not pending:
+        return None
+    shot_id = str(pending.get("shotId") or "").strip()
+    if not shot_id:
+        return None
+    graph = read_storyboard_graph()
+    if not isinstance(graph, dict):
+        return None
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return None
+    changed = False
+    found = False
+    for n in nodes:
+        if isinstance(n, dict) and n.get("id") == shot_id and n.get("kind") == "shot":
+            found = True
+            existing = str(n.get("url") or "").strip()
+            shot_job = str(n.get("_jobId") or "").strip()
+            # Shot already bound to a different job — do not stomp with stale pending
+            if shot_job and shot_job != jid:
+                pj.clear_pending(jid)
+                return {
+                    "jobId": jid,
+                    "shotId": shot_id,
+                    "url": existing,
+                    "updated": False,
+                    "skipped": "job_mismatch",
+                }
+            if existing and existing != u and shot_job and shot_job != jid:
+                pj.clear_pending(jid)
+                return {
+                    "jobId": jid,
+                    "shotId": shot_id,
+                    "url": existing,
+                    "updated": False,
+                    "skipped": "shot_moved_on",
+                }
+            if n.get("url") != u:
+                n["url"] = u
+                now_ms = int(time.time() * 1000)
+                n["_urlUpdatedAt"] = now_ms
+                n["urlUpdatedAt"] = now_ms
+                changed = True
+            break
+    if not found:
+        return None
+    if changed:
+        write_storyboard_graph(graph)
+    pj.clear_pending(jid)
+    return {"jobId": jid, "shotId": shot_id, "url": u, "updated": changed}
+
 
 SAMPLERS = [
     "er_sde", "euler", "euler_ancestral", "euler_cfg_pp", "euler_ancestral_cfg_pp",
@@ -1108,6 +1269,13 @@ class Handler(BaseHTTPRequestHandler):
         """Record real POST /api/generate — keys only, no tokens, no image bytes."""
         payload = payload if isinstance(payload, dict) else {}
         data = data if isinstance(data, dict) else {}
+        # lengths only — never dump data URLs / image bytes
+        n_refs = data.get("nRefs")
+        if n_refs is None:
+            n_refs = data.get("local_nRefs")
+        if n_refs is None:
+            bag = payload.get("input_references") or payload.get("images") or []
+            n_refs = len(bag) if isinstance(bag, list) else 0
         rec = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "backend": getattr(prov, "id", None),
@@ -1115,6 +1283,8 @@ class Handler(BaseHTTPRequestHandler):
             "promptLen": len(str(payload.get("prompt") or "")),
             "keys": sorted(str(k) for k in payload.keys()),
             "nLoras": len(payload["loras"]) if isinstance(payload.get("loras"), list) else 0,
+            "nRefs": n_refs,
+            "endpointTried": data.get("endpointTried"),
             "code": code,
             "jobId": data.get("id") or data.get("jobId") or data.get("workflowId"),
             "status": data.get("status"),
@@ -1156,6 +1326,12 @@ class Handler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
         if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
             return self._handle_canvas_get(path)
+        if path == "/api/storyboard-graph":
+            graph = read_storyboard_graph()
+            return self._json(200, {"graph": graph})
+        if path == "/api/pending-jobs":
+            from providers import pending_jobs as pj
+            return self._json(200, {"jobs": pj.list_pending()})
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         # Seko storyboard canvas (PLAN-v0789): /storyboard + /cloud-nodes share one shell.
@@ -1308,6 +1484,32 @@ class Handler(BaseHTTPRequestHandler):
                         "saved": data.get("saved"),
                         "error": data.get("error"),
                     }, ensure_ascii=False)[:1500], flush=True)
+                # o46/o46b: pending→shot writeback; if upstream failed but local /out exists, rebuild saved[]
+                from providers import pending_jobs as pj
+                data = dict(data)
+                saved_u = pj.first_saved_url(data)
+                if not saved_u:
+                    local_saved = pj.find_local_out_saved(wf_id)
+                    if local_saved:
+                        data["saved"] = local_saved
+                        data["localOutResume"] = True
+                        saved_u = pj.first_saved_url(data)
+                        print("[web] LOCAL_OUT_RESUME", wf_id, len(local_saved), flush=True)
+                if saved_u:
+                    try:
+                        applied = apply_pending_job_to_graph(wf_id, saved_u)
+                        if applied:
+                            data["pendingWriteback"] = applied
+                            print("[web] PENDING_WB", json.dumps(applied, ensure_ascii=False), flush=True)
+                    except Exception as e:
+                        print("[web] PENDING_WB skip", e, flush=True)
+                elif st in ("failed", "error"):
+                    # only clear when no local materialize — else keep pending for client resume
+                    try:
+                        if not pj.find_local_out_saved(wf_id):
+                            pj.clear_pending(wf_id)
+                    except Exception:
+                        pass
             return self._json(code, data)
         if path == "/api/import":
             backend = (qs.get("backend") or ["civitai"])[0]
@@ -1440,6 +1642,17 @@ class Handler(BaseHTTPRequestHandler):
                 endpoint=payload.get("endpoint") or payload.get("serviceId"),
             )
             return self._json(code, data)
+        if path == "/api/pending-jobs":
+            from providers import pending_jobs as pj
+            try:
+                rec = pj.register_pending(
+                    str(payload.get("jobId") or payload.get("id") or ""),
+                    str(payload.get("shotId") or ""),
+                    str(payload.get("backend") or ""),
+                )
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            return self._json(200, {"ok": True, "job": rec})
         if path == "/api/graph/compile":
             from providers.graph_compile import compile_graph
             result = compile_graph(payload.get("graph") if isinstance(payload.get("graph"), dict) else payload)
@@ -1511,6 +1724,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "invalid json"})
             if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
                 return self._handle_canvas_patch(path, payload, replace=True)
+            if path == "/api/storyboard-graph":
+                body = payload.get("graph") if isinstance(payload.get("graph"), dict) else payload
+                try:
+                    graph = write_storyboard_graph(body)
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
+                return self._json(200, {"graph": graph})
             return self._json(404, {"error": "not found"})
         except Exception as e:
             print("[web] PUT", e, flush=True)
@@ -1524,6 +1744,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
                 return self._handle_canvas_delete(path)
+            if path.startswith("/api/pending-jobs/"):
+                from providers import pending_jobs as pj
+                jid = urllib.parse.unquote(path.split("/api/pending-jobs/", 1)[1]).strip("/")
+                ok = pj.clear_pending(jid)
+                return self._json(200 if ok else 404, {"ok": ok, "jobId": jid})
             if path.startswith("/api/jobs/") and path.rstrip("/").endswith("/cancel"):
                 return self._cancel_job(path)
             return self._json(404, {"error": "not found"})
@@ -1536,6 +1761,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    n_fill = ensure_fill_cap_fixtures()
+    if n_fill:
+        print(f"o41 ensure_fill_cap_fixtures copied={n_fill}", flush=True)
     civ = providers.get("civitai")
     n = 0
     if civ:

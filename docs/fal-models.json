@@ -1884,7 +1884,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/lite/image-to-video",
@@ -2533,7 +2541,15 @@
         "num_images",
         "enable_safety_checker",
         "seed"
-      ]
+      ],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/fast",
@@ -4075,7 +4091,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "bytedance/seedance-2.0/fast/text-to-video",
@@ -4997,7 +5021,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/veo3.1/fast/first-last-frame-to-video",
@@ -6545,7 +6577,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/kling-video/o1/video-to-video/edit",
@@ -7239,7 +7279,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/qwen-image-layered",
@@ -8538,7 +8586,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "mirelo-ai/sfx-v1.5/video-to-video",
@@ -9168,7 +9224,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/kling-video/o3/4k/reference-to-video",
@@ -9807,7 +9871,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/ltx-2.3/text-to-video/fast",
@@ -12915,7 +12987,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/pixverse/v5/text-to-video",
@@ -15161,7 +15241,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/stable-diffusion-v3-medium",
@@ -16396,7 +16484,15 @@
       "durationField": null,
       "aspectRatioField": null,
       "required": [],
-      "optional": []
+      "optional": [],
+      "maxRefs": 4,
+      "maxImages": 4,
+      "max_input_images": 4,
+      "capabilities": {
+        "maxRefs": 4,
+        "maxImages": 4,
+        "max_input_images": 4
+      }
     },
     {
       "id": "fal-ai/pixverse/v6/extend",

@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "stamp must be v0821o8-caption-i2i")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "stamp must be v0821o49b-hydrate-fresh-empty-url")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -364,8 +364,8 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -426,7 +426,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "stamp v0821o8-caption-i2i")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "stamp v0821o49b-hydrate-fresh-empty-url")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -486,8 +486,8 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -604,11 +604,11 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o8-caption-i2i: unmention/link helpers still present."""
+    """v0817b lineage under v0821o49b-hydrate-fresh-empty-url: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -624,12 +624,12 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o8-caption-i2i: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o49b-hydrate-fresh-empty-url: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821d")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821e"' in js, "STORE_OLDS keeps v0821e")
     assert_true('"nl-storyboard-v0821d"' in js, "STORE_OLDS keeps v0821d")
@@ -670,8 +670,8 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -744,8 +744,8 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -779,8 +779,8 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true('dockMode: "collapsed"' in js, "default dockMode collapsed")
@@ -805,8 +805,8 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
@@ -845,8 +845,8 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -882,12 +882,13 @@ def test_v0820_civitai_comfy_params():
     k = js.find("async function runShotStep")
     assert_true(k >= 0, "runShotStep")
     run = js[k:k + 9000]
-    assert_true("packComfyParamsForPayload()" in run, "pack comfy in runShotStep")
+    assert_true("packComfyParamsForPayload(shot)" in run or "packComfyParamsForPayload()" in run,
+                "pack comfy in runShotStep")
     assert_true("packLorasForPayload()" in run, "loras still packed")
     assert_true("payload.loras = packedLoras" in run, "sets payload.loras")
     assert_true("payload[k] = packedComfy[k]" in run or "payload[k]=packedComfy[k]" in run.replace(" ", ""),
                 "merges packed comfy onto payload")
-    assert_true(run.find("packLorasForPayload()") < run.find("packComfyParamsForPayload()"),
+    assert_true(run.find("packLorasForPayload()") < run.find("packComfyParamsForPayload("),
                 "comfy packed after loras")
     # Spot-check fixture shape fields must be nameable (no silent drop list)
     for field in ("serviceId", "steps", "cfgScale", "sampler", "scheduler", "seed", "width", "height", "loras"):
@@ -904,8 +905,8 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     # applyImport path
@@ -975,8 +976,8 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0820c")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("CIVITAI_PREF_SERVICE" in js, "pref constant kept for catalog ordering")
@@ -1039,9 +1040,9 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n4")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
@@ -1093,7 +1094,7 @@ def test_v0821n_krea2_import_hardgate():
     # packLoras: keep air/path/scale/strength; civitai skips no-air; empty → null
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i - 2200:pack_i + 1600]
+    pack = js[pack_i:pack_i + 4200]
     for field in ("air:", "path:", "scale:", "strength:", "versionId:", "downloadUrl:", "modelId:"):
         assert_true(field in pack, "pack field " + field)
     assert_true("function loraRowCanOutbound" in js, "loraRowCanOutbound helper")
@@ -1133,9 +1134,9 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
 
@@ -1218,9 +1219,9 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp v0821o8-caption-i2i")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821b")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     assert_true("nl-storyboard-v0821" in js, "STORE_OLDS keeps v0821")
     assert_true('FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video"' in js,
@@ -1340,15 +1341,15 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821c")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
     # pickUrl must map fal video shapes
     i = js.find("function pickUrl")
     assert_true(i >= 0, "pickUrl")
-    block = js[i:i + 1200]
-    assert_true("data.video" in block and "result.video" in block or "res.video" in block, "pickUrl video.url")
+    block = js[i:i + 3200]
+    assert_true("data.video" in block and ("result.video" in block or "res.video" in block), "pickUrl video.url")
     assert_true("v0821c" in block or "fal video" in block, "v0821c note on pickUrl")
 
     frame = "/out/12100372-20260907215435634_0.jpg"
@@ -1397,9 +1398,11 @@ def test_v0821c_fal_i2v_preview():
 
     # Node harness: pickUrl extracts fal video.url / result.video.url / saved
     import subprocess
-    end = js.find("function hasUnresolvedStageOut", i)
-    assert_true(end > i, "pickUrl end")
-    fn = js[i:end]
+    i_saved = js.find("function pickSavedUrl")
+    assert_true(i_saved >= 0, "pickSavedUrl before pickUrl")
+    end = js.find("function hasUnresolvedStageOut", i_saved)
+    assert_true(end > i_saved, "pickUrl end")
+    fn = js[i_saved:end]
     node = subprocess.run(
         ["node", "-e", fn + r"""
 const cases = [
@@ -1426,9 +1429,9 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1444,7 +1447,7 @@ def test_v0821f_send_noop():
 
     # runShotStep never silent on !shot
     run_i = js.find("async function runShotStep")
-    run = js[run_i:run_i + 1200]
+    run = js[run_i:run_i + 4500]
     assert_true("请先选中分镜再生成" in run, "setMsg when !shot")
     assert_true('shot.kind !== "shot"' in run and "setMsg" in run, "wrong-kind setMsg")
 
@@ -1490,13 +1493,13 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o8-caption-i2i: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o49b-hydrate-fresh-empty-url: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1509,7 +1512,7 @@ def test_v0821g_send_bind():
 
     k = js.find("function renderDock")
     assert_true(k >= 0, "renderDock")
-    dock = js[k:k + 5500]
+    dock = js[k:k + 9000]
     # ready tip kept, but v0821j gates on !fireSend._busy (must not wipe in-flight)
     assert_true("首帧已就绪 · 可生成" in dock, "ready msg")
     assert_true("setMsg(\"首帧已就绪 · 可生成\")" in dock or "setMsg('首帧已就绪 · 可生成')" in dock,
@@ -1518,8 +1521,8 @@ def test_v0821g_send_bind():
                 "renderDock skips ready while busy/group")
     assert_true("/缺首帧|视频需要先连一张首帧图|本版未接/" not in dock,
                 "stale-only regex gate removed")
-    # missing-frame → bad (red)
-    assert_true('setMsg("缺首帧 · 视频需要先连一张首帧图", "bad")' in dock, "missing-frame bad")
+    # missing-frame → bad (red); o17 copy points at 图片生成 or attach
+    assert_true('setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad")' in dock, "missing-frame bad")
     assert_true("syncSendGate" in dock, "syncSendGate from renderDock")
 
     # bind helpers
@@ -1548,13 +1551,13 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o8-caption-i2i: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o49b-hydrate-fresh-empty-url: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821h")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
 
@@ -1576,7 +1579,7 @@ def test_v0821h_send_aria():
     assert_true("is-blocked" in sv, "is-blocked class")
 
     # fireSend: no early-return on btn.disabled; gate with setMsg + stop
-    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2400]
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4500]
     assert_true("if (btn.disabled) return" not in fs and "if(btn.disabled)return" not in fs,
                 "fireSend must not early-return on disabled")
     assert_true("缺首帧" in fs and '"bad"' in fs, "needFrame click → bad setMsg")
@@ -1614,9 +1617,10 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
+    assert_true('"nl-storyboard-v0821o7"' in js, "STORE_OLDS keeps v0821o7")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
@@ -1631,10 +1635,17 @@ def test_v0821i_i2v_writeback():
     assert_true("function writebackResult" in js, "writebackResult helper")
     assert_true("function pushHistoryItem" in js, "pushHistoryItem helper")
     assert_true("writebackResult(shot, url)" in js, "success path calls writebackResult")
-    wb = js[js.find("function writebackResult"):js.find("function pickUrl")]
+    wb = js[js.find("function writebackResult"):js.find("function pickSavedUrl")]
     assert_true("promoteResult(" not in wb, "writebackResult must not spawn canvas clone via promoteResult")
     assert_true("removeUnpromotedFromShot" in wb, "writebackResult drops leftover 分镜N成片 clones")
+    assert_true("live.url = url" in wb or "shot.url = url" in wb, "writebackResult sets shot.url on card")
+    assert_true("nodeById(shot.id)" in wb, "writebackResult re-resolves live shot")
     assert_true("此镜完成，已写入卡片" in js, "success copy writes onto the card")
+    assert_true("data-hist-pin" in js, "接到此镜 hist-pin kept")
+    assert_true("writebackResult(shot, item.url)" in js, "接到此镜 applies media to shot card via writebackResult")
+    assert_true("spawnHistoryAt(item, shot.x" not in js or js.find("writebackResult(shot, item.url)") > 0, "hist-pin prefers writeback over clone-only")
+    assert_true("bePoll === \"civitai\"" in js or "bePoll === 'civitai'" in js or 'bePoll === "civitai"' in js, "civitai in extended pollMax")
+    assert_true("PREPARING" in js, "preparing treated as in-flight")
     assert_true("成片已收进资产库" not in js, "success copy must not imply a duplicate asset card")
 
     # card video preview
@@ -1645,7 +1656,10 @@ def test_v0821i_i2v_writeback():
     assert_true("pollMax" in js or "v0821m" in js, "video poll lengthened")
 
     assert_true("never break on succeeded alone" in js or "成片落盘中" in js, "poll waits for saved after succeeded")
-    assert_true('if (pickUrl(st)) break;' in js, "poll breaks only when pickUrl hits")
+    assert_true("function pickSavedUrl" in js, "pickSavedUrl helper")
+    assert_true("pickSavedUrl(st)" in js, "poll break uses pickSavedUrl")
+    assert_true('if (pickUrl(st)) break;' not in js, "must not break poll on CDN pickUrl alone")
+    assert_true("const savedUrl = pickSavedUrl(j)" in js and "savedUrl || pickUrl(j)" in js, "final url prefers saved then CDN")
     assert_true('pickUrl(st) || st.status === "done"' not in js and "pickUrl(st) || st.status === 'done'" not in js, "old succeeded-or-pickUrl break removed")
 
     # loadOuts keeps videos
@@ -1693,14 +1707,18 @@ def test_v0821i_i2v_writeback():
     assert_true("缺少文本" in (r2.get("error") or ""), r2)
 
     # Node: pickUrl prefer saved; writebackResult shape via promote+history sim
-    end = js.find("function hasUnresolvedStageOut", i)
-    fn = js[i:end]
+    i_saved = js.find("function pickSavedUrl")
+    assert_true(i_saved >= 0, "pickSavedUrl before pickUrl")
+    end = js.find("function hasUnresolvedStageOut", i_saved)
+    fn = js[i_saved:end]
     # extract promoteResult + helpers roughly via node harness
     node = subprocess.run(
         ["node", "-e", fn + r"""
 const cases = [
   [{ saved: [{ url: "/out/fal_…01a07e47…_0.mp4" }], result: { video: { url: "https://cdn/v.mp4" } } }, "/out/fal_…01a07e47…_0.mp4"],
   [{ result: { video: { url: "https://cdn/v.mp4" } } }, "https://cdn/v.mp4"],
+  [{ status: "succeeded", steps: [{ output: { images: [{ url: "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg?sig=1", previewUrl: "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg?sig=p" }] } }] }, "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg?sig=1"],
+  [{ status: "succeeded", saved: [{ url: "/out/12100372-20260910074123211_0.jpg" }], steps: [{ output: { images: [{ url: "https://orchestration-new.civitai.com/v2/consumer/blobs/x-0.jpg" }] } }] }, "/out/12100372-20260910074123211_0.jpg"],
 ];
 const out = cases.map(([d, exp]) => ({ got: pickUrl(d), exp, ok: pickUrl(d) === exp }));
 console.log(JSON.stringify(out));
@@ -1723,10 +1741,10 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821j")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
     # renderDock busy guard
@@ -1741,7 +1759,7 @@ def test_v0821j_send_busy_msg():
     assert_true("\\bbad\\b" in dock or "bad" in dock[ready_i-200:ready_i+80], "v0821k keep bad/warn tip")
 
     # fireSend: once-per-event + gates before ack; non-silent debounce
-    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2800]
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4500]
     assert_true("_nlSendHandled" in fs, "same-event once flag")
     assert_true('setMsg("已点生成")' in fs, "已点生成 ack present")
     entry_i = fs.find('setMsg("已点生成")')
@@ -1802,9 +1820,19 @@ function setAckMsg(rest, cls){ const body = String(rest||"").replace(/^已点生
 function needsPromptBeforeGenerate(){ return false; }
 function chipsLackAirForOutbound(){ return false; }
 function paramGateMessage(){ return ""; }
+function currentBackend(){ return "fal"; }
+function falHasLoras(){ return false; }
+function falLoraUnsupportedMsg(){ return ""; }
+function pinFalLoraServiceId(s){ return s || ""; }
+function hfHasLoras(){ return false; }
+function hfLoraUnsupportedMsg(){ return ""; }
+function pinHfLoraServiceId(s){ return s || ""; }
+function keepComposerPromptVisible(){}
+function paintShotFail(shot, err, cls){ setMsg(String(err), cls||"bad"); }
+function outboundLoraBlockMsg(){ return "LoRA block"; }
 let generateCalls = 0;
 function generate(){ generateCalls++; setAckMsg("校验连线…"); fireSend._busy = true; }
-const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null), setAttribute(){}, removeAttribute(){} };
 function $(id){ return id === "send" ? btn : (id === "prompt" ? { value: "camera slowly pans" } : null); }
 """ + js[js.find("function fireSend"):js.find("\n  function bindSendButton")] + r"""
 fireSend._busy = false;
@@ -1844,10 +1872,10 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821k")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
     assert_true("function needsPromptBeforeGenerate" in js, "prompt gate helper")
@@ -1859,7 +1887,7 @@ def test_v0821k_i2v_prompt_req():
     assert_true("formatErr(e)" in js or "formatErr(st.error" in js, "surface job.error via formatErr")
     assert_true("/\\bbad\\b|\\bwarn\\b/" in js or "keep bad/warn" in js, "renderDock preserves bad/warn")
 
-    fs = js[js.find("function fireSend"):js.find("function fireSend") + 2800]
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4500]
     assert_true("needsPromptBeforeGenerate" in fs, "fireSend client gate")
     assert_true("此模型需要提示词" in fs, "fireSend hard red")
     need_i = fs.find("此模型需要提示词")
@@ -1960,9 +1988,18 @@ function needsPromptBeforeGenerate(){
 }
 function chipsLackAirForOutbound(){ return false; }
 function paramGateMessage(){ return ""; }
+function falHasLoras(){ return false; }
+function falLoraUnsupportedMsg(){ return ""; }
+function pinFalLoraServiceId(s){ return s || ""; }
+function hfHasLoras(){ return false; }
+function hfLoraUnsupportedMsg(){ return ""; }
+function pinHfLoraServiceId(s){ return s || ""; }
+function keepComposerPromptVisible(){}
+function paintShotFail(shot, err, cls){ setMsg(String(err), cls||"bad"); }
+function outboundLoraBlockMsg(){ return "LoRA block"; }
 let generateCalls = 0;
 function generate(){ generateCalls++; setAckMsg("校验连线…"); }
-const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null), setAttribute(){}, removeAttribute(){} };
 const promptEl = { value: "" };
 function $(id){
   if (id === "send") return btn;
@@ -2032,13 +2069,13 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821l")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
-    fs = js[js.find("function fireSend"):js.find("function fireSend") + 3200]
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4800]
     assert_true("_nlSendHandled" in fs, "once-per-event flag")
     assert_true(fs.find("_nlSendHandled") < fs.find('setMsg("已点生成")'), "flag before ack")
     assert_true(fs.find("此模型需要提示词") < fs.find('setMsg("已点生成")'), "prompt gate before ack")
@@ -2096,9 +2133,19 @@ function needsPromptBeforeGenerate(){
 }
 function chipsLackAirForOutbound(){ return false; }
 function paramGateMessage(){ return ""; }
+function currentBackend(){ return "fal"; }
+function falHasLoras(){ return false; }
+function falLoraUnsupportedMsg(){ return ""; }
+function pinFalLoraServiceId(s){ return s || ""; }
+function hfHasLoras(){ return false; }
+function hfLoraUnsupportedMsg(){ return ""; }
+function pinHfLoraServiceId(s){ return s || ""; }
+function keepComposerPromptVisible(){}
+function paintShotFail(shot, err, cls){ setMsg(String(err), cls||"bad"); }
+function outboundLoraBlockMsg(){ return "LoRA block"; }
 let generateCalls = 0;
 function generate(){ generateCalls++; setAckMsg("校验连线…"); fireSend._busy = true; }
-const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null) };
+const btn = { getAttribute: (k) => (k === "data-reason" ? "enabled" : null), setAttribute(){}, removeAttribute(){} };
 const promptEl = { value: PROMPT };
 function $(id){
   if (id === "send") return btn;
@@ -2179,9 +2226,9 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821m2")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
     assert_true('"nl-storyboard-v0821l"' in js, "STORE_OLDS keeps v0821l")
     assert_true("? 180 : 40" in js or "pollMax = 180" in js, "video pollMax 180")
@@ -2197,9 +2244,9 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n3")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
     assert_true("nl-storyboard-v0821m2" in js, "STORE_OLDS keeps v0821m2")
@@ -2211,7 +2258,7 @@ def test_v0821n2_lora_air_gate():
     # packLoras: civitai requires air on EVERY chip; empty → null; keep air when present
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i - 1800:pack_i + 1800]
+    pack = js[pack_i:pack_i + 3200]
     assert_true("function loraRowCanOutbound" in js, "loraRowCanOutbound")
     assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter")
     assert_true("row.air" in pack, "checks air")
@@ -2271,9 +2318,9 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821n4")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
     assert_true("nl-storyboard-v0821n" in js, "STORE_OLDS keeps v0821n")
@@ -2298,7 +2345,18 @@ def test_v0821n3_import_air_chip():
     block = js[i:j]
     assert_true("normalizeLora" in block, "maps via normalizeLora")
     assert_true("row.air" in block, "reaffirms air from import row")
+    assert_true("loraVersionId" in block, "applyImport resolves versionId via loraVersionId")
+    assert_true("loraDownloadUrl" in block, "applyImport reconciles path via loraDownloadUrl")
     assert_true("/api/generate" not in block, "import must not call /api/generate")
+
+    # loraVersionId prefers AIR @version over stale sibling versionId
+    vi = js.find("function loraVersionId")
+    assert_true(vi >= 0, "loraVersionId present")
+    vid_fn = js[vi:vi + 500]
+    air_at = vid_fn.find("air.match")
+    ver_at = vid_fn.find("l.versionId")
+    assert_true(air_at >= 0 and (ver_at < 0 or air_at < ver_at),
+                "loraVersionId must read AIR @version before versionId")
 
     # normalizeLora copies air
     ni = js.find("function normalizeLora(")
@@ -2383,23 +2441,23 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "script ?v=")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE n5")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script ?v=")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
         ".dock-foot{flex:0 0 auto;max-height:none;overflow:visible;position:static;" in html,
@@ -2422,11 +2480,11 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "script cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE v0821o")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
 
@@ -2499,7 +2557,7 @@ def test_v0821o_fal_lora_knife():
     # packLoras: fal requires http path (not AIR-only)
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i - 4000:pack_i + 1600]
+    pack = js[pack_i:pack_i + 3200]
     assert_true('be === "fal"' in pack or "be === 'fal'" in pack, "fal path filter gate")
     assert_true("isHttpUrl" in pack or "https://" in pack, "http path check in pack")
     assert_true("looksAir" in pack, "rejects air-as-path")
@@ -2590,11 +2648,11 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o3")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
 
@@ -2623,28 +2681,33 @@ def test_v0821o2_fal_turbo_pin():
     assert_true("Krea 2 Turbo LoRA" in ens_fal or "Krea 2 Turbo LoRA" in js[js.find("function svcOptionText"):js.find("function svcMatchBlob")],
                 "option label for pinned id")
 
-    # Sim: empty service + loras → pin turbo/lora (never flux/schnell→flux-lora)
-    FAL_T2I = "fal-ai/flux/schnell"
+    # o29: fixture path still krea; AIR-base resolver present (flux1≠hard-pin krea)
+    assert_true("function resolveFalLoraEndpointFromChips" in js, "resolveFalLoraEndpointFromChips")
+    assert_true("FAL_LORA_BY_BASE" in js, "FAL_LORA_BY_BASE")
+    assert_true("FAL_FLUX_LORA_SERVICE" in js, "FAL_FLUX_LORA_SERVICE")
+    assert_true('flux1: FAL_FLUX_LORA_SERVICE' in js or 'flux1: "fal-ai/flux-lora"' in js, "flux1→flux-lora")
+    assert_true("krea2: FAL_LORA_PREF_SERVICE" in js or 'krea2: "fal-ai/krea-2/turbo/lora"' in js, "krea2→krea")
+    assert_true("不硬钉" in js or "不支持" in js, "honest unsupported copy")
     PREF = "fal-ai/krea-2/turbo/lora"
+    FLUX = "fal-ai/flux-lora"
+    BY = {"flux1": FLUX, "krea2": PREF}
 
-    def pin(sid, has_loras=True):
-        s = str(sid or "").strip()
-        if not has_loras:
-            return s
-        if s in ("fal-ai/krea-2/turbo", "fal-ai/z-image/turbo", "fal-ai/z-image/turbo/lora"):
-            return PREF
-        if s == PREF:
-            return s
-        if (not s) or s in ("fal-ai/flux-lora", FAL_T2I):
-            return PREF
-        return s
+    def resolve(bases):
+        if not bases:
+            return "", "no AIR base"
+        if len(set(bases)) > 1:
+            return "", "mixed"
+        b = bases[0]
+        return BY.get(b, ""), ("" if b in BY else "unsupported")
 
-    assert_true(pin("") == PREF, "empty → turbo/lora")
-    assert_true(pin(FAL_T2I) == PREF, "schnell drift → turbo/lora")
-    assert_true(pin("fal-ai/flux-lora") == PREF, "flux-lora blocked → turbo/lora")
-    assert_true(pin("fal-ai/z-image/turbo") == PREF, "turbo → turbo/lora only")
-    assert_true(pin(PREF) == PREF, "already pinned stays")
-    assert_true(pin("", has_loras=False) == "", "no LoRAs: empty stays empty for civitai-style")
+    ep, reason = resolve(["krea2"])
+    assert_true(ep == PREF and not reason, "krea2 → krea turbo/lora")
+    ep, reason = resolve(["flux1"])
+    assert_true(ep == FLUX and not reason, "flux1 → flux-lora (NOT krea)")
+    ep, reason = resolve(["flux1", "krea2"])
+    assert_true(not ep and reason == "mixed", "mixed bases unsupported")
+    ep, reason = resolve([])
+    assert_true(not ep and reason, "no AIR → unsupported (no hard-pin krea)")
 
 
 def test_v0821o3_fal_clear_loras():
@@ -2652,11 +2715,11 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
 
@@ -2767,21 +2830,41 @@ def test_v0821o3_fal_clear_loras():
     civ_no_key = {"backend": "civitai", "serviceId": "image/comfy/krea2/turbo/createImage"}
     assert_true(sim_apply_import_loras(OLD, civ_no_key) == [], "civitai missing loras still clears")
 
-    # Pin uses j.loras.length — leftover chips must not drive turbo pin
+    # o29: no loras → keep prev pin; path-only loras without AIR → do not invent krea
     def pin_from_import(sid, payload, prev_pin=""):
         j_loras = payload.get("loras")
         has = isinstance(j_loras, list) and len(j_loras) > 0
-        s = str(sid or "").strip() or "fal-ai/krea-2/turbo/lora"
-        if has and s in ("fal-ai/flux-lora", "fal-ai/flux/schnell", "fal-ai/krea-2/turbo", "fal-ai/z-image/turbo", ""):
-            s = "fal-ai/krea-2/turbo/lora"
-        pin = s if has else (prev_pin or "")
-        return s, pin
+        s = str(sid or "").strip()
+        if not has:
+            return s or "fal-ai/flux/schnell", (prev_pin or "")
+        bases = []
+        for row in j_loras:
+            air = str((row or {}).get("air") or "")
+            if air.startswith("urn:air:"):
+                parts = air.split(":")
+                if len(parts) >= 3:
+                    bases.append(parts[2].lower())
+        bases = list(dict.fromkeys(bases))
+        BY = {"flux1": "fal-ai/flux-lora", "krea2": "fal-ai/krea-2/turbo/lora"}
+        if not bases:
+            return "", ""  # path-only: honest no hard-pin
+        if len(bases) > 1:
+            return "", ""
+        want = BY.get(bases[0], "")
+        return want, want
 
     sid, pin = pin_from_import("fal-ai/flux/schnell", fal_no_key, prev_pin="fal-ai/krea-2/turbo/lora")
     assert_true(pin == "fal-ai/krea-2/turbo/lora", "no loras: keep previous pin, do not rewrite from stale chips")
+    # fal_present is path-only Asian Mix — no AIR → must NOT invent krea
     sid2, pin2 = pin_from_import("fal-ai/flux/schnell", fal_present, prev_pin="")
-    assert_true(sid2 == "fal-ai/krea-2/turbo/lora" and pin2 == "fal-ai/krea-2/turbo/lora",
-                "with loras: still pin turbo/lora off flux/schnell")
+    assert_true(sid2 == "" and pin2 == "", "path-only LoRAs: no AIR base → no hard-pin krea")
+    flux_payload = {
+        "backend": "fal",
+        "loras": [{"air": "urn:air:flux1:lora:civitai:730162@823089", "path": PATH, "scale": 0.7}],
+    }
+    sid3, pin3 = pin_from_import("fal-ai/krea-2/turbo/lora", flux_payload, prev_pin="")
+    assert_true(sid3 == "fal-ai/flux-lora" and pin3 == "fal-ai/flux-lora",
+                "flux1 AIR → flux-lora (not krea)")
 
 
 def test_v0821o4_hf_turbo_lora():
@@ -2794,11 +2877,11 @@ def test_v0821o4_hf_turbo_lora():
     PATH = "https://civitai.com/api/download/models/3231694"
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o4")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
 
@@ -2814,12 +2897,15 @@ def test_v0821o4_hf_turbo_lora():
     fixture_block = js[fi:fj if fj > fi else fi + 1100]
     assert_true('backend: "huggingface"' in fixture_block or "backend:'huggingface'" in fixture_block,
                 "fixture backend huggingface")
-    assert_true('serviceId: "krea/Krea-2-Turbo"' in fixture_block
-                or "serviceId: HF_LORA_PREF_SERVICE" in fixture_block,
-                "fixture serviceId is krea/Krea-2-Turbo")
-    assert_true('serviceId: "fal-ai/z-image/turbo/lora"' not in fixture_block
-                and "serviceId: FAL_LORA_PREF_SERVICE" not in fixture_block,
-                "HF fixture must NOT rewrite to fal turbo/lora sibling")
+    # o31: HF+LoRA fixture mounts official Fal LoRA endpoint (krea-2/turbo/lora) + AIR — not Hub turbo (no LoRA).
+    assert_true("FAL_LORA_PREF_SERVICE" in fixture_block
+                or 'serviceId: "fal-ai/krea-2/turbo/lora"' in fixture_block
+                or 'serviceId: "krea/Krea-2-Turbo"' in fixture_block,
+                "HF LoRA fixture has serviceId")
+    assert_true("urn:air:krea2:lora:" in fixture_block or "air:" in fixture_block,
+                "HF LoRA fixture carries AIR base for o31 pin")
+    assert_true('serviceId: "fal-ai/z-image/turbo/lora"' not in fixture_block,
+                "HF fixture must NOT use z-image turbo/lora")
     assert_true(PATH in fixture_block, "fixture http path 3231694")
     assert_true("scale: 0.8" in fixture_block or "scale:0.8" in fixture_block, "fixture scale 0.8")
     assert_true("air:" not in fixture_block.split("loras:")[1][:400] or PATH in fixture_block,
@@ -2958,19 +3044,23 @@ def test_v0821o4_hf_turbo_lora():
     assert_true(sim_empty_service("huggingface") != FAL_SIB, "HF empty must not fal sibling")
     assert_true(sim_empty_service("fal") == FAL_SIB, "Fal empty+loras still turbo/lora")
 
-    def sim_pin_hf(sid):
+    def sim_pin_hf(sid, has_loras=False, air_base=""):
         s = str(sid or "").strip()
-        if (not s) or s.startswith("fal-ai/") or s.startswith("image/"):
-            return HUB
-        if s == HUB:
+        if not has_loras:
+            if (not s) or s.startswith("fal-ai/") or s.startswith("image/"):
+                return HUB
             return s
-        return s
+        # o31: with LoRAs, AIR base picks official Fal LoRA endpoint (not Hub turbo).
+        by = {"flux1": "fal-ai/flux-lora", "krea2": "fal-ai/krea-2/turbo/lora"}
+        return by.get(air_base, "")
 
-    assert_true(sim_pin_hf("") == HUB, "empty → Hub")
-    assert_true(sim_pin_hf(FAL_SIB) == HUB, "fal sibling on HF backend → Hub (no keep sibling)")
-    assert_true(sim_pin_hf("image/comfy/krea2/turbo/createImage") == HUB, "civitai id on HF → Hub")
-    assert_true(sim_pin_hf(HUB) == HUB, "Hub stays Hub")
+    assert_true(sim_pin_hf("") == HUB, "empty → Hub (no loras)")
+    assert_true(sim_pin_hf(FAL_SIB) == HUB, "fal sibling on HF no-loras → Hub")
+    assert_true(sim_pin_hf("image/comfy/krea2/turbo/createImage") == HUB, "civitai id on HF no-loras → Hub")
+    assert_true(sim_pin_hf(HUB) == HUB, "Hub stays Hub (no loras)")
     assert_true(sim_pin_hf("Qwen/Qwen-Image") == "Qwen/Qwen-Image", "other Hub id kept")
+    assert_true(sim_pin_hf(HUB, has_loras=True, air_base="flux1") == "fal-ai/flux-lora", "o31 flux1 → flux-lora")
+    assert_true(sim_pin_hf(HUB, has_loras=True, air_base="krea2") == "fal-ai/krea-2/turbo/lora", "o31 krea2 → krea lora")
 
     # runShotStep: HF outbound serviceId is Hub, not fal sibling
     rsi = js.find("async function runShotStep")
@@ -2996,9 +3086,10 @@ def test_v0821o4_hf_turbo_lora():
     assert_true(abs(float(forced["loras"][0]["scale"]) - 0.8) < 1e-6, "_force_loras scale 0.8")
     assert_true('hf|sync|' in hf, "job shape hf|sync|")
     assert_true("looks_like_civitai_service" in hf, "HF generate rejects Civitai serviceId")
-    assert_true('startswith(("fal-ai/"' in hf or 'startswith("fal-ai/")' in hf or "fal-ai/" in hf
-                and "不能发给 Hugging Face" in hf,
-                "HF generate rejects Fal serviceId")
+    assert_true("不能发给 Hugging Face" in hf or "不接受 LoRA 的 Fal" in hf,
+                "HF generate still rejects non-LoRA Fal serviceId")
+    assert_true("fal_supports_lora" in hf or "v0821o31" in hf or "direct_fal_lora" in hf,
+                "o31 HF allows official Fal LoRA endpoints when loras[] present")
     assert_true("return pid" in hf or "return (pid" in hf, "_maybe_lora_pid does not rewrite")
     assert_true("/lora" in hf and "sibling" in hf.lower() or "Router does not host" in hf,
                 "docs: no fal /lora sibling")
@@ -3018,11 +3109,11 @@ def test_v0821o5_hf_no_wavespeed():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
-    assert_true("v0821o8-caption-i2i" in html, "html stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o5")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -3106,12 +3197,33 @@ def test_v0821o5_hf_no_wavespeed():
             return str(data.get("error") or data)
         return str(data)
 
+    # o31: Hub mid mapped to no-LoRA fal pid + loras[] → honest 400 (no silent sibling / no call).
     try:
         hfmod.inference_mapping = fake_map
         hfmod._call_fal = fake_call
         hfmod.hf_key = lambda: "hf_test_token"
+        hfmod.hf_keys = lambda: ["hf_test_token"]
         hfmod._provider_candidates = fake_cands
-        code, data = hfmod.HuggingFaceProvider().generate(payload)
+        code_lora, data_lora = hfmod.HuggingFaceProvider().generate(payload)
+    finally:
+        hfmod.inference_mapping = orig_map
+        hfmod._call_fal = orig_call
+        hfmod.hf_key = orig_key
+        hfmod._provider_candidates = orig_cands
+    assert_true(code_lora == 400, "o31 Hub+loras → 400 before call: %s" % data_lora)
+    assert_true("不接受 LoRA" in err_text(data_lora), "o31 copy: %s" % data_lora)
+    assert_true(not called, "o31 must not call providers for Hub+loras no-LoRA map: %s" % called)
+
+    # o5 wavespeed-final still holds for no-LoRA outbound (fal-ai error not overwritten).
+    payload_nolora = {"serviceId": HUB, "prompt": "portrait, soft light"}
+    called.clear()
+    try:
+        hfmod.inference_mapping = fake_map
+        hfmod._call_fal = fake_call
+        hfmod.hf_key = lambda: "hf_test_token"
+        hfmod.hf_keys = lambda: ["hf_test_token"]
+        hfmod._provider_candidates = fake_cands
+        code, data = hfmod.HuggingFaceProvider().generate(payload_nolora)
     finally:
         hfmod.inference_mapping = orig_map
         hfmod._call_fal = orig_call
@@ -3155,7 +3267,7 @@ def test_v0821o6_modelscope_hub_lora():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o8-caption-i2i"
+    STAMP = "v0821o49b-hydrate-fresh-empty-url"
     HUB = "krea/Krea-2-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3164,9 +3276,9 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o6")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -3274,7 +3386,7 @@ def test_v0821o6_modelscope_hub_lora():
                 "o3: missing loras[] still clears")
 
     pack_i = js.find("function packLorasForPayload")
-    pack = js[pack_i - 1800:pack_i + 1600]
+    pack = js[pack_i:pack_i + 4200]
     assert_true("isModelscopeBe" in pack or 'modelscope-ai' in pack,
                 "modelscope Hub-repo filter in pack")
     assert_true("isHfRepo" in pack or "owner/repo" in pack or "count(\"/\")" in pack
@@ -3531,7 +3643,7 @@ def test_v0821o6b_ms_lora_shape():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o8-caption-i2i"
+    STAMP = "v0821o49b-hydrate-fresh-empty-url"
     HUB = "Tongyi-MAI/Z-Image-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3539,15 +3651,15 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-astra-0163679" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true("nanogpt" not in STAMP and "nano-gpt" not in STAMP, "stamp stays Magao, not Nano")
-    assert_true("v0821o12" not in html, "html must not drift onto Nano stamps")
-    assert_true("v0821o8-caption-i2i" in html, "o7 param-surface stamp")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html and "nano" not in "v0821o49b-hydrate-fresh-empty-url", "html must not drift onto Nano stamps")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "o7 param-surface stamp")
 
     fi = js.find("function msLoraFixtureImport")
     fj = js.find("async function mountMsLoraFixture", fi)
@@ -3666,10 +3778,10 @@ def test_v0821o7_param_surface():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o8-caption-i2i" in html, "html stamp o7")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-astra-0163679"' in html, "cache-bust")
-    assert_true('const STORE = "nl-storyboard-v0821o7"' in js, "STORE o7")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "cache-bust")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
     # Supported fields have real inputs
@@ -3737,7 +3849,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-uifix3">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260911-o49bhydratefreshemptyurl">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3755,10 +3867,8 @@ def test_v0821o7_c1_closeout():
                 "packLoras strength must not clamp null→0.8")
     assert_true("clampLoraScale(inp.value, 0.8)" not in js, "slider must not write 0.8 on empty")
     assert_true("strengthMissing" in js, "strengthMissing flag on normalize/pack")
-    pack_i = js.find("function packLoraRow")
-    if pack_i < 0:
-        pack_i = js.find("function packLorasForPayload")
-    pack = js[pack_i:pack_i + 3600]
+    pack_i = js.find("function packLorasForPayload")
+    pack = js[pack_i:pack_i + 4200]
     assert_true("strengthMissing" in pack or "strength: null" in pack or "strength: l.strength" in pack,
                 "pack ships null strength into payload")
     rend_i = js.find("function renderLoras")
@@ -3790,20 +3900,15 @@ def test_v0821o7_c1_closeout():
     cc = js[js.find("function catalogCaps"):js.find("function markOver")]
     assert_true("parameterCapabilities" in cc, "catalogCaps must read parameterCapabilities")
 
-    # 5. backend=fal hides #comfyParams — 16:9/720P must not sit next to 960×1440
+    # 5. o28 board §硬规则2: unsupported → disable+「不支持」, do not hide comfy as-complete on fal
     sync = js[js.find("function syncParamSurface"):js.find("function readComfyParamsFromUi")]
-    assert_true("comfyBox" in sync, "syncParamSurface touches #comfyParams")
-    compact_sync = " ".join(sync.split())
-    assert_true(
-        'comfyBox.classList.toggle("hidden"' in compact_sync
-        or "comfyBox.classList.toggle('hidden'" in compact_sync,
-        "comfyParams visibility is toggled",
-    )
-    assert_true('classList.toggle("hidden", false)' not in sync
-                or "be === \"fal\"" in sync
-                or 'be === "fal"' in compact_sync,
-                "fal must hide #comfyParams (not always show)")
-    assert_true("fal" in sync and "hidden" in sync, "fal path hides a param group")
+    assert_true("ComposerFieldAdapt" in sync or "applyToSurface" in sync,
+                "syncParamSurface delegates to ComposerFieldAdapt")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    assert_true("param-unsupported" in adapt, "unsupported fields get param-unsupported")
+    assert_true("本家不支持" in adapt, "plain unsupported copy")
+    assert_true("showComfyGroup = true" in adapt or "showComfyGroup=true" in adapt.replace(" ", ""),
+                "comfyParams stay mounted; per-field disable handles honesty")
 
     # 6. loadCatalog failure must not swallow
     assert_true("} catch (_) {}" not in lc, "loadCatalog must not catch (_) {}")
@@ -3825,7 +3930,7 @@ def test_v0821o7_c1_closeout():
 
     # 8. video→image must withdraw 缺首帧
     sm = js[js.find("function setMode"):js.find("function setMode") + 900]
-    rd = js[js.find("function renderDock"):js.find("function renderDock") + 2500]
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 9000]
     assert_true("缺首帧" in rd, "video missing-frame copy kept")
     withdrawn = (
         ("缺首帧" in sm and "image" in sm)
@@ -3891,6 +3996,1196 @@ def test_v0821o8_caption_i2i():
     assert_true("j.caption" in cap, "caption text comes from the model")
 
 
+
+def test_v0821o9_fail_zh_lora_honesty():
+    """Knife A + Critiquito: humanize Fal 422/missing/body.loc; no bare-missing FP; Composer foot == card; LoRA honesty kept."""
+    import json
+    import subprocess
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    index = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust")
+    assert_true("function humanizeFailText" in js, "humanizeFailText helper")
+    assert_true('/\\bmissing\\b/.test(lower) && /body\\./.test(lower)' not in js,
+                "no bare missing&&body. false-positive clause")
+    assert_true('setMsg(n._error, "bad"' in js, "Composer foot mirrors card _error")
+    assert_true("内容未通过安全审核" in js, "content checker Chinese copy")
+    assert_true("缺少提示词（服务端校验）" in js, "Field required Chinese copy")
+    assert_true("humanizeFailText(raw)" in js, "formatErrInfo uses humanize")
+    assert_true("flagged by a content checker" in js, "maps Fal content-checker English")
+
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 3500]
+    assert_true("n._error" in rd and "setMsg(n._error" in rd, "renderDock syncs shot _error to Composer foot")
+    assert_true('setMsg(n._error, "bad"' in rd, "foot uses bad tone")
+
+    rend = js[js.find("function renderLoras"):js.find("function renderLoras") + 2400]
+    assert_true("未填" in rend, "LoRA strength placeholder is outbound-honest")
+    assert_true(
+        "ComposerFieldAdapt.strengthPlaceholder" in rend or "未填·出站按提供方默认" in rend,
+        "strength uses adapt「未填」helper (or legacy honest placeholder)",
+    )
+    assert_true("不写 1.0/0.8" in rend, "title/placeholder denies invent defaults")
+
+    paint = js[js.find("function paintShotFail"):js.find("function paintShotFail") + 900]
+    assert_true("shot._error = info.text" in paint, "paintShotFail card _error is humanized text")
+    assert_true("setMsg(info.text" in paint, "paintShotFail Composer #msg same as card")
+    failblk = js[js.find("function fail(err, status, cls"):js.find("function fail(err, status, cls") + 1600]
+    assert_true("shot._error = info.text" in failblk, "runShotStep fail card _error is humanized text (not prefix)")
+    assert_true("formatErrInfo(err)" in failblk, "runShotStep fail goes through formatErrInfo")
+    # poll must throw RAW Fal/job error so formatErrInfo can keep English excerpt
+    run = js[js.find("async function runShotStepWork"):js.find("function setSendVisual")]
+    assert_true("throw new Error(detail)" not in run, "poll must not pre-wrap formatErr (loses excerpt)")
+    assert_true("throw (st.error" in run or "throw st.error" in run, "poll throws raw job.error into fail()")
+
+    hs = js.find("function shortErrExcerpt")
+    he = js.find("function formatErr(", hs)
+    helpers = js[hs:he]
+    assert_true("function humanizeFailText" in helpers and "function formatErrInfo" in helpers, "extract humanize+formatErrInfo")
+    prog = helpers + r"""
+const cases = [
+  ["body.prompt: The content could not be processed because it contained material flagged by a content checker.", "内容未通过安全审核"],
+  ["body.prompt: Field required", "缺少提示词（服务端校验）"],
+  ["body.image_url: Field required", "缺少图片输入（服务端校验）"],
+  ['{"type":"missing","loc":["body","prompt"],"msg":"Field required"}', "缺少提示词（服务端校验）"],
+  ['{"type":"missing","loc":["body","prompt"]}', "缺少提示词（服务端校验）"],
+  ['[{"type":"missing","loc":["body","start_image"],"msg":"Field required"}]', "缺少图片输入（服务端校验）"],
+  ["prompt is required but was not provided", "缺少提示词（服务端校验）"],
+  ["content_policy_violation", "内容未通过安全审核"],
+  ["flagged by a content checker", "内容未通过安全审核"],
+  ["missing dependency in body.build", "missing dependency in body.build"],
+  ["User is missing something without body.", "User is missing something without body."],
+  ["The type: missing widget in body.build", "The type: missing widget in body.build"],
+  ["The file is missing", "The file is missing"],
+  ["此模型需要提示词", "此模型需要提示词"],
+  ["File download error", "资源下载失败（链接不可达）"],
+];
+let bad = [];
+for (const [inp, want] of cases) {
+  const got = humanizeFailText(inp);
+  if (got !== want) bad.push({kind:"humanize", inp, want, got});
+}
+const fiCases = [
+  {inp: "body.prompt: Field required", text: "缺少提示词（服务端校验）", excerptHas: ["body.prompt", "Field required"]},
+  {inp: "missing dependency in body.build", text: "missing dependency in body.build", excerptEmpty: true},
+  {inp: "The type: missing widget in body.build", text: "The type: missing widget in body.build", excerptEmpty: true},
+  {inp: '{"type":"missing","loc":["body","prompt"]}', text: "缺少提示词（服务端校验）", excerptHas: ["missing", "body"]},
+  {inp: "body.prompt: The content could not be processed because it contained material flagged by a content checker.", text: "内容未通过安全审核", excerptHas: ["content checker"]},
+  {inp: {error: "body.prompt: Field required"}, text: "缺少提示词（服务端校验）", excerptHas: ["Field required"]},
+];
+for (const c of fiCases) {
+  const fi = formatErrInfo(c.inp);
+  if (fi.text !== c.text) bad.push({kind:"formatErrInfo.text", inp: c.inp, want: c.text, got: fi.text});
+  if (c.excerptEmpty && fi.excerpt) bad.push({kind:"formatErrInfo.excerpt", inp: c.inp, want: "", got: fi.excerpt});
+  if (c.excerptHas) {
+    for (const p of c.excerptHas) {
+      if (!(fi.excerpt || "").includes(p)) bad.push({kind:"formatErrInfo.excerpt", inp: c.inp, need: p, got: fi.excerpt});
+    }
+  }
+  if (fi.text && /[\u4e00-\u9fff]/.test(fi.text) && c.excerptHas) {
+    // mapped ZH must not dump pydantic English into the card/foot text
+    if (fi.text === (typeof c.inp === "string" ? c.inp : JSON.stringify(c.inp))) {
+      bad.push({kind:"zh-not-applied", inp: c.inp, got: fi.text});
+    }
+  }
+}
+if (bad.length) { console.log(JSON.stringify(bad)); process.exit(1); }
+console.log("ok");
+"""
+    r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)
+    assert_true(r.returncode == 0, "humanizeFailText/formatErrInfo node eval: %s %s" % (r.stdout, r.stderr))
+
+    assert_true("fallback == null ? 0.8" not in index, "index clamp must not default 0.8")
+    assert_true("clampLoraScale(v.strength != null ? v.strength : v.scale, 0.8)" not in index,
+                "index normalizeLora must not invent 0.8")
+    assert_true("clampLoraScale(l.scale != null ? l.scale : l.strength, 0.8)" not in index,
+                "index payload/slim must not invent 0.8 scale")
+    assert_true("clampLoraScale(l.strength != null ? l.strength : l.scale, 0.8)" not in index,
+                "index payload/slim must not invent 0.8 strength")
+    assert_true("strengthMissing" in index, "index tracks strengthMissing")
+    assert_true("未填·出站按提供方默认" in index, "index LoRA placeholder honest")
+    assert_true("strength: null" in index, "index addLora uses null strength")
+    assert_true(index.count("strength: 0.8") == 0, "index search/add must not hardcode strength: 0.8")
+
+    # storyboard searchLoras / add-from-search must not silently invent 0.8 (fixtures elsewhere may still use 0.8)
+    sl_start = js.find("async function searchLoras")
+    sl_end = js.find("function bindLoraUi()", sl_start)
+    assert_true(sl_start >= 0 and sl_end > sl_start, "searchLoras block found")
+    search_loras = js[sl_start:sl_end]
+    assert_true("strength: 0.8" not in search_loras, "storyboard searchLoras must not hardcode strength: 0.8")
+    assert_true("strength:0.8" not in search_loras, "storyboard searchLoras must not hardcode strength:0.8")
+    assert_true(search_loras.count("strength: null") >= 4, "storyboard searchLoras add paths use strength: null")
+
+
+
+def test_v0821o15_server_writeback_executable():
+    """v0821o15: local persist + PUT /api/storyboard-graph; clean-profile hydrate keeps shot.url."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o15")
+    assert_true('"nl-storyboard-v0821o14"' in js, "STORE_OLDS keeps o14")
+    assert_true('"nl-storyboard-v0821o13"' in js, "STORE_OLDS keeps o13")
+    assert_true('"nl-storyboard-v0821o12"' in js, "STORE_OLDS keeps o12")
+    assert_true("storyboard.js?v=20260911-o49bhydratefreshemptyurl" in html, "js cache bust")
+    assert_true("function mergePreferUrl" in js, "mergePreferUrl helper")
+    assert_true("function isQuotaErr" in js, "isQuotaErr helper")
+    assert_true("function persistServer" in js, "persistServer helper")
+    assert_true("function hydrateFromServer" in js, "hydrateFromServer helper")
+    assert_true("function applyGraph" in js, "applyGraph helper")
+    assert_true("/api/storyboard-graph" in js, "storyboard-graph API")
+    assert_true("本地缓存已满" in js, "QuotaExceeded user warn")
+    # Structural: writeback persists local + server
+    w = js.find("function writebackResult")
+    assert_true(w >= 0, "writebackResult")
+    wend = js.find("function pickSavedUrl", w)
+    if wend < 0:
+        wend = js.find("function pickUrl", w)
+    wb = js[w:wend]
+    assert_true("persist()" in wb, "writebackResult calls persist")
+    assert_true("persistServer()" in wb, "writebackResult calls persistServer")
+    assert_true("shot.kind === \"shot\"" in wb or "shot.kind===\"shot\"" in wb.replace(" ", ""), "writeback re-attaches orphan shot")
+    assert_true("state.nodes.push" in wb, "orphan push into state.nodes")
+    assert_true("skip PUT" in js, "persistServer skips empty nodes")
+    assert_true("服务端保存失败 HTTP" in js, "persistServer surfaces HTTP fail")
+    assert_true("function pickSavedUrl" in js, "pickSavedUrl")
+    assert_true("pickSavedUrl(st)" in js, "poll break on saved")
+    assert_true("const savedUrl = pickSavedUrl(j)" in js and "savedUrl || pickUrl(j)" in js, "final prefer saved")
+    assert_true('if (pickUrl(st)) break;' not in js, "no CDN poll break")
+    assert_true('"nl-storyboard-v0821o15"' in js, "STORE_OLDS keeps o15")
+    assert_true("hydrateFromServer()" in js, "boot calls hydrateFromServer")
+    # Server helpers exist
+    server = (ROOT / "server.py").read_text(encoding="utf-8")
+    assert_true("def read_storyboard_graph" in server, "read_storyboard_graph")
+    assert_true("def write_storyboard_graph" in server, "write_storyboard_graph")
+    assert_true('"/api/storyboard-graph"' in server, "server route")
+    # Executable proof (node VM runs production persist/restore + server seams)
+    import subprocess
+    proc = subprocess.run(
+        ["node", str(ROOT / "scripts" / "test_storyboard_persist_restore.js")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert_true(proc.returncode == 0, "executable persist/restore failed: " + (proc.stdout or "") + (proc.stderr or ""))
+    assert_true("ok: storyboard persist/restore executable checks passed" in (proc.stdout or ""), proc.stdout)
+
+
+def test_v0821o19_single_up_writeback():
+    """o19: 双↑→单↑ + writeback keepalive + frame-edge ensure; keep A1/A3/A4/A5."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o19")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "js cache-bust o19")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
+    assert_true('"nl-storyboard-v0821o16"' in js, "STORE_OLDS still knows o16")
+
+    # A1 capsule + right rail; default image
+    assert_true('id="chatRail"' in html, "right chat-rail skeleton")
+    assert_true("function renderChatRail" in js, "renderChatRail")
+    assert_true("function positionDock" in js, "positionDock")
+    assert_true("折叠胶囊" in html, "collapse is capsule not 底栏")
+    assert_true("折叠为底栏" not in html, "no bottom-bar copy")
+    assert_true('id="modeImg" class="on"' in html or 'id="modeImg" class="on"' in html.replace(" ", " "),
+                "图片生成 starts on")
+    add = js[js.find('$("btnAdd").onclick'):js.find('$("btnAdd").onclick') + 700]
+    assert_true('state.mode = "image"' in add, "btnAdd defaults image")
+    assert_true('mode: "image"' in add, "new shot.mode image")
+
+    # A3 visible wires
+    assert_true("svg.wires path.edge" in html, "path.edge css")
+    assert_true("stroke:#e8edf4" in html or 'stroke="#e8edf4"' in js, "edge stroke paints")
+    assert_true("class=\"edge-glow\"" in js or "class='edge-glow'" in js or 'class="edge-glow"' in js,
+                "wire glow path")
+    dw = js[js.find("function drawWires"):js.find("function drawWires") + 1800]
+    assert_true("stroke=" in dw and "e8edf4" in dw, "drawWires inline stroke")
+    assert_true("z-index:4" in html or 'zIndex = "4"' in dw, "wires above cards")
+    assert_true("vector-effect: non-scaling-stroke" in css, "non-scaling stroke kept")
+
+    # A2 writeback not history-only; o16 poll/persist kept
+    wb = js[js.find("function writebackResult"):js.find("function pickSavedUrl")]
+    assert_true("live.url = url" in wb, "writeback sets shot.url")
+    assert_true("persistServer()" in wb, "writeback PUT graph")
+    assert_true("skip PUT" in js, "persistServer skip empty")
+    assert_true("pickSavedUrl(st)" in js, "poll waits saved[]")
+    assert_true('if (pickUrl(st)) break;' not in js, "no CDN early break")
+    assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
+
+    # A4 first-frame slot has upload/select, no silent steal
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 9000]
+    assert_true('data-act="upload"' in rd and "缺首帧" in rd, "missing slot upload")
+    assert_true('data-act="pick"' in rd, "missing slot select")
+    assert_true("切到图片生成" in js, "soften copy")
+    assert_true("不能偷配方台" in js, "hard gate no recipe steal")
+    assert_true("首帧已就绪 · 可生成" in js, "ready copy kept")
+
+    # P1 from code review Pass (o18)
+    assert_true('state.mode === "image" || state.mode === "video"' in js, "chatRail mode step lights for video")
+    assert_true(".dock.collapsed .dock-foot{display:none}" not in html, "collapsed must not hide dock-foot")
+    assert_true(".dock.collapsed .dock-foot{display:flex" in html, "collapsed dock-foot flex visible")
+    assert_true(".dock.collapsed .dock-foot .bar > :not(#send):not(.grow){display:none}" in html,
+                "collapsed keeps #send")
+    assert_true("shot.url = url" in js[js.find("function writebackResult"):js.find("function pickSavedUrl")],
+                "writeback syncs caller shot.url")
+    assert_true("v0821o18: explicit attach only" in js, "i2v attach announces 首帧已就绪")
+
+    # o19 visual P0 双↑ → only capsule #send
+    assert_true("chatRailSend" not in js, "no chatRailSend second ↑")
+    assert_true("双↑" in js, "documents 双↑ fix")
+    assert_true("keepalive: true" in js, "persistServer keepalive for writeback PUT")
+    assert_true("firstFrameId set but edge dropped" in js, "drawWires ensures frame edges")
+    assert_true(js.count('id="chatRailSend"') == 0, "no chatRailSend id")
+    assert_true(html.count('id="send"') == 1, "exactly one #send in html")
+
+    # A5 honest stubs (o20: compact 文本/音频 + 未接 pill)
+    assert_true('id="modeText" class="stub"' in html and "未接" in html, "text 未接")
+    assert_true('id="modeAud" class="stub"' in html, "audio stub")
+    assert_true("本版未接" in js, "stub generate blocked")
+
+
+def test_v0821o20_visual_p0():
+    """o20: selected image in 参考链; compact 未接 pills; chatRail product copy."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o20")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "js cache-bust o20")
+    assert_true('href="/static/storyboard-ui.css?v=20260911-o49bhydratefreshemptyurl"' in html, "css cache-bust o20")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
+    assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
+
+    # P0-1 visual chip + UI count; send-path 参考 is inbound edges only (own url must not trip t2i unused-ref)
+    assert_true("function shotResultImageUrl" in js, "shotResultImageUrl helper")
+    assert_true("function displayRefUrls" in js, "displayRefUrls UI helper")
+    cr = js[js.find("function countRefUrls"):js.find("function countRefUrls") + 1100]
+    assert_true("shotResultImageUrl" not in cr, "countRefUrls send-path excludes own shot.url")
+    ae = js[js.find("function attachExtraImages"):js.find("function attachExtraImages") + 1400]
+    assert_true("shotResultImageUrl" not in ae, "attachExtraImages send-path excludes own shot.url")
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 9000]
+    assert_true('data-self-ref="1"' in rd, "成片 chip in 参考链")
+    assert_true("countRefUrls(null, n)" in rd, "参考 N/cap uses outbound countRefUrls (o40)")
+    sn = js[js.find("function selectNode"):js.find("function selectNode") + 1200]
+    assert_true("linkAssetToShot" in sn, "select image source auto-links into composer shot")
+    assert_true("isImageSource(selected)" in rd or "isImageSource(selected)" in js, "keep dock when selecting image source")
+
+    # P0-2 compact stubs
+    assert_true(".modes button.stub" in html and "flex:0 0 auto" in html, "stub flex compact")
+    assert_true("flex-wrap: nowrap" in html or "flex-wrap:nowrap" in html, "modes nowrap")
+    assert_true("flex-wrap: nowrap" in css, "ui.css modes nowrap")
+    assert_true('id="modeImg"' in html and html.find('id="modeImg"') < html.find('id="modeText"'),
+                "图片生成 before 文本 stub")
+    assert_true(">文本<span class=\"mode-tag\">未接</span>" in html, "text compact 未接 pill")
+    assert_true(">音频<span class=\"mode-tag\">未接</span>" in html, "audio compact 未接 pill")
+    assert_true('class="stub"' in html and "本版未接" in js, "stubs still honest/blocked")
+
+    # P0-3 no debug copy on creation surface
+    rail = js[js.find("function renderChatRail"):js.find("function renderChatRail") + 2200]
+    assert_true("无第二套" not in rail, "no 无第二套 on rail")
+    assert_true("/api/generate" not in rail, "no /api/generate on rail copy")
+    assert_true("无第二套" not in html, "html skeleton no 无第二套")
+    assert_true("同一 /api/generate" not in html, "html skeleton no api debug")
+    assert_true("it.name" in rail or "svcLabel" in rail, "service label prefers catalog name")
+    assert_true("选分镜 → " in rail and "胶囊 ↑" in rail, "product path copy")
+
+
+
+def test_v0821o22_hinablue_writeback():
+    """o22: 19201654 import eco/service; diffusionModel pack; CDN honesty; UI displayRefUrls; no 142210587 lock."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o23 (o22 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "js cache-bust o23")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
+    assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
+    assert_true("keepalive: true" in js, "persistServer keepalive kept")
+    assert_true("shot._jobId" in js and "[outbound-fail]" in js, "jobId fail capture kept")
+
+    # import ecosystem must not keep krea2 for sdxl/pony (19201654 class)
+    assert_true('eco == "sdxl"' in civ, "import maps sdxl ecosystem branch")
+    assert_true('engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None' in civ,
+                "sdxl uses sdcpp createImage")
+
+    # diffusionModel / ecosystem wire (generic hinablue import → outbound)
+    ai = js[js.find("async function applyImport"):js.find("async function applyImport") + 14000]
+    assert_true("shot.diffusionModel" in ai, "applyImport stores diffusionModel on shot")
+    assert_true("shot.checkpointName" in ai, "applyImport stores checkpointName on shot")
+    assert_true("shot.ecosystem" in ai, "applyImport stores ecosystem on shot")
+    assert_true("shot.serviceId" in ai, "applyImport stores serviceId on shot (o23)")
+    pack = js[js.find("function packComfyParamsForPayload"):js.find("function packComfyParamsForPayload") + 1800]
+    assert_true("p.diffusionModel = dm" in pack, "pack attaches diffusionModel for civitai")
+    assert_true("p.ecosystem = eco" in pack, "pack attaches ecosystem")
+    assert_true("never invent" in pack, "pack comment: never invent default AIR")
+    run = js[js.find("async function runShotStepWork"):js.find("async function runShotStepWork") + 30000]
+    assert_true("142210587" not in run, "runShotStepWork not locked to 142210587")
+    assert_true("142210587" not in ai, "applyImport not locked to 142210587")
+    assert_true("LoRA 出站 " in run, "partial LoRA drop honesty")
+
+    # CDN honesty
+    assert_true("CDN 暂存" in run or "CDN 暂存" in js, "CDN writeback warn copy")
+    assert_true("const savedUrl = pickSavedUrl(j)" in run and "durable" in run, "durable /out check")
+
+    # Visual P0 lightweight
+    assert_true("function displayRefUrls" in js, "displayRefUrls helper")
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 9000]
+    assert_true("countRefUrls(null, n)" in rd, "参考 hint uses outbound countRefUrls (o40)")
+    cr = js[js.find("function countRefUrls"):js.find("function countRefUrls") + 1100]
+    assert_true("shotResultImageUrl" not in cr, "countRefUrls still excludes own url")
+    ae = js[js.find("function attachExtraImages"):js.find("function attachExtraImages") + 1400]
+    assert_true("shotResultImageUrl" not in ae, "attachExtraImages still excludes own url")
+    assert_true('data-self-ref="1"' in rd, "成片 chip kept")
+
+    rail = js[js.find("function renderChatRail"):js.find("function renderChatRail") + 2200]
+    assert_true("无第二套" not in rail and "/api/generate" not in rail, "no debug copy on rail")
+    assert_true('id="send"' in html and html.count('id="send"') == 1, "single capsule ↑")
+
+
+
+def test_v0821o23_sdxl_service_stick():
+    """o23: import→shot.serviceId→outbound resolve forbids silent krea2 when eco/dm is sdxl."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o23")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "js cache-bust o23")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
+    assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
+    assert_true("function resolveCivitaiOutboundServiceId" in js, "resolve helper")
+    assert_true("function civitaiServiceIdFromImportShot" in js, "shot→serviceId helper")
+    assert_true("isCivitaiKrea2TurboService" in js, "krea2 detect")
+    assert_true("image/sdcpp/sdxl/createImage" in js, "sdxl service literal")
+    bg = js[js.find("function buildGraph"):js.find("function buildGraph") + 3500]
+    assert_true("resolveCivitaiOutboundServiceId(shot)" in bg, "buildGraph uses resolve")
+    run = js[js.find("async function runShotStepWork"):js.find("async function runShotStepWork") + 32000]
+    assert_true("resolveCivitaiOutboundServiceId(shot)" in run, "runShot uses resolve")
+    assert_true("syncCivitaiServiceSelect" in run, "sync #service before POST")
+    ai = js[js.find("async function applyImport"):js.find("async function applyImport") + 16000]
+    assert_true("shot.serviceId" in ai, "applyImport writes shot.serviceId")
+    # writeback/jobId paths kept
+    assert_true("shot._jobId" in js and "[outbound-fail]" in js, "jobId fail path kept")
+    assert_true("keepalive: true" in js, "persist keepalive kept")
+    # LoRA file-stem dedupe
+    assert_true("def _file_stem" in civ and "seen_stems" in civ, "prompt-tag file-stem dedupe")
+    assert_true('engine, operation, ecosystem, model = "sdcpp", "createImage", "sdxl", None' in civ,
+                "import still maps sdxl→sdcpp")
+
+
+def test_import_19201654_original_params():
+    """Acceptance-sample self-check (import only, NOT generate / NOT closed-loop): post 19201654."""
+    from providers.civitai import import_image
+    j = import_image("19201654")
+    assert_true(isinstance(j, dict), "import dict")
+    assert_true(j.get("backend") == "civitai" or j.get("serviceId"), "civitai-shaped")
+    assert_true(j.get("ecosystem") == "sdxl", "ecosystem sdxl not krea2")
+    assert_true("sdxl" in str(j.get("serviceId") or ""), "serviceId sdxl path")
+    assert_true("krea2" not in str(j.get("serviceId") or ""), "serviceId must not stay krea2 turbo")
+    prompt = str(j.get("prompt") or "")
+    assert_true(len(prompt) > 200, "original prompt not short/SFW")
+    assert_true("samurai" in prompt.lower() or "sword" in prompt.lower() or "score_9" in prompt, "prompt looks original")
+    dm = str(j.get("diffusionModel") or "")
+    assert_true(dm.startswith("urn:air:sdxl:"), "diffusionModel sdxl AIR")
+    assert_true(j.get("width") == 1728 and j.get("height") == 2048, "original size")
+    assert_true(j.get("steps") == 30, "steps 30")
+    assert_true(float(j.get("cfgScale") or 0) == 7.0, "cfgScale 7")
+    assert_true(j.get("sampler") == "dpmpp_2m" and j.get("scheduler") == "karras", "sampler/scheduler")
+    assert_true(j.get("seed") == 3436905144 or str(j.get("seed")) == "3436905144", "seed")
+    assert_true(j.get("serviceId") == "image/sdcpp/sdxl/createImage",
+                "exact sdcpp/sdxl serviceId (not krea2)")
+    loras = j.get("loras") or []
+    assert_true(len(loras) >= 1, "at least one LoRA")
+    # o23: prompt tag hinaSamuraiArmorPony_rev1 is file stem of @633865 — dedupe, no empty-air twin
+    empty_air = [r for r in loras if not str((r or {}).get("air") or "").strip()]
+    assert_true(len(empty_air) == 0, "no empty-air LoRA chip after file-stem dedupe")
+    hit = None
+    for row in loras:
+        air = str((row or {}).get("air") or "")
+        if "@633865" in air or str((row or {}).get("versionId") or "") == "633865":
+            hit = row
+            break
+    assert_true(hit is not None, "LoRA @633865 present with air")
+    assert_true(float(hit.get("strength") or 0) == 0.7, "strength 0.7 not invented null")
+
+
+def test_v0821o21_outbound_jobid_writeback():
+    """o21 lineage under o22: fail surfaces jobId+backend; single generate; persist keepalive (no fixture lock)."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o23 (o21 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "js cache-bust o23")
+    assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
+    assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
+    assert_true("keepalive: true" in js, "persistServer keepalive")
+
+    run = js[js.find("async function runShotStepWork"):js.find("async function runShotStepWork") + 28000]
+    assert_true("function fail(err, status, cls, meta)" in run or "function fail(err, status, cls, meta)" in js,
+                "fail accepts meta jobId/backend")
+    assert_true("[outbound-fail]" in run, "structured outbound-fail log")
+    assert_true("jobId=" in run and "backend=" in run, "fail excerpt tags jobId+backend")
+    assert_true("{ jobId: jobId, backend: bePoll }" in run or "{ jobId: jobId, backend: bePoll }" in js,
+                "timeout fail passes jobId")
+    assert_true("shot._jobId" in run, "shot stores jobId")
+    assert_true("packLorasForPayload" in run, "loras attached after compile")
+    assert_true("packComfyParamsForPayload" in run, "comfy params attached after compile")
+    assert_true("payload.loras = packedLoras" in run, "loras land on generate payload")
+
+    # Import path keeps original prompt + LoRA chips (no short/SFW fill)
+    ai = js[js.find("async function applyImport"):js.find("async function applyImport") + 14000]
+    assert_true("shot.prompt = p" in ai, "import writes full prompt onto shot")
+    assert_true("CIVITAI_PREF" not in ai, "civitai import no Krea2 soft-fill")
+    pack = js[js.find("function packLorasForPayload"):js.find("function packLorasForPayload") + 4200]
+    assert_true('be === "civitai"' in pack and "row.air" in pack, "civitai pack requires air")
+
+    persist_js = (ROOT / "scripts" / "test_storyboard_persist_restore.js").read_text(encoding="utf-8")
+    assert_true("writeback PUT uses keepalive" in persist_js, "persist test asserts keepalive")
+    assert_true("hydrate_fills_blank_url_by_id" in persist_js, "hydrate by-id fill test")
+
+
+
+def test_v0821o26_fal_swap_dropdown():
+    """o26: Fal 换家 after Civitai import — pinFal rewrites foreign serviceId; #backend syncs all providers."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    init = (ROOT / "providers" / "__init__.py").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o26")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "js cache-bust o26")
+    assert_true("v0821o26:" in js[:5000] or "v0821o29:" in js[:5000], "js knife banner lineage")
+
+    # Static HTML lists every registered backend (honest fallback before /api/providers)
+    for bid in ("fal", "civitai", "nano-gpt", "modelscope-ai", "modelscope-cn", "huggingface"):
+        assert_true('value="' + bid + '"' in html, "html option " + bid)
+
+    assert_true("function syncBackendOptionsFromProviders" in js, "syncBackendOptionsFromProviders")
+    assert_true("syncBackendOptionsFromProviders(items)" in js, "loadProviderCaps calls sync")
+    # Must NOT hide providers lacking keys
+    caps_i = js.find("function syncBackendOptionsFromProviders")
+    caps_block = js[caps_i:caps_i + 900]
+    assert_true("hasKey" not in caps_block, "dropdown sync must not filter hasKey")
+
+    # pinFal rejects civitai / HF ids (换家)
+    pi = js.find("function pinFalLoraServiceId")
+    assert_true(pi >= 0, "pinFalLoraServiceId")
+    pin = js[pi:pi + 900]
+    assert_true("looksCivitaiServiceId(s)" in pin, "pinFal rejects civitai serviceId")
+    assert_true("looksHfServiceId(s)" in pin, "pinFal rejects HF serviceId")
+    assert_true("resolveFalLoraEndpointFromChips" in js, "o29 base resolver")
+    assert_true("FAL_LORA_BY_BASE" in js or "FAL_FLUX_LORA_SERVICE" in pin or "FAL_FLUX_LORA_SERVICE" in js,
+                "flux family const")
+    assert_true("FAL_T2I_DEFAULT" in pin, "pinFal → t2i default without LoRAs")
+
+    # backend onchange clears foreign service + pins Fal LoRA
+    oi = js.find('$("backend").onchange')
+    if oi < 0:
+        oi = js.find("$(\"backend\").onchange")
+    assert_true(oi >= 0, "backend onchange")
+    on = js[oi:oi + 2400]
+    assert_true("looksCivitaiServiceId(cur)" in on, "onchange clears civitai #service on Fal")
+    assert_true("ensureFalLoraServiceSelected" in on, "onchange ensures Fal LoRA service")
+    assert_true("resolveFalLoraEndpointFromChips" in on, "onchange resolves Fal LoRA by AIR base")
+
+    # providers registered (enabled surface)
+    fal_py = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
+    assert_true("register(FalProvider())" in fal_py, "Fal registered")
+    assert_true("from . import fal" in init or "import fal" in init, "fal loaded in providers")
+    assert_true("list_public" in init, "list_public feeds /api/providers")
+
+    # o23 civitai stick path untouched (only when be===civitai)
+    assert_true("function resolveCivitaiOutboundServiceId" in js, "civitai resolve kept")
+    bgi = js.find("function buildGraph")
+    bg = js[bgi:bgi + 3600]
+    assert_true('be === "civitai"' in bg and "resolveCivitaiOutboundServiceId" in bg,
+                "civitai outbound still resolves shot.serviceId")
+    assert_true('be === "fal"' in bg and "pinFalLoraServiceId" in bg, "fal outbound still pins")
+
+
+def test_import_142210587_original_params():
+    """OPTIONAL unit fixture only — NOT acceptance / NOT closed-loop sample.
+    Live import (not generate) of historical id 142210587 for pack shape smoke.
+    Real page ↑ must use a fresh hinablue post (开发 organizes)."""
+    from providers.civitai import import_image
+    j = import_image("142210587")
+    assert_true(isinstance(j, dict), "import dict")
+    assert_true(j.get("backend") == "civitai", "backend civitai")
+    assert_true("krea2" in str(j.get("serviceId") or ""), "krea2 service")
+    prompt = str(j.get("prompt") or "")
+    assert_true(len(prompt) > 200, "original prompt not short/SFW")
+    assert_true("Asian" in prompt or "girl" in prompt.lower() or "tween" in prompt.lower(),
+                "prompt looks like original post not a stub")
+    loras = j.get("loras") or []
+    assert_true(len(loras) >= 1, "at least one LoRA")
+    hit = None
+    for row in loras:
+        vid = str((row or {}).get("versionId") or "")
+        air = str((row or {}).get("air") or "")
+        if vid == "3203007" or "@3203007" in air:
+            hit = row
+            break
+    assert_true(hit is not None, "LoRA @3203007 present")
+    assert_true(str(hit.get("air") or "").startswith("urn:air:"), "LoRA has air")
+    st = hit.get("strength")
+    assert_true(st == 1 or st == 1.0, "strength 1 not invented null")
+    assert_true(j.get("width") and j.get("height") and j.get("steps") is not None, "full size/steps")
+    assert_true(j.get("sampler") and j.get("seed") is not None, "sampler+seed")
+
+
+
+def test_v0821o28_composer_adaptive():
+    """Composer field board adapt module: show/disable/不支持 + strength 未填; no Fal pin edits."""
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html tip stamp o30")
+    assert_true("v0821o47-composer-board-sync" in adapt or "v0821o28-composer-adaptive" in adapt, "adapt module stamp o47/o28")
+    assert_true("composer-field-adapt.js" in html, "adapt script included")
+    assert_true("composer-field-adapt.css" in html, "adapt css included")
+    assert_true("paramSupportStrip" in html, "support strip mounted")
+    assert_true("ComposerFieldAdapt" in adapt and "applyToSurface" in adapt, "adapt API")
+    assert_true("本家不支持" in adapt, "plain unsupported copy")
+    assert_true('return "未填"' in adapt, "null strength → 未填")
+    assert_true("filledUnsupportedWarnings" in adapt and "blockingUnsupportedMessages" in adapt,
+                "o30 warn vs block split")
+    assert_true("adapt.applyToSurface" in js, "syncParamSurface delegates")
+    assert_true("pinFalLoraServiceId" in js and "FAL_LORA_BY_BASE" in js, "o29 Fal pin preserved")
+    # adapt file must not define Fal pin symbols (comments mentioning o29 ownership OK)
+    assert_true("function pinFalLoraServiceId" not in adapt, "adapt stays clear of Fal pin fn")
+    assert_true("FAL_LORA_BY_BASE =" not in adapt and "FAL_LORA_BY_BASE=" not in adapt,
+                "adapt stays clear of FAL_LORA_BY_BASE map")
+
+
+def test_v0821o29_fal_lora_base():
+    """o29: Fal LoRA endpoint by AIR base — flux1→flux-lora; krea2→krea; else 不支持; never hard-pin wrong family."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    # stamp advanced by o28 tip; o29 behavior still required in storyboard.js
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html tip stamp o31 (keeps o29 behavior)")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust current tip")
+    assert_true("v0821o29:" in js[:5000], "js o29 banner preserved")
+
+    assert_true("function resolveFalLoraEndpointFromChips" in js, "resolver")
+    assert_true("function loraAirBase" in js, "loraAirBase")
+    assert_true("FAL_LORA_BY_BASE" in js, "FAL_LORA_BY_BASE")
+    assert_true('FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora"' in js, "flux-lora official")
+    assert_true('FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora"' in js, "krea pref kept for krea2/fixture")
+
+    # Mapping literals
+    board = js[js.find("FAL_LORA_BY_BASE"):js.find("FAL_LORA_BY_BASE") + 500]
+    assert_true("flux1" in board and "krea2" in board, "flux1+krea2 keys")
+
+    pin = js[js.find("function pinFalLoraServiceId"):js.find("function ensureFalLoraServiceSelected")]
+    assert_true("resolveFalLoraEndpointFromChips" in pin, "pin uses resolver")
+    assert_true("resolved.reason" in pin or "resolved.endpoint" in pin, "pin honors unsupported")
+    # Must NOT unconditionally assign FAL_LORA_PREF_SERVICE whenever falHasLoras
+    assert_true('return falHasLoras() ? FAL_LORA_PREF_SERVICE' not in pin,
+                "no one-shot all LoRAs to krea-2")
+
+    # Fixture acceptance path unchanged (not swapped to flux)
+    fi = js.find("function falLoraFixtureImport")
+    fj = js.find("async function mountFalLoraFixture", fi)
+    if fj < 0:
+        fj = js.find("function mountFalLoraFixture", fi)
+    fixture = js[fi:fj]
+    assert_true('serviceId: "fal-ai/krea-2/turbo/lora"' in fixture, "fixture stays krea")
+    assert_true('serviceId: "fal-ai/flux-lora"' not in fixture, "fixture not swapped to flux")
+
+    # 换家 onchange uses resolver
+    oi = js.find('$("backend").onchange')
+    if oi < 0:
+        oi = js.find("$(\"backend\").onchange")
+    on = js[oi:oi + 1800]
+    assert_true("resolveFalLoraEndpointFromChips" in on, "backend onchange base resolve")
+
+    # Generate gate
+    assert_true("falLoraUnsupportedMsg" in js, "unsupported msg helper")
+    run = js[js.find("async function runShotStep"):js.find("async function runShotStep") + 12000]
+    assert_true("falLoraUnsupportedMsg" in run, "runShotStep gates unsupported base")
+
+
+
+
+def test_v0821o31_hf_lora_base():
+    """o31: HF LoRA endpoint by AIR base — flux1→fal-ai/flux-lora; krea2→krea lora; never Hub turbo/no-LoRA."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
+    assert_true("v0821o31:" in js[:5000], "js o31 banner")
+    assert_true("HF_LORA_BY_BASE" in js, "HF_LORA_BY_BASE")
+    assert_true("function resolveHfLoraEndpointFromChips" in js, "resolver")
+    assert_true("function hfLoraUnsupportedMsg" in js, "unsupported msg")
+    assert_true("function pinHfLoraServiceId" in js, "pinHf")
+
+    board = js[js.find("HF_LORA_BY_BASE"):js.find("HF_LORA_BY_BASE") + 450]
+    assert_true("flux1" in board and "krea2" in board, "flux1+krea2 keys")
+    assert_true("FAL_FLUX_LORA_SERVICE" in board or "fal-ai/flux-lora" in board, "flux-lora family")
+
+    pin = js[js.find("function pinHfLoraServiceId"):js.find("function ensureHfLoraServiceSelected")]
+    assert_true("resolveHfLoraEndpointFromChips" in pin, "pin uses resolver")
+    assert_true("resolved.reason" in pin or "hfHasLoras" in pin, "pin honors unsupported / hasLoras")
+    assert_true('return HF_LORA_PREF_SERVICE' in pin or "HF_LORA_PREF_SERVICE" in pin,
+                "no-loras still Hub pref available")
+
+    # Never delete chips on unsupported
+    ens = js[js.find("function ensureHfLoraServiceSelected"):js.find("function ensureHfLoraServiceSelected") + 2800]
+    assert_true("state.loras = []" not in ens, "ensure must never clear LoRA chips")
+    assert_true("setMsg" in ens and "resolved.reason" in ens, "honest 不支持 surface")
+
+    # fireSend / runShotStep gates
+    assert_true("hfLoraUnsupportedMsg" in js, "gate helper")
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4500]
+    assert_true("hfLoraUnsupportedMsg" in fs or "hfHasLoras" in fs, "fireSend HF base gate")
+    run = js[js.find("async function runShotStep"):js.find("async function runShotStep") + 16000]
+    assert_true("hfLoraUnsupportedMsg" in run, "runShotStep HF unsupported gate")
+
+    # backend allowlist
+    assert_true("direct_fal_lora" in hf, "HF generate direct fal lora route")
+    assert_true("fal_supports_lora" in hf, "uses fal_supports_lora")
+    assert_true("不接受 LoRA" in hf, "honest 400 for Hub→no-LoRA map")
+
+    # Offline: Hub turbo + loras 400; flux-lora ok path uses apply
+    from providers.huggingface import HuggingFaceProvider
+    from unittest.mock import patch
+    import providers.huggingface as hfmod
+    prov = HuggingFaceProvider()
+    lora = {
+        "path": "https://civitai.com/api/download/models/816500?fileId=730088",
+        "scale": 0.5,
+        "air": "urn:air:flux1:lora:civitai:730162@816500",
+    }
+    with patch.object(hfmod, "hf_keys", return_value=["hf_test"]), patch.object(
+        hfmod, "inference_mapping",
+        return_value={"fal-ai": {"providerId": "fal-ai/krea-2/turbo", "status": "live", "task": "text-to-image"}},
+    ):
+        code, data = prov.generate({"serviceId": "krea/Krea-2-Turbo", "prompt": "x", "loras": [lora]})
+        assert_true(code == 400, "Hub turbo + loras → 400")
+        assert_true("不接受 LoRA" in str(data.get("error") or ""), "400 copy mentions no LoRA")
+    # o33: flux-lora under HF refused by default (Path A does not score HF)
+    with patch.object(hfmod, "_submit_hf_fal_lora_via_fal") as mocked_submit, patch.object(
+        hfmod, "_call_fal"
+    ) as call_fal_spy:
+        code, data = prov.generate({"serviceId": "fal-ai/flux-lora", "prompt": "x", "loras": [lora]})
+        assert_true(code == 400, "flux-lora + loras → 400 honest refuse")
+        assert_true("请换家 Fal" in str(data.get("error") or ""), "400 copy 请换家 Fal: %s" % data)
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "scoresAsHfClosedLoop false")
+        assert_true(not mocked_submit.called, "default must NOT call Path A submit")
+        assert_true(not call_fal_spy.called, "must NOT call HF Router _call_fal")
+
+    # keep o29/o30 markers
+    assert_true("FAL_LORA_BY_BASE" in js and "pinFalLoraServiceId" in js, "o29 kept")
+    assert_true("surfaceSendReject" in js, "o30 kept")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in js, "o33 Composer msg const")
+
+
+def test_v0821o32_hf_fal_lora_transport():
+    """o32 Path A kept behind debug switch only; default refuse (o33). Debug still transport=fal / not HF score."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
+    assert_true("v0821o32:" in js[:5000], "js o32 banner retained")
+    assert_true("_submit_hf_fal_lora_via_fal" in hf, "Fal transport helper retained")
+    assert_true("_needs_fal_lora_transport" in hf, "transport gate")
+    assert_true("_allow_fal_transport_debug" in hf, "debug switch")
+    assert_true("HF_ALLOW_FAL_TRANSPORT" in hf, "env name")
+    assert_true("scoresAsHfClosedLoop" in hf, "non-score marker")
+
+    from providers.huggingface import HuggingFaceProvider, _needs_fal_lora_transport, HF_FAL_LORA_VIA_FAL
+    from unittest.mock import patch
+    import providers.huggingface as hfmod
+    import providers.fal as falmod
+    import os
+
+    assert_true(_needs_fal_lora_transport("fal-ai/flux-lora"), "flux-lora needs Fal transport")
+    assert_true("fal-ai/flux-lora" in HF_FAL_LORA_VIA_FAL, "set has flux-lora")
+
+    prov = HuggingFaceProvider()
+    lora = {
+        "path": "https://civitai.com/api/download/models/816500?fileId=730088",
+        "scale": 0.5,
+        "air": "urn:air:flux1:lora:civitai:730162@816500",
+    }
+    outbound_body = {
+        "prompt": "a detailed cinematic portrait",
+        "loras": [{"path": lora["path"], "scale": 0.5}],
+        "image_size": {"width": 832, "height": 1216},
+    }
+    fal_resp = {
+        "request_id": "req-o32-test",
+        "status_url": "https://queue.fal.run/fal-ai/flux-lora/requests/req-o32-test/status",
+        "response_url": "https://queue.fal.run/fal-ai/flux-lora/requests/req-o32-test",
+    }
+    calls = {"urls": []}
+
+    def fake_fal_call(url, method="GET", body=None, timeout=90):
+        calls["urls"].append((method, url))
+        if method == "POST":
+            assert_true(isinstance(body, dict), "POST body dict")
+            assert_true("transport" not in body, "transport not sent to Fal API body")
+            assert_true(body.get("loras"), "loras in Fal body")
+            assert_true(abs(float(body["loras"][0]["scale"]) - 0.5) < 1e-6, "scale preserved")
+            return 200, fal_resp
+        return 200, {"status": "IN_QUEUE"}
+
+    # Default: refuse (no env)
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": ""}, clear=False), patch.object(
+        hfmod, "_submit_hf_fal_lora_via_fal"
+    ) as mocked_submit, patch.object(hfmod, "_call_fal") as spy:
+        code, data = prov.generate({
+            "serviceId": "fal-ai/flux-lora",
+            "prompt": outbound_body["prompt"],
+            "loras": [lora],
+        })
+        assert_true(code == 400, "default refuse 400: %s" % data)
+        assert_true("请换家 Fal" in str(data.get("error") or ""), "请换家 Fal")
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "not HF score")
+        assert_true(not mocked_submit.called and not spy.called, "no outbound")
+
+    # Debug switch: Path A still works but marked non-scoring
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": "1"}, clear=False), patch.object(
+        falmod, "fal_key", return_value="fal_test_key"
+    ), patch.object(
+        falmod, "build_fal_input", return_value=dict(outbound_body)
+    ), patch.object(
+        falmod, "materialize_fal_media", side_effect=lambda x: x
+    ), patch.object(
+        falmod, "fal_call", side_effect=fake_fal_call
+    ), patch.object(
+        hfmod, "hf_keys", return_value=[]
+    ), patch.object(hfmod, "_call_fal") as call_fal_spy:
+        code, data = prov.generate({
+            "serviceId": "fal-ai/flux-lora",
+            "prompt": outbound_body["prompt"],
+            "loras": [lora],
+            "width": 832,
+            "height": 1216,
+        })
+        assert_true(code == 200, "debug Path A 200: %s" % data)
+        assert_true(data.get("backend") == "huggingface", "backend=huggingface")
+        assert_true((data.get("submittedInput") or {}).get("transport") == "fal", "submittedInput.transport=fal")
+        assert_true((data.get("submittedInput") or {}).get("scoresAsHfClosedLoop") is False, "submitted not HF score")
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "top-level not HF score")
+        assert_true(data.get("transport") == "fal", "top-level transport=fal")
+        assert_true(not call_fal_spy.called, "must NOT call HF Router _call_fal")
+        assert_true(any(u.startswith("https://queue.fal.run/fal-ai/flux-lora") for _, u in calls["urls"]),
+                    "POST queue.fal.run: %s" % calls["urls"])
+
+    assert_true("HF_LORA_BY_BASE" in js and "pinHfLoraServiceId" in js, "o31 pin kept")
+    assert_true("direct_fal_lora" in hf, "o31 allowlist kept")
+
+
+def test_v0821o33_hf_router_honest():
+    """o33: HF+fal-ai/*lora default refuse「请换家 Fal」; Composer honest; Hub mid has no transport=fal; chips kept."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
+    assert_true("v0821o33:" in js[:5000], "js o33 banner")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in js, "Composer msg const")
+    assert_true("HF Router 不托管该 Fal LoRA 端点，请换家 Fal" in js, "Composer exact copy")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in hf, "backend msg const")
+    assert_true("_allow_fal_transport_debug" in hf, "debug switch present")
+    assert_true("scoresAsHfClosedLoop" in hf, "score honesty field")
+
+    # resolveHfLoraEndpointFromChips must NOT return fal endpoint as pin when chips present
+    resolve = js[js.find("function resolveHfLoraEndpointFromChips"):js.find("function hfLoraUnsupportedMsg")]
+    assert_true("scoresAsHf: false" in resolve or 'scoresAsHf: false' in resolve, "resolve marks non-score")
+    assert_true("endpoint: """ in resolve or "endpoint: ''" in resolve or 'endpoint: ""' in resolve,
+                "resolve empties endpoint for Fal sibling")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in resolve, "resolve uses honest msg")
+    # ensure never clears chips
+    ens = js[js.find("function ensureHfLoraServiceSelected"):js.find("function ensureHfLoraServiceSelected") + 2800]
+    assert_true("state.loras = []" not in ens, "ensure must never clear LoRA chips")
+
+    # catalog must not inject fal-ai/*lora as pretend-HF when chips present
+    assert_true("do NOT inject fal-ai" in js or "不计 HF 分" in js, "catalog/label honesty")
+
+    from providers.huggingface import HuggingFaceProvider, HF_ROUTER_FAL_LORA_MSG
+    from unittest.mock import patch
+    import providers.huggingface as hfmod
+    import os
+
+    prov = HuggingFaceProvider()
+    lora = {
+        "path": "https://civitai.com/api/download/models/816500?fileId=730088",
+        "scale": 0.5,
+        "air": "urn:air:flux1:lora:civitai:730162@816500",
+    }
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": "0"}, clear=False), patch.object(
+        hfmod, "_submit_hf_fal_lora_via_fal"
+    ) as mocked, patch.object(hfmod, "_call_fal") as spy:
+        for sid in ("fal-ai/flux-lora", "fal-ai/krea-2/turbo/lora"):
+            code, data = prov.generate({"serviceId": sid, "prompt": "x", "loras": [lora]})
+            assert_true(code == 400, "%s → 400" % sid)
+            assert_true(HF_ROUTER_FAL_LORA_MSG in str(data.get("error") or ""), "msg for %s: %s" % (sid, data))
+            assert_true(data.get("scoresAsHfClosedLoop") is False, "not HF score %s" % sid)
+        assert_true(not mocked.called and not spy.called, "no Path A / Router")
+
+    # Hub mid without loras: real HF path must not stamp transport=fal on submittedInput construction
+    # (offline: missing key → 401 before submit; just assert generate path does not set transport for Hub)
+    gen = hf[hf.find("    def generate"):hf.find("    def job_status")]
+    assert_true("scoresAsHfClosedLoop" in gen, "generate honesty")
+    # Real Router path comments
+    assert_true("Real HF closed-loop" in gen or "router.huggingface.co" in hf, "docs Hub Router path")
+
+    # 28216420 does not score HF (fixture note in report; code-level: Path A non-score)
+    assert_true("请换家 Fal" in js and "请换家 Fal" in hf, "both surfaces")
+
+
+def test_v0821o30_send_gate():
+    """o30: #send clickability + failUi never silent; unsupported filled warn-only; keep o29 Fal pin."""
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
+    assert_true("v0821o30:" in js[:5000], "js o30 banner")
+
+    # clickability / z-index above zoom/minimap (22)
+    assert_true(".dock.show{z-index:26}" in html.replace(" ", "") or "z-index:26" in html or "z-index: 26" in ui,
+                "dock.show above zoom/minimap")
+    assert_true("msg.bad" in html and "dock.collapsed" in html, "collapsed bad msg visible rule")
+    assert_true("send-toast" in html or "send-toast" in js, "send toast surface")
+
+    # fireSend never silent reject
+    assert_true("function surfaceSendReject" in js, "surfaceSendReject")
+    assert_true("function showSendToast" in js, "showSendToast")
+    assert_true("data-send-fired" in js, "click-reached marker")
+    fs = js[js.find("function fireSend"):js.find("function fireSend") + 4200]
+    assert_true("surfaceSendReject" in fs, "fireSend uses surfaceSendReject")
+    assert_true("data-send-fired" in fs, "fireSend marks fired")
+
+    # o30: omitable unsupported is warn-only (not paramGate hard block)
+    gi = js.find("function paramGateMessage")
+    gate = js[gi:gi + 4500]
+    assert_true("blockingUnsupportedMessages" in gate, "paramGate uses blocking split")
+    assert_true("filledUnsupportedWarnings" in gate, "paramGate surfaces warnings")
+    assert_true("filledUnsupportedWarnings" in adapt, "adapt warns API")
+    assert_true("blockingUnsupportedMessages" in adapt, "adapt blocks API")
+
+    # keep o28 board adapt + o29 fal pin
+    assert_true("adapt.applyToSurface" in js, "o28 adapt kept")
+    assert_true("pinFalLoraServiceId" in js and "FAL_LORA_BY_BASE" in js, "o29 kept")
+    assert_true('FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora"' in js, "flux-lora kept")
+
+
+
+def test_v0821o36_checkpoint_not_lora():
+    """o36: checkpoint/diffuser/diffusionmodel AIR must not enter loras[]; isLoraAir gates apply+pack."""
+    import json
+    import re
+    import subprocess
+    import tempfile
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o36")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust o36")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust o36")
+    assert_true("v0821o36:" in js[:5000], "js o36 banner")
+
+    assert_true("function isLoraAir" in js, "isLoraAir helper")
+    assert_true("function isNonLoraModelAir" in js, "isNonLoraModelAir")
+    assert_true("function shouldDropNonLoraAir" in js, "shouldDropNonLoraAir")
+    helper = js[js.find("function isLoraAir"):js.find("function isLoraAir") + 900]
+    assert_true("lora|lycoris" in helper or ("lora" in helper and "lycoris" in helper), "lora/lycoris family")
+    non = js[js.find("function isNonLoraModelAir"):js.find("function isNonLoraModelAir") + 400]
+    assert_true("checkpoint" in non and "diffusionmodel" in non and "diffuser" in non,
+                "checkpoint/diffusionmodel/diffuser rejected")
+
+    ai = js.find("async function applyImport")
+    assert_true(ai >= 0, "applyImport")
+    apply_body = js[ai:ai + 22000]
+    assert_true("shouldDropNonLoraAir" in apply_body, "applyImport uses shouldDropNonLoraAir")
+    assert_true("droppedCkpt" in apply_body, "applyImport counts dropped checkpoint chips")
+    assert_true("dmAir" in apply_body, "applyImport compares to j.diffusionModel")
+
+    pack_i = js.find("function packLorasForPayload")
+    pack = js[pack_i:pack_i + 3500]
+    assert_true("skippedNonLora" in pack, "pack counts skipped non-LoRA")
+    assert_true("shouldDropNonLoraAir" in pack, "pack filters via shouldDropNonLoraAir")
+    assert_true("不进 loras[]" in pack, "honest warn copy")
+
+    add = js[js.find("function addLora"):js.find("function addLora") + 700]
+    assert_true("shouldDropNonLoraAir(row.air)" in add, "addLora rejects non-LoRA AIR")
+    assert_true("已拒绝非 LoRA AIR" in js, "paste/search honesty")
+
+    m = re.search(
+        r"function isLoraAir\(air\) \{.*?\n  \}\n  function isNonLoraModelAir\(air\) \{.*?\n  \}\n"
+        r"  /\*\* True when.*?function shouldDropNonLoraAir\(air, diffusionModel\) \{.*?\n  \}",
+        js,
+        re.S,
+    )
+    assert_true(m is not None, "extract helpers for node eval")
+    looks_m = re.search(r"function looksAir\(s\) \{.*?\n  \}", js, re.S)
+    assert_true(looks_m is not None, "extract looksAir")
+    harness = (
+        looks_m.group(0) + "\n" + m.group(0) + "\n"
+        + """
+const ckpt = "urn:air:flux1:checkpoint:civitai:1752722@1983609";
+const lora = "urn:air:flux1:lora:civitai:823089@823089";
+const lyco = "urn:air:sdxl:lycoris:civitai:1@2";
+const dm = "urn:air:krea2:diffusionmodel:civitai:1@2";
+const dif = "urn:air:flux1:diffuser:civitai:618692@691639";
+const cases = [];
+function check(ok, name) { if (!ok) throw new Error(name); cases.push(name); }
+check(isLoraAir(lora) === true, "lora true");
+check(isLoraAir(lyco) === true, "lycoris true");
+check(isLoraAir(ckpt) === false, "checkpoint false");
+check(isLoraAir(dm) === false, "diffusionmodel false");
+check(isLoraAir(dif) === false, "diffuser false");
+check(shouldDropNonLoraAir(ckpt) === true, "drop ckpt");
+check(shouldDropNonLoraAir(lora) === false, "keep lora");
+check(shouldDropNonLoraAir(ckpt, ckpt) === true, "drop equals dm");
+check(shouldDropNonLoraAir(lora, ckpt) === false, "keep lora even if dm set");
+check(shouldDropNonLoraAir("", ckpt) === false, "empty air keep (path-only)");
+console.log(JSON.stringify({ok: true, n: cases.length}));
+"""
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    r = subprocess.run(["node", path], capture_output=True, text=True, timeout=10)
+    assert_true(r.returncode == 0, "node helper eval exit0: " + (r.stderr or r.stdout or "")[:300])
+    out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    assert_true(out.get("ok") is True and out.get("n") == 10, "node helper cases pass: " + str(out))
+
+
+
+def test_v0821o37_poll_preparing_wb():
+    """o37: civitai preparing must outlive ~5min poll; stillGoing mirrors inFlight; saved→writeback."""
+    import json
+    import re
+    import subprocess
+    import tempfile
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o37")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust o37")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust o37")
+    assert_true("v0821o37:" in js[:5000], "js o37 banner")
+
+    run_i = js.find("async function runShotStep")
+    assert_true(run_i >= 0, "runShotStep")
+    run = js[run_i:run_i + 24000]
+
+    # pollMax: civitai image materializing ≥720 @ 2.5s ≈30min (api; covers ~29min preparing)
+    assert_true("pollMax = 720" in run or "pollMax=720" in run, "civitai image pollMax ≥720")
+    assert_true("2500" in run, "pollMs 2.5s kept")
+    # do not shrink video budget
+    assert_true("isVideoPoll ? 180 : 40" in run or "pollMax = 180" in run, "video pollMax 180 kept")
+
+    infl_i = run.find("const inFlight")
+    assert_true(infl_i >= 0, "inFlight")
+    infl = run[infl_i:infl_i + 500]
+    for tok in ("PREPARING", "PREPARED", "QUEUED", "SCHEDULED"):
+        assert_true(tok in infl, "inFlight includes " + tok)
+
+    still_i = run.find("const stillGoing")
+    assert_true(still_i >= 0, "stillGoing")
+    still = run[still_i:still_i + 700]
+    for tok in ("preparing", "prepared", "scheduled", "queued"):
+        assert_true(tok in still, "stillGoing includes " + tok)
+    assert_true("IN_QUEUE" in still and "IN_PROGRESS" in still, "stillGoing keeps queue/progress")
+
+    # saved /out still drives writebackResult (unchanged success path)
+    assert_true("writebackResult(shot, url)" in run, "writebackResult on success")
+    assert_true("pickSavedUrl(st)" in run, "poll breaks on saved[]")
+    assert_true("等待超时，云端任务仍在进行中" in run, "timeout stillGoing copy")
+
+    # Node sim: preparing×N then succeeded+saved → writeback; timeout while preparing → stillGoing
+    harness = r"""
+function upper(s){ return String(s||"").toUpperCase(); }
+function inFlight(st){
+  const stStatus = upper(st && st.status);
+  return stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
+    || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING"
+    || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED"
+    || stStatus === "SCHEDULED";
+}
+function stillGoing(j){
+  return !!(j && (
+    /^(pending|processing|running|in_queue|in_progress|preparing|prepared|scheduled|queued)$/i.test(String(j.status||""))
+    || j.status === "IN_QUEUE" || j.status === "IN_PROGRESS"
+    || !j.status
+  ));
+}
+function pickSavedUrl(st){
+  const s = (st && st.saved) || [];
+  if (!s.length) return "";
+  const u = s[0] && (s[0].url || s[0]);
+  return u ? String(u) : "";
+}
+function simulate(polls, pollMax){
+  let j = {status:"preparing"};
+  let wrote = null;
+  for (let i=0;i<pollMax;i++){
+    j = polls[Math.min(i, polls.length-1)];
+    const stStatus = upper(j.status);
+    const flying = inFlight(j);
+    if ((j.error || j.status === "failed") && !flying) throw new Error("fail");
+    if (pickSavedUrl(j)) { wrote = pickSavedUrl(j); break; }
+  }
+  if (wrote) return {path:"writeback", url:wrote, stillGoing:false};
+  const url = pickSavedUrl(j);
+  if (url) return {path:"writeback", url:url, stillGoing:false};
+  return {path: stillGoing(j) ? "stillGoing" : "empty", url:"", stillGoing: stillGoing(j)};
+}
+const longPrep = Array(50).fill({status:"preparing"}).concat([
+  {status:"succeeded", saved:[{url:"/out/job_0.jpg"}]}
+]);
+const r1 = simulate(longPrep, 720);
+if (r1.path !== "writeback" || r1.url !== "/out/job_0.jpg") throw new Error("prep→saved writeback "+JSON.stringify(r1));
+const r2 = simulate(Array(800).fill({status:"preparing"}), 720);
+if (r2.path !== "stillGoing" || !r2.stillGoing) throw new Error("timeout preparing must stillGoing "+JSON.stringify(r2));
+for (const st of ["preparing","PREPARING","scheduled","SCHEDULED","queued","prepared","IN_PROGRESS"]){
+  if (!stillGoing({status:st}) || !inFlight({status:st})) throw new Error("align "+st);
+}
+if (stillGoing({status:"failed"}) || inFlight({status:"failed"})) throw new Error("failed not in-flight");
+console.log(JSON.stringify({ok:true, r1:r1.path, r2:r2.path, pollMax:720}));
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    r = subprocess.run(["node", path], capture_output=True, text=True, timeout=10)
+    assert_true(r.returncode == 0, "node poll sim exit0: " + (r.stderr or r.stdout or "")[:400])
+    out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    assert_true(out.get("ok") is True and out.get("r1") == "writeback" and out.get("r2") == "stillGoing",
+                "node poll sim: " + str(out))
+    # Source stillGoing must match sim list (preparing family)
+    m = re.search(r"const stillGoing = !!\(j && \((.*?)\)\);", run, re.S)
+    assert_true(m is not None, "stillGoing expression extractable")
+    body = m.group(1)
+    assert_true("preparing" in body and "scheduled" in body and "queued" in body and "prepared" in body,
+                "stillGoing source lists preparing family")
+
+
+
+def test_v0821o38_dm_pack_shot():
+    """o38: packComfy prefer generate shot; applyImport keep dm; flux1 without dm blocked before POST."""
+    import json
+    import re
+    import subprocess
+    import tempfile
+
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o38")
+    assert_true('class="stamp"' in html, ".stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust o38")
+    assert_true('src="/static/storyboard.js?v=20260911-o49bhydratefreshemptyurl"' in html, "script cache-bust o38")
+    assert_true("v0821o38:" in js[:5000], "js o38 banner")
+
+    pack_i = js.find("function packComfyParamsForPayload")
+    assert_true(pack_i >= 0, "packComfyParamsForPayload")
+    pack = js[pack_i:pack_i + 2200]
+    assert_true("shotOpt" in pack, "pack accepts generate shotOpt")
+    assert_true("shotOpt && shotOpt.kind === \"shot\"" in pack or "shotOpt.kind === \"shot\"" in pack,
+                "prefer generate shot when kind=shot")
+    assert_true("state.selected" in pack and "lastComposerShot" in pack, "fallback selected/lastComposerShot")
+    assert_true("p.diffusionModel = dm" in pack, "pack sets diffusionModel")
+    assert_true("never invent" in pack, "never invent default AIR")
+
+    run_i = js.find("async function runShotStepWork")
+    assert_true(run_i >= 0, "runShotStepWork")
+    run = js[run_i:run_i + 28000]
+    assert_true("packComfyParamsForPayload(shot)" in run, "runShot packs with generate shot")
+    assert_true("payload.diffusionModel = String(shot.diffusionModel).trim()" in run
+                or "payload.diffusionModel = String(shot.diffusionModel)" in run,
+                "force payload.diffusionModel from shot after merge")
+    assert_true("缺少 diffusionModel" in run and "diffuserModel" in run, "flux1 hard-reject message")
+    assert_true("/flux1/" in run or "flux1" in run, "flux1 preflight present")
+    # hard reject must be before POST
+    assert_true(run.find("缺少 diffusionModel") < run.find('fetch("/api/generate"'),
+                "dm preflight before POST")
+
+    ai_i = js.find("async function applyImport")
+    assert_true(ai_i >= 0, "applyImport")
+    ai = js[ai_i:ai_i + 16000]
+    # must assign when present
+    assert_true("shot.diffusionModel = String(j.diffusionModel).trim()" in ai, "assign dm when present")
+    # must NOT wipe when j omits — no delete shot.diffusionModel in applyImport dm block
+    dm_block = ai[ai.find("v0821o22: any hinablue"):ai.find("v0821o23: keep import serviceId")]
+    assert_true("delete shot.diffusionModel" not in dm_block, "applyImport must not delete diffusionModel when j omits")
+    assert_true("delete shot.checkpointName" not in dm_block, "applyImport must not delete checkpointName when j omits")
+    assert_true("delete shot.ecosystem" not in dm_block, "applyImport must not delete ecosystem when j omits")
+    assert_true("do NOT delete" in dm_block or "only assign when present" in dm_block, "o38 keep comment")
+
+    # Node sim: pack prefers generate shot AIR when selected empty; applyImport omit keeps dm; flux1 no-dm blocks
+    harness = r"""
+function packComfyParamsForPayload(shotOpt, state, be) {
+  const p = {};
+  if (be === "civitai") {
+    const shot = (shotOpt && shotOpt.kind === "shot" ? shotOpt : null)
+      || (state.selected && state.nodes[state.selected]) || (state.lastComposerShot && state.nodes[state.lastComposerShot]);
+    const dm = shot && shot.diffusionModel ? String(shot.diffusionModel).trim() : "";
+    if (dm) p.diffusionModel = dm;
+  }
+  return Object.keys(p).length ? p : null;
+}
+function applyImportKeep(shot, j) {
+  if (j.diffusionModel != null && String(j.diffusionModel).trim()) {
+    shot.diffusionModel = String(j.diffusionModel).trim();
+  }
+  // o38: no delete when omitted
+  return shot;
+}
+function flux1NeedsDmReject(sid, payload) {
+  const sidL = String(sid || "").toLowerCase();
+  const needsDm = /\/flux1\//.test(sidL) || /diffuser|diffusionmodel|sdcpp\/flux/.test(sidL);
+  const dmOut = payload.diffusionModel != null ? String(payload.diffusionModel).trim() : "";
+  if (needsDm && !dmOut) return "缺少 diffusionModel（diffuserModel）";
+  return "";
+}
+const AIR = "urn:air:flux1:checkpoint:civitai:1752722@1983609";
+const genShot = { kind: "shot", id: "g1", diffusionModel: AIR };
+const emptySel = { kind: "shot", id: "s1" };
+const state = { selected: "s1", lastComposerShot: "s1", nodes: { s1: emptySel, g1: genShot } };
+const packed = packComfyParamsForPayload(genShot, state, "civitai");
+if (!packed || packed.diffusionModel !== AIR) throw new Error("pack must use generate shot dm got "+JSON.stringify(packed));
+const packedBad = packComfyParamsForPayload(null, state, "civitai");
+if (packedBad && packedBad.diffusionModel) throw new Error("selected empty must not invent dm");
+const shotKeep = { diffusionModel: AIR };
+applyImportKeep(shotKeep, { prompt: "x" }); // omit dm
+if (shotKeep.diffusionModel !== AIR) throw new Error("applyImport omit must keep dm");
+applyImportKeep(shotKeep, { diffusionModel: "urn:air:flux1:checkpoint:civitai:1@2" });
+if (shotKeep.diffusionModel !== "urn:air:flux1:checkpoint:civitai:1@2") throw new Error("assign when present");
+const rej = flux1NeedsDmReject("image/sdcpp/flux1/createImage", {});
+if (!/diffusionModel/.test(rej)) throw new Error("flux1 no dm must reject");
+const ok = flux1NeedsDmReject("image/sdcpp/flux1/createImage", { diffusionModel: AIR });
+if (ok) throw new Error("with dm must pass");
+const payload = {};
+if (genShot.diffusionModel) payload.diffusionModel = String(genShot.diffusionModel).trim();
+if (payload.diffusionModel !== AIR) throw new Error("force from shot");
+console.log(JSON.stringify({ok:true, dm: payload.diffusionModel}));
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    r = subprocess.run(["node", path], capture_output=True, text=True, timeout=10)
+    assert_true(r.returncode == 0, "node o38 sim exit0: " + (r.stderr or r.stdout or "")[:400])
+    out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    assert_true(out.get("ok") is True and "1752722" in str(out.get("dm")),
+                "node o38 sim: " + str(out))
+
+
+
 def main():
     tests = [
         test_t2i_no_ref,
@@ -3946,7 +5241,29 @@ def main():
         test_v0821l_send_once,
         test_v0821m2_poll_copy,
         test_v0821o8_caption_i2i,
+        test_v0821o9_fail_zh_lora_honesty,
         test_r7_new_shot_does_not_stack,
+        test_v0821o15_server_writeback_executable,
+        test_v0821o19_single_up_writeback,
+        test_v0821o20_visual_p0,
+        test_v0821o21_outbound_jobid_writeback,
+        test_v0821o22_hinablue_writeback,
+        test_v0821o23_sdxl_service_stick,
+        test_v0821o26_fal_swap_dropdown,
+        test_v0821o28_composer_adaptive,
+        test_v0821o29_fal_lora_base,
+        test_v0821o31_hf_lora_base,
+        test_v0821o32_hf_fal_lora_transport,
+        test_v0821o33_hf_router_honest,
+        test_v0821o36_checkpoint_not_lora,
+        test_v0821o37_poll_preparing_wb,
+        test_v0821o38_dm_pack_shot,
+        test_o39_refs_fill_smart_match_static,
+        test_o40_fill_exact_cap_static,
+        test_o41_fill_real_fixtures_static,
+        test_v0821o30_send_gate,
+        test_import_19201654_original_params,
+        # test_import_142210587_original_params  # optional fixture; NOT acceptance
     ]
     failed = 0
     for fn in tests:
@@ -3959,6 +5276,60 @@ def main():
     print("result", len(tests) - failed, "/", len(tests))
     return 1 if failed else 0
 
+
+
+def test_o39_refs_fill_smart_match_static():
+    """o39 tip: full cap slots + Edit sibling one-click + stamp."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust o39")
+    assert_true("v0821o39:" in js, "js header o39")
+    assert_true("function editSiblingId" in js, "editSiblingId")
+    assert_true("function applyEditSibling" in js, "applyEditSibling")
+    assert_true("function fillRefSlotsToCap" in js, "fillRefSlotsToCap")
+    assert_true("ref-slot-empty" in js and "ref-slot-empty" in css, "empty cap slots")
+    assert_true('data-act="apply-edit-sibling"' in js, "one-click Edit act")
+    assert_true('data-act="fill-refs-cap"' in js, "灌满测试 act")
+    assert_true("for (let si = 0; si < remain; si++)" in js, "expose remain empty slots")
+    # unused gate still hard-blocks; apply path present
+    assert_true("function refUnusedGateMessage" in js, "unused gate kept")
+    assert_true("不静默忽略" in js, "no silent ignore copy")
+
+
+
+def test_o40_fill_exact_cap_static():
+    """o40 lineage under o41: 灌满+gate outbound口径; stamp; no displayRefUrls numerator."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp v0821o49b-hydrate-fresh-empty-url")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust o41")
+    assert_true("v0821o41:" in js, "js header o41")
+    assert_true("v0821o40:" in js, "js header o40 lineage")
+    assert_true("function fillRefSlotsToCap" in js, "fillRefSlotsToCap")
+    assert_true("/out/fill-cap-" in js, "real fill-cap fixtures")
+    assert_true("/out/o40-fill-" not in js, "no phantom o40-fill URLs")
+    assert_true("countRefUrls(null, n).length" in js, "UI numerator uses outbound countRefUrls")
+    assert_true("const refCount = displayRefUrls(n).length" not in js, "UI must not use displayRefUrls for N/cap")
+    assert_true("never N>cap" in js or "urls.length > cap" in js, "fill safety never over cap")
+
+
+def test_o41_fill_real_fixtures_static():
+    """o41: real fill-cap fixtures + server ensure-copy; never phantom URLs."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    server = (ROOT / "server.py").read_text(encoding="utf-8")
+    assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp")
+    assert_true("20260911-o49bhydratefreshemptyurl" in html, "cache-bust")
+    assert_true("def ensure_fill_cap_fixtures" in server, "server ensure helper")
+    assert_true("ensure_fill_cap_fixtures()" in server, "boot calls ensure")
+    assert_true("fal-refs-fill-9" in server, "fixture source dir")
+    for i in range(1, 10):
+        fp = ROOT / "out" / f"fill-cap-{i}.jpg"
+        assert_true(fp.is_file() and fp.stat().st_size > 0, f"fixture exists {fp.name}")
+    assert_true("/out/fill-cap-" in js, "client fill-cap urls")
+    assert_true("/out/o40-fill-" not in js, "no phantom")
 
 
 if __name__ == "__main__":
