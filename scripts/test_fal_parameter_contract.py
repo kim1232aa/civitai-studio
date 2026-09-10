@@ -222,6 +222,8 @@ class FalContract(unittest.TestCase):
                 "strength": None,
             },
             {"air": air, "id": 2653078, "strength": None},
+            {"air": air, "versionId": 2653078, "strength": None},
+            {"air": air, "modelVersionId": 2653078, "id": 2653078, "strength": None},
         ]
         for row in cases:
             with self.subTest(row=row):

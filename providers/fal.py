@@ -306,9 +306,9 @@ _CIVITAI_DL_RE = re.compile(
 def _fal_lora_version_id(item: dict) -> str:
     """Canonical Civitai modelVersionId for Fal download URLs.
 
-    Prefer explicit versionId / modelVersionId, then AIR `@version`.
-    Never let a bare `id` (search-hit modelId, or sibling version) beat AIR —
-    model 2323765 ships both 3071582 (Krea2) and 2653078 (z_image_turbo).
+    Prefer AIR `@version`, then versionId / modelVersionId.
+    Never let a bare `id` or stale sibling versionId (2653078) beat AIR
+    `@3071582` — model 2323765 ships both Krea2 and z_image_turbo siblings.
     """
     if not isinstance(item, dict):
         return ""
@@ -319,15 +319,15 @@ def _fal_lora_version_id(item: dict) -> str:
         s = str(raw).strip()
         return s if s.isdigit() else ""
 
-    for key in ("versionId", "modelVersionId"):
-        vid = _as_vid(item.get(key))
-        if vid:
-            return vid
     air = (item.get("air") or "").strip()
     if air:
         m = re.search(r"@(\d+)\s*$", air) or re.search(r"civitai:\d+@(\d+)", air, re.I)
         if m:
             return m.group(1)
+    for key in ("versionId", "modelVersionId"):
+        vid = _as_vid(item.get(key))
+        if vid:
+            return vid
     return _as_vid(item.get("id"))
 
 

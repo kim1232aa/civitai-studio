@@ -2201,7 +2201,7 @@ def test_v0821n2_lora_air_gate():
     # packLoras: still filter no-air on civitai; empty → null; keep air when present
     pack_i = js.find("function packLorasForPayload")
     assert_true(pack_i >= 0, "packLorasForPayload")
-    pack = js[pack_i:pack_i + 2200]
+    pack = js[pack_i:pack_i + 3200]
     assert_true('be === "civitai"' in pack or "be === 'civitai'" in pack, "civitai air filter")
     assert_true("row.air" in pack, "checks air")
     assert_true("mapped.length ? mapped : null" in pack, "empty → null")
@@ -2284,7 +2284,18 @@ def test_v0821n3_import_air_chip():
     block = js[i:j]
     assert_true("normalizeLora" in block, "maps via normalizeLora")
     assert_true("row.air" in block, "reaffirms air from import row")
+    assert_true("loraVersionId" in block, "applyImport resolves versionId via loraVersionId")
+    assert_true("loraDownloadUrl" in block, "applyImport reconciles path via loraDownloadUrl")
     assert_true("/api/generate" not in block, "import must not call /api/generate")
+
+    # loraVersionId prefers AIR @version over stale sibling versionId
+    vi = js.find("function loraVersionId")
+    assert_true(vi >= 0, "loraVersionId present")
+    vid_fn = js[vi:vi + 500]
+    air_at = vid_fn.find("air.match")
+    ver_at = vid_fn.find("l.versionId")
+    assert_true(air_at >= 0 and (ver_at < 0 or air_at < ver_at),
+                "loraVersionId must read AIR @version before versionId")
 
     # normalizeLora copies air
     ni = js.find("function normalizeLora")

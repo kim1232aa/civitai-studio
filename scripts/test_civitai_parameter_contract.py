@@ -574,6 +574,47 @@ class CivitaiContract(unittest.TestCase):
         self.assertEqual(code, 400, data)
         self.transport.assert_not_called()
 
+    def test_import_air_at_version_beats_sibling_id_path_2653078(self):
+        """Fixture 134923572: AIR @3071582 must land on chips, not sibling 2653078."""
+        air = "urn:air:krea2:lora:civitai:2323765@3071582"
+        cases = [
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "id": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "versionId": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "modelVersionId": 2653078, "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "id": 2653078,
+             "path": "https://civitai.com/api/download/models/2653078",
+             "downloadUrl": "https://civitai.com/api/download/models/2653078",
+             "strength": None},
+            {"air": air, "modelType": "LORA", "modelName": "Radiance Chrome Voluptuous",
+             "modelVersionId": 3071582, "id": 2653078, "strength": None},
+        ]
+        for resources in ([[c] for c in cases]):
+            with self.subTest(resources=resources):
+                loras = civ._loras_from_import_sources(resources)
+                self.assertEqual(len(loras), 1)
+                row = loras[0]
+                self.assertEqual(row["air"], air)
+                self.assertEqual(row["versionId"], 3071582)
+                self.assertIn("3071582", row.get("path") or "")
+                self.assertNotIn("2653078", row.get("path") or "")
+                self.assertNotIn("2653078", row.get("downloadUrl") or "")
+                self.assertEqual(row["versionId"], civ._version_id_from_air(air))
+
+        # No AIR @version: explicit versionId still wins over bare id.
+        no_air = civ._loras_from_import_sources([{
+            "modelType": "LORA",
+            "modelName": "X",
+            "versionId": 3071582,
+            "id": 2653078,
+            "strength": 0.8,
+        }])
+        self.assertEqual(no_air[0]["versionId"], 3071582)
+        self.assertIn("3071582", no_air[0]["path"])
+
     def test_prompt_lora_tag_without_weight_is_not_defaulted_to_0_8(self):
         tagged = civ._prompt_lora_tags("<lora:RadianceChrome>")
         self.assertEqual(len(tagged), 1)

@@ -3308,11 +3308,13 @@
   }
   function loraVersionId(l) {
     if (!l) return "";
-    if (l.versionId) return String(l.versionId);
-    if (l.modelVersionId) return String(l.modelVersionId);
+    // Prefer AIR @version over stale sibling versionId/path (2653078 vs 3071582).
     const air = String(l.air || "");
     const m = air.match(/@(\d+)\s*$/) || air.match(/civitai:\d+@(\d+)/i);
-    return m ? m[1] : "";
+    if (m) return m[1];
+    if (l.versionId != null && /^\d+$/.test(String(l.versionId).trim())) return String(l.versionId).trim();
+    if (l.modelVersionId != null && /^\d+$/.test(String(l.modelVersionId).trim())) return String(l.modelVersionId).trim();
+    return "";
   }
   function loraHasDirectPath(l) {
     if (!l) return false;
@@ -3352,7 +3354,7 @@
       air: air,
       path: path,
       downloadUrl: v.downloadUrl || path,
-      versionId: v.versionId || loraVersionId(v) || (v.id && /^\d+$/.test(String(v.id)) ? String(v.id) : ""),
+      versionId: loraVersionId(v) || (v.id && /^\d+$/.test(String(v.id)) ? String(v.id) : ""),
       strength: strength,
       scale: strength,
       strengthMissing: strengthMissing,
@@ -3781,7 +3783,7 @@
     // v0821n: civitai lora_map skips no-air — path-only must not ship empty air entries
     const mapped = list.map(function (l) {
       let path = l.path || l.downloadUrl || l.url || "";
-      const versionId = l.versionId || loraVersionId(l) || "";
+      const versionId = loraVersionId(l) || "";
       if (path && !looksAir(path) && versionId && /^\d+$/.test(String(versionId))) {
         const m = String(path).match(/^(https?:\/\/(?:www\.)?civitai\.com\/api\/download\/models\/)(\d+)(.*)$/i);
         if (m && String(m[2]) !== String(versionId)) path = m[1] + versionId + m[3];
@@ -5992,12 +5994,19 @@
       state.loras = j.loras.map(function (row) {
         const n = normalizeLora(row || {});
         if (row && row.air) n.air = String(row.air).trim();
-        if (row && row.versionId != null && String(row.versionId).trim() !== "") {
-          n.versionId = String(row.versionId);
-        }
-        if (row && (row.path || row.downloadUrl) && !n.path) {
-          n.path = row.path || row.downloadUrl || n.path;
-          n.downloadUrl = row.downloadUrl || n.path;
+        // AIR @version wins over wrong sibling versionId/path from import JSON.
+        const vid = loraVersionId({
+          air: n.air,
+          versionId: row && row.versionId,
+          modelVersionId: row && row.modelVersionId,
+        }) || loraVersionId(n);
+        if (vid) {
+          n.versionId = String(vid);
+          const reconciled = loraDownloadUrl(n);
+          if (reconciled) {
+            n.path = reconciled;
+            n.downloadUrl = reconciled;
+          }
         }
         return n;
       });

@@ -1076,6 +1076,65 @@ def fetch_version_air(vid, timeout=20):
     return ver if isinstance(ver, dict) else {}
 
 
+_AIR_AT_VERSION_RE = re.compile(r"@(\d+)\s*$")
+_AIR_CIVITAI_VERSION_RE = re.compile(r"civitai:\d+@(\d+)", re.I)
+_CIVITAI_DL_MODELS_RE = re.compile(
+    r"(https?://(?:www\.)?civitai\.com/api/download/models/)(\d+)(.*)$",
+    re.I,
+)
+
+
+def _as_version_id(raw):
+    """Positive digit version id, or None. Rejects bools and non-numeric strings."""
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw > 0 else None
+    s = str(raw).strip()
+    if s.isdigit():
+        n = int(s)
+        return n if n > 0 else None
+    return None
+
+
+def _version_id_from_air(air: str):
+    """Parse `@version` / `civitai:model@version` from an AIR URN."""
+    air = (air or "").strip()
+    if not air:
+        return None
+    m = _AIR_AT_VERSION_RE.search(air) or _AIR_CIVITAI_VERSION_RE.search(air)
+    return int(m.group(1)) if m else None
+
+
+def _import_lora_version_id(r: dict):
+    """Canonical modelVersionId for import chips.
+
+    Prefer AIR `@version`, then `versionId`, then `modelVersionId`.
+    Never let bare `id` (search-hit modelId or sibling version like 2653078)
+    beat AIR `@3071582`.
+    """
+    if not isinstance(r, dict):
+        return None
+    air_vid = _version_id_from_air(r.get("air") or "")
+    if air_vid is not None:
+        return air_vid
+    for key in ("versionId", "modelVersionId"):
+        vid = _as_version_id(r.get(key))
+        if vid is not None:
+            return vid
+    return _as_version_id(r.get("id"))
+
+
+def _reconcile_civitai_download_path(path: str, vid) -> str:
+    """Rewrite stale sibling download URLs to match canonical versionId."""
+    if not path or vid is None:
+        return path or ""
+    m = _CIVITAI_DL_MODELS_RE.match(str(path).strip())
+    if m and m.group(2) != str(vid):
+        return f"{m.group(1)}{vid}{m.group(3)}"
+    return path
+
+
 def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict | None = None) -> list:
     """Assemble import LoRA chips. Page `strength: null` stays null; never invent 0.8."""
     loras = []
@@ -1084,9 +1143,7 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
     for r in resources or []:
         if not isinstance(r, dict):
             continue
-        vid = r.get("modelVersionId") or r.get("versionId") or r.get("id")
-        if vid and not (isinstance(vid, int) or str(vid).isdigit()):
-            vid = r.get("modelVersionId") or r.get("versionId")
+        vid = _import_lora_version_id(r)
         ver = versions.get(vid) or _version_from_cache(vid) or {}
         air = (r.get("air") or ver.get("air") or "").strip()
         typ = r.get("modelType") or r.get("type") or (ver.get("model") or {}).get("type") or ""
@@ -1094,6 +1151,9 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
         if not air:
             mid = r.get("modelId") or ver.get("modelId")
             air = _air_from_ids(mid, vid, typ, r.get("baseModel") or ver.get("baseModel"), name)
+            # AIR may have been minted above; prefer its @version if id fields were empty.
+            if vid is None:
+                vid = _version_id_from_air(air)
         if not _is_lora_resource(typ, air, name):
             continue
         key = str(vid or air or name).lower()
@@ -1105,15 +1165,22 @@ def _loras_from_import_sources(resources: list, prompt: str = "", versions: dict
             "name": name or "LoRA",
         }
         item.update(_strength_fields(_resource_strength_raw(r)))
-        if vid:
+        if vid is not None:
             item["versionId"] = vid
         path = ""
         for f in (ver.get("files") or []):
             if isinstance(f, dict) and (f.get("downloadUrl") or f.get("download_url")):
                 path = f.get("downloadUrl") or f.get("download_url")
                 break
-        if not path and vid:
+        if not path:
+            for k in ("path", "downloadUrl", "download_url", "url"):
+                raw = r.get(k)
+                if isinstance(raw, str) and raw.strip() and "civitai.com/api/download/models/" in raw:
+                    path = raw.strip()
+                    break
+        if not path and vid is not None:
             path = f"https://civitai.com/api/download/models/{vid}"
+        path = _reconcile_civitai_download_path(path, vid)
         if path:
             item["path"] = path
             item["downloadUrl"] = path
