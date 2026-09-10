@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o12";
-  const STORE_OLDS = ["nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o13";
+  const STORE_OLDS = ["nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o13: writebackResult persists shot.url to localStorage (hard refresh keeps card); dual-read session migrate
   // v0821o12: civitai writeback — pickUrl steps[].output.images; writebackResult sets shot.url; hist-pin applies to card
   // v0821o11: tighten humanizeFailText — drop bare missing&&body.; quoted type:"missing"; poll throws raw
   // v0821o9: Critiquito P1 — Fal fail 中文 humanize; Composer foot sync _error; LoRA 未填·出站按提供方默认
@@ -993,7 +994,8 @@
   function persist() {
     try {
       saveDisplayedComposer();
-      sessionStorage.setItem(STORE, JSON.stringify({
+      // v0821o13: localStorage so hard refresh / new tab still restores shot.url (sessionStorage was ephemeral across review contexts).
+      const payload = JSON.stringify({
         cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
         railTab: state.railTab,
         groups: state.groups || [],
@@ -1018,15 +1020,26 @@
         nanoRes: $("nanoRes") && $("nanoRes").value,
         negative: $("negative") && $("negative").value,
         loras: Array.isArray(state.loras) ? state.loras : [],
-      }));
+      });
+      localStorage.setItem(STORE, payload);
+      try { sessionStorage.setItem(STORE, payload); } catch (_) {}
     } catch (_) {}
   }
   function restore() {
     try {
-      let raw = sessionStorage.getItem(STORE);
+      function readStore(key) {
+        try {
+          const a = localStorage.getItem(key);
+          if (a) return a;
+        } catch (_) {}
+        try {
+          return sessionStorage.getItem(key);
+        } catch (_) { return null; }
+      }
+      let raw = readStore(STORE);
       if (!raw) {
         for (let i = 0; i < STORE_OLDS.length; i++) {
-          raw = sessionStorage.getItem(STORE_OLDS[i]);
+          raw = readStore(STORE_OLDS[i]);
           if (raw) break;
         }
       }
@@ -1078,6 +1091,36 @@
         return false;
       }
       removeUnpromotedFromShot();
+      // Re-save under current STORE in localStorage (migrate session/old keys → durable graph).
+      try {
+        const payload = JSON.stringify({
+          cam: state.cam, nodes: state.nodes, edges: state.edges, mode: state.mode,
+          railTab: state.railTab,
+          groups: state.groups || [],
+          workspace: state.workspace || "canvas",
+          script: state.script || { title: "未命名故事", logline: "", scenes: [] },
+          editor: {
+            activeShotId: state.editor && state.editor.activeShotId || null,
+            playIndex: state.editor && Number.isFinite(state.editor.playIndex) ? state.editor.playIndex : 0,
+          },
+          backend: $("backend") && $("backend").value,
+          service: $("service") && $("service").value,
+          duration: $("duration") && $("duration").value,
+          aspect: $("aspect") && $("aspect").value,
+          res: $("res") && $("res").value,
+          width: $("width") && $("width").value,
+          height: $("height") && $("height").value,
+          steps: $("steps") && $("steps").value,
+          cfg: $("cfg") && $("cfg").value,
+          sampler: $("sampler") && $("sampler").value,
+          scheduler: $("scheduler") && $("scheduler").value,
+          seed: $("seed") && $("seed").value,
+          nanoRes: $("nanoRes") && $("nanoRes").value,
+          negative: $("negative") && $("negative").value,
+          loras: Array.isArray(state.loras) ? state.loras : [],
+        });
+        localStorage.setItem(STORE, payload);
+      } catch (_) {}
       return true;
     } catch (_) { return false; }
   }
@@ -4763,12 +4806,15 @@
   function writebackResult(shot, url) {
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
+    // v0821o13: persist here so hard refresh keeps card even if caller forgets persist().
     if (!shot || !url) return;
     const live = nodeById(shot.id) || shot;
     live.url = url;
     removeUnpromotedFromShot(live.id);
     pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
     renderRail();
+    try { renderCards(); drawWires(); } catch (_) {}
+    persist();
   }
 
     function pickUrl(data) {
