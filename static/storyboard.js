@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o7";
   const STORE_OLDS = ["nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o9: Critiquito P1 — Fal fail 中文 humanize; Composer foot sync _error; LoRA 未填·出站按提供方默认
   // v0821o8: v0794 caption reverse + 生图; HF catalog t2i+i2i
   // v0821o7: Composer params for all backends; full catalog roster; import does not silent-swap Turbo
   // v0821o6b: Magao outbound loras [{model, weight}] even for one; fixture force modelscope-ai
@@ -1754,6 +1755,9 @@
       setMsg(unusedMsg, "bad");
     } else if (capMsg) {
       setMsg(capMsg, "bad");
+    } else if (n._error) {
+      // v0821o9: card 生成失败 + reason must mirror on Composer foot (not card-only)
+      setMsg(n._error, "bad", n._errorDetail || "");
     } else if (state.mode !== "video") {
       const msgEl = $("msg");
       const t = (msgEl && msgEl.textContent) || "";
@@ -3194,15 +3198,84 @@
     }
     return String(e);
   }
+  function humanizeFailText(raw) {
+    const t = String(raw == null ? "" : raw).replace(/\s+/g, " ").trim();
+    if (!t) return "";
+    // Already short Chinese user copy — keep.
+    if (/^[\u4e00-\u9fff]/.test(t) && !/[A-Za-z]{4,}/.test(t)) return t;
+    const lower = t.toLowerCase();
+    // Fal content_policy_violation / content checker (often "body.prompt: …")
+    if (/content_policy_violation/.test(lower)
+        || /flagged by a content checker/.test(lower)
+        || /contained material flagged/.test(lower)
+        || (/content.?policy/.test(lower) && /violat/.test(lower))) {
+      return "内容未通过安全审核";
+    }
+    if (/no_media_generated/.test(lower)
+        || /did not generate the expected output/.test(lower)) {
+      return "模型未产出可用结果";
+    }
+    if (/file_download_error/.test(lower) || /\bfile download error\b/.test(lower)) {
+      return "资源下载失败（链接不可达）";
+    }
+    if (/image_load_error/.test(lower) || /\bimage load error\b/.test(lower)) {
+      return "图片加载失败";
+    }
+    if (/image_too_large/.test(lower) || /\bimage too large\b/.test(lower)) {
+      return "图片尺寸过大";
+    }
+    if (/image_too_small/.test(lower) || /\bimage too small\b/.test(lower)) {
+      return "图片尺寸过小";
+    }
+    if (/face_detection_error/.test(lower) || /could not detect face/.test(lower)) {
+      return "未检测到人脸";
+    }
+    if (/generation_timeout/.test(lower) || /\bgeneration timeout\b/.test(lower)) {
+      return "生成超时";
+    }
+    if (/downstream_service_unavailable/.test(lower)) {
+      return "下游服务暂不可用";
+    }
+    if (/downstream_service_error/.test(lower)) {
+      return "下游服务错误";
+    }
+    if (/internal_server_error/.test(lower) || /\binternal server error\b/.test(lower)) {
+      return "服务端内部错误";
+    }
+    if (/feature_not_supported/.test(lower) || /\bfeature not supported\b/.test(lower)) {
+      return "当前端点不支持该功能";
+    }
+    // missing / Field required — body.prompt etc.
+    if (/\bfield required\b/.test(lower)
+        || /\btype["']?\s*:\s*["']?missing\b/.test(lower)
+        || /is required but was not provided/.test(lower)
+        || /\bmissing\b/.test(lower) && /body\./.test(lower)) {
+      if (/prompt/.test(lower)) return "缺少提示词（服务端校验）";
+      if (/image|frame|start_image|first_frame/.test(lower)) return "缺少图片输入（服务端校验）";
+      return "请求字段缺失（服务端校验）";
+    }
+    // Strip body.loc noise when remaining msg is still English noise
+    const locm = t.match(/^body(?:\.[A-Za-z0-9_]+)*:\s*(.+)$/i);
+    if (locm) {
+      const rest = locm[1].trim();
+      const mapped = humanizeFailText(rest);
+      if (mapped && mapped !== rest) return mapped;
+      if (/^field required$/i.test(rest)) return "请求字段缺失（服务端校验）";
+    }
+    return t;
+  }
   function formatErrInfo(e) {
     const raw = unwrapErrText(e, 0) || "未知错误";
     const billing = isBillingErrText(raw) || (e && typeof e === "object" && (e.status === 402 || e.statusCode === 402));
     if (billing) {
       return { text: "额度不足或账单错误", excerpt: shortErrExcerpt(raw, 180), billing: true };
     }
-    const human = raw.length > 240 ? (raw.slice(0, 240) + "…") : raw;
-    const excerpt = raw.length > 240 ? shortErrExcerpt(raw, 180) : "";
-    return { text: human || "未知错误", excerpt: excerpt, billing: false };
+    const mapped = humanizeFailText(raw);
+    const text = (mapped && mapped !== raw) ? mapped : (raw.length > 240 ? (raw.slice(0, 240) + "…") : raw);
+    let excerpt = "";
+    if (mapped && mapped !== raw) excerpt = shortErrExcerpt(raw, 220);
+    else if (raw.length > 240) excerpt = shortErrExcerpt(raw, 180);
+    return { text: text || "未知错误", excerpt: excerpt, billing: false };
   }
   function formatErr(e) {
     return formatErrInfo(e).text;
@@ -3437,7 +3510,7 @@
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
           esc(strVal) +
-          '" placeholder="未填" data-lora-str="' + i + '" title="strength 未填则留空" aria-label="strength">' +
+          '" placeholder="未填·出站按提供方默认" data-lora-str="' + i + '" title="strength 未填：出站省略数值，按提供方默认（不写 1.0/0.8）" aria-label="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
     }).join("");
