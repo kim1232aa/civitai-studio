@@ -376,7 +376,7 @@
   .composer-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0}
 
 </style>
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-planner-68180be">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-canvas-manager">
 </head>
 <body>
 <div class="app">
@@ -389,11 +389,13 @@
       <button type="button" data-workspace="editor" aria-controls="editorWorkspace">编辑器</button>
     </nav>
     <div class="mode-mini">
+      <button class="tool-mini" id="canvasManagerToggle" type="button">项目</button>
       <a href="/">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o11-delete-node</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o12-canvas-manager</span>
     </div>
   </header>
+  <div id="canvasManager" class="canvas-manager" aria-label="项目与画布管理"></div>
   <div class="stage">
     <div class="workspace-panel" id="scriptWorkspace" role="region" aria-labelledby="scriptWorkspaceTitle" hidden></div>
     <div class="workspace-panel" id="editorWorkspace" role="region" aria-labelledby="editorWorkspaceTitle" hidden></div>
@@ -570,6 +572,7 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<script src="/static/storyboard.js?v=20260910-planner-68180be"></script>
+<script src="/static/storyboard.js?v=20260910-canvas-manager"></script>
+<script src="/static/canvas_manager.js?v=20260910-canvas-manager"></script>
 </body>
 </html>

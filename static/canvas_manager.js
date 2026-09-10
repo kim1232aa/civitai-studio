@@ -374,10 +374,8 @@
     }
 
     renderWorkspaceTabs() {
-      if (!this.root) return;
-      const buttons = global.document
-        ? global.document.querySelectorAll("[data-workspace]")
-        : this.root.querySelectorAll("[data-workspace]");
+      if (!this.root || typeof this.root.querySelectorAll !== "function") return;
+      const buttons = this.root.querySelectorAll("[data-workspace]");
       buttons.forEach((button) => {
         const active = button.dataset.workspace === this.workspace;
         button.classList.toggle("on", active);
@@ -574,12 +572,6 @@
       global.canvasManager = mountCanvasManager(root);
       const toggle = global.document.getElementById("canvasManagerToggle");
       if (toggle) toggle.addEventListener("click", () => root.classList.toggle("show"));
-      global.document.querySelectorAll("header [data-workspace]").forEach((button) => {
-        button.addEventListener("click", () => {
-          global.canvasManager.setWorkspace(button.dataset.workspace);
-          root.classList.add("show");
-        });
-      });
     }
   }
 

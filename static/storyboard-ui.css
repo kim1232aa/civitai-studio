@@ -459,3 +459,50 @@ color:#e8e8ec;font-size:12px;padding:8px 10px;border-radius:8px}
 .split-menu button:disabled:hover{background:transparent}
 .node-menu{position:absolute;z-index:30;min-width:132px}
 .node-menu button.danger{color:#ff8d83}
+
+.tool-mini{border:1px solid var(--line,#2a2a30);background:#16161a;color:#ddd;border-radius:8px;padding:5px 9px;font-size:11px}
+.tool-mini:hover{border-color:#4a4a52;color:#fff}
+.canvas-manager{position:fixed;top:62px;right:16px;z-index:60;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 78px);
+overflow:auto;display:none;background:#151519ee;border:1px solid #35353e;border-radius:16px;padding:14px;
+box-shadow:0 24px 80px rgba(0,0,0,.58);backdrop-filter:blur(18px)}
+.canvas-manager.show{display:block}
+.cm-head,.cm-controls,.cm-columns,.cm-row,.cm-asset{display:flex;align-items:center}
+.cm-head{justify-content:space-between;gap:12px;margin-bottom:12px}
+.cm-tabs{display:flex;gap:4px;background:#101014;border:1px solid #2a2a30;border-radius:999px;padding:3px}
+.cm-tabs button,.cm-controls button,.cm-add,.cm-asset button{border:1px solid #303039;background:#1a1a1f;color:#cfcfd6;border-radius:8px;padding:6px 10px}
+.cm-tabs button{border:0;border-radius:999px;padding:6px 12px;color:#9a9aa3}
+.cm-tabs button[aria-selected="true"]{background:#27272e;color:#fff}
+.cm-close{border:0;background:transparent;color:#aaa;font-size:22px;line-height:1}
+.cm-controls{flex-wrap:wrap;gap:7px;padding-bottom:10px;border-bottom:1px solid #292930}
+.cm-controls label{display:flex;align-items:center;gap:6px;color:#9a9aa3;margin-right:auto}
+.cm-controls select{min-width:160px;max-width:280px;background:#1a1a1f;border:1px solid #303039;border-radius:8px;padding:6px 8px}
+.cm-controls button:disabled,.cm-add:disabled{opacity:.4;cursor:not-allowed}
+.cm-status{min-height:1.4em;padding:8px 2px;color:var(--coral,#e85d4c);font-size:12px}
+.cm-columns{align-items:stretch;gap:12px}
+.cm-columns section{min-width:0;flex:1;border:1px solid #2a2a30;border-radius:12px;background:#111114;padding:10px}
+.cm-columns h3{margin:0 0 8px;color:#eee;font-size:13px}
+.cm-columns h3 small{font-weight:400;color:#777780;margin-left:4px}
+.cm-columns ul{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:5px}
+.cm-row{gap:4px;border:1px solid #27272e;border-radius:8px;padding:3px;background:#17171b}
+.cm-row.on{border-color:var(--teal,#5ee0c5)}
+.cm-row button:first-child{flex:1;border:0;background:transparent;color:#ddd;text-align:left;padding:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-icon{border:0;background:transparent;color:#888;padding:4px 6px}
+.cm-asset{gap:7px;border:1px solid #27272e;border-radius:8px;padding:4px;background:#17171b}
+.cm-asset.bound{border-color:#4b9f8c}
+.cm-asset img,.cm-thumb-empty{width:34px;height:34px;object-fit:cover;border-radius:5px;background:#202026;display:grid;place-items:center;color:#777}
+.cm-asset span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;font-size:12px}
+.cm-asset button{padding:4px 7px;font-size:11px}
+.cm-empty,.cm-note{color:#777780;font-size:12px}
+.cm-note{line-height:1.5;margin:10px 0 0}
+.cm-workspace{border:1px solid #2a2a30;border-radius:12px;background:#111114;padding:14px}
+.cm-workspace-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cm-workspace h2{margin:0;font-size:16px;color:#fff}
+.cm-workspace-head .cm-note{margin:3px 0 0;min-height:1.2em}
+.cm-save{border:1px solid #4b9f8c;background:#18332e;color:#dffcf5;border-radius:8px;padding:6px 12px}
+.cm-save:disabled{opacity:.4;cursor:not-allowed}
+.cm-story-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cm-story-grid label{display:flex;flex-direction:column;gap:5px;color:#ddd;font-size:12px}
+.cm-story-grid textarea,.cm-editor{width:100%;min-height:170px;resize:vertical;background:#18181d;border:1px solid #303039;border-radius:8px;padding:9px;color:#eee;line-height:1.55}
+.cm-editor{min-height:390px;resize:vertical}
+.cm-story-grid textarea:focus,.cm-editor:focus{outline:1px solid var(--teal,#5ee0c5);border-color:var(--teal,#5ee0c5)}
+@media (max-width:700px){.cm-story-grid{grid-template-columns:1fr}.cm-columns{flex-direction:column}}
