@@ -21,14 +21,14 @@
 ---
 
 ### Task 1: Failing tests
-- [ ] UI/outbound: service with maxRefs=5 shows 5 capacity; with 5 linked URLs, payload bag length=5.
-- [ ] maxRefs=1 (魔搭): bag/singular length=1; never claim 5.
-- [ ] t2i + refs: still hard-block or smart-switch to Edit sibling (no silent ignore).
+- [x] UI/outbound: service with maxRefs=5 shows 5 capacity; with 5 linked URLs, payload bag length=5.
+- [x] maxRefs=1 (魔搭): bag/singular length=1; never claim 5.
+- [x] t2i + refs: still hard-block or smart-switch to Edit sibling (no silent ignore).
 
 ### Task 2: Implement
-- [ ] Expose full cap slots / remain chips; optional「灌满测试」dev action that attaches N distinct local/fixture images up to cap (page path still human-clickable for acceptance).
-- [ ] Smart-match: when refs>0 and !eatsRefs, offer/apply `editSibling` serviceId if catalog has it.
-- [ ] Stamp + push tip hash; closed-loop still 0.
+- [x] Expose full cap slots / remain chips; optional「灌满测试」dev action that attaches N distinct local/fixture images up to cap (page path still human-clickable for acceptance).
+- [x] Smart-match: when refs>0 and !eatsRefs, offer/apply `editSibling` serviceId if catalog has it.
+- [x] Stamp + push tip hash; closed-loop still 0. (510532c)
 
 ### Task 3: Burns (开发)
 - [ ] Page↑ per provider with **灌满** refs + api 核 outbound count==cap; auto writeback; no 接到此镜; no curl generate.
