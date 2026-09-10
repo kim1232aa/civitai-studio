@@ -4,6 +4,7 @@
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   // v0821o29: Fal LoRA endpoint by AIR base (flux1→flux-lora; krea2→krea-2/turbo/lora; else 不支持 — never hard-pin wrong family)
+  // v0821o28: Composer field adapt — board show/disable/「不支持」+ strength「未填」(static/composer-field-adapt.js; no Fal pin)
   // v0821o27: import strength — trpc null backfill from REST /api/generation/data (28533344→0.7; never invent)
   // v0821o26: Fal 换家 — pinFal rejects civitai/HF serviceId; #backend sync from /api/providers (all enabled)
   // v0821o25: sdcpp sampleMethod map — import dpmpp_2m → outbound dpm++2m (locked); schedule karras keep
@@ -3770,26 +3771,36 @@
     const q = $("loraQ");
     const lbl = $("loraQLbl");
     const hint = $("loraHint");
+    const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+    const shape = adapt && typeof adapt.loraShape === "function" ? adapt.loraShape(be) : "";
     if (be === "fal" || isNanogptBe() || be === "huggingface") {
       if (q) q.placeholder = "URL、HF owner/name、名字或 version id";
-      if (lbl) lbl.textContent = "LoRA · 搜索名字 / URL / HF / version id";
+      if (lbl) lbl.textContent = (shape === "path") ? "LoRA · path/scale" : "LoRA · 搜索名字 / URL / HF / version id";
     } else if (isModelscopeBe()) {
       if (q) q.placeholder = "魔搭 owner/repo，例如 Qwen/Qwen-Image";
-      if (lbl) lbl.textContent = "LoRA · 魔搭 Hub owner/repo";
+      if (lbl) lbl.textContent = "LoRA · Hub owner/repo";
     } else {
       if (q) q.placeholder = "名字 / version id / AIR";
-      if (lbl) lbl.textContent = "LoRA · 搜索名字 / version id / AIR";
+      if (lbl) lbl.textContent = shape === "air" ? "LoRA · air+strength" : "LoRA · 搜索名字 / version id / AIR";
     }
     if (hint) {
       if (isModelscopeBe()) {
         hint.textContent = "请填写魔搭仓库名，例如 Qwen/Qwen-Image";
         hint.classList.add("show");
+        hint.classList.remove("lora-unverified");
       } else if (be === "huggingface") {
-        hint.textContent = "可搜索模型名，或粘贴 Hugging Face 仓库 / 直链";
+        const shapeHint = adapt && adapt.loraShapeHintText ? adapt.loraShapeHintText(be) : "";
+        hint.textContent = shapeHint || "可搜索模型名，或粘贴 Hugging Face 仓库 / 直链 · unverified";
         hint.classList.add("show");
+        hint.classList.add("lora-unverified");
+      } else if (adapt && typeof adapt.loraShapeHintText === "function") {
+        hint.textContent = adapt.loraShapeHintText(be);
+        hint.classList.add("show");
+        hint.classList.remove("lora-unverified");
       } else {
         hint.textContent = "";
         hint.classList.remove("show");
+        hint.classList.remove("lora-unverified");
       }
     }
   }
@@ -3832,7 +3843,15 @@
         '</div>' +
         '<input class="lora-str" type="number" step="0.05" min="0" max="2" value="' +
           esc(strVal) +
-          '" placeholder="未填·出站按提供方默认" data-lora-str="' + i + '" title="strength 未填：出站省略数值，按提供方默认（不写 1.0/0.8）" aria-label="strength">' +
+          '" placeholder="' +
+          ((typeof window !== "undefined" && window.ComposerFieldAdapt &&
+            typeof window.ComposerFieldAdapt.strengthPlaceholder === "function")
+            ? window.ComposerFieldAdapt.strengthPlaceholder() : "未填") +
+          '" data-lora-str="' + i + '" title="' +
+          ((typeof window !== "undefined" && window.ComposerFieldAdapt &&
+            typeof window.ComposerFieldAdapt.strengthTitle === "function")
+            ? window.ComposerFieldAdapt.strengthTitle() : "strength 未填：出站省略数值（不写 1.0/0.8）") +
+          '" aria-label="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
     }).join("");
@@ -4000,6 +4019,19 @@
     } else {
       markOver(nano, false);
     }
+    // v0821o28: honest unsupported filled fields (adapt board; no silent drop).
+    try {
+      const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+      if (adapt && typeof adapt.filledUnsupportedMessages === "function") {
+        const extra = adapt.filledUnsupportedMessages({
+          $: $,
+          backend: currentBackend(),
+          mode: state.mode,
+          caps: caps
+        }) || [];
+        extra.forEach(function (m) { if (m) msgs.push(m); });
+      }
+    } catch (_) {}
     setParamWarn(msgs[0] || "", !!msgs.length);
     return msgs[0] || "";
   }
@@ -4016,51 +4048,30 @@
     fillSelectOpts(sel, tokens, keep);
   }
   function syncParamSurface() {
-    const be = currentBackend();
-    const civ = be === "civitai";
-    const nano = be === "nano-gpt";
-    const vid = state.mode === "video";
-    const caps = catalogCaps();
-    const falBox = $("falParams");
-    const comfyBox = $("comfyParams");
-    const nanoBox = $("nanoParams");
-    if (falBox) falBox.classList.toggle("hidden", !!civ || !!nano);
-    if (comfyBox) comfyBox.classList.toggle("hidden", be === "fal");
-    if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
-    const sampler = $("sampler");
-    const scheduler = $("scheduler");
-    const steps = $("steps");
-    const cfg = $("cfg");
-    const width = $("width");
-    const height = $("height");
-    const seed = $("seed");
-    const neg = $("negative");
-    const duration = $("duration");
-    const aspect = $("aspect");
-    const res = $("res");
-    if (sampler) sampler.classList.toggle("hidden", !civ && !caps.sampler);
-    if (scheduler) scheduler.classList.toggle("hidden", !civ);
-    if (steps) steps.classList.toggle("hidden", !civ);
-    if (cfg) cfg.classList.toggle("hidden", !civ);
-    if (width) {
-      width.disabled = !!nano;
-      width.title = nano ? "Nano 提交用目录 resolution token" : "宽";
-      width.classList.toggle("hidden", !!nano && !civ);
+    // v0821o28: delegate show/disable/「不支持」to ComposerFieldAdapt (board + live caps tighten-only).
+    const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+    const ctx = {
+      $: $,
+      backend: currentBackend(),
+      mode: state.mode,
+      caps: catalogCaps(),
+      fillNanoResOptions: fillNanoResOptions
+    };
+    if (adapt && typeof adapt.applyToSurface === "function") {
+      adapt.applyToSurface(ctx);
+    } else {
+      // Fallback if adapt script missing — keep fields visible; never pretend supported by hiding.
+      const be = currentBackend();
+      const nano = be === "nano-gpt";
+      const vid = state.mode === "video";
+      const falBox = $("falParams");
+      const comfyBox = $("comfyParams");
+      const nanoBox = $("nanoParams");
+      if (falBox) falBox.classList.toggle("hidden", state.mode === "text" || state.mode === "audio");
+      if (comfyBox) comfyBox.classList.toggle("hidden", false);
+      if (nanoBox) nanoBox.classList.toggle("hidden", !nano);
+      if (nano) fillNanoResOptions();
     }
-    if (height) {
-      height.disabled = !!nano;
-      height.title = nano ? "Nano 提交用目录 resolution token" : "高";
-      height.classList.toggle("hidden", !!nano && !civ);
-    }
-    if (seed) seed.classList.toggle("hidden", false);
-    if (neg) {
-      const showNeg = caps.negative !== false;
-      neg.classList.toggle("hidden", !showNeg);
-    }
-    if (duration) duration.classList.toggle("hidden", !vid || caps.videoDuration === false);
-    if (aspect) aspect.classList.toggle("hidden", state.mode === "text" || state.mode === "audio" || (caps.videoAspect === false && vid));
-    if (res) res.classList.toggle("hidden", !!nano || state.mode === "text" || state.mode === "audio");
-    if (nano) fillNanoResOptions();
     paramGateMessage();
     if (!syncParamSurface._skipDock) renderDock();
   }

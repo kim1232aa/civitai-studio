@@ -447,3 +447,9 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
 @media (prefers-reduced-motion: reduce) {
   .group-bound.flash { animation: none; }
 }
+
+
+/* v0821o28-composer-adaptive — secondary hooks (primary: composer-field-adapt.css) */
+.param-support-strip { font-size: 11px; color: #8b8b94; line-height: 1.35; margin: 4px 0 2px; overflow-wrap: anywhere; }
+.param-field.param-unsupported :is(input, select) { opacity: 0.55; cursor: not-allowed; }
+.prompt.neg.param-unsupported-control { opacity: 0.55; cursor: not-allowed; }

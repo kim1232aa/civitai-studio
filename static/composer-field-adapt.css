@@ -1,0 +1,23 @@
+/* v0821o28-composer-adaptive — CSS hooks for Composer field board */
+.param-support-strip{
+  margin:4px 0 2px;font:11px/1.35 ui-monospace,Menlo,monospace;
+  color:#8b8b94;min-height:1.1em;white-space:normal;word-break:break-word;
+}
+.param-support-strip[hidden]{display:none !important}
+.bar .param-field.param-mode-hide{display:none !important}
+.bar .param-field.param-unsupported > span,
+.param-field.param-unsupported > span{color:#e8a598}
+.bar .param-field.param-unsupported input,
+.bar .param-field.param-unsupported select,
+.param-field.param-unsupported input,
+.param-field.param-unsupported select{
+  opacity:.55;cursor:not-allowed;border-color:#5a3a36;background:#1a1414;color:#c9a9a4;
+}
+.bar .param-field.param-catalog > span{color:#b8a86a}
+.bar .param-field.param-unknown > span{color:#8a8a94}
+.prompt.param-unsupported-control,
+textarea.param-unsupported-control{
+  opacity:.6;cursor:not-allowed;border-color:#5a3a36;background:#1a1414;color:#c9a9a4;
+}
+.lora-hint.lora-unverified{color:#c9b56a}
+.lora-str::placeholder{color:#8b8b94;font-style:italic}

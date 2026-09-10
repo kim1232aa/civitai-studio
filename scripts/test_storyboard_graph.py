@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "stamp must be v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "stamp must be v0821o28-composer-adaptive")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -364,7 +364,7 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -424,7 +424,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "stamp v0821o28-composer-adaptive")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -483,7 +483,7 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -601,10 +601,10 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o29-fal-lora-base: unmention/link helpers still present."""
+    """v0817b lineage under v0821o28-composer-adaptive: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -621,10 +621,10 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o29-fal-lora-base: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o28-composer-adaptive: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -667,7 +667,7 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -741,7 +741,7 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -776,7 +776,7 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -802,7 +802,7 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -842,7 +842,7 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -901,7 +901,7 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -972,7 +972,7 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
@@ -1036,7 +1036,7 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -1126,7 +1126,7 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
@@ -1209,7 +1209,7 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp v0821o29-fal-lora-base")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp v0821o28-composer-adaptive")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1331,7 +1331,7 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1419,7 +1419,7 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -1483,12 +1483,12 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o29-fal-lora-base: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o28-composer-adaptive: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1541,12 +1541,12 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o29-fal-lora-base: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o28-composer-adaptive: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1607,7 +1607,7 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821o7"' in js, "STORE_OLDS keeps v0821o7")
@@ -1731,9 +1731,9 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1852,9 +1852,9 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2040,9 +2040,9 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2187,7 +2187,7 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
@@ -2205,7 +2205,7 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -2274,7 +2274,7 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -2397,22 +2397,22 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2436,10 +2436,10 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2604,10 +2604,10 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2671,10 +2671,10 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2833,10 +2833,10 @@ def test_v0821o4_hf_turbo_lora():
     PATH = "https://civitai.com/api/download/models/3231694"
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3056,10 +3056,10 @@ def test_v0821o5_hf_no_wavespeed():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3193,7 +3193,7 @@ def test_v0821o6_modelscope_hub_lora():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o29-fal-lora-base"
+    STAMP = "v0821o28-composer-adaptive"
     HUB = "krea/Krea-2-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3202,8 +3202,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3569,7 +3569,7 @@ def test_v0821o6b_ms_lora_shape():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o29-fal-lora-base"
+    STAMP = "v0821o28-composer-adaptive"
     HUB = "Tongyi-MAI/Z-Image-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3577,15 +3577,15 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true("nanogpt" not in STAMP and "nano-gpt" not in STAMP, "stamp stays Magao, not Nano")
-    assert_true("v0821o29-fal-lora-base" in html and "nano" not in "v0821o29-fal-lora-base", "html must not drift onto Nano stamps")
-    assert_true("v0821o29-fal-lora-base" in html, "o7 param-surface stamp")
+    assert_true("v0821o28-composer-adaptive" in html and "nano" not in "v0821o28-composer-adaptive", "html must not drift onto Nano stamps")
+    assert_true("v0821o28-composer-adaptive" in html, "o7 param-surface stamp")
 
     fi = js.find("function msLoraFixtureImport")
     fj = js.find("async function mountMsLoraFixture", fi)
@@ -3704,9 +3704,9 @@ def test_v0821o7_param_surface():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o7")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3775,7 +3775,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-r29fallorabase">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-o28adaptive">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3826,20 +3826,15 @@ def test_v0821o7_c1_closeout():
     cc = js[js.find("function catalogCaps"):js.find("function markOver")]
     assert_true("parameterCapabilities" in cc, "catalogCaps must read parameterCapabilities")
 
-    # 5. backend=fal hides #comfyParams — 16:9/720P must not sit next to 960×1440
+    # 5. o28 board §硬规则2: unsupported → disable+「不支持」, do not hide comfy as-complete on fal
     sync = js[js.find("function syncParamSurface"):js.find("function readComfyParamsFromUi")]
-    assert_true("comfyBox" in sync, "syncParamSurface touches #comfyParams")
-    compact_sync = " ".join(sync.split())
-    assert_true(
-        'comfyBox.classList.toggle("hidden"' in compact_sync
-        or "comfyBox.classList.toggle('hidden'" in compact_sync,
-        "comfyParams visibility is toggled",
-    )
-    assert_true('classList.toggle("hidden", false)' not in sync
-                or "be === \"fal\"" in sync
-                or 'be === "fal"' in compact_sync,
-                "fal must hide #comfyParams (not always show)")
-    assert_true("fal" in sync and "hidden" in sync, "fal path hides a param group")
+    assert_true("ComposerFieldAdapt" in sync or "applyToSurface" in sync,
+                "syncParamSurface delegates to ComposerFieldAdapt")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    assert_true("param-unsupported" in adapt, "unsupported fields get param-unsupported")
+    assert_true("本家不支持" in adapt, "plain unsupported copy")
+    assert_true("showComfyGroup = true" in adapt or "showComfyGroup=true" in adapt.replace(" ", ""),
+                "comfyParams stay mounted; per-field disable handles honesty")
 
     # 6. loadCatalog failure must not swallow
     assert_true("} catch (_) {}" not in lc, "loadCatalog must not catch (_) {}")
@@ -3936,8 +3931,8 @@ def test_v0821o9_fail_zh_lora_honesty():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     index = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "script cache-bust")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "script cache-bust")
     assert_true("function humanizeFailText" in js, "humanizeFailText helper")
     assert_true('/\\bmissing\\b/.test(lower) && /body\\./.test(lower)' not in js,
                 "no bare missing&&body. false-positive clause")
@@ -3951,9 +3946,13 @@ def test_v0821o9_fail_zh_lora_honesty():
     assert_true("n._error" in rd and "setMsg(n._error" in rd, "renderDock syncs shot _error to Composer foot")
     assert_true('setMsg(n._error, "bad"' in rd, "foot uses bad tone")
 
-    rend = js[js.find("function renderLoras"):js.find("function renderLoras") + 1800]
-    assert_true("未填·出站按提供方默认" in rend, "LoRA strength placeholder is outbound-honest")
-    assert_true("提供方默认" in rend, "title/placeholder denies invent")
+    rend = js[js.find("function renderLoras"):js.find("function renderLoras") + 2400]
+    assert_true("未填" in rend, "LoRA strength placeholder is outbound-honest")
+    assert_true(
+        "ComposerFieldAdapt.strengthPlaceholder" in rend or "未填·出站按提供方默认" in rend,
+        "strength uses adapt「未填」helper (or legacy honest placeholder)",
+    )
+    assert_true("不写 1.0/0.8" in rend, "title/placeholder denies invent defaults")
 
     paint = js[js.find("function paintShotFail"):js.find("function paintShotFail") + 900]
     assert_true("shot._error = info.text" in paint, "paintShotFail card _error is humanized text")
@@ -4050,12 +4049,12 @@ def test_v0821o15_server_writeback_executable():
     """v0821o15: local persist + PUT /api/storyboard-graph; clean-profile hydrate keeps shot.url."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o15")
     assert_true('"nl-storyboard-v0821o14"' in js, "STORE_OLDS keeps o14")
     assert_true('"nl-storyboard-v0821o13"' in js, "STORE_OLDS keeps o13")
     assert_true('"nl-storyboard-v0821o12"' in js, "STORE_OLDS keeps o12")
-    assert_true("storyboard.js?v=20260910-r29fallorabase" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o28adaptive" in html, "js cache bust")
     assert_true("function mergePreferUrl" in js, "mergePreferUrl helper")
     assert_true("function isQuotaErr" in js, "isQuotaErr helper")
     assert_true("function persistServer" in js, "persistServer helper")
@@ -4105,8 +4104,8 @@ def test_v0821o19_single_up_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o19")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "js cache-bust o19")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o19")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "js cache-bust o19")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
     assert_true('"nl-storyboard-v0821o16"' in js, "STORE_OLDS still knows o16")
 
@@ -4178,9 +4177,9 @@ def test_v0821o20_visual_p0():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o20")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "js cache-bust o20")
-    assert_true('href="/static/storyboard-ui.css?v=20260910-r29fallorabase"' in html, "css cache-bust o20")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o20")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "js cache-bust o20")
+    assert_true('href="/static/storyboard-ui.css?v=20260910-o28adaptive"' in html, "css cache-bust o20")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
 
@@ -4224,8 +4223,8 @@ def test_v0821o22_hinablue_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o23 (o22 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "js cache-bust o23")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o23 (o22 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive kept")
@@ -4276,8 +4275,8 @@ def test_v0821o23_sdxl_service_stick():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o23")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "js cache-bust o23")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o23")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("function resolveCivitaiOutboundServiceId" in js, "resolve helper")
@@ -4340,8 +4339,8 @@ def test_v0821o21_outbound_jobid_writeback():
     """o21 lineage under o22: fail surfaces jobId+backend; single generate; persist keepalive (no fixture lock)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o23 (o21 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-r29fallorabase"' in html, "js cache-bust o23")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o23 (o21 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o28adaptive"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive")
@@ -4377,8 +4376,8 @@ def test_v0821o26_fal_swap_dropdown():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     init = (ROOT / "providers" / "__init__.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o26")
-    assert_true("20260910-r29fallorabase" in html, "js cache-bust o26")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp o26")
+    assert_true("20260910-o28adaptive" in html, "js cache-bust o26")
     assert_true("v0821o26:" in js[:5000] or "v0821o29:" in js[:5000], "js knife banner lineage")
 
     # Static HTML lists every registered backend (honest fallback before /api/providers)
@@ -4458,14 +4457,36 @@ def test_import_142210587_original_params():
     assert_true(j.get("sampler") and j.get("seed") is not None, "sampler+seed")
 
 
+
+def test_v0821o28_composer_adaptive():
+    """Composer field board adapt module: show/disable/不支持 + strength 未填; no Fal pin edits."""
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp")
+    assert_true("composer-field-adapt.js" in html, "adapt script included")
+    assert_true("composer-field-adapt.css" in html, "adapt css included")
+    assert_true("paramSupportStrip" in html, "support strip mounted")
+    assert_true("ComposerFieldAdapt" in adapt and "applyToSurface" in adapt, "adapt API")
+    assert_true("本家不支持" in adapt, "plain unsupported copy")
+    assert_true('return "未填"' in adapt, "null strength → 未填")
+    assert_true("adapt.applyToSurface" in js, "syncParamSurface delegates")
+    assert_true("pinFalLoraServiceId" in js and "FAL_LORA_BY_BASE" in js, "o29 Fal pin preserved")
+    # adapt file must not define Fal pin symbols (comments mentioning o29 ownership OK)
+    assert_true("function pinFalLoraServiceId" not in adapt, "adapt stays clear of Fal pin fn")
+    assert_true("FAL_LORA_BY_BASE =" not in adapt and "FAL_LORA_BY_BASE=" not in adapt,
+                "adapt stays clear of FAL_LORA_BY_BASE map")
+
+
 def test_v0821o29_fal_lora_base():
     """o29: Fal LoRA endpoint by AIR base — flux1→flux-lora; krea2→krea; else 不支持; never hard-pin wrong family."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o29-fal-lora-base" in html, "html stamp o29")
-    assert_true("20260910-r29fallorabase" in html, "cache-bust o29")
-    assert_true("v0821o29:" in js[:5000], "js o29 banner")
+    # stamp advanced by o28 tip; o29 behavior still required in storyboard.js
+    assert_true("v0821o28-composer-adaptive" in html, "html stamp (o28 tip after o29)")
+    assert_true("20260910-o28adaptive" in html, "cache-bust current tip")
+    assert_true("v0821o29:" in js[:5000], "js o29 banner preserved")
 
     assert_true("function resolveFalLoraEndpointFromChips" in js, "resolver")
     assert_true("function loraAirBase" in js, "loraAirBase")
@@ -4571,6 +4592,7 @@ def main():
         test_v0821o22_hinablue_writeback,
         test_v0821o23_sdxl_service_stick,
         test_v0821o26_fal_swap_dropdown,
+        test_v0821o28_composer_adaptive,
         test_v0821o29_fal_lora_base,
         test_import_19201654_original_params,
         # test_import_142210587_original_params  # optional fixture; NOT acceptance
