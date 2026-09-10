@@ -6,6 +6,7 @@ import json
 import re
 import mimetypes
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -32,6 +33,27 @@ SITE = "https://civitai.com/api/v1"
 PORT = int(os.environ.get("PORT", "8765"))
 OUT.mkdir(parents=True, exist_ok=True)
 DOCS.mkdir(parents=True, exist_ok=True)
+
+
+FILL_FIXTURE_SRC = DOCS / "review-shots" / "closed-loop" / "fal-refs-fill-9"
+
+
+def ensure_fill_cap_fixtures() -> int:
+    """Copy docs fal-refs-fill-9/ref-{1..9}.jpg -> out/fill-cap-{i}.jpg when missing (o41)."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for i in range(1, 10):
+        dest = OUT / f"fill-cap-{i}.jpg"
+        if dest.is_file() and dest.stat().st_size > 0:
+            continue
+        src = FILL_FIXTURE_SRC / f"ref-{i}.jpg"
+        if not src.is_file():
+            continue
+        shutil.copy2(src, dest)
+        copied += 1
+    return copied
+
+
 
 CANVAS_STORE_PATH = Path(
     os.environ.get("CANVAS_STORE_PATH", str(ROOT / "data" / "canvas_projects.json"))
@@ -1572,6 +1594,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    n_fill = ensure_fill_cap_fixtures()
+    if n_fill:
+        print(f"o41 ensure_fill_cap_fixtures copied={n_fill}", flush=True)
     civ = providers.get("civitai")
     n = 0
     if civ:

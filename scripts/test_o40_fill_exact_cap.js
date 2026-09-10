@@ -11,10 +11,13 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o40-fill-exact-cap"), "html stamp o40");
-assert.ok(html.includes("storyboard.js?v=20260910-o40fillexactcap"), "cache bust o40");
-assert.ok(source.includes("v0821o40:"), "js header o40");
+assert.ok(html.includes("v0821o41-fill-real-fixtures"), "html stamp o41");
+assert.ok(html.includes("storyboard.js?v=20260910-o41fillrealfixtures"), "cache bust o41");
+assert.ok(source.includes("v0821o41:"), "js header o41");
+assert.ok(source.includes("v0821o40:"), "js header o40 lineage");
 assert.ok(source.includes("function fillRefSlotsToCap"), "fillRefSlotsToCap");
+assert.ok(source.includes("/out/fill-cap-"), "fill uses /out/fill-cap- fixtures");
+assert.ok(!source.includes("/out/o40-fill-"), "must not invent phantom o40-fill URLs");
 assert.ok(source.includes("countRefUrls(null, n).length"), "UI numerator outbound");
 assert.ok(!/const refCount = displayRefUrls\(n\)\.length/.test(source), "UI must not use displayRefUrls for N/cap");
 
@@ -121,7 +124,9 @@ function harness(backend) {
   assert.equal(api.countRefUrls(null, shot).length, 0, "outbound excludes 成片");
   assert.equal(api.displayRefUrls(shot).length, 1, "display includes 成片");
   const added = api.fillRefSlotsToCap(shot);
-  const sendN = api.countRefUrls(null, shot).length;
+  const fillUrls = api.countRefUrls(null, shot);
+  assert.ok(fillUrls.every((u) => /^\/out\/fill-cap-\d+\.jpg$/.test(u)), "all fill urls are real fill-cap jpg, got " + JSON.stringify(fillUrls));
+  const sendN = fillUrls.length;
   const dispN = api.displayRefUrls(shot).length;
   assert.equal(sendN, 5, "outbound exactly 5 after 灌满, got " + sendN);
   assert.ok(sendN <= 5, "never outbound > cap");
@@ -173,4 +178,4 @@ function harness(backend) {
   assert.equal(api.countRefUrls(null, shot).length, 5);
 }
 
-console.log("PASS o40 fill-exact-cap");
+console.log("PASS o40 fill-exact-cap + o41 real fixtures");
