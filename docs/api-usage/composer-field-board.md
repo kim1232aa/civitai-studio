@@ -46,9 +46,11 @@
 ### huggingface
 - **必露**：Hub mid、prompt、seed（显示 clamp）、steps/cfg、size  
 - **LoRA**：可露但标 **unverified**（发出≠加载）；OpenAI/bytes 通道 **unsupported** LoRA  
+- **Civitai LoRA / Fal `/lora`**：HF Router **不托管** → Composer 明文「HF Router 不托管该 Fal LoRA 端点，请换家 Fal」；**keep chips**；**不计 HF 闭环分**（Path A Fal-key 仅 `HF_ALLOW_FAL_TRANSPORT=1` 调试，仍 `transport=fal` / `scoresAsHfClosedLoop=false`）  
+- **真 HF 闭环**：Hub mid（FLUX.1-dev/schnell 等）→ `router.huggingface.co` + HF token；`submittedInput` **不得**带 `transport=fal`  
 - **i2v**：能力表 none → Composer **禁用并写不支持**  
 - **progress/cancel**：none/False → 禁假进度条  
-- **出站证据**：本轮无完整页↑证明
+- **出站证据**：本轮无完整页↑证明；`28216420` / Path A **不计** HF 分
 
 ### modelscope-ai / modelscope-cn
 - **必露**：owner/repo model、prompt、negative、size、seed、steps、guidance  

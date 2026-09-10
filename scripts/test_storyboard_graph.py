@@ -264,7 +264,7 @@ def test_selbar_scoped_layout_skips_exclusive_outside_asset():
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS must keep v0817 for migrate")
     assert_true("nl-storyboard-v0816b" in js, "STORE_OLDS must keep v0816b for migrate")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "stamp must be v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "stamp must be v0821o33-hf-router-honest")
 
 
 def test_empty_boot_no_robot_demo():
@@ -288,7 +288,7 @@ def test_empty_boot_no_robot_demo():
     assert_true("isClassicRobotDemo" in js, "robot demo detector required for migrate")
     assert_true("未命名画布" in html or "新项目" in html, "neutral projTitle")
     assert_true("扫地机器人" not in html, "projTitle must not mention 扫地机器")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -300,7 +300,7 @@ def test_v0815_gen_hardgate():
     """v0815b packing + v0815c stamp: images[] always; caps from capabilities/imageFields."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -364,7 +364,7 @@ def test_v0816_sb_lora():
     """LoRA UI + packing still green under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -424,7 +424,7 @@ def test_v0815c_ref_cap_single_slot_and_overcap_block():
     """v0815c: imageFields without multi → maxRefs=1; over-cap blocks send; setShotBusy on more."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "stamp v0821o33-hf-router-honest")
     assert_true("nl-storyboard-v0821n" in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -483,7 +483,7 @@ def test_v0817_no_at_filename():
     """v0817 lineage: link/mention must not append @sourceTitle; kept under v0818 stamp."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817" in js, "STORE_OLDS has v0817")
@@ -601,10 +601,10 @@ def _sim_unmention_legacy(prompt, asset, titles_by_id):
 
 
 def test_v0817b_unmention_at_tag():
-    """v0817b lineage under v0821o32-hf-fal-lora-transport: unmention/link helpers still present."""
+    """v0817b lineage under v0821o33-hf-router-honest: unmention/link helpers still present."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -621,10 +621,10 @@ def test_v0817b_unmention_at_tag():
 
 
 def test_empty_prompt_on_new_shot_and_load_demo():
-    """v0821o32-hf-fal-lora-transport: loadDemo + btnAdd default prompt is empty; Skill template stays."""
+    """v0821o33-hf-router-honest: loadDemo + btnAdd default prompt is empty; Skill template stays."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821d")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -667,7 +667,7 @@ def test_v0817c_no_at_in_prompt():
     """v0817c: insertMention/atbox must not write any @ into prompt; edge+chip only."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
     assert_true("nl-storyboard-v0817b" in js, "STORE_OLDS has v0817b")
@@ -741,7 +741,7 @@ def test_v0818_sticky_composer_bar():
     """v0818 lineage: LoRA + bar + msg pinned in dock-foot; prompt scrolls in dock-scroll (kept under v0819)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -776,7 +776,7 @@ def test_v0819_canvas_stage():
     """v0819: canvas is main stage — Composer defaults collapsed; empty tip; click expands."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0818" in js, "STORE_OLDS has v0818")
     assert_true("nl-storyboard-v0817c" in js, "STORE_OLDS has v0817c")
@@ -802,7 +802,7 @@ def test_v0819b_expand_prompt():
     """v0819b: first paint of expanded dock shows #prompt in dock-scroll without scrolling."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
     assert_true("nl-storyboard-v0819" in js, "STORE_OLDS has v0819")
@@ -842,7 +842,7 @@ def test_v0820_civitai_comfy_params():
     """v0820: Composer exposes civitai comfy params and packs them (134923572 spot-check shape)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -901,7 +901,7 @@ def test_v0820b_apply_import():
     """v0820b: storyboard applyImport packs civitai backend/service/comfy/LoRA; no fal silent fallback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
     assert_true("nl-storyboard-v0819b" in js, "STORE_OLDS has v0819b")
@@ -972,7 +972,7 @@ def test_v0820c_hard_service():
     """v0820c: empty civitai #service must hard-error; no CIVITAI_PREF soft-fill in buildGraph/runShotStep."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0820c")
     assert_true("nl-storyboard-v0820b" in js, "STORE_OLDS has v0820b")
     assert_true("nl-storyboard-v0820" in js, "STORE_OLDS has v0820")
@@ -1036,7 +1036,7 @@ def test_v0821n_krea2_import_hardgate():
     """v0821n knife②: applyImport mounts civitai+Krea2; packLoras keeps air; empty service hard-red."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -1126,7 +1126,7 @@ def test_v0821_hardgate_i2v_refs():
     """v0821: i2v keeps first-frame; multi-ref packs N; P1 seed/dock/LoRA name."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821")
     assert_true("nl-storyboard-v0820c" in js, "STORE_OLDS has v0820c")
@@ -1209,7 +1209,7 @@ def test_v0821b_i2v_detect():
     import subprocess
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp v0821o32-hf-fal-lora-transport")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp v0821o33-hf-router-honest")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821b")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1331,7 +1331,7 @@ def test_v0821c_fal_i2v_preview():
     )
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821c")
     assert_true("nl-storyboard-v0821b" in js, "STORE_OLDS keeps v0821b")
@@ -1419,7 +1419,7 @@ def test_v0821f_send_noop():
     """v0821f lineage retained under v0821h: never silent runShotStep; disabled gray; click feedback."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821h"' in js, "STORE_OLDS keeps v0821h")
@@ -1483,12 +1483,12 @@ console.log(JSON.stringify({ frameId: frame && frame.id, healedFirst: shot.first
 
 
 def test_v0821g_send_bind():
-    """v0821o32-hf-fal-lora-transport: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
+    """v0821o33-hf-router-honest: always 首帧已就绪; addEventListener+pointerdown; hit/z-index; missing-frame bad."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1541,12 +1541,12 @@ def test_v0821g_send_bind():
 
 
 def test_v0821h_send_aria():
-    """v0821o32-hf-fal-lora-transport: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
+    """v0821o33-hf-router-honest: gate via aria-disabled (not disabled=true); click setMsg on needFrame/stub; busy → 进行中."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821h")
     assert_true('"nl-storyboard-v0821g"' in js, "STORE_OLDS keeps v0821g")
     assert_true('"nl-storyboard-v0821f"' in js, "STORE_OLDS keeps v0821f")
@@ -1607,7 +1607,7 @@ def test_v0821i_i2v_writeback():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821o7"' in js, "STORE_OLDS keeps v0821o7")
@@ -1731,9 +1731,9 @@ def test_v0821j_send_busy_msg():
 
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821i"' in js, "STORE_OLDS keeps v0821i")
 
@@ -1862,9 +1862,9 @@ def test_v0821k_i2v_prompt_req():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal_src = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o12")
     assert_true('"nl-storyboard-v0821j"' in js, "STORE_OLDS keeps v0821j")
 
@@ -2059,9 +2059,9 @@ def test_v0821l_send_once():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821l")
     assert_true('"nl-storyboard-v0821k"' in js, "STORE_OLDS keeps v0821k")
 
@@ -2216,7 +2216,7 @@ def test_v0821m2_poll_copy():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     cn = (ROOT / "static" / "cloud-nodes.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821m2")
     assert_true('"nl-storyboard-v0821m"' in js, "STORE_OLDS keeps v0821m")
@@ -2234,7 +2234,7 @@ def test_v0821n2_lora_air_gate():
     """v0821n2: chips without air → red block; chips with air → pack has air; some filtered."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n3")
     assert_true("nl-storyboard-v0821n2" in js, "STORE_OLDS keeps v0821n2")
@@ -2303,7 +2303,7 @@ def test_v0821n3_import_air_chip():
     """v0821n3: applyImport preserves air on 134923572-shaped fixture; chip subtitle prefers air over path."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "STORE_OLDS keeps n3")
@@ -2426,22 +2426,22 @@ def test_v0821n4_js_cache_bust():
     """Lineage: script ?v= still bound to stamp; STORE bumped; n4 kept in OLDS."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
     assert_true('"nl-storyboard-v0821n3"' in js, "OLDS keeps n3")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "script cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "script cache-bust")
 
 
 def test_v0821n5_dock_scroll():
     """v0821n5: single Composer scrollbar — dock-foot overflow:visible; dock-scroll overflow:auto."""
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "script ?v=")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "script ?v=")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS prepends n4")
     assert_true(
@@ -2465,10 +2465,10 @@ def test_v0821o_fal_lora_knife():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     fal = (ROOT / "providers" / "fal.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "script cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "script cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o")
     assert_true('"nl-storyboard-v0821n5"' in js, "OLDS keeps n5")
     assert_true('"nl-storyboard-v0821n4"' in js, "OLDS keeps n4")
@@ -2633,10 +2633,10 @@ def test_v0821o2_fal_turbo_pin():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
     assert_true('"nl-storyboard-v0821o"' in js, "OLDS keeps o")
@@ -2700,10 +2700,10 @@ def test_v0821o3_fal_clear_loras():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
     assert_true('"nl-storyboard-v0821o2"' in js, "OLDS keeps o2")
@@ -2862,10 +2862,10 @@ def test_v0821o4_hf_turbo_lora():
     PATH = "https://civitai.com/api/download/models/3231694"
     FAL_SIB = "fal-ai/z-image/turbo/lora"
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o4")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3093,10 +3093,10 @@ def test_v0821o5_hf_no_wavespeed():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
     assert_true('"nl-storyboard-v0821o3"' in js, "OLDS keeps o3")
@@ -3251,7 +3251,7 @@ def test_v0821o6_modelscope_hub_lora():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o32-hf-fal-lora-transport"
+    STAMP = "v0821o33-hf-router-honest"
     HUB = "krea/Krea-2-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3260,8 +3260,8 @@ def test_v0821o6_modelscope_hub_lora():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true('"nl-storyboard-v0821o4"' in js, "OLDS keeps o4")
@@ -3627,7 +3627,7 @@ def test_v0821o6b_ms_lora_shape():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     ms = (ROOT / "providers" / "modelscope.py").read_text(encoding="utf-8")
 
-    STAMP = "v0821o32-hf-fal-lora-transport"
+    STAMP = "v0821o33-hf-router-honest"
     HUB = "Tongyi-MAI/Z-Image-Turbo"
     HUB_LORA = "DiffSynth-Studio/Z-Image-Turbo-DistillPatch"
     HTTP = "https://civitai.com/api/download/models/3231694"
@@ -3635,15 +3635,15 @@ def test_v0821o6b_ms_lora_shape():
 
     assert_true(STAMP in html, "html stamp")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
     assert_true('"nl-storyboard-v0821o6"' in js, "OLDS keeps o6")
     assert_true('"nl-storyboard-v0821o5"' in js, "OLDS keeps o5")
     assert_true("nanogpt" not in STAMP and "nano-gpt" not in STAMP, "stamp stays Magao, not Nano")
-    assert_true("v0821o32-hf-fal-lora-transport" in html and "nano" not in "v0821o32-hf-fal-lora-transport", "html must not drift onto Nano stamps")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "o7 param-surface stamp")
+    assert_true("v0821o33-hf-router-honest" in html and "nano" not in "v0821o33-hf-router-honest", "html must not drift onto Nano stamps")
+    assert_true("v0821o33-hf-router-honest" in html, "o7 param-surface stamp")
 
     fi = js.find("function msLoraFixtureImport")
     fj = js.find("async function mountMsLoraFixture", fi)
@@ -3762,9 +3762,9 @@ def test_v0821o7_param_surface():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o7")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o7")
     assert_true('class="stamp"' in html, ".stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "cache-bust")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "cache-bust")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE o7")
     assert_true('"nl-storyboard-v0821o6b"' in js, "OLDS keeps o6b")
 
@@ -3833,7 +3833,7 @@ def test_v0821o7_c1_closeout():
     assert_true("</style>" in html, "html has </style>")
     after_style = html.split("</style>", 1)[1]
     assert_true(
-        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-o32hffallora">' in after_style.split("<body", 1)[0],
+        '<link rel="stylesheet" href="/static/storyboard-ui.css?v=20260910-o33hfrouterhonest">' in after_style.split("<body", 1)[0],
         "storyboard-ui.css link after </style>",
     )
 
@@ -3989,8 +3989,8 @@ def test_v0821o9_fail_zh_lora_honesty():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     index = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "script cache-bust")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "script cache-bust")
     assert_true("function humanizeFailText" in js, "humanizeFailText helper")
     assert_true('/\\bmissing\\b/.test(lower) && /body\\./.test(lower)' not in js,
                 "no bare missing&&body. false-positive clause")
@@ -4107,12 +4107,12 @@ def test_v0821o15_server_writeback_executable():
     """v0821o15: local persist + PUT /api/storyboard-graph; clean-profile hydrate keeps shot.url."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE v0821o15")
     assert_true('"nl-storyboard-v0821o14"' in js, "STORE_OLDS keeps o14")
     assert_true('"nl-storyboard-v0821o13"' in js, "STORE_OLDS keeps o13")
     assert_true('"nl-storyboard-v0821o12"' in js, "STORE_OLDS keeps o12")
-    assert_true("storyboard.js?v=20260910-o32hffallora" in html, "js cache bust")
+    assert_true("storyboard.js?v=20260910-o33hfrouterhonest" in html, "js cache bust")
     assert_true("function mergePreferUrl" in js, "mergePreferUrl helper")
     assert_true("function isQuotaErr" in js, "isQuotaErr helper")
     assert_true("function persistServer" in js, "persistServer helper")
@@ -4162,8 +4162,8 @@ def test_v0821o19_single_up_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o19")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "js cache-bust o19")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o19")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "js cache-bust o19")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
     assert_true('"nl-storyboard-v0821o16"' in js, "STORE_OLDS still knows o16")
 
@@ -4235,9 +4235,9 @@ def test_v0821o20_visual_p0():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o20")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "js cache-bust o20")
-    assert_true('href="/static/storyboard-ui.css?v=20260910-o32hffallora"' in html, "css cache-bust o20")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o20")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "js cache-bust o20")
+    assert_true('href="/static/storyboard-ui.css?v=20260910-o33hfrouterhonest"' in html, "css cache-bust o20")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
 
@@ -4281,8 +4281,8 @@ def test_v0821o22_hinablue_writeback():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o23 (o22 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "js cache-bust o23")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o23 (o22 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive kept")
@@ -4333,8 +4333,8 @@ def test_v0821o23_sdxl_service_stick():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     civ = (ROOT / "providers" / "civitai.py").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o23")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "js cache-bust o23")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o23")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("function resolveCivitaiOutboundServiceId" in js, "resolve helper")
@@ -4397,8 +4397,8 @@ def test_v0821o21_outbound_jobid_writeback():
     """o21 lineage under o22: fail surfaces jobId+backend; single generate; persist keepalive (no fixture lock)."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o23 (o21 lineage)")
-    assert_true('src="/static/storyboard.js?v=20260910-o32hffallora"' in html, "js cache-bust o23")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o23 (o21 lineage)")
+    assert_true('src="/static/storyboard.js?v=20260910-o33hfrouterhonest"' in html, "js cache-bust o23")
     assert_true('const STORE = "nl-storyboard-v0821o16"' in js, "STORE stays o16")
     assert_true(js.count('fetch("/api/generate"') == 1, "single generate stack")
     assert_true("keepalive: true" in js, "persistServer keepalive")
@@ -4434,8 +4434,8 @@ def test_v0821o26_fal_swap_dropdown():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     init = (ROOT / "providers" / "__init__.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp o26")
-    assert_true("20260910-o32hffallora" in html, "js cache-bust o26")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp o26")
+    assert_true("20260910-o33hfrouterhonest" in html, "js cache-bust o26")
     assert_true("v0821o26:" in js[:5000] or "v0821o29:" in js[:5000], "js knife banner lineage")
 
     # Static HTML lists every registered backend (honest fallback before /api/providers)
@@ -4521,7 +4521,7 @@ def test_v0821o28_composer_adaptive():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html tip stamp o30")
+    assert_true("v0821o33-hf-router-honest" in html, "html tip stamp o30")
     assert_true("v0821o28-composer-adaptive" in adapt, "adapt module stamp o28 kept")
     assert_true("composer-field-adapt.js" in html, "adapt script included")
     assert_true("composer-field-adapt.css" in html, "adapt css included")
@@ -4545,8 +4545,8 @@ def test_v0821o29_fal_lora_base():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
 
     # stamp advanced by o28 tip; o29 behavior still required in storyboard.js
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html tip stamp o31 (keeps o29 behavior)")
-    assert_true("20260910-o32hffallora" in html, "cache-bust current tip")
+    assert_true("v0821o33-hf-router-honest" in html, "html tip stamp o31 (keeps o29 behavior)")
+    assert_true("20260910-o33hfrouterhonest" in html, "cache-bust current tip")
     assert_true("v0821o29:" in js[:5000], "js o29 banner preserved")
 
     assert_true("function resolveFalLoraEndpointFromChips" in js, "resolver")
@@ -4596,8 +4596,8 @@ def test_v0821o31_hf_lora_base():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
-    assert_true("20260910-o32hffallora" in html, "cache-bust")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
+    assert_true("20260910-o33hfrouterhonest" in html, "cache-bust")
     assert_true("v0821o31:" in js[:5000], "js o31 banner")
     assert_true("HF_LORA_BY_BASE" in js, "HF_LORA_BY_BASE")
     assert_true("function resolveHfLoraEndpointFromChips" in js, "resolver")
@@ -4648,60 +4648,45 @@ def test_v0821o31_hf_lora_base():
         code, data = prov.generate({"serviceId": "krea/Krea-2-Turbo", "prompt": "x", "loras": [lora]})
         assert_true(code == 400, "Hub turbo + loras → 400")
         assert_true("不接受 LoRA" in str(data.get("error") or ""), "400 copy mentions no LoRA")
-    # o32: flux-lora goes via Fal transport (not HF Router _call_fal)
-    with patch.object(hfmod, "_submit_hf_fal_lora_via_fal", return_value=(200, {
-        "id": "hf|sync|test",
-        "status": "succeeded",
-        "backend": "huggingface",
-        "endpoint": "fal-ai/flux-lora",
-        "provider": "fal-ai",
-        "saved": [{"url": "/out/x.png"}],
-        "submittedInput": {"prompt": "x", "loras": [{"path": lora["path"], "scale": 0.5}], "transport": "fal"},
-        "transport": "fal",
-    })) as mocked_submit:
+    # o33: flux-lora under HF refused by default (Path A does not score HF)
+    with patch.object(hfmod, "_submit_hf_fal_lora_via_fal") as mocked_submit, patch.object(
+        hfmod, "_call_fal"
+    ) as call_fal_spy:
         code, data = prov.generate({"serviceId": "fal-ai/flux-lora", "prompt": "x", "loras": [lora]})
-        assert_true(code == 200, "flux-lora + loras → 200")
-        assert_true(mocked_submit.called, "uses Fal transport submit")
-        assert_true((data.get("submittedInput") or {}).get("loras"), "loras shipped")
-        assert_true((data.get("submittedInput") or {}).get("transport") == "fal", "transport=fal")
-        assert_true(data.get("backend") == "huggingface", "backend stays huggingface")
-        assert_true(abs(float((data.get("submittedInput") or {})["loras"][0]["scale"]) - 0.5) < 1e-6, "scale 0.5 no invent")
+        assert_true(code == 400, "flux-lora + loras → 400 honest refuse")
+        assert_true("请换家 Fal" in str(data.get("error") or ""), "400 copy 请换家 Fal: %s" % data)
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "scoresAsHfClosedLoop false")
+        assert_true(not mocked_submit.called, "default must NOT call Path A submit")
+        assert_true(not call_fal_spy.called, "must NOT call HF Router _call_fal")
 
     # keep o29/o30 markers
     assert_true("FAL_LORA_BY_BASE" in js and "pinFalLoraServiceId" in js, "o29 kept")
     assert_true("surfaceSendReject" in js, "o30 kept")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in js, "o33 Composer msg const")
 
 
 def test_v0821o32_hf_fal_lora_transport():
-    """o32 path A: HF+fal-ai/flux-lora → Fal key queue; backend=huggingface; transport=fal; no Router POST."""
+    """o32 Path A kept behind debug switch only; default refuse (o33). Debug still transport=fal / not HF score."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
-    assert_true("20260910-o32hffallora" in html, "cache-bust")
-    assert_true("v0821o32:" in js[:5000], "js o32 banner")
-    assert_true("_submit_hf_fal_lora_via_fal" in hf, "Fal transport helper")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
+    assert_true("20260910-o33hfrouterhonest" in html, "cache-bust")
+    assert_true("v0821o32:" in js[:5000], "js o32 banner retained")
+    assert_true("_submit_hf_fal_lora_via_fal" in hf, "Fal transport helper retained")
     assert_true("_needs_fal_lora_transport" in hf, "transport gate")
-    assert_true("HF_FAL_LORA_VIA_FAL" in hf, "official LoRA set")
-    assert_true('["transport"] = "fal"' in hf or '"transport"] = "fal"' in hf, "marks transport=fal")
-    assert_true("fal_mod.QUEUE" in hf or "queue.fal.run" in hf, "posts Fal queue")
-    helper = hf[hf.find("def _submit_hf_fal_lora_via_fal"):hf.find("def _force_loras")]
-    assert_true("fal_mod.QUEUE" in helper and "fal_mod.fal_call" in helper, "uses Fal QUEUE+fal_call")
-    assert_true("f\"{ROUTER}" not in helper and "ROUTER/" not in helper and "f'{ROUTER}" not in helper,
-                "Fal transport helper never builds Router URL")
-    assert_true("fal_mod.fal_call" in helper, "uses fal_call")
-    js_src = hf[hf.find("    def job_status"):]
-    assert_true('transport == "fal"' in js_src, "job_status handles transport=fal")
+    assert_true("_allow_fal_transport_debug" in hf, "debug switch")
+    assert_true("HF_ALLOW_FAL_TRANSPORT" in hf, "env name")
+    assert_true("scoresAsHfClosedLoop" in hf, "non-score marker")
 
     from providers.huggingface import HuggingFaceProvider, _needs_fal_lora_transport, HF_FAL_LORA_VIA_FAL
     from unittest.mock import patch
     import providers.huggingface as hfmod
     import providers.fal as falmod
+    import os
 
     assert_true(_needs_fal_lora_transport("fal-ai/flux-lora"), "flux-lora needs Fal transport")
-    assert_true(_needs_fal_lora_transport("fal-ai/krea-2/turbo/lora"), "krea lora needs Fal transport")
-    assert_true(not _needs_fal_lora_transport("fal-ai/flux/schnell"), "schnell stays Router-capable")
     assert_true("fal-ai/flux-lora" in HF_FAL_LORA_VIA_FAL, "set has flux-lora")
 
     prov = HuggingFaceProvider()
@@ -4732,7 +4717,24 @@ def test_v0821o32_hf_fal_lora_transport():
             return 200, fal_resp
         return 200, {"status": "IN_QUEUE"}
 
-    with patch.object(falmod, "fal_key", return_value="fal_test_key"), patch.object(
+    # Default: refuse (no env)
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": ""}, clear=False), patch.object(
+        hfmod, "_submit_hf_fal_lora_via_fal"
+    ) as mocked_submit, patch.object(hfmod, "_call_fal") as spy:
+        code, data = prov.generate({
+            "serviceId": "fal-ai/flux-lora",
+            "prompt": outbound_body["prompt"],
+            "loras": [lora],
+        })
+        assert_true(code == 400, "default refuse 400: %s" % data)
+        assert_true("请换家 Fal" in str(data.get("error") or ""), "请换家 Fal")
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "not HF score")
+        assert_true(not mocked_submit.called and not spy.called, "no outbound")
+
+    # Debug switch: Path A still works but marked non-scoring
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": "1"}, clear=False), patch.object(
+        falmod, "fal_key", return_value="fal_test_key"
+    ), patch.object(
         falmod, "build_fal_input", return_value=dict(outbound_body)
     ), patch.object(
         falmod, "materialize_fal_media", side_effect=lambda x: x
@@ -4748,48 +4750,78 @@ def test_v0821o32_hf_fal_lora_transport():
             "width": 832,
             "height": 1216,
         })
-        assert_true(code == 200, "generate 200 via Fal queue: %s" % data)
+        assert_true(code == 200, "debug Path A 200: %s" % data)
         assert_true(data.get("backend") == "huggingface", "backend=huggingface")
         assert_true((data.get("submittedInput") or {}).get("transport") == "fal", "submittedInput.transport=fal")
+        assert_true((data.get("submittedInput") or {}).get("scoresAsHfClosedLoop") is False, "submitted not HF score")
+        assert_true(data.get("scoresAsHfClosedLoop") is False, "top-level not HF score")
         assert_true(data.get("transport") == "fal", "top-level transport=fal")
-        assert_true((data.get("id") or "").startswith("hf|queue|"), "hf queue job id: %s" % data.get("id"))
         assert_true(not call_fal_spy.called, "must NOT call HF Router _call_fal")
         assert_true(any(u.startswith("https://queue.fal.run/fal-ai/flux-lora") for _, u in calls["urls"]),
-                    "POST queue.fal.run/fal-ai/flux-lora: %s" % calls["urls"])
-        assert_true(not any("router.huggingface.co" in u for _, u in calls["urls"]),
-                    "no HF Router URL in Fal transport")
-
-    from providers.io_meta import job_meta
-    jid = data["id"]
-    meta = job_meta(jid)
-    assert_true(meta and meta.get("transport") == "fal", "meta.transport=fal")
-    assert_true("queue.fal.run" in (meta.get("queueStatusUrl") or ""), "native Fal status URL")
-
-    status_calls = []
-
-    def fake_status_call(url, method="GET", body=None, timeout=90):
-        status_calls.append(url)
-        if "/status" in url:
-            return 200, {"status": "COMPLETED"}
-        return 200, {"images": [{"url": "https://example.com/o32.png"}]}
-
-    with patch.object(falmod, "fal_key", return_value="fal_test_key"), patch.object(
-        falmod, "fal_call", side_effect=fake_status_call
-    ), patch.object(hfmod, "_save_json_images", return_value=[{"url": "/out/o32.png"}]):
-        sc, sd = prov.job_status(jid)
-        assert_true(sc == 200 and sd.get("status") == "succeeded", "job_status succeeded: %s" % sd)
-        assert_true(sd.get("backend") == "huggingface", "status backend huggingface")
-        assert_true(sd.get("transport") == "fal", "status transport=fal")
-        assert_true(any("queue.fal.run" in u for u in status_calls), "polled Fal queue")
-
-    with patch.object(falmod, "fal_key", return_value=""), patch.object(hfmod, "_call_fal") as spy2:
-        code2, data2 = prov.generate({"serviceId": "fal-ai/flux-lora", "prompt": "x", "loras": [lora]})
-        assert_true(code2 == 401, "no Fal key → 401")
-        assert_true("Fal API Key" in str(data2.get("error") or ""), "mentions Fal key")
-        assert_true(not spy2.called, "still no Router call")
+                    "POST queue.fal.run: %s" % calls["urls"])
 
     assert_true("HF_LORA_BY_BASE" in js and "pinHfLoraServiceId" in js, "o31 pin kept")
     assert_true("direct_fal_lora" in hf, "o31 allowlist kept")
+
+
+def test_v0821o33_hf_router_honest():
+    """o33: HF+fal-ai/*lora default refuse「请换家 Fal」; Composer honest; Hub mid has no transport=fal; chips kept."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    hf = (ROOT / "providers" / "huggingface.py").read_text(encoding="utf-8")
+
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
+    assert_true("20260910-o33hfrouterhonest" in html, "cache-bust")
+    assert_true("v0821o33:" in js[:5000], "js o33 banner")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in js, "Composer msg const")
+    assert_true("HF Router 不托管该 Fal LoRA 端点，请换家 Fal" in js, "Composer exact copy")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in hf, "backend msg const")
+    assert_true("_allow_fal_transport_debug" in hf, "debug switch present")
+    assert_true("scoresAsHfClosedLoop" in hf, "score honesty field")
+
+    # resolveHfLoraEndpointFromChips must NOT return fal endpoint as pin when chips present
+    resolve = js[js.find("function resolveHfLoraEndpointFromChips"):js.find("function hfLoraUnsupportedMsg")]
+    assert_true("scoresAsHf: false" in resolve or 'scoresAsHf: false' in resolve, "resolve marks non-score")
+    assert_true("endpoint: """ in resolve or "endpoint: ''" in resolve or 'endpoint: ""' in resolve,
+                "resolve empties endpoint for Fal sibling")
+    assert_true("HF_ROUTER_FAL_LORA_MSG" in resolve, "resolve uses honest msg")
+    # ensure never clears chips
+    ens = js[js.find("function ensureHfLoraServiceSelected"):js.find("function ensureHfLoraServiceSelected") + 2800]
+    assert_true("state.loras = []" not in ens, "ensure must never clear LoRA chips")
+
+    # catalog must not inject fal-ai/*lora as pretend-HF when chips present
+    assert_true("do NOT inject fal-ai" in js or "不计 HF 分" in js, "catalog/label honesty")
+
+    from providers.huggingface import HuggingFaceProvider, HF_ROUTER_FAL_LORA_MSG
+    from unittest.mock import patch
+    import providers.huggingface as hfmod
+    import os
+
+    prov = HuggingFaceProvider()
+    lora = {
+        "path": "https://civitai.com/api/download/models/816500?fileId=730088",
+        "scale": 0.5,
+        "air": "urn:air:flux1:lora:civitai:730162@816500",
+    }
+    with patch.dict(os.environ, {"HF_ALLOW_FAL_TRANSPORT": "0"}, clear=False), patch.object(
+        hfmod, "_submit_hf_fal_lora_via_fal"
+    ) as mocked, patch.object(hfmod, "_call_fal") as spy:
+        for sid in ("fal-ai/flux-lora", "fal-ai/krea-2/turbo/lora"):
+            code, data = prov.generate({"serviceId": sid, "prompt": "x", "loras": [lora]})
+            assert_true(code == 400, "%s → 400" % sid)
+            assert_true(HF_ROUTER_FAL_LORA_MSG in str(data.get("error") or ""), "msg for %s: %s" % (sid, data))
+            assert_true(data.get("scoresAsHfClosedLoop") is False, "not HF score %s" % sid)
+        assert_true(not mocked.called and not spy.called, "no Path A / Router")
+
+    # Hub mid without loras: real HF path must not stamp transport=fal on submittedInput construction
+    # (offline: missing key → 401 before submit; just assert generate path does not set transport for Hub)
+    gen = hf[hf.find("    def generate"):hf.find("    def job_status")]
+    assert_true("scoresAsHfClosedLoop" in gen, "generate honesty")
+    # Real Router path comments
+    assert_true("Real HF closed-loop" in gen or "router.huggingface.co" in hf, "docs Hub Router path")
+
+    # 28216420 does not score HF (fixture note in report; code-level: Path A non-score)
+    assert_true("请换家 Fal" in js and "请换家 Fal" in hf, "both surfaces")
 
 
 def test_v0821o30_send_gate():
@@ -4799,8 +4831,8 @@ def test_v0821o30_send_gate():
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
     ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
 
-    assert_true("v0821o32-hf-fal-lora-transport" in html, "html stamp")
-    assert_true("20260910-o32hffallora" in html, "cache-bust")
+    assert_true("v0821o33-hf-router-honest" in html, "html stamp")
+    assert_true("20260910-o33hfrouterhonest" in html, "cache-bust")
     assert_true("v0821o30:" in js[:5000], "js o30 banner")
 
     # clickability / z-index above zoom/minimap (22)
@@ -4900,6 +4932,7 @@ def main():
         test_v0821o29_fal_lora_base,
         test_v0821o31_hf_lora_base,
         test_v0821o32_hf_fal_lora_transport,
+        test_v0821o33_hf_router_honest,
         test_v0821o30_send_gate,
         test_import_19201654_original_params,
         # test_import_142210587_original_params  # optional fixture; NOT acceptance

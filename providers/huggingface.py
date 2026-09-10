@@ -423,11 +423,24 @@ def _maybe_lora_pid(pid: str, payload: dict) -> str:
 
 
 # Official Fal LoRA apps are NOT in HF Inference Providers catalog (Router 400
-# "Model not supported by provider fal-ai"). o32: outbound via Fal key + queue.fal.run.
+# "Model not supported by provider fal-ai").
+# v0821o33: Path A (Fal key under backend=huggingface) does NOT score as HF closed-loop.
+# Default: refuse with honest「请换家 Fal」. Debug-only: HF_ALLOW_FAL_TRANSPORT=1 re-enables
+# o32 Fal queue outbound (still transport=fal / scoresAsHfClosedLoop=false).
 HF_FAL_LORA_VIA_FAL = frozenset({
     "fal-ai/flux-lora",
     "fal-ai/krea-2/turbo/lora",
 })
+
+HF_ROUTER_FAL_LORA_MSG = (
+    "HF Router 不托管该 Fal LoRA 端点，请换家 Fal"
+)
+
+
+def _allow_fal_transport_debug() -> bool:
+    """Debug switch only — Path A never counts as HF provider closed-loop score."""
+    v = (os.environ.get("HF_ALLOW_FAL_TRANSPORT") or "").strip().lower()
+    return v in ("1", "true", "yes", "on", "debug")
 
 
 def _needs_fal_lora_transport(pid: str) -> bool:
@@ -450,10 +463,11 @@ def _fal_native_queue_url(value):
 
 
 def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
-    """v0821o32 path A: HF backend + official Fal LoRA → Fal key / queue.fal.run.
+    """v0821o32/o33 path A (DEBUG ONLY): HF backend + Fal LoRA → Fal key / queue.fal.run.
 
-    Job meta keeps backend=huggingface; submittedInput.transport=fal (honest label).
-    Never POST router.huggingface.co/fal-ai/<lora> (catalog rejects).
+    Does NOT score as HF provider closed-loop. submittedInput.transport=fal;
+    scoresAsHfClosedLoop=false. Never POST router.huggingface.co/fal-ai/<lora>.
+    Call only when HF_ALLOW_FAL_TRANSPORT=1 — default generate() refuses with 请换家 Fal.
     """
     from . import fal as fal_mod
     eid = (eid or "").lstrip("/").replace("fal.ai/", "fal-ai/", 1)
@@ -474,6 +488,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
         data = {"error": str(data)}
     submitted = dict(outbound) if isinstance(outbound, dict) else {"raw": outbound}
     submitted["transport"] = "fal"
+    submitted["scoresAsHfClosedLoop"] = False
     jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
     meta = {
         "backend": "huggingface",
@@ -484,6 +499,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
         "jobId": jid,
         "provider": "fal-ai",
         "transport": "fal",
+        "scoresAsHfClosedLoop": False,
         "submittedInput": submitted,
     }
     if code >= 400 or data.get("error"):
@@ -492,6 +508,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
             data["backend"] = "huggingface"
             data["submittedInput"] = submitted
             data["transport"] = "fal"
+            data["scoresAsHfClosedLoop"] = False
         return (code if code >= 400 else 502), data
     if data.get("request_id"):
         try:
@@ -531,6 +548,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
             "provider": "fal-ai",
             "submittedInput": submitted,
             "transport": "fal",
+            "scoresAsHfClosedLoop": False,
         }
     saved = []
     try:
@@ -562,6 +580,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
             "saved": saved,
             "submittedInput": submitted,
             "transport": "fal",
+            "scoresAsHfClosedLoop": False,
         }
         remember_job(jid, {**meta, "result": out})
         return 200, out
@@ -570,6 +589,7 @@ def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
         "backend": "huggingface",
         "submittedInput": submitted,
         "transport": "fal",
+        "scoresAsHfClosedLoop": False,
     }
 
 
@@ -1250,9 +1270,10 @@ class HuggingFaceProvider(Provider):
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
             return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
-        # v0821o31: official Fal LoRA endpoints (flux-lora / */lora) may be selected on HF
-        # when payload carries loras[]. Never accept bare fal-ai/krea-2/turbo (no LoRA).
-        # v0821o32: those endpoints are NOT on HF Router — outbound via Fal key + queue (transport=fal).
+        # v0821o31: official Fal LoRA endpoints (flux-lora / */lora) may appear when chips present.
+        # v0821o32: those endpoints are NOT on HF Router (catalog rejects).
+        # v0821o33: Path A does NOT score HF — default refuse「请换家 Fal」; debug HF_ALLOW_FAL_TRANSPORT=1 only.
+        # Real HF closed-loop = Hub mid → router.huggingface.co + HF token (no transport=fal).
         from .fal import fal_supports_lora, find_model as fal_find_model
         direct_fal_lora = None
         if (sid or "").startswith(("fal-ai/", "fal.ai/")):
@@ -1262,11 +1283,22 @@ class HuggingFaceProvider(Provider):
             else:
                 return 400, {
                     "error": "当前选中的是不接受 LoRA 的 Fal 服务，不能发给 Hugging Face。"
-                    "有 LoRA 时请选 fal-ai/flux-lora 等；无 LoRA 时请选 Hub 模型。",
+                    "有 LoRA 时请换家 Fal；无 LoRA 时请选 Hub 模型（FLUX.1-dev/schnell 等）。",
                     "backend": self.id,
                     "serviceId": sid,
+                    "scoresAsHfClosedLoop": False,
                 }
         if direct_fal_lora and _needs_fal_lora_transport(direct_fal_lora):
+            if not _allow_fal_transport_debug():
+                return 400, {
+                    "error": HF_ROUTER_FAL_LORA_MSG,
+                    "backend": self.id,
+                    "serviceId": direct_fal_lora,
+                    "transport": "fal",
+                    "scoresAsHfClosedLoop": False,
+                    "hint": "换 backend=fal 使用同一端点；或选 Hub mid 走 Router（无 Civitai Fal-/lora）。"
+                    "调试可设 HF_ALLOW_FAL_TRANSPORT=1（仍不计 HF 闭环分）。",
+                }
             return _submit_hf_fal_lora_via_fal(direct_fal_lora, payload or {})
         keys = hf_keys()
         if not keys:
@@ -1289,10 +1321,12 @@ class HuggingFaceProvider(Provider):
                 prov, pid, style = candidates[0]
                 if style == "fal" and not fal_supports_lora(fal_find_model(pid) or {"id": pid}):
                     return 400, {
-                        "error": f"HF 映射端点 {pid} 不接受 LoRA，不能静默换 sibling；请改选 fal-ai/flux-lora 等",
+                        "error": f"HF 映射端点 {pid} 不接受 LoRA，不能静默换 sibling；"
+                        f"{HF_ROUTER_FAL_LORA_MSG}",
                         "backend": self.id,
                         "serviceId": mid,
                         "mapped": pid,
+                        "scoresAsHfClosedLoop": False,
                     }
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
