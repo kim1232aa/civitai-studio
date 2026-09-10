@@ -3245,11 +3245,13 @@
     if (/feature_not_supported/.test(lower) || /\bfeature not supported\b/.test(lower)) {
       return "当前端点不支持该功能";
     }
-    // missing / Field required — body.prompt etc.
+    // Field required / pydantic type:"missing" / Fal loc body.<field>: …
+    // Do NOT use bare \bmissing\b + body. — false-positives prose like
+    // "missing dependency in body.build" or "User is missing … body.".
     if (/\bfield required\b/.test(lower)
         || /\btype["']?\s*:\s*["']?missing\b/.test(lower)
         || /is required but was not provided/.test(lower)
-        || /\bmissing\b/.test(lower) && /body\./.test(lower)) {
+        || /\bbody\.\w+\s*:\s*field required\b/.test(lower)) {
       if (/prompt/.test(lower)) return "缺少提示词（服务端校验）";
       if (/image|frame|start_image|first_frame/.test(lower)) return "缺少图片输入（服务端校验）";
       return "请求字段缺失（服务端校验）";
