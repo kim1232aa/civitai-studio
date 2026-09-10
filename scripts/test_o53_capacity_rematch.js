@@ -10,10 +10,12 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o53-capacity-rematch"), "html stamp");
-assert.ok(html.includes("20260911-o53bcapacityrematch") || html.includes("o53capacityrematch"), "cache bust");
+assert.ok(html.includes("v0821o53c-capacity-rematch-click") || html.includes("v0821o53-capacity-rematch"), "html stamp");
+assert.ok(html.includes("o53ccapacityrematchclick") || html.includes("o53bcapacityrematch") || html.includes("o53capacityrematch"), "cache bust");
 assert.ok(source.includes("function capacityRematchId"), "capacityRematchId");
 assert.ok(source.includes('data-act="capacity-rematch"'), "一键匹配");
+assert.ok(source.includes('act.dataset.act === "capacity-rematch"'), "click handler");
+assert.ok(source.includes("_capacityRematchLock") || source.includes("capacity rematch lock"), "pin lock");
 assert.ok(source.includes("Fal t2i with empty imageFields"), "fal eats=false");
 assert.ok(source.includes('"/image-to-image"'), "image-to-image sibling");
 assert.ok(source.includes("拒新连线（不砍旧线）"), "link gate");

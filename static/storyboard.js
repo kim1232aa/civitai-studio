@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o53c: wire capacity-rematch click + keep pin on capacity-ok endpoint; stamp v0821o53c-capacity-rematch-click
   // v0821o53: capacity rematch when N>maxRefs (catalog eats+cap≥N; no silent unlink); stamp v0821o53-capacity-rematch
   // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
@@ -3637,6 +3638,13 @@
       }
       return;
     }
+    if (act.dataset.act === "capacity-rematch") {
+      if (!applyCapacityRematch()) {
+        /* applyCapacityRematch already setMsg */
+      }
+      try { persist(); } catch (_) {}
+      return;
+    }
     if (act.dataset.act === "fill-refs-cap") {
       const shot = nodeById(state.selected);
       if (!shot || shot.kind !== "shot") return;
@@ -6060,8 +6068,20 @@
     if (!sel) return false;
     ensureSelectOpt(sel, want);
     sel.value = want;
-    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
     shot.serviceId = want;
+    // o53c: keep Fal LoRA pin on capacity-ok endpoint — never re-pin flux-lora over rematch
+    if ((typeof currentBackend === "function" ? currentBackend() : "") === "fal" || ($("backend") && $("backend").value === "fal")) {
+      state._pinFalLoraService = want;
+      state._pendingService = want;
+      state._capacityRematchLock = want;
+    }
+    try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    // If pin path rewrote service back, force rematch target once more
+    if (sel.value !== want && state.catalogById[want]) {
+      sel.value = want;
+      shot.serviceId = want;
+      state._pinFalLoraService = want;
+    }
     renderDock();
     syncParamSurface();
     const row = state.catalogById[want];
@@ -8052,6 +8072,22 @@
     if (be !== "fal") return;
     const sel = $("service");
     if (!sel) return;
+    // o53c: capacity rematch lock / already capacity-ok → do not re-pin flux-lora
+    const lock = state._capacityRematchLock;
+    if (lock && sel.value === lock) {
+      state._pinFalLoraService = lock;
+      return;
+    }
+    const shotOk = nodeById(state.selected);
+    if (shotOk && shotOk.kind === "shot") {
+      const nOk = countRefUrls(null, shotOk).length;
+      const itOk = (state.catalogById && state.catalogById[sel.value]) || catalogItemForService();
+      const resOk = resolveRefCaps(itOk);
+      if (nOk && resOk.known && nOk <= resOk.maxRefs && catalogEatsRefs(itOk)) {
+        state._pinFalLoraService = sel.value;
+        return;
+      }
+    }
     const resolved = resolveFalLoraEndpointFromChips();
     state._falLoraUnsupported = resolved.reason || "";
     if (resolved.reason) {
