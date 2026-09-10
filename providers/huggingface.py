@@ -422,6 +422,157 @@ def _maybe_lora_pid(pid: str, payload: dict) -> str:
     return (pid or "").lstrip("/")
 
 
+# Official Fal LoRA apps are NOT in HF Inference Providers catalog (Router 400
+# "Model not supported by provider fal-ai"). o32: outbound via Fal key + queue.fal.run.
+HF_FAL_LORA_VIA_FAL = frozenset({
+    "fal-ai/flux-lora",
+    "fal-ai/krea-2/turbo/lora",
+})
+
+
+def _needs_fal_lora_transport(pid: str) -> bool:
+    p = (pid or "").lstrip("/").replace("fal.ai/", "fal-ai/", 1)
+    if p in HF_FAL_LORA_VIA_FAL:
+        return True
+    # Any fal-ai/*/lora sibling — Router does not host these (matches _maybe_lora_pid).
+    return p.startswith("fal-ai/") and ("/lora" in p or p.endswith("-lora") or p == "fal-ai/lora")
+
+
+def _fal_native_queue_url(value):
+    """Keep native Fal queue URLs for transport=fal (do not rewrite to HF Router)."""
+    parsed = urlsplit(value) if isinstance(value, str) else None
+    if not parsed or parsed.scheme != "https" or parsed.netloc not in ("queue.fal.run", "fal.run"):
+        raise ValueError("Fal 传输任务的队列地址无效")
+    path = parsed.path or ""
+    if "/requests/" not in path or ".." in path.split("/"):
+        raise ValueError("Fal 传输任务缺少合法请求路径")
+    return value
+
+
+def _submit_hf_fal_lora_via_fal(eid: str, payload: dict):
+    """v0821o32 path A: HF backend + official Fal LoRA → Fal key / queue.fal.run.
+
+    Job meta keeps backend=huggingface; submittedInput.transport=fal (honest label).
+    Never POST router.huggingface.co/fal-ai/<lora> (catalog rejects).
+    """
+    from . import fal as fal_mod
+    eid = (eid or "").lstrip("/").replace("fal.ai/", "fal-ai/", 1)
+    if not fal_mod.fal_key():
+        return 401, {
+            "error": "没有 Fal API Key（HF Router 不托管该 LoRA 端点，出站需走 Fal）",
+            "backend": "huggingface",
+            "serviceId": eid,
+        }
+    try:
+        pl = dict(payload or {}, serviceId=eid)
+        inp = fal_mod.build_fal_input(pl)
+        outbound = fal_mod.materialize_fal_media(inp)
+    except ValueError as e:
+        return 400, {"error": str(e), "backend": "huggingface", "endpoint": eid}
+    code, data = fal_mod.fal_call(f"{fal_mod.QUEUE}/{eid}", method="POST", body=outbound)
+    if not isinstance(data, dict):
+        data = {"error": str(data)}
+    submitted = dict(outbound) if isinstance(outbound, dict) else {"raw": outbound}
+    submitted["transport"] = "fal"
+    jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
+    meta = {
+        "backend": "huggingface",
+        "serviceId": eid,
+        "prompt": (payload or {}).get("prompt"),
+        "negativePrompt": (payload or {}).get("negativePrompt"),
+        "seed": (payload or {}).get("seed"),
+        "jobId": jid,
+        "provider": "fal-ai",
+        "transport": "fal",
+        "submittedInput": submitted,
+    }
+    if code >= 400 or data.get("error"):
+        if isinstance(data, dict):
+            data.setdefault("error", extract_error(data, f"HTTP {code}"))
+            data["backend"] = "huggingface"
+            data["submittedInput"] = submitted
+            data["transport"] = "fal"
+        return (code if code >= 400 else 502), data
+    if data.get("request_id"):
+        try:
+            result_url = _fal_native_queue_url(data.get("response_url"))
+            if data.get("status_url"):
+                status_url = _fal_native_queue_url(data["status_url"])
+            else:
+                # Fal response_url is .../requests/{id}; status is sibling /status
+                status_url = result_url.rstrip("/") + "/status"
+                status_url = _fal_native_queue_url(status_url)
+        except ValueError as exc:
+            return 502, {"error": str(exc), "backend": "huggingface", "provider": "fal-ai",
+                         "submittedInput": submitted}
+        jid = jid.replace("|sync|", "|queue|")
+        meta.update(
+            jobId=jid,
+            queueResultUrl=result_url,
+            queueStatusUrl=status_url,
+            falRequestId=data.get("request_id"),
+        )
+        remember_job(jid, meta)
+        try:
+            fal_mod._remember_job(data.get("request_id"), {
+                "endpoint": eid,
+                "status_url": data.get("status_url"),
+                "response_url": data.get("response_url"),
+                "cancel_url": data.get("cancel_url"),
+                "submittedInput": submitted,
+            })
+        except Exception:
+            pass
+        return 200, {
+            "id": jid,
+            "status": "pending",
+            "backend": "huggingface",
+            "endpoint": eid,
+            "provider": "fal-ai",
+            "submittedInput": submitted,
+            "transport": "fal",
+        }
+    saved = []
+    try:
+        saved = _save_json_images(data, jid, meta=meta)
+    except Exception as exc:
+        return 502, {
+            "error": f"HF/Fal 媒体保存失败：{exc}",
+            "backend": "huggingface",
+            "submittedInput": submitted,
+        }
+    if not saved:
+        urls = collect_urls(data)
+        if urls:
+            try:
+                saved = save_media_urls(urls, jid, meta=meta)
+            except Exception as exc:
+                return 502, {
+                    "error": f"HF/Fal 媒体保存失败：{exc}",
+                    "backend": "huggingface",
+                    "submittedInput": submitted,
+                }
+    if saved:
+        out = {
+            "id": jid,
+            "status": "succeeded",
+            "backend": "huggingface",
+            "endpoint": eid,
+            "provider": "fal-ai",
+            "saved": saved,
+            "submittedInput": submitted,
+            "transport": "fal",
+        }
+        remember_job(jid, {**meta, "result": out})
+        return 200, out
+    return 502, {
+        "error": "Fal 队列没有返回图片",
+        "backend": "huggingface",
+        "submittedInput": submitted,
+        "transport": "fal",
+    }
+
+
 def _force_loras(body: dict, payload: dict) -> None:
     raw = payload.get("loras")
     if raw in (None, []):
@@ -1096,14 +1247,12 @@ class HuggingFaceProvider(Provider):
     def generate(self, payload: dict):
         if not isinstance(payload, dict) or not isinstance(payload.get("serviceId", ""), str):
             return 400, {"error": "请求必须是对象，serviceId 必须是文本", "backend": self.id}
-        keys = hf_keys()
-        if not keys:
-            return 401, {"error": "没有 Hugging Face API Key"}
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
             return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
         # v0821o31: official Fal LoRA endpoints (flux-lora / */lora) may be selected on HF
         # when payload carries loras[]. Never accept bare fal-ai/krea-2/turbo (no LoRA).
+        # v0821o32: those endpoints are NOT on HF Router — outbound via Fal key + queue (transport=fal).
         from .fal import fal_supports_lora, find_model as fal_find_model
         direct_fal_lora = None
         if (sid or "").startswith(("fal-ai/", "fal.ai/")):
@@ -1117,7 +1266,13 @@ class HuggingFaceProvider(Provider):
                     "backend": self.id,
                     "serviceId": sid,
                 }
+        if direct_fal_lora and _needs_fal_lora_transport(direct_fal_lora):
+            return _submit_hf_fal_lora_via_fal(direct_fal_lora, payload or {})
+        keys = hf_keys()
+        if not keys:
+            return 401, {"error": "没有 Hugging Face API Key"}
         if direct_fal_lora:
+            # Defensive: non-transport Fal id with loras (should not reach here for */lora).
             mid = direct_fal_lora
             spec = fal_find_model(direct_fal_lora) or {"id": direct_fal_lora, "task": "text-to-image"}
             mapping = {"fal-ai": {"providerId": direct_fal_lora, "status": "live", "task": "text-to-image"}}
@@ -1296,6 +1451,48 @@ class HuggingFaceProvider(Provider):
             return 200, meta["result"]
         if not meta.get("queueStatusUrl"):
             return 502, {"id": job_id, "error": "HF 任务缺少查询地址", "backend": self.id}
+        transport = meta.get("transport") or (meta.get("submittedInput") or {}).get("transport")
+        out = {
+            "id": job_id, "backend": self.id, "endpoint": meta.get("serviceId"),
+            "provider": meta.get("provider"), "submittedInput": meta.get("submittedInput"),
+        }
+        if transport == "fal":
+            out["transport"] = "fal"
+            from .fal import fal_call, fal_key
+            if not fal_key():
+                return 401, {"error": "没有 Fal API Key", "backend": self.id}
+            code, data = fal_call(meta["queueStatusUrl"], timeout=60)
+            if code >= 400 or not isinstance(data, dict):
+                return code if code >= 400 else 502, {
+                    "id": job_id, "error": extract_error(data), "backend": self.id, "transport": "fal",
+                }
+            state = str(data.get("status") or "").upper()
+            if state in ("IN_QUEUE", "IN_PROGRESS"):
+                return 200, {**out, "status": "pending" if state == "IN_QUEUE" else "processing"}
+            if state != "COMPLETED" or data.get("error"):
+                return 200, {
+                    **out, "status": "failed",
+                    "error": extract_error(data, f"HF/Fal 队列状态异常：{state}"),
+                }
+            code, result = fal_call(meta["queueResultUrl"], timeout=60)
+            if code >= 400 or not isinstance(result, dict) or result.get("error"):
+                return 200, {
+                    **out, "status": "failed",
+                    "error": extract_error(result, "HF/Fal 获取结果失败"),
+                }
+            try:
+                saved = _save_json_images(result, job_id, meta=meta)
+                if not saved:
+                    urls = collect_urls(result)
+                    if urls:
+                        saved = save_media_urls(urls, job_id, meta=meta)
+            except Exception as exc:
+                return 502, {**out, "error": f"HF/Fal 媒体保存失败：{exc}"}
+            if not saved:
+                return 502, {**out, "error": "HF/Fal 队列已完成，但没有获得媒体文件"}
+            out.update(status="succeeded", saved=saved)
+            remember_job(job_id, {**meta, "result": out})
+            return 200, out
         keys = hf_keys()
         if not keys:
             return 401, {"error": "没有 Hugging Face API Key", "backend": self.id}
@@ -1309,10 +1506,6 @@ class HuggingFaceProvider(Provider):
         if code >= 400 or not isinstance(data, dict):
             return code if code >= 400 else 502, {"id": job_id, "error": extract_error(data), "backend": self.id}
         state = str(data.get("status") or "").upper()
-        out = {
-            "id": job_id, "backend": self.id, "endpoint": meta.get("serviceId"),
-            "provider": meta.get("provider"), "submittedInput": meta.get("submittedInput"),
-        }
         if state in ("IN_QUEUE", "IN_PROGRESS"):
             return 200, {**out, "status": "pending" if state == "IN_QUEUE" else "processing"}
         if state != "COMPLETED" or data.get("error"):
