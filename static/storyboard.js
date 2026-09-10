@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o26: Fal 换家 — pinFal rejects civitai/HF serviceId; #backend sync from /api/providers (all enabled)
   // v0821o25: sdcpp sampleMethod map — import dpmpp_2m → outbound dpm++2m (locked); schedule karras keep
   // v0821o24: capsule/Composer 锚底自适应 — full mode labels; bottom stick; no orphan empty refs
   // v0821o23: import sdxl serviceId sticks on shot + outbound (forbid silent krea2/turbo); prompt-tag LoRA file-stem dedupe
@@ -6261,6 +6262,11 @@
   }
   function pinFalLoraServiceId(sid) {
     const s = String(sid || "").trim();
+    // v0821o26: after Civitai/HF import 换家 → Fal, rewrite foreign serviceIds (mirror pinHf).
+    // Never ship image/comfy/… or Hub ids to Fal outbound.
+    if (looksCivitaiServiceId(s) || looksHfServiceId(s)) {
+      return falHasLoras() ? FAL_LORA_PREF_SERVICE : FAL_T2I_DEFAULT;
+    }
     if (!falHasLoras()) return s;
     // Explicit turbo → turbo/lora sibling only; never fuzzy to flux-lora
     if (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora") return FAL_LORA_PREF_SERVICE;
@@ -6896,9 +6902,27 @@
   $("backend").onchange = function () {
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
+    const be = ($("backend") && $("backend").value) || "";
+    // v0821o26: drop foreign #service when 换家 so catalog keep= does not re-select civitai/HF id on Fal.
+    if ($("service")) {
+      const cur = String($("service").value || "").trim();
+      if (be === "fal" && (looksCivitaiServiceId(cur) || looksHfServiceId(cur))) $("service").value = "";
+      if (be === "civitai" && (looksFalServiceId(cur) || looksHfServiceId(cur))) $("service").value = "";
+      if (be === "huggingface" && (looksFalServiceId(cur) || looksCivitaiServiceId(cur))) $("service").value = "";
+      if ((be === "modelscope-ai" || be === "modelscope-cn") && (looksFalServiceId(cur) || looksCivitaiServiceId(cur))) $("service").value = "";
+    }
+    if (be === "fal" && falHasLoras()) {
+      state._pendingService = FAL_LORA_PREF_SERVICE;
+      state._pinFalLoraService = FAL_LORA_PREF_SERVICE;
+    }
     syncParamSurface();
-    loadCatalog();
-    syncLoraUi();
+    const p = loadCatalog();
+    Promise.resolve(p).then(function () {
+      if (be === "fal") ensureFalLoraServiceSelected();
+      else if (be === "huggingface") ensureHfLoraServiceSelected();
+      else if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
+      syncLoraUi();
+    }).catch(function () { syncLoraUi(); });
   };
   if ($("catalogMore")) {
     $("catalogMore").addEventListener("click", function () {
@@ -6943,15 +6967,41 @@
   if ($("nanoRes")) {
     $("nanoRes").addEventListener("change", function () { persist(); paramGateMessage(); });
   }
+  // v0821o26: rebuild #backend from /api/providers — every registered provider, honest labels.
+  // Never filter to hasKey-only (铁律: 禁止隐藏 API 已支持能力 / 禁止单家盯梢).
+  function syncBackendOptionsFromProviders(items) {
+    const sel = $("backend");
+    if (!sel || !Array.isArray(items) || !items.length) return;
+    const keep = String(sel.value || "").trim();
+    const seen = {};
+    const rows = [];
+    items.forEach(function (it) {
+      if (!it || !it.id || seen[it.id]) return;
+      seen[it.id] = true;
+      rows.push({ id: String(it.id), label: String(it.label || it.id) });
+    });
+    if (!rows.length) return;
+    sel.innerHTML = "";
+    rows.forEach(function (row) {
+      const o = document.createElement("option");
+      o.value = row.id;
+      o.textContent = row.label;
+      sel.appendChild(o);
+    });
+    if (keep && seen[keep]) sel.value = keep;
+    else if (!sel.value && rows[0]) sel.value = rows[0].id;
+  }
   async function loadProviderCaps() {
     try {
       const r = await fetch("/api/providers");
       const j = await r.json();
       const map = {};
-      (j.items || []).forEach(function (it) {
+      const items = j.items || [];
+      items.forEach(function (it) {
         if (it && it.id) map[it.id] = it.capabilities || {};
       });
       state._providerCaps = map;
+      syncBackendOptionsFromProviders(items);
     } catch (_) {}
   }
 
