@@ -1,4 +1,4 @@
-// Executable persist→clear-session→restore harness (runs production storyboard.js seams).
+// Executable persist→clear-session→restore + server writeback hydrate harness.
 // Run: node scripts/test_storyboard_persist_restore.js
 "use strict";
 
@@ -11,10 +11,13 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("v0821o14-writeback-persist-restore"), "html stamp o14");
-assert.ok(html.includes("storyboard.js?v=20260910-r14wbpersist"), "cache bust o14");
-assert.ok(source.includes('const STORE = "nl-storyboard-v0821o14"'), "STORE o14");
-assert.ok(source.includes('"nl-storyboard-v0821o13"'), "STORE_OLDS keeps o13");
+assert.ok(html.includes("v0821o15-server-writeback"), "html stamp o15");
+assert.ok(html.includes("storyboard.js?v=20260910-r15srvwb"), "cache bust o15");
+assert.ok(source.includes('const STORE = "nl-storyboard-v0821o15"'), "STORE o15");
+assert.ok(source.includes('"nl-storyboard-v0821o14"'), "STORE_OLDS keeps o14");
+assert.ok(source.includes("function persistServer"), "persistServer");
+assert.ok(source.includes("function hydrateFromServer"), "hydrateFromServer");
+assert.ok(source.includes("/api/storyboard-graph"), "storyboard-graph path");
 
 function section(from, to) {
   const start = source.indexOf(from);
@@ -65,7 +68,8 @@ function harness(opts) {
   }
   const localStorage = new FakeStorage({ throwOnSet: !!(opts && opts.quotaLocal) });
   const sessionStorage = new FakeStorage();
-  const msgs = [];
+  const serverStore = { graph: (opts && opts.serverGraph) || null };
+  const puts = [];
   const sandbox = {
     console,
     localStorage,
@@ -73,6 +77,24 @@ function harness(opts) {
     document: {
       getElementById: (id) => elements[id] || null,
       createElement: (tag) => new Element(tag),
+    },
+    fetch: async (url, init) => {
+      const u = String(url || "");
+      if (u.indexOf("/api/storyboard-graph") >= 0) {
+        const method = String((init && init.method) || "GET").toUpperCase();
+        if (method === "PUT") {
+          const body = JSON.parse(init.body);
+          serverStore.graph = body;
+          puts.push(body);
+          return { ok: true, status: 200, json: async () => ({ graph: body }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ graph: serverStore.graph }),
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({ error: "not found" }) };
     },
   };
   vm.createContext(sandbox);
@@ -110,9 +132,11 @@ function harness(opts) {
     "  function setMsg(t, cls) { __msgs.push({ t: String(t || ''), cls: cls || '' }); }",
     section("  function isQuotaErr(e) {", "  function applyCam() {"),
     section("  function writebackResult(shot, url) {", "    function pickUrl(data) {"),
-    "  globalThis.api = { state, STORE, persist, restore, writebackResult, mergePreferUrl, isQuotaErr, __msgs, localStorage, sessionStorage };",
+    "  globalThis.api = { state, STORE, persist, restore, writebackResult, mergePreferUrl, isQuotaErr, persistServer, hydrateFromServer, applyGraph, __msgs, localStorage, sessionStorage, __puts: null, __server: null };",
   ].join("\n");
   vm.runInContext(code, sandbox, { filename: "storyboard-persist-restore.vm.js" });
+  sandbox.api.__puts = puts;
+  sandbox.api.__server = serverStore;
   return sandbox.api;
 }
 
@@ -120,10 +144,10 @@ function test_persist_clear_session_restore_keeps_shot_url() {
   const api = harness();
   const shot = { id: "shot-1", kind: "shot", title: "分镜1", url: "", x: 0, y: 0 };
   api.state.nodes = [shot];
-  api.writebackResult(shot, "/out/proof-o14.png");
-  assert.equal(api.state.nodes[0].url, "/out/proof-o14.png", "writeback sets live.url");
+  api.writebackResult(shot, "/out/proof-o15.png");
+  assert.equal(api.state.nodes[0].url, "/out/proof-o15.png", "writeback sets live.url");
   const rawLocal = api.localStorage.getItem(api.STORE);
-  assert.ok(rawLocal && rawLocal.includes("/out/proof-o14.png"), "persisted into localStorage");
+  assert.ok(rawLocal && rawLocal.includes("/out/proof-o15.png"), "persisted into localStorage");
   assert.ok(api.sessionStorage.getItem(api.STORE), "also mirrored to sessionStorage");
 
   // Hard-refresh simulation: session gone; in-memory graph wiped; restore from localStorage.
@@ -133,7 +157,7 @@ function test_persist_clear_session_restore_keeps_shot_url() {
   const ok = api.restore();
   assert.equal(ok, true, "restore returns true");
   assert.equal(api.state.nodes.length, 1, "restored one node");
-  assert.equal(api.state.nodes[0].url, "/out/proof-o14.png", "shot.url survives clear-session restore");
+  assert.equal(api.state.nodes[0].url, "/out/proof-o15.png", "shot.url survives clear-session restore");
 }
 
 function test_merge_prefer_url_session_fills_blank_local() {
@@ -176,8 +200,36 @@ function test_mergePreferUrl_unit() {
   assert.equal(api.mergePreferUrl(a, null), a);
 }
 
+async function test_writeback_puts_server_and_clean_profile_hydrate() {
+  const api = harness();
+  const shot = { id: "shot-op", kind: "shot", title: "分镜1", url: "", x: 10, y: 20 };
+  api.state.nodes = [shot];
+  api.writebackResult(shot, "/out/12100372-20260910081835126_0.jpg");
+  // allow microtask for fetch PUT
+  await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(api.__puts.length >= 1, "writeback PUT /api/storyboard-graph");
+  assert.equal(api.__server.graph.nodes[0].url, "/out/12100372-20260910081835126_0.jpg");
+
+  // Clean profile: wipe local/session/memory (UI审查员 different desktop)
+  api.localStorage.clear();
+  api.sessionStorage.clear();
+  api.state.nodes = [{ id: "shot-1", kind: "shot", title: "分镜1", url: "", x: 560, y: 80 }]; // loadDemo
+  api.state.edges = [];
+  const changed = await api.hydrateFromServer();
+  assert.equal(changed, true, "hydrate adopts server graph when no local media");
+  assert.equal(api.state.nodes[0].id, "shot-op", "server shot id adopted");
+  assert.equal(api.state.nodes[0].url, "/out/12100372-20260910081835126_0.jpg", "card url survives clean-profile hydrate");
+  assert.ok(api.localStorage.getItem(api.STORE), "hydrate mirrors into localStorage");
+}
+
 test_mergePreferUrl_unit();
 test_persist_clear_session_restore_keeps_shot_url();
 test_merge_prefer_url_session_fills_blank_local();
 test_quota_exceeded_surfaces_warn();
-console.log("ok: storyboard persist/restore executable checks passed");
+test_writeback_puts_server_and_clean_profile_hydrate().then(() => {
+  console.log("ok: storyboard persist/restore executable checks passed");
+}).catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o14";
-  const STORE_OLDS = ["nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o15";
+  const STORE_OLDS = ["nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o15: writeback also PUT /api/storyboard-graph; boot hydrate so clean-profile hard refresh keeps card
   // v0821o14: persist→localStorage + QuotaExceeded warn; restore merge prefer-url (session media not clobbered)
   // v0821o13: writebackResult persists shot.url to localStorage (hard refresh keeps card); dual-read session migrate
   // v0821o12: civitai writeback — pickUrl steps[].output.images; writebackResult sets shot.url; hist-pin applies to card
@@ -1069,6 +1070,57 @@
       try { sessionStorage.setItem(STORE, payload); } catch (_) {}
     } catch (_) {}
   }
+  /** Apply a parsed graph object into live state. Returns false if empty/robot-demo discarded. */
+  function applyGraph(p) {
+    if (!p || !p.nodes || !p.nodes.length) return false;
+    state.cam = p.cam || state.cam;
+    if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
+    state.nodes = p.nodes;
+    state.edges = p.edges || [];
+    state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
+    state.railTab = p.railTab || "assets";
+    state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
+    state.script = p.script && typeof p.script === "object"
+      ? p.script
+      : { title: "未命名故事", logline: "", scenes: [] };
+    state.editor = Object.assign(state.editor || {}, p.editor || {});
+    state.editor.timer = null;
+    state.editor.playing = false;
+    state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
+      id: g.id || uid("grp"),
+      name: g.name || "组",
+      memberIds: Array.isArray(g.memberIds) ? g.memberIds.slice() : [],
+    })).filter((g) => g.memberIds.length) : [];
+    if (p.backend && $("backend")) $("backend").value = p.backend;
+    if (p.duration && $("duration")) $("duration").value = p.duration;
+    if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
+    if (p.res && $("res")) $("res").value = p.res;
+    if (p.width != null && $("width")) $("width").value = p.width;
+    if (p.height != null && $("height")) $("height").value = p.height;
+    if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
+    if (p.steps != null && $("steps")) $("steps").value = p.steps;
+    if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
+    if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
+    if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
+    if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
+    if (p.seed != null && $("seed")) {
+      $("seed").value = p.seed;
+      $("seed").title = String(p.seed);
+    }
+    if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
+    if (p.negative != null && $("negative")) $("negative").value = p.negative;
+    state._pendingService = p.service || "";
+    state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
+    if (isClassicRobotDemo(state.nodes)) {
+      // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
+      state.nodes = [];
+      state.edges = [];
+      state.groups = [];
+      return false;
+    }
+    removeUnpromotedFromShot();
+    return true;
+  }
   function restore() {
     try {
       let pair = readStorePair(STORE);
@@ -1080,53 +1132,7 @@
       }
       const raw = mergePreferUrl(pair.local, pair.session);
       const p = parseStoreRaw(raw);
-      if (!p || !p.nodes || !p.nodes.length) return false;
-      state.cam = p.cam || state.cam;
-      if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
-      state.nodes = p.nodes;
-      state.edges = p.edges || [];
-      state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
-      state.railTab = p.railTab || "assets";
-      state.workspace = p.workspace === "script" || p.workspace === "editor" ? p.workspace : "canvas";
-      state.script = p.script && typeof p.script === "object"
-        ? p.script
-        : { title: "未命名故事", logline: "", scenes: [] };
-      state.editor = Object.assign(state.editor || {}, p.editor || {});
-      state.editor.timer = null;
-      state.editor.playing = false;
-      state.groups = Array.isArray(p.groups) ? p.groups.map((g) => ({
-        id: g.id || uid("grp"),
-        name: g.name || "组",
-        memberIds: Array.isArray(g.memberIds) ? g.memberIds.slice() : [],
-      })).filter((g) => g.memberIds.length) : [];
-      if (p.backend && $("backend")) $("backend").value = p.backend;
-      if (p.duration && $("duration")) $("duration").value = p.duration;
-      if (p.aspect && $("aspect")) $("aspect").value = p.aspect;
-      if (p.res && $("res")) $("res").value = p.res;
-      if (p.width != null && $("width")) $("width").value = p.width;
-      if (p.height != null && $("height")) $("height").value = p.height;
-      if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
-      if (p.steps != null && $("steps")) $("steps").value = p.steps;
-      if (p.cfg != null && $("cfg")) $("cfg").value = p.cfg;
-      if (p.cfgScale != null && $("cfg") && (p.cfg == null || p.cfg === "")) $("cfg").value = p.cfgScale;
-      if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
-      if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
-      if (p.seed != null && $("seed")) {
-        $("seed").value = p.seed;
-        $("seed").title = String(p.seed);
-      }
-      if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
-      if (p.negative != null && $("negative")) $("negative").value = p.negative;
-      state._pendingService = p.service || "";
-      state.loras = Array.isArray(p.loras) ? p.loras.map(function (x) { return Object.assign({}, x); }) : (state.loras || []);
-      if (isClassicRobotDemo(state.nodes)) {
-        // Old robot fixtures / dead DEMO thumbs — discard and empty-boot instead.
-        state.nodes = [];
-        state.edges = [];
-        state.groups = [];
-        return false;
-      }
-      removeUnpromotedFromShot();
+      if (!applyGraph(p)) return false;
       // Re-save under current STORE in localStorage (migrate session/old keys → durable graph).
       try {
         localStorage.setItem(STORE, graphPayload());
@@ -1137,6 +1143,54 @@
       }
       return true;
     } catch (_) { return false; }
+  }
+  /** v0821o15: shared-studio writeback — any client hydrates shot.url from this file. */
+  function persistServer() {
+    try {
+      const payload = graphPayload();
+      fetch("/api/storyboard-graph", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).catch(function () {});
+    } catch (_) {}
+  }
+  function shotsHaveMedia() {
+    return (state.nodes || []).some(function (n) { return n && n.kind === "shot" && n.url; });
+  }
+  /** Clean profile / empty demo: adopt server graph. Else fill blank shot.url by id. */
+  async function hydrateFromServer() {
+    try {
+      const r = await fetch("/api/storyboard-graph");
+      if (!r.ok) return false;
+      const j = await r.json();
+      const p = j && (j.graph || j);
+      if (!p || !Array.isArray(p.nodes) || !p.nodes.length) return false;
+      if (!shotsHaveMedia()) {
+        if (!applyGraph(p)) return false;
+        persist();
+        return true;
+      }
+      const byId = {};
+      for (let i = 0; i < p.nodes.length; i++) {
+        const n = p.nodes[i];
+        if (n && n.id) byId[n.id] = n;
+      }
+      let changed = false;
+      for (let i = 0; i < state.nodes.length; i++) {
+        const n = state.nodes[i];
+        if (!n || n.url) continue;
+        const o = byId[n.id];
+        if (o && o.url) {
+          n.url = o.url;
+          changed = true;
+        }
+      }
+      if (changed) persist();
+      return changed;
+    } catch (_) {
+      return false;
+    }
   }
 
   function applyCam() {
@@ -4820,7 +4874,7 @@
   function writebackResult(shot, url) {
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
-    // v0821o14/o13: persist here so hard refresh keeps card even if caller forgets persist().
+    // v0821o15: persist local + PUT /api/storyboard-graph so clean-profile hard refresh keeps card.
     if (!shot || !url) return;
     const live = nodeById(shot.id) || shot;
     live.url = url;
@@ -4829,6 +4883,7 @@
     renderRail();
     try { renderCards(); drawWires(); } catch (_) {}
     persist();
+    persistServer();
   }
 
     function pickUrl(data) {
@@ -6546,6 +6601,22 @@
   if (!restore()) loadDemo();
   separateOverlappingShots();
   ensureWorkspaceModel();
+  // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
+  hydrateFromServer().then(function (changed) {
+    if (!changed) return;
+    try {
+      separateOverlappingShots();
+      ensureWorkspaceModel();
+      applyCam();
+      renderCards();
+      drawWires();
+      renderRail();
+      const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
+      selectNode(state.selected || (firstShot && firstShot.id) || "shot-1", { collapsed: true });
+      renderWorkspace();
+      if (typeof renderDock === "function") renderDock();
+    } catch (_) {}
+  });
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
   let _wantHfLoraFixture = false;

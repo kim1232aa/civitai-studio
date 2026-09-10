@@ -6,6 +6,7 @@ import json
 import re
 import mimetypes
 import os
+import tempfile
 import threading
 import time
 import urllib.error
@@ -37,6 +38,53 @@ CANVAS_STORE_PATH = Path(
 )
 CANVAS_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
 canvas_store = CanvasStore(CANVAS_STORE_PATH)
+
+# Shared storyboard graph (shot.url writeback survives hard refresh across browser profiles).
+STORYBOARD_GRAPH_PATH = Path(
+    os.environ.get("STORYBOARD_GRAPH_PATH", str(ROOT / "data" / "storyboard_graph.json"))
+)
+STORYBOARD_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
+_storyboard_graph_lock = threading.Lock()
+
+
+def read_storyboard_graph() -> dict | None:
+    with _storyboard_graph_lock:
+        if not STORYBOARD_GRAPH_PATH.exists():
+            return None
+        try:
+            data = json.loads(STORYBOARD_GRAPH_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
+
+
+def write_storyboard_graph(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        raise ValueError("storyboard graph 必须是对象")
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise ValueError("storyboard graph.nodes 必须是非空数组")
+    STORYBOARD_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    with _storyboard_graph_lock:
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{STORYBOARD_GRAPH_PATH.name}.",
+            suffix=".tmp",
+            dir=STORYBOARD_GRAPH_PATH.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, STORYBOARD_GRAPH_PATH)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+    return payload
 
 SAMPLERS = [
     "er_sde", "euler", "euler_ancestral", "euler_cfg_pp", "euler_ancestral_cfg_pp",
@@ -1149,6 +1197,9 @@ class Handler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
         if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
             return self._handle_canvas_get(path)
+        if path == "/api/storyboard-graph":
+            graph = read_storyboard_graph()
+            return self._json(200, {"graph": graph})
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         # Seko storyboard canvas (PLAN-v0789): /storyboard + /cloud-nodes share one shell.
@@ -1489,6 +1540,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "invalid json"})
             if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
                 return self._handle_canvas_patch(path, payload, replace=True)
+            if path == "/api/storyboard-graph":
+                body = payload.get("graph") if isinstance(payload.get("graph"), dict) else payload
+                try:
+                    graph = write_storyboard_graph(body)
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
+                return self._json(200, {"graph": graph})
             return self._json(404, {"error": "not found"})
         except Exception as e:
             print("[web] PUT", e, flush=True)
