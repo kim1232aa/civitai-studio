@@ -108,6 +108,42 @@ def write_storyboard_graph(payload: dict) -> dict:
             raise
     return payload
 
+def apply_pending_job_to_graph(job_id: str, url: str) -> dict | None:
+    """Belt: when job materializes saved[], bind url onto pending shot in graph."""
+    from providers import pending_jobs as pj
+    jid = (job_id or "").strip()
+    u = (url or "").strip()
+    if not jid or not u:
+        return None
+    pending = pj.get_pending(jid)
+    if not pending:
+        return None
+    shot_id = str(pending.get("shotId") or "").strip()
+    if not shot_id:
+        return None
+    graph = read_storyboard_graph()
+    if not isinstance(graph, dict):
+        return None
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return None
+    changed = False
+    found = False
+    for n in nodes:
+        if isinstance(n, dict) and n.get("id") == shot_id and n.get("kind") == "shot":
+            found = True
+            if n.get("url") != u:
+                n["url"] = u
+                changed = True
+            break
+    if not found:
+        return None
+    if changed:
+        write_storyboard_graph(graph)
+    pj.clear_pending(jid)
+    return {"jobId": jid, "shotId": shot_id, "url": u, "updated": changed}
+
+
 SAMPLERS = [
     "er_sde", "euler", "euler_ancestral", "euler_cfg_pp", "euler_ancestral_cfg_pp",
     "heun", "heunpp2", "dpm_2", "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
@@ -1231,6 +1267,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/storyboard-graph":
             graph = read_storyboard_graph()
             return self._json(200, {"graph": graph})
+        if path == "/api/pending-jobs":
+            from providers import pending_jobs as pj
+            return self._json(200, {"jobs": pj.list_pending()})
         if path in ("/", "/index.html"):
             return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         # Seko storyboard canvas (PLAN-v0789): /storyboard + /cloud-nodes share one shell.
@@ -1383,6 +1422,23 @@ class Handler(BaseHTTPRequestHandler):
                         "saved": data.get("saved"),
                         "error": data.get("error"),
                     }, ensure_ascii=False)[:1500], flush=True)
+                # o46: if pending maps this job→shot and saved[] ready, write shot.url on graph
+                from providers import pending_jobs as pj
+                saved_u = pj.first_saved_url(data)
+                if saved_u:
+                    try:
+                        applied = apply_pending_job_to_graph(wf_id, saved_u)
+                        if applied:
+                            data = dict(data)
+                            data["pendingWriteback"] = applied
+                            print("[web] PENDING_WB", json.dumps(applied, ensure_ascii=False), flush=True)
+                    except Exception as e:
+                        print("[web] PENDING_WB skip", e, flush=True)
+                elif st in ("failed", "error"):
+                    try:
+                        pj.clear_pending(wf_id)
+                    except Exception:
+                        pass
             return self._json(code, data)
         if path == "/api/import":
             backend = (qs.get("backend") or ["civitai"])[0]
@@ -1500,6 +1556,17 @@ class Handler(BaseHTTPRequestHandler):
                 endpoint=payload.get("endpoint") or payload.get("serviceId"),
             )
             return self._json(code, data)
+        if path == "/api/pending-jobs":
+            from providers import pending_jobs as pj
+            try:
+                rec = pj.register_pending(
+                    str(payload.get("jobId") or payload.get("id") or ""),
+                    str(payload.get("shotId") or ""),
+                    str(payload.get("backend") or ""),
+                )
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            return self._json(200, {"ok": True, "job": rec})
         if path == "/api/graph/compile":
             from providers.graph_compile import compile_graph
             result = compile_graph(payload.get("graph") if isinstance(payload.get("graph"), dict) else payload)
@@ -1591,6 +1658,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/canvas-projects" or path.startswith("/api/canvas-projects/"):
                 return self._handle_canvas_delete(path)
+            if path.startswith("/api/pending-jobs/"):
+                from providers import pending_jobs as pj
+                jid = urllib.parse.unquote(path.split("/api/pending-jobs/", 1)[1]).strip("/")
+                ok = pj.clear_pending(jid)
+                return self._json(200 if ok else 404, {"ok": ok, "jobId": jid})
             if path.startswith("/api/jobs/") and path.rstrip("/").endswith("/cancel"):
                 return self._cancel_job(path)
             return self._json(404, {"error": "not found"})

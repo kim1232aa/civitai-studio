@@ -125,8 +125,8 @@ def test_generate_audit_nrefs_data_lengths_only():
 def test_stamp_and_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    check("v0821o45-magao-edit2509-refs3" in html, "html stamp")
-    check("20260910-o45magaoedit2509refs3" in html, "cache-bust")
+    check("v0821o46-resume-job-writeback" in html, "html stamp")
+    check("20260911-o46resumejobwriteback" in html, "cache-bust")
     check("v0821o44" in js, "js header o44")
 
 

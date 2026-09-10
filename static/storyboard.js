@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o16";
   const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o46: resume writeback after tab death (pending jobId↔shotId + boot resume); stamp v0821o46-resume-job-writeback
   // v0821o45: Magao Edit-2509 maxRefs=3 (provider ceiling 3; catalog tightens); stamp v0821o45-magao-edit2509-refs3
   // v0821o44: civitai editImage materialize /out → data URL before POST; stamp v0821o44-civitai-edit-materialize-refs
   // v0821o43: fal flux-2/edit OpenAPI maxRefs=4 (siblings with official ≤4); stamp v0821o43-fal-flux2-edit-maxrefs4
@@ -5326,6 +5327,152 @@
     state.multi = (state.multi || []).filter((id) => !removed.has(id));
     return true;
   }
+
+  // v0821o46: pending jobId↔shotId — survives tab OOM so boot can resume writeback
+  const PENDING_JOBS_KEY = "nl-pending-jobs-v0821o46";
+  function readLocalPending() {
+    try {
+      const raw = localStorage.getItem(PENDING_JOBS_KEY);
+      const j = raw ? JSON.parse(raw) : {};
+      return (j && typeof j === "object" && j.jobs && typeof j.jobs === "object") ? j.jobs : {};
+    } catch (_) { return {}; }
+  }
+  function writeLocalPending(jobs) {
+    try { localStorage.setItem(PENDING_JOBS_KEY, JSON.stringify({ jobs: jobs || {} })); } catch (_) {}
+  }
+  function registerPendingJob(jobId, shotId, backend) {
+    const jid = String(jobId || "").trim();
+    const sid = String(shotId || "").trim();
+    if (!jid || !sid) return;
+    const jobs = readLocalPending();
+    jobs[jid] = { shotId: sid, backend: String(backend || ""), startedAt: Date.now() };
+    writeLocalPending(jobs);
+    try {
+      fetch("/api/pending-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: jid, shotId: sid, backend: backend || "" }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (_) {}
+  }
+  function clearPendingJob(jobId) {
+    const jid = String(jobId || "").trim();
+    if (!jid) return;
+    const jobs = readLocalPending();
+    if (jobs[jid]) {
+      delete jobs[jid];
+      writeLocalPending(jobs);
+    }
+    try {
+      fetch("/api/pending-jobs/" + encodeURIComponent(jid), { method: "DELETE", keepalive: true }).catch(function () {});
+    } catch (_) {}
+  }
+  async function mergeServerPending() {
+    try {
+      const r = await fetch("/api/pending-jobs");
+      if (!r.ok) return readLocalPending();
+      const j = await r.json();
+      const list = (j && j.jobs) || [];
+      const jobs = readLocalPending();
+      for (let i = 0; i < list.length; i++) {
+        const row = list[i];
+        if (!row || !row.jobId || !row.shotId) continue;
+        if (!jobs[row.jobId]) {
+          jobs[row.jobId] = { shotId: row.shotId, backend: row.backend || "", startedAt: Date.now() };
+        }
+      }
+      writeLocalPending(jobs);
+      return jobs;
+    } catch (_) {
+      return readLocalPending();
+    }
+  }
+  async function resumeOnePending(jobId, rec) {
+    const jid = String(jobId || "").trim();
+    const sid = rec && rec.shotId;
+    if (!jid || !sid) return;
+    let shot = nodeById(sid);
+    if (!shot || shot.kind !== "shot") {
+      // graph may have shot after hydrate; try again from state
+      shot = (state.nodes || []).find(function (n) { return n && n.id === sid && n.kind === "shot"; });
+    }
+    if (!shot) {
+      clearPendingJob(jid);
+      return;
+    }
+    const bePoll = String((rec && rec.backend) || shot._backend || "").trim();
+    const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
+      || bePoll === "modelscope-ai" || bePoll === "modelscope-cn" || !bePoll;
+    try {
+      setShotBusy(shot, true);
+      setMsg("恢复任务写回 · " + jid.slice(0, 12) + "…", "warn");
+      let j = null;
+      const pollMax = (bePoll === "civitai") ? 720 : 180;
+      const pollMs = 2500;
+      for (let i = 0; i < pollMax; i++) {
+        const st = await (await fetch("/api/jobs/" + encodeURIComponent(jid))).json();
+        j = st;
+        const stStatus = String((st && st.status) || "").toUpperCase();
+        const inFlight = stStatus === "IN_QUEUE" || stStatus === "IN_PROGRESS"
+          || stStatus === "PENDING" || stStatus === "PROCESSING" || stStatus === "RUNNING"
+          || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED"
+          || stStatus === "SCHEDULED";
+        if ((st.error || st.status === "failed") && !inFlight) {
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("恢复失败: " + (st.error || st.message || "任务失败"), "bad");
+          return;
+        }
+        // Server belt may already have written shot.url via pendingWriteback
+        if (st && st.pendingWriteback && st.pendingWriteback.url) {
+          writebackResult(shot, st.pendingWriteback.url);
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡（服务端）", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        const savedUrl = pickSavedUrl(st);
+        if (savedUrl) {
+          writebackResult(shot, savedUrl);
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        if (!materializing && pickUrl(st)) {
+          writebackResult(shot, pickUrl(st));
+          clearPendingJob(jid);
+          setShotBusy(shot, false);
+          setMsg("已恢复写回原卡", "ok");
+          try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+          return;
+        }
+        if (i === 0) {
+          // also check if hydrate already has newer url containing job fragment
+          continue;
+        }
+        await new Promise(function (res) { setTimeout(res, pollMs); });
+        setMsg("恢复写回轮询 " + (i + 1) + "/" + pollMax, "warn");
+      }
+      setShotBusy(shot, false);
+      setMsg("恢复写回超时 · job 仍 pending: " + jid, "warn");
+    } catch (e) {
+      try { setShotBusy(shot, false); } catch (_) {}
+      setMsg("恢复写回异常: " + (e && e.message ? e.message : String(e)), "bad");
+    }
+  }
+  async function resumePendingJobs() {
+    const jobs = await mergeServerPending();
+    const ids = Object.keys(jobs || {});
+    if (!ids.length) return;
+    for (let i = 0; i < ids.length; i++) {
+      await resumeOnePending(ids[i], jobs[ids[i]]);
+    }
+  }
+
   function writebackResult(shot, url) {
     // Hard gate: media lands on the originating shot card (shot.url). History stays;
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
@@ -5350,6 +5497,8 @@
     try { renderCards(); drawWires(); renderDock(); } catch (_) {}
     persist();
     persistServer();
+    if (live && live._jobId) clearPendingJob(live._jobId);
+    else if (shot && shot._jobId) clearPendingJob(shot._jobId);
   }
 
   function pickSavedUrl(data) {
@@ -5509,6 +5658,10 @@
       state.dockMode = "expanded";
       renderCards();
       renderDock();
+      // o46: clear pending only on terminal fail — keep on wait-timeout/abort so boot can resume
+      if (jid && (status === "error" || (cls || "bad") === "bad")) {
+        try { clearPendingJob(jid); } catch (_) {}
+      }
       const out = { status: status || "blocked", error: text };
       if (jid) out.jobId = jid;
       if (be) out.backend = be;
@@ -5713,6 +5866,7 @@
         if (jobId) shot._jobId = jobId;
         if (bePoll) shot._backend = bePoll;
       }
+      if (jobId && shot && shot.id) registerPendingJob(jobId, shot.id, bePoll);
       if (!r.ok || (j && j.error)) throw (j.error || j.message || j.detail || ("HTTP " + r.status));
       // Materializing backends download CDN → /out saved[]; do not treat steps CDN as done.
       const materializing = bePoll === "civitai" || bePoll === "fal" || bePoll === "huggingface"
@@ -7583,20 +7737,23 @@
   ensureWorkspaceModel();
   // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
   hydrateFromServer().then(function (changed) {
-    if (!changed) return;
-    try {
-      separateOverlappingShots();
-      ensureWorkspaceModel();
-      applyCam();
-      renderCards();
-      drawWires();
-      renderRail();
-      const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
-      selectNode(state.selected || (firstShot && firstShot.id) || "shot-1", { collapsed: true });
-      renderWorkspace();
-      if (typeof renderDock === "function") renderDock();
-    } catch (_) {}
-  });
+    if (changed) {
+      try {
+        separateOverlappingShots();
+        ensureWorkspaceModel();
+        applyCam();
+        renderCards();
+        drawWires();
+        renderRail();
+        const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
+        selectNode(state.selected || (firstShot && firstShot.id) || "shot-1", { collapsed: true });
+        renderWorkspace();
+        if (typeof renderDock === "function") renderDock();
+      } catch (_) {}
+    }
+    // v0821o46: always try resume pending jobs after hydrate (tab death / OOM mid-poll)
+    return resumePendingJobs();
+  }).catch(function () {});
   // v0821o2: mount fixture AFTER first catalog fill so #service stays turbo/lora (not 默认模型)
   let _wantFalLoraFixture = false;
   let _wantHfLoraFixture = false;

@@ -190,8 +190,8 @@ def test_audit_lengths_helper():
 def test_stamp_and_cache_bust():
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
-    check("v0821o45-magao-edit2509-refs3" in html, "html stamp")
-    check("20260910-o45magaoedit2509refs3" in html, "cache-bust")
+    check("v0821o46-resume-job-writeback" in html, "html stamp")
+    check("20260911-o46resumejobwriteback" in html, "cache-bust")
     check("v0821o42" in js, "js header o42")
 
 
