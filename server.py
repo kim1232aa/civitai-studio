@@ -1171,6 +1171,13 @@ class Handler(BaseHTTPRequestHandler):
         """Record real POST /api/generate — keys only, no tokens, no image bytes."""
         payload = payload if isinstance(payload, dict) else {}
         data = data if isinstance(data, dict) else {}
+        # lengths only — never dump data URLs / image bytes
+        n_refs = data.get("nRefs")
+        if n_refs is None:
+            n_refs = data.get("local_nRefs")
+        if n_refs is None:
+            bag = payload.get("input_references") or payload.get("images") or []
+            n_refs = len(bag) if isinstance(bag, list) else 0
         rec = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "backend": getattr(prov, "id", None),
@@ -1178,6 +1185,8 @@ class Handler(BaseHTTPRequestHandler):
             "promptLen": len(str(payload.get("prompt") or "")),
             "keys": sorted(str(k) for k in payload.keys()),
             "nLoras": len(payload["loras"]) if isinstance(payload.get("loras"), list) else 0,
+            "nRefs": n_refs,
+            "endpointTried": data.get("endpointTried"),
             "code": code,
             "jobId": data.get("id") or data.get("jobId") or data.get("workflowId"),
             "status": data.get("status"),

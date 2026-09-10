@@ -17,8 +17,9 @@
 | API root | `https://nano-gpt.com/api/v1` |
 | 图模型目录 | `GET /api/v1/images/models` |
 | 视频目录 | `GET /api/v1/video-models` |
-| 出图（优先） | `POST /api/v1/images` |
-| 出图（回退） | `POST /v1/images/generations` |
+| 出图（优先） | `POST /api/v1/images`（`input_references`） |
+| 出图（回退 OAI） | `POST /v1/images/generations`（`imageDataUrl(s)` only — never mix `input_references`） |
+| 出图（Edit 优先） | `POST /api/v1/images/edits` + `/edit`（`imageDataUrl(s)`；`*/edit` 模型） |
 | 视频提交 | `POST /api/generate-video` |
 | 视频状态 | `GET /api/video/status?requestId=` |
 
@@ -46,7 +47,7 @@
 | `aspect` 推导 | `aspect_ratio` | 否 | `closest_aspect` |
 | `seed` | `seed` | 否 | mod int32；变化时 `seedOriginal`/`seedClamped` |
 | `quantity` | `n` / `nImages` | 否 | 1–4 |
-| refs | `input_references` | i2i | **禁止**同时混 `image`/`image_url`/`imageDataUrl` |
+| refs | `input_references`（normalized）/ `imageDataUrl(s)`（OAI+edit） | i2i | **禁止**同请求混两种风格；OAI/edit 由 `input_references` 映射 |
 | `denoise`/`strength` | `strength` | i2i | 默认 0.65 |
 | `steps` | `num_inference_steps` + `steps` | 否 | |
 | `cfgScale` | `guidance_scale` | 否 | |

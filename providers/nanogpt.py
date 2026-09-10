@@ -30,6 +30,8 @@ IMG_MODELS = API + "/images/models"
 VID_MODELS = API + "/video-models?detailed=true"
 GEN_IMAGES = API + "/images"
 GEN_IMAGES_OAI = BASE + "/v1/images/generations"
+GEN_IMAGES_EDIT = API + "/images/edit"
+GEN_IMAGES_EDITS = API + "/images/edits"
 GEN_VIDEO = BASE + "/api/generate-video"
 VIDEO_STATUS = BASE + "/api/video/status"
 TEXT_MODELS = API + "/models?detailed=true"
@@ -942,13 +944,77 @@ def _image_body(payload: dict, spec: dict) -> dict:
 
 
 def _core_image_body(full: dict) -> dict:
+    """OAI / generations + edit JSON body: imageDataUrl(s) only — never mix input_references.
+
+    Normalized POST /api/v1/images keeps input_references on `full`. This helper is for
+    OpenAI-compatible routes that expect imageDataUrl / imageDataUrls instead.
+    """
     keep = (
         "model", "prompt", "n", "nImages", "resolution", "size", "aspect_ratio",
-        "seed", "negative_prompt", "input_references", "imageDataUrl", "imageUrl",
-        "image", "strength", "loras", "guidance_scale", "num_inference_steps",
-        "response_format",
+        "seed", "negative_prompt", "strength", "loras", "guidance_scale",
+        "num_inference_steps", "response_format",
     )
-    return {k: full[k] for k in keep if k in full}
+    body = {k: full[k] for k in keep if k in full}
+    refs = full.get("input_references")
+    if isinstance(refs, list) and refs:
+        body["imageDataUrls"] = list(refs)
+        body["imageDataUrl"] = refs[0]
+    else:
+        # Pass through explicit OAI fields only when no input_references bag.
+        for k in ("imageDataUrls", "imageDataUrl", "imageUrl", "image"):
+            if k in full:
+                body[k] = full[k]
+    return body
+
+
+def _edit_image_body(full: dict) -> dict:
+    """Edit endpoint JSON: same imageDataUrl(s) shape as OAI, never input_references."""
+    return _core_image_body(full)
+
+
+def _is_empty_input_images_error(err) -> bool:
+    """True for upstream 'requires between 1 and N input images' (refs never arrived)."""
+    if isinstance(err, dict):
+        msg = str(err.get("error") or err.get("message") or err)
+    else:
+        msg = str(err or "")
+    low = msg.lower()
+    if "input image" not in low and "input_image" not in low:
+        return False
+    return ("requires between" in low) or ("between 1 and" in low) or ("at least 1" in low)
+
+
+def _image_body_audit(body: dict | None) -> dict:
+    """Lengths only — never dump data URLs."""
+    body = body if isinstance(body, dict) else {}
+    refs = body.get("input_references")
+    urls = body.get("imageDataUrls")
+    n_refs = len(refs) if isinstance(refs, list) else 0
+    n_urls = len(urls) if isinstance(urls, list) else (1 if body.get("imageDataUrl") else 0)
+    return {
+        "nInputReferences": n_refs,
+        "nImageDataUrls": n_urls,
+        "hasImageDataUrl": bool(body.get("imageDataUrl")),
+    }
+
+
+def _image_endpoint_candidates(spec: dict | None, full: dict) -> list:
+    """Ordered (url, body) attempts. Edit models prefer /images/edit(s) + imageDataUrls."""
+    norm = dict(full)  # keeps input_references only style from _image_body
+    oai = _core_image_body(full)
+    edit = _edit_image_body(full)
+    if _looks_like_required_edit((spec or {}).get("id") or "", (spec or {}).get("name") or ""):
+        return [
+            (GEN_IMAGES_EDITS, edit),
+            (GEN_IMAGES_EDIT, edit),
+            (GEN_IMAGES, norm),
+            (GEN_IMAGES_OAI, oai),
+        ]
+    return [
+        (GEN_IMAGES, norm),
+        (GEN_IMAGES_OAI, oai),
+    ]
+
 
 
 def _save_result(data, jid, meta) -> list:
@@ -1215,16 +1281,35 @@ class NanoGptProvider(Provider):
         }
         headers = _auth()
         last = (502, {"error": "NanoGPT 出图失败"})
-        for url, body in (
-            (GEN_IMAGES, full),
-            (GEN_IMAGES_OAI, _core_image_body(full)),
-        ):
+        local_refs = full.get("input_references") if isinstance(full.get("input_references"), list) else []
+        local_n_refs = len(local_refs)
+        endpoint_tried: list = []
+        saw_empty_image = False
+        for url, body in _image_endpoint_candidates(spec, full):
+            audit = _image_body_audit(body)
+            endpoint_tried.append({
+                "url": url,
+                "nInputReferences": audit["nInputReferences"],
+                "nImageDataUrls": audit["nImageDataUrls"],
+            })
+            print(
+                "[nano] image-attempt",
+                json.dumps({
+                    "serviceId": mid,
+                    "nRefs": local_n_refs,
+                    "endpointTried": url,
+                    **audit,
+                }, ensure_ascii=False)[:800],
+                flush=True,
+            )
             code, data = json_call(url, method="POST", headers=headers, body=body, timeout=180)
             if not isinstance(data, dict):
                 last = (code if code >= 400 else 502, {"error": str(data)})
                 continue
             if code >= 400:
                 data.setdefault("error", extract_error(data, f"HTTP {code}"))
+                if _is_empty_input_images_error(data):
+                    saw_empty_image = True
                 last = (code, data)
                 continue
             resp_seed = _response_seed(data)
@@ -1241,9 +1326,32 @@ class NanoGptProvider(Provider):
                     "submittedInput": sanitize_submitted_for_persist(body, lora_meta),
                     "seed": used_seed,
                     "cost": data.get("cost"),
+                    "nRefs": local_n_refs,
+                    "endpointTried": [e["url"] for e in endpoint_tried],
                 }
                 return 200, out
             last = (502, {"error": "NanoGPT 没有返回图片", "raw": json.dumps(data)[:400]})
+        # Fail-closed: local bag had refs but every path claimed 0 input images.
+        if saw_empty_image and local_n_refs >= 1:
+            code, data = last
+            if not isinstance(data, dict):
+                data = {"error": str(data)}
+            else:
+                data = dict(data)
+            upstream = data.get("error") or "upstream rejected input images"
+            tried_urls = [e["url"] for e in endpoint_tried]
+            data["error"] = (
+                f"{upstream} · local_nRefs={local_n_refs} but upstream saw 0 "
+                f"(endpoints={tried_urls})"
+            )
+            data["local_nRefs"] = local_n_refs
+            data["endpointTried"] = tried_urls
+            data["nRefs"] = local_n_refs
+            data["refAudit"] = endpoint_tried
+            return (code if code >= 400 else 400), data
+        if isinstance(last[1], dict):
+            last[1].setdefault("nRefs", local_n_refs)
+            last[1].setdefault("endpointTried", [e["url"] for e in endpoint_tried])
         return last
 
     def _generate_video(self, payload, spec, mid):
