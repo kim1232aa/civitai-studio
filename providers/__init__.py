@@ -76,5 +76,15 @@ def _boot_ui_patch():
         print("[web] static_patch skip", e, flush=True)
 
 
+def _boot_catalog_stamps():
+    """o57: official item caps on Provider.catalog HTTP rows."""
+    try:
+        from .catalog_stamp import install_catalog_stamps
+        install_catalog_stamps(PROVIDERS)
+    except Exception as e:
+        print("[catalog] o57 stamp skip", e, flush=True)
+
+
 load()
 _boot_ui_patch()
+_boot_catalog_stamps()
