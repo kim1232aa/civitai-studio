@@ -25,13 +25,14 @@ textarea.param-unsupported-control{
 
 /* v0821o62: expanded dock can outgrow the short #viewport so #send stays visible */
 .dock.expanded {
+  /* o60 overrides o62 visible overflow — keep composer inside viewport */
   height: auto !important;
-  max-height: min(78vh, 720px) !important;
-  overflow: visible !important;
+  max-height: min(58vh, 560px) !important;
+  overflow: hidden !important;
 }
 .dock.expanded .dock-body {
-  overflow: visible !important;
-  max-height: none !important;
+  overflow: hidden !important;
+  max-height: calc(58vh - 48px) !important;
 }
 .dock.expanded .dock-prompt { overflow: hidden; min-height: 148px; flex: 1 1 auto; }
 .dock.expanded .dock-foot {
@@ -68,3 +69,79 @@ textarea.param-unsupported-control{
 .dock.expanded .bar .param-group.hidden { display: none !important; }
 .dock.expanded .bar .param-field { min-width: 88px; }
 .dock.expanded #prompt { min-height: 120px; }
+
+/* v0821o60-clip-fix: pin dock to viewport */
+.dock,
+.dock.expanded {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 12px !important;
+  top: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(720px, calc(100vw - 48px)) !important;
+  max-width: min(720px, calc(100vw - 48px)) !important;
+  max-height: min(58vh, 560px) !important;
+  height: auto !important;
+  z-index: 40 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.dock.expanded .dock-body {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  max-height: calc(58vh - 48px) !important;
+  overflow: hidden !important;
+}
+.dock.expanded .dock-scroll {
+  flex: 0 1 auto !important;
+  max-height: 22% !important;
+  overflow: auto !important;
+}
+.dock.expanded .dock-prompt {
+  flex: 1 1 auto !important;
+  min-height: 96px !important;
+  max-height: 36% !important;
+  overflow: hidden !important;
+}
+.dock.expanded #prompt {
+  display: block !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  max-height: 100% !important;
+  box-sizing: border-box !important;
+}
+.dock.expanded .dock-foot {
+  flex: 0 0 auto !important;
+  max-height: 42% !important;
+  overflow: auto !important;
+}
+.dock.expanded .bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
+  height: auto !important;
+  max-height: none !important;
+}
+.dock.expanded .bar .param-group.hidden,
+.dock.expanded .bar .param-group[hidden] {
+  display: none !important;
+}
+.dock.expanded #falParams.hidden,
+.dock.expanded #comfyParams.hidden,
+.dock.expanded #nanoParams.hidden {
+  display: none !important;
+}
+.dock.expanded #send,
+.dock.expanded .send {
+  position: sticky !important;
+  bottom: 4px !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  z-index: 9 !important;
+  pointer-events: auto !important;
+}
