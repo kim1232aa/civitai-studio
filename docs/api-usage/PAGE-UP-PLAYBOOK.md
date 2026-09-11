@@ -18,6 +18,19 @@
 
 启动一个 `python3 server.py`。端口不钉死，记 PID + HEAD。
 
+开跑前可用官方只读探测（**禁止** POST 本站 `/api/generate`）：
+
+| backend | 探测 |
+| --- | --- |
+| civitai | `GET https://civitai.com/api/v1/models?limit=1` Bearer |
+| fal | `GET https://fal.ai/api/models` `Authorization: Key KEY_ID:KEY_SECRET` |
+| huggingface | `GET https://huggingface.co/api/whoami-v2` Bearer（401 = 本机钥失效，换新钥，不进仓） |
+| modelscope-ai | `GET https://modelscope.ai/openapi/v1/users/me` Bearer |
+| modelscope-cn | `GET https://modelscope.cn/openapi/v1/users/me` Bearer |
+| nano-gpt | `GET https://nano-gpt.com/api/v1/models` Bearer |
+
+AI token 打 CN host / CN token 打 AI host 应为 401。探测 200 不是页 ↑ Pass。
+
 ## 每家一轮
 
 1. 从 hinablue 点一张**没用过**的图，导入完整参数（原 prompt、底模、LoRA、尺寸、seed）。
