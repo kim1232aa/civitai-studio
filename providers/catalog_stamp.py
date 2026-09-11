@@ -1,8 +1,7 @@
 """o57: stamp GET /api/catalog rows with official item-level match caps.
 
-Provider.catalog is the HTTP boundary (see providers.base). Overlays only
-translate official schema; they do not invent duration 5/12/16 or raise
-HF loraConfidence to official.
+All six backends. Overlays only translate official schema; they do not invent
+duration 5/12/16, Nano promptMax=1200, or raise HF loraConfidence to official.
 """
 from __future__ import annotations
 
@@ -22,6 +21,12 @@ def overlay_provider_catalog(backend: str | None, body: dict | None) -> dict:
     if be in ("huggingface", "hf"):
         from .hf_catalog_caps import overlay_huggingface_catalog
         return overlay_huggingface_catalog(body)
+    if be == "fal":
+        from .six_catalog_caps import overlay_fal_catalog
+        return overlay_fal_catalog(body)
+    if be in ("nano-gpt", "nanogpt", "nano"):
+        from .six_catalog_caps import overlay_nano_catalog
+        return overlay_nano_catalog(body)
     return dict(body)
 
 
@@ -39,19 +44,22 @@ def _wrap_catalog(provider: Any, overlay_fn: Callable[[dict | None], dict]) -> N
 
 
 def install_catalog_stamps(providers_map: dict | None) -> None:
-    """Wrap live Provider.catalog + civitai.slim_item. Idempotent."""
+    """Wrap live Provider.catalog + civitai.slim_item. Idempotent. All six houses."""
     from .capabilities import (
         overlay_civitai_catalog,
         overlay_civitai_catalog_item,
         overlay_modelscope_catalog,
     )
     from .hf_catalog_caps import overlay_huggingface_catalog
+    from .six_catalog_caps import overlay_fal_catalog, overlay_nano_catalog
 
     mapping = providers_map or {}
     _wrap_catalog(mapping.get("civitai"), overlay_civitai_catalog)
     _wrap_catalog(mapping.get("modelscope-ai"), overlay_modelscope_catalog)
     _wrap_catalog(mapping.get("modelscope-cn"), overlay_modelscope_catalog)
     _wrap_catalog(mapping.get("huggingface"), overlay_huggingface_catalog)
+    _wrap_catalog(mapping.get("fal"), overlay_fal_catalog)
+    _wrap_catalog(mapping.get("nano-gpt"), overlay_nano_catalog)
 
     from . import civitai as civitai_mod
     if not getattr(civitai_mod, "_o57_slim_stamped", False):
