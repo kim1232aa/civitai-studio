@@ -23,7 +23,7 @@ API 调查报告单独保留在 [`api-usage/`](./api-usage/)，可与本文件�
 7. **禁止空壳**：看着像功能就必须端到端能用；否则如实报未完成。llm 为交差弄空壳 = 越权 / Fail。
 8. **禁止多余门阀**：不要加一刀切 gate 把本来正常的功能禁掉；能力不明标「未知」，不要当「上限很低」来拦。
 9. **禁止发明默认值 / 偷换模型·LoRA·strength**。魔搭 / HF 仅在老板已拍板「允许近似」时可用目录近似条目顶替；不得私自发明。
-10. **禁止单家盯梢**：Civitai / Fal / HF / 魔搭 / Nano… 凡启用的 provider 都要真闭环轮转推进，不许只啃一两家交差。
+10. **禁止单家盯梦**：Civitai / Fal / HF / 魔搭 / Nano… 凡启用的 provider 都要真闭环轮转推进，不许只啃一两家交差。
 
 ## 3. 闭环计数口径
 
@@ -33,8 +33,8 @@ API 调查报告单独保留在 [`api-usage/`](./api-usage/)，可与本文件�
 
 ## 4. 流程
 
-11. **不做分支**：禁止 `feat/` / `fix/` / 任何新枝。只在 `origin/main` 上改、`commit`、`push`。旧旁枝有用的已合进 main 就删；未合且会冲回旧闸的 **禁止再 merge**。
-12. 老板已授权：刀收完可直接 `commit` + `push`（理清工作区），不必再问。一个 bug 一次 commit+push；只留一个本地服务，旧进程杀掉。
+11. **只写 `main`，禁止开新枝**。不建 `feat/*` / `fix/*` / agent 专用枝。已合进 main 的 stale 枝**只删不重复合**（重合会把旧门门冲回）。push main 前仍要自审：禁空壳、禁删功能、禁未验证断言。
+12. 老板已授权：刀收完可直接 `commit` + `push` 到 **main**（理清工作区），不必再问。
 13. 不到交付不要喊老板验收；审查员见空壳 / 删功能 / 未验证断言 / 多余门阀误杀 = **Fail**。
 
 ## 5. 当前拍板（§4）
@@ -59,7 +59,10 @@ API 调查报告单独保留在 [`api-usage/`](./api-usage/)，可与本文件�
 
 **方向：我们对照源站，不是源站对照我们。** Seko 是基准；本站是被测对象。逐项问「我们差源站什么」，禁止反过来说「源站没有我们的某某所以算齐」。
 
+
 对照入口：§6 Seko URL。**每一项**先截源站同流程作基准，再截本站对照；缺源站基准或只晒本站 = 未验证。只截 stamp/空画布/登录页不算对照。
+
+
 
 ### 对照维度（每项都要覆盖）
 
@@ -94,23 +97,47 @@ D. **本地化源站 HTML** — 本站实现应对齐源站 DOM/结构与交互�
 
 交付一句口径：`原站对照 = 以 Seko 为基准，按 §7×四维量本站差距；未列完不得宣称像 Seko。`
 
-## 8. 分支纪律（老板原话）
+## 8. 分支纪律（只认 main）
 
-> 都要理啊 这么多分支 我一直说要弄 main 不知道你们为什么一直建分支
-> 没有用的可以删了，有用的合并到main
+老板原话（`REQUIREMENTS` §1.10）：「都要理啊 这么多分支 我一直说要弄 main 不知道你们为什么一直建分支。没有用的可以删了，有用的合并到 main。」
 
-14. **禁止新建分支**（`feat/*` `fix/*` `wip/*` 都算）。以后只写 `main`，只推 `origin/main`。
-15. **不得为了整理再 merge 一次旧旁枝**：若该枝已是 main 祖先，再合会把旧闸（seed mod、promptMax=1200、发明 duration）冲回。
-16. 遭遇远程还挂着的旧枝：先确认 main 已含其有用提交 → `git push origin --delete <branch>`。MCP 没有删枝接口时说明这条命令，不要造 PR 再合一遍。
+1. **之后不开新枝。** 禁止 `git checkout -b`、禁止 `feat/` `fix/` `wip/` agent 专用枝。一刀一 `commit` + `push origin main`。
+2. **之后只合 / 只写 main。** 有用的改动已在 main 就停止。stale 枝若已是 main 祖先，**只删不再 merge**（再合会把旧 seed-mod / 发明门门冲回）。
+3. 远程只应留 `origin/main`。发现旁枝：先核是否已在 main 历史；已合 → `git push origin --delete <branch>`；未合的有用提交 → 检查差异后**人工 cherry-pick 到 main**，不要整枝盲合。
+4. 禁止并列 worktree / 多 clone 各写一枝导致 SHA 对不上。工作区只留一份、只跟 `origin/main`。
+5. 不要动 `main` 的保护开关来绕过本条。
 
-## 9. 工作规范（测试文件 / 临时文件）
+## 9. 工作区文件规范
 
-17. **持久单测**：只放 `scripts/test_*.py` 或 `scripts/test_*.js`。命名 `test_<主题>`，不要散落仓库根、`/tmp`、桌面。
-18. **一次性探测 / 临时产出**：
-    - 脚本与抓包：`temp/` 或 `.test-tmp/`（`.gitignore` 已忽略）
-    - 成片 / 上传：`out/`
-    - 审查截图：`docs/review-shots/`
-    - **测完立刻删**，禁止 `git add` 进仓库。
-19. **禁止入库**：`*.bak`、`patch_*.py`、`.env*`、`data/`、token 文件、本机服务日志、未收完的 findings 草稿。
-20. 持久单测也只留还在验证的行为；过时 stamp / 拷贝旧闸的断言要改或删，不要堆旧夹具冒充绿。
-21. 每轮结束前自查：`git status` 只有这一刀的代码/文档；工作区不留临时文件。
+老板原话：「理清楚工作区，不要脏了」。每修一个 bug 就 commit + push main。只启动一个服务（`python3 server.py` / `scripts/restart.py`）。
+
+### 可进仓（持久）
+
+| 放哪 | 什么 |
+| --- | --- |
+| `scripts/test_*.py` · `scripts/test_*.js` | 持久单测。命名 `test_oNN_主题`。测对接/门门/字段契约，**不算页↑验收** |
+| `scripts/smoke*.py` | 读路由探活；禁 POST `/api/generate` 冒充闭环 |
+| `docs/api-usage/` · `docs/00-IRON-RULES.md` | 官方 API 对照与铁律 |
+
+### 禁止进 git（临时，测完必删）
+
+已在 `.gitignore`：
+
+| 放哪 | 什么 |
+| --- | --- |
+| `temp/` | 一次性 dump、官方页摘录、老板原话拉取 |
+| `.test-tmp/` | 单测跑出的临时目录 |
+| `out/` | 成片 / sidecar / audit；本地证据，不当仓库交付 |
+| `data/` | 画布图 / pending jobs |
+| `docs/review-shots/` | 审查截图 |
+| `*.bak` · `patch_*.py` | 补丁草稿 |
+| `.env*` | 密钥 |
+
+本机草稿还可放 `/tmp`。**测完立刻删** `temp/` `.test-tmp/` 里本次生的文件；禁止把 scratch 、`_ui_findings.md` 、`.jspace/` 、`.cursor/` commit 进 main。
+
+### 禁止
+
+- 用临时文件冒充交付或 Pass
+- 把密钥、签名 URL、`?token=` 写进测试或文档
+- 绿测通过当页↑闭环
+- 为了放测试另开一个分支
