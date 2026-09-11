@@ -82,3 +82,9 @@ def install_catalog_stamps(providers_map: dict | None) -> None:
 
         civitai_mod.catalog_items = catalog_items
         civitai_mod._o57_slim_stamped = True
+
+    try:
+        from .civitai_lora_shape import install_civitai_lora_shape
+        install_civitai_lora_shape()
+    except Exception as e:
+        print("[civitai] o57 lora shape skip", e, flush=True)
