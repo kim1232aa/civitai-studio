@@ -1,5 +1,6 @@
-/* v0821o61-group-hide — load AFTER composer-field-adapt.js
+/* v0821o65-group-hide — load AFTER composer-field-adapt.js
  * Civitai image must not keep #falParams visible.
+ * Fal width is supported, so the width!=unsupported fallback must NOT open #comfyParams.
  */
 (function () {
   function install() {
@@ -16,7 +17,7 @@
       var ic = typeof api.itemCaps === "function" ? api.itemCaps(ctx) : {};
       var hasDurationEnum = Array.isArray(ic.durationEnum) && ic.durationEnum.length > 0;
       var showFal = !textish && (be === "fal" || (vid && hasDurationEnum));
-      var showComfy = !textish && !nano && (
+      var showComfy = !textish && !nano && be !== "fal" && (
         be === "civitai" || be === "huggingface" ||
         be === "modelscope-ai" || be === "modelscope-cn" ||
         (typeof api.resolveFieldSupport === "function" && api.resolveFieldSupport("width", ctx) !== "unsupported")
@@ -30,7 +31,7 @@
       if (nanoBox && nanoBox.classList) nanoBox.classList.toggle("hidden", !showNano);
     };
     api._o61 = true;
-    api.STAMP = "v0821o61-group-hide";
+    api.STAMP = "v0821o65-group-hide";
   }
   install();
 })();
