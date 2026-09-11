@@ -1,6 +1,5 @@
-/* v0821o30-send-gate: dock above zoom/minimap; send hit */
-/* Storyboard-only visual layer. Node dimensions match box() and portPos();
-   no graph, provider, parameter, or generation behavior is changed. */
+/* v0821o66-dock: overlay. Expanded composer must stay usable (o59).
+   No 380px body cap, no 520px width cap. */
 :root {
   color-scheme: dark;
   --bg: #111113;
@@ -9,6 +8,7 @@
   --line: #343438;
   --muted: #a0a0a8;
   --wire: #8d949b;
+  --teal: #5ee0c5;
 }
 * { scrollbar-width: thin; scrollbar-color: #505057 #1a1a1d; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
@@ -28,12 +28,12 @@ header {
 }
 .title { max-width: 100%; font-size: 14px; }
 .tabs { margin: 0; background: #1c1c1f; border-color: #303034; }
-.tabs button {
+.tabs button, .tabs a {
   color: #d2d2d8; cursor: pointer; opacity: 1; pointer-events: auto;
-  background: transparent; border: 0;
+  background: transparent; border: 0; text-decoration: none;
 }
-.tabs button:hover { color: #fff; background: #2a2a32; }
-.tabs .on, .tabs button.on { background: #38383d; color: #fff; }
+.tabs button:hover, .tabs a:hover { color: #fff; background: #2a2a32; }
+.tabs .on, .tabs button.on, .tabs a.on { background: #38383d; color: #fff; }
 .mode-mini { justify-self: end; margin: 0; gap: 12px; }
 .stamp { display: none !important; }
 .stage { background: #111113; isolation: isolate; }
@@ -58,7 +58,30 @@ header {
   border: 1px solid #303034; border-radius: 14px;
   background: #1a1a1ded; box-shadow: 0 6px 20px #0002;
 }
-.dock.expanded { max-height: min(42vh, 400px); max-width: min(520px, calc(100% - 48px)); z-index: 22; }
-.dock.expanded .dock-body { max-height: min(40vh, 380px); }
+.dock { max-width: min(720px, calc(100% - 48px)); }
+.dock.expanded {
+  max-height: min(62vh, 560px);
+  max-width: min(720px, calc(100% - 48px));
+  z-index: 22;
+}
+.dock.expanded .dock-body { max-height: none; overflow: hidden; }
+.dock-prompt {
+  flex: 1 1 auto;
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+}
+.dock.collapsed .dock-prompt { display: none; }
+.dock.expanded .dock-scroll { max-height: 28%; flex: 0 1 auto; height: auto; }
+.dock-foot { max-height: 42%; overflow: auto; }
+.dock.expanded #send {
+  position: sticky;
+  bottom: 8px;
+  z-index: 8;
+  pointer-events: auto !important;
+}
 .badge.house { border-color: rgba(94,224,197,.45); color: #dffcf5; }
 .badge.svc { border-color: #3a3a42; color: #c8c8d0; font-weight: 500; }
+.shot .face img, .shot .face video { object-fit: contain; background: #121214; }
