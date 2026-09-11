@@ -7,11 +7,13 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ],
+      "tags": ["t2i"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": false,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
+        "loraConfidence": "official",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -26,17 +28,16 @@
       "status": "available",
       "task": "image-to-image",
       "needsSource": true,
-      "tags": [
-        "i2i"
-      ],
+      "tags": ["i2i"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": true,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
-        "imageFields": [
-          "image_url"
-        ]
+        "imageFields": ["image_url"]
       },
       "supported_parameters": {
         "max_input_images": 1
@@ -50,17 +51,16 @@
       "status": "available",
       "task": "image-to-image",
       "needsSource": true,
-      "tags": [
-        "i2i"
-      ],
+      "tags": ["i2i"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": true,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
-        "imageFields": [
-          "image_url"
-        ]
+        "imageFields": ["image_url"]
       },
       "supported_parameters": {
         "max_input_images": 1
@@ -73,11 +73,13 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ],
+      "tags": ["t2i"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": false,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
+        "loraConfidence": "official",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -91,12 +93,12 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i",
-        "krea2"
-      ],
+      "tags": ["t2i", "krea2"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": false,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -110,12 +112,12 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i",
-        "krea2"
-      ],
+      "tags": ["t2i", "krea2"],
+      "supportsLora": true,
       "capabilities": {
         "image_to_image": false,
+        "supportsLora": true,
+        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -129,12 +131,11 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-video",
-      "tags": [
-        "t2v",
-        "krea"
-      ],
+      "tags": ["t2v", "krea"],
+      "supportsLora": false,
       "capabilities": {
         "image_to_image": false,
+        "supportsLora": false,
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",

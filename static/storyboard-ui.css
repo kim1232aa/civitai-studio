@@ -1,5 +1,5 @@
-/* v0821o66-dock: overlay. Expanded composer must stay usable (o59).
-   No 380px body cap, no 520px width cap. */
+/* v0821o69-dock: overlay. Expanded composer usable. Rail bottom-anchored so it
+   does not cover the first shot (Seko: tools left, assets above minimap). */
 :root {
   color-scheme: dark;
   --bg: #111113;
@@ -43,7 +43,7 @@ header {
   left: 16px; top: 20px; width: 56px; gap: 5px;
   padding: 7px; border: 1px solid #303034; border-radius: 20px;
   background: #1b1b1eee; box-shadow: 0 6px 20px #0003;
-  max-height: calc(100% - 204px); overflow: auto;
+  max-height: calc(100% - 220px); overflow: auto;
 }
 .tool, .tool.lbl {
   width: 40px; min-width: 40px; height: 40px; flex-shrink: 0;
@@ -53,14 +53,22 @@ header {
 #btnAdd { background: #ececef; color: #171719; border-radius: 50%; font-size: 24px; }
 .tools-hint { display: none !important; }
 .rail {
-  left: 84px; top: 20px; width: 164px;
-  max-height: calc(100% - 204px); padding: 10px; gap: 8px;
-  border: 1px solid #303034; border-radius: 14px;
-  background: #1a1a1ded; box-shadow: 0 6px 20px #0002;
+  left: 16px;
+  top: auto;
+  bottom: 176px;
+  width: 164px;
+  max-height: 36vh;
+  padding: 10px;
+  gap: 8px;
+  border: 1px solid #303034;
+  border-radius: 14px;
+  background: #1a1a1ded;
+  box-shadow: 0 6px 20px #0002;
+  z-index: 8;
 }
 .dock { max-width: min(720px, calc(100% - 48px)); }
 .dock.expanded {
-  max-height: min(62vh, 560px);
+  max-height: min(58vh, 560px);
   max-width: min(720px, calc(100% - 48px));
   z-index: 22;
 }
@@ -85,3 +93,4 @@ header {
 .badge.house { border-color: rgba(94,224,197,.45); color: #dffcf5; }
 .badge.svc { border-color: #3a3a42; color: #c8c8d0; font-weight: 500; }
 .shot .face img, .shot .face video { object-fit: contain; background: #121214; }
+#paramSupportStrip { display: none !important; }

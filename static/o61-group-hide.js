@@ -1,11 +1,27 @@
-/* v0821o65-group-hide — load AFTER composer-field-adapt.js
+/* v0821o69-group-hide — load AFTER composer-field-adapt.js
  * Civitai image must not keep #falParams visible.
  * Fal width is supported, so the width!=unsupported fallback must NOT open #comfyParams.
+ * o69: hide unsupported fields (not grey badge). LoRA only when supportsLora===true,
+ * except Civitai AIR which always shows LoRA after a model is selected.
  */
 (function () {
+  function hide(el) {
+    if (!el) return;
+    el.classList.add("hidden");
+    if (el.style) el.style.display = "none";
+  }
+  function show(el) {
+    if (!el) return;
+    el.classList.remove("hidden");
+    if (el.style && el.style.display === "none") el.style.display = "";
+  }
+  function wrapOf(el) {
+    if (!el) return null;
+    return (el.closest && el.closest(".param-field")) || el.parentElement || el;
+  }
   function install() {
     var api = typeof window !== "undefined" ? window.ComposerFieldAdapt : null;
-    if (!api || typeof api.applyToSurface !== "function" || api._o61) return;
+    if (!api || typeof api.applyToSurface !== "function" || api._o69) return;
     var orig = api.applyToSurface;
     api.applyToSurface = function (ctx) {
       orig(ctx);
@@ -19,8 +35,7 @@
       var showFal = !textish && (be === "fal" || (vid && hasDurationEnum));
       var showComfy = !textish && !nano && be !== "fal" && (
         be === "civitai" || be === "huggingface" ||
-        be === "modelscope-ai" || be === "modelscope-cn" ||
-        (typeof api.resolveFieldSupport === "function" && api.resolveFieldSupport("width", ctx) !== "unsupported")
+        be === "modelscope-ai" || be === "modelscope-cn"
       );
       var showNano = nano;
       var fal = ctx.$("falParams");
@@ -29,9 +44,52 @@
       if (fal && fal.classList) fal.classList.toggle("hidden", !showFal);
       if (comfy && comfy.classList) comfy.classList.toggle("hidden", !showComfy);
       if (nanoBox && nanoBox.classList) nanoBox.classList.toggle("hidden", !showNano);
+
+      var item = (ctx.item && typeof ctx.item === "object") ? ctx.item : {};
+      var caps = (item.capabilities && typeof item.capabilities === "object") ? item.capabilities : (ctx.caps || {});
+      var supportsLora = caps.supportsLora;
+      if (supportsLora == null) supportsLora = item.supportsLora;
+
+      ["sampler", "scheduler", "steps", "cfg", "width", "height", "nanoRes", "duration", "aspect", "res", "seed"].forEach(function (field) {
+        var el = ctx.$(field);
+        if (!el || typeof api.resolveFieldSupport !== "function") return;
+        var support = api.resolveFieldSupport(field, ctx);
+        var wrap = wrapOf(el);
+        if (support === "unsupported") hide(wrap);
+        else if (wrap && wrap.classList && wrap.classList.contains("param-mode-hide")) hide(wrap);
+        else show(wrap);
+      });
+
+      if (be !== "civitai") {
+        hide(wrapOf(ctx.$("sampler")));
+        hide(wrapOf(ctx.$("scheduler")));
+      }
+
+      var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
+      var loraBlock = (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
+      var hasModel = !!(item.id || ctx.serviceId);
+      var showLora = be === "civitai" ? hasModel : (hasModel && supportsLora === true);
+      if (showLora) {
+        show(loraBlock);
+        if (loraBlock && loraBlock.classList) loraBlock.classList.remove("param-lora-off");
+      } else {
+        hide(loraBlock);
+        if (loraBlock && loraBlock.classList) loraBlock.classList.add("param-lora-off");
+      }
+
+      var refs = ctx.$("refs") || ctx.$("refSlot") || ctx.$("refImages");
+      if (caps.image_to_image === false || item.task === "text-to-image") hide(refs);
+      if (caps.image_to_image === true || item.task === "image-to-image") show(refs);
+
+      var strip = ctx.$("paramSupportStrip");
+      if (strip) {
+        strip.hidden = true;
+        hide(strip);
+      }
     };
     api._o61 = true;
-    api.STAMP = "v0821o65-group-hide";
+    api._o69 = true;
+    api.STAMP = "v0821o69-group-hide";
   }
   install();
 })();

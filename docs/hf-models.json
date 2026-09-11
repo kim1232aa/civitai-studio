@@ -7,9 +7,13 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false,
+        "loraConfidence": "none"
+      }
     },
     {
       "id": "black-forest-labs/FLUX.1-dev",
@@ -18,9 +22,13 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false,
+        "loraConfidence": "unverified"
+      }
     },
     {
       "id": "black-forest-labs/FLUX.1-Krea-dev",
@@ -29,9 +37,13 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false,
+        "loraConfidence": "unverified"
+      }
     },
     {
       "id": "Qwen/Qwen-Image",
@@ -40,9 +52,12 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false
+      }
     },
     {
       "id": "Tongyi-MAI/Z-Image-Turbo",
@@ -51,9 +66,12 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false
+      }
     },
     {
       "id": "stabilityai/stable-diffusion-xl-base-1.0",
@@ -62,9 +80,12 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": [
-        "t2i"
-      ]
+      "tags": ["t2i"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false
+      }
     },
     {
       "id": "tencent/HunyuanVideo",
@@ -73,9 +94,13 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-video",
-      "tags": [
-        "t2v"
-      ]
+      "tags": ["t2v"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false,
+        "videoDuration": false
+      }
     },
     {
       "id": "Lightricks/LTX-Video-0.9.8-13B-distilled",
@@ -84,9 +109,13 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-video",
-      "tags": [
-        "t2v"
-      ]
+      "tags": ["t2v"],
+      "supportsLora": false,
+      "capabilities": {
+        "supportsLora": false,
+        "image_to_image": false,
+        "videoDuration": false
+      }
     }
   ]
 }
