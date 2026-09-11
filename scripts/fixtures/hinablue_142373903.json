@@ -1,0 +1,22 @@
+{
+  "id": 142373903,
+  "sourceUrl": "https://civitai.red/images/142373903",
+  "username": "hinablue",
+  "prompt": "A massive, whimsical crowd of stylized cats tightly packs the canvas in a compressed, straight-on group portrait. The characters are stacked vertically and horizontally, overlapping one another to create a dense, chaotic wall of fur that fills nearly the entire frame. Each feline features an oversized, perfectly round pair of white eyes with tiny, pinprick black pupils that look in slightly different directions, giving the entire group a wonderfully goofy, wide-eyed expression of collective bewilderment. The characters showcase a charming variety of colors and textures, all rendered in a soft, illustrative watercolor style. Towering at the top are long-bodied cats in chocolate brown, soft white, and a misty gray, while a fluffy, jet-black cat dominates the absolute center with wild, spiky fur. Interspersed throughout the middle and lower rows are short-eared felines in warm ginger-orange, deep rusty red, tabby brown, and a light cream color, creating a rich patchwork of autumn tones that contrasts beautifully with a stark white cat sitting in the bottom left corner. The composition relies on a flat, compressed perspective, completely eliminating any sense of physical depth or environment to keep the focus entirely on the humorous group dynamic. Long, thin, and wiry whiskers shoot out horizontally from their tiny pink and black noses, crisscrossing over neighboring faces in a messy, entangled grid. Their bodies are simple, tapering oblong shapes that seamlessly blend into a solid mass of color along the lower edge of the frame, capturing the cozy warmth of a tightly huddled pack. The original plain white backdrop has been completely replaced with a solid, vibrant canary-yellow background that peeks out only through the tiny gaps near the top corners and ears of the highest cats. This loud, cheerful yellow frame introduces a bright energy to the illustration, making the various shades of brown, orange, and gray fur pop with immense visual contrast. The camera remains fixed in a wide, dead-center positioning, trapping the entire quirky assembly together as they stare perpetually outward at the viewer. <lora:Purple_Graphics_KR2:1>",
+  "negativePrompt": "",
+  "sampler": "er_sde",
+  "steps": 8,
+  "cfgScale": 1,
+  "seed": 243138068893831,
+  "width": 960,
+  "height": 1440,
+  "Size": "960x1440",
+  "Model": "1125 - Krea2 Asian Utopian - Turbo/INT8/INT4/NVFP4/GGUF (Checkpoint v3.3)",
+  "resources": [
+    {
+      "type": "lora",
+      "name": "Purple_Graphics_KR2",
+      "weight": 1
+    }
+  ]
+}
