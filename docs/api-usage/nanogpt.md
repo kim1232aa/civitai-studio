@@ -1,6 +1,6 @@
 # NanoGPT API 用法
 
-适配器：`providers/nanogpt.py`。capabilities：`lora=path`，`loraPath=civitai_download`，`resolution=catalog_token`，`promptMax=1200`，`seed` mod int32，`progress=none`，`cancel=False`，`estimate=catalog_price`，`i2i=input_references`，`i2v=image_url`，`maxRefs=5`，`refImagesField=input_references`，`videoDuration=string_seconds`。
+适配器：`providers/nanogpt.py`。capabilities：`lora=path`，`loraPath=civitai_download`，`resolution=catalog_token`，`promptMax=None`（**无公布上限**），`seed` clamp=`none`（**禁止 mod int32**），`progress=none`，`cancel=False`，`estimate=catalog_price`，`i2i=input_references`，`i2v=image_url`，`maxRefs=5`，`refImagesField=input_references`，`videoDuration=string_seconds`。
 
 ## Auth
 
@@ -27,7 +27,7 @@
 
 ## Catalog
 
-`fetch_catalog` 合并图+视频；TTL 300s。行含 `supported_parameters.resolutions`、`supportsLora`（`*-lora` / tags）、`pricing`。
+`fetch_catalog` 合并图+视频；TTL 300s。行含 `supported_parameters.resolutions`、`supportsLora`（`*-lora` / tags，**heuristic**）、`pricing`。
 
 `GET /api/catalog?backend=nano-gpt`。
 
@@ -40,18 +40,18 @@
 | Studio | Vendor | 必填? | 备注 |
 | --- | --- | --- | --- |
 | `serviceId` | `model` | 是 | Civitai id→400；无 resolutions 列表→400 |
-| `prompt` | `prompt` | 是 | len≤**1200** 否则 `prompt_too_long` |
+| `prompt` | `prompt` | 是 | **无官方 max**；`NANO_PROMPT_MAX=None`，禁止本地 1200 门闹。上游 `prompt_too_long` 仍按 400 出面 |
 | `negativePrompt` | `negative_prompt` + `negativePrompt` | 否 | |
 | `resolution` / WxH 参考 | `resolution` + `size`（**同一 token**） | 是 | `pick_resolution`；**禁止**自由 width/height 出站 |
 | `width`/`height` | 仅算 `aspect_ratio` | — | `_core_image_body` / `sanitize_submitted_for_persist` **pop 掉** |
 | `aspect` 推导 | `aspect_ratio` | 否 | `closest_aspect` |
-| `seed` | `seed` | 否 | mod int32；变化时 `seedOriginal`/`seedClamped` |
+| `seed` | `seed` | 否 | 整数 ≥ -1；**禁止 mod int32**；无 `seedClamped` |
 | `quantity` | `n` / `nImages` | 否 | 1–4 |
-| refs | `input_references`（normalized）/ `imageDataUrl(s)`（OAI+edit） | i2i | **禁止**同请求混两种风格；OAI/edit 由 `input_references` 映射 |
-| `denoise`/`strength` | `strength` | i2i | 默认 0.65 |
+| refs | `input_references`（normalized）/ `imageDataUrl(s)`（OAI+edit） | i2i | **禁止**同请求混两种风格；混用官方 `conflicting_image_inputs` |
+| `denoise`/`strength` | `strength` | i2i | **未填省略**（不发明 0.65） |
 | `steps` | `num_inference_steps` + `steps` | 否 | |
 | `cfgScale` | `guidance_scale` | 否 | |
-| `loras[]` | `loras[{path,scale}]` + `lora_i_url`/`lora_i_scale` | 否 | ≤3；须 `*-lora` 模型 |
+| `loras[]` | `loras[{path,scale}]` + `lora_i_url`/`lora_i_scale` | 否 | 官方 Image API **请求表无 loras**；仅 `*-lora` 模型 heuristic 通道；≤3 |
 | mature | `enable_safety_checker:false` | 否 | |
 
 视频 `_video_body`：`duration` 字符串；首帧 `imageDataUrl` 或 `imageUrl`/`image_url`；`mode` image-to-video|text-to-video。
@@ -70,7 +70,7 @@
 
 | 项 | 行为 |
 | --- | --- |
-| seed | mod；响应 seed 优先写入 meta |
+| seed | 整数原样出站；禁止 mod / clip int32；响应 seed 优先写入 meta |
 | resolution | **仅**目录 token；空目录 → 400 |
 | negative | 支持 |
 | progress | 图 sync `none`；视频可 poll status，progress 仍 None |
@@ -84,7 +84,7 @@
 
 | 动作 | 行 |
 | --- | --- |
-| TOKEN / endpoints / NANO_PROMPT_MAX | `nanogpt.py:18-55` |
+| TOKEN / endpoints / `NANO_PROMPT_MAX=None` | `nanogpt.py:18-55` |
 | `pick_resolution` | `:174-244` |
 | B2 resolve / sanitize | `:349-448` |
 | `resolve_nano_loras` | `:474-598` |
@@ -102,7 +102,7 @@
 2. `GET /api/v1/video-models` → `_row_video`
 3. Studio：`GET /api/catalog?backend=nano-gpt`
 
-`supportsLora`：id/name/tags 含 `lora` 或 `*-lora`；**upscale/bg/utility 禁止**因裸子串标 true（v0771）。
+`supportsLora`：id/name/tags 含 `lora` 或 `*-lora`；**upscale/bg/utility 禁止**因裸子串标 true（v0771）。**官方 supported_parameters 无 loras 键** — 此旗 heuristic。
 
 机器可读说明 + 实测样本：[models/nanogpt-inventory.md](models/nanogpt-inventory.md) / [models/nanogpt-index.json](models/nanogpt-index.json)。
 
@@ -131,11 +131,12 @@ persist：只存 download API / versionId（禁止签名 B2 / ?token=）
 
 Civitai API key **永不**发给 Nano、永不进 URL query。
 
-## 官方对照（2026-09-08）
+## 官方对照（2026-09-11）
 
-- 文档：https://docs.nano-gpt.com/introduction
-- 目录：`GET /api/v1/images/models`、`GET /api/v1/video-models`
+- 文档：https://docs.nano-gpt.com/api-reference/endpoint/image-api-generate
+- 目录：`GET /api/v1/images/models`、`GET /api/v1/video-models`（勿硬编能力表）
 - 出图优先 `POST /api/v1/images`，失败再试 `/v1/images/generations`
+- 官方请求键：`model, prompt, n, resolution, aspect_ratio, quality, output_format, seed, input_references`
+- **没有** prompt 字符上限；**没有** seed int32；**没有** 官方 `loras[]` 键
 - 视频：`POST /api/generate-video` + `GET /api/video/status?requestId=`
-- 能力表：`promptMax=1200`，`resolution=catalog_token`，`progress=none`，`cancel=False`，`maxRefs=5`，`refImagesField=input_references`
-- 改 `nanogpt.py` 后必须 `python3 scripts/restart.py && ./run.sh`（只硬刷 HTML 不够）
+- 改 `nanogpt.py` 后必须 `python3 scripts/restart.py && ./run.sh`
