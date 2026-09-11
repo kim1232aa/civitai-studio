@@ -1,6 +1,7 @@
 """Pending generate jobs: jobId ↔ shotId for resume writeback after tab death.
 
 Client + server share data/pending_jobs.json so clean-profile hydrate can resume.
+o58: completing a job without a node/shot id is incomplete, not success.
 """
 from __future__ import annotations
 
@@ -17,6 +18,9 @@ PENDING_PATH = Path(
     os.environ.get("PENDING_JOBS_PATH", str(ROOT / "data" / "pending_jobs.json"))
 )
 PENDING_PATH.parent.mkdir(parents=True, exist_ok=True)
+GRAPH_PATH = Path(
+    os.environ.get("STORYBOARD_GRAPH_PATH", str(ROOT / "data" / "storyboard_graph.json"))
+)
 _lock = threading.Lock()
 
 
@@ -85,20 +89,20 @@ def get_pending(job_id: str) -> dict[str, Any] | None:
 
 def register_pending(job_id: str, shot_id: str, backend: str = "", **extra: Any) -> dict[str, Any]:
     jid = (job_id or "").strip()
-    sid = (shot_id or "").strip()
+    sid = (shot_id or "").strip() or str(extra.get("nodeId") or "").strip()
     if not jid or not sid:
         raise ValueError("jobId and shotId required")
     data = _read()
     jobs = data.setdefault("jobs", {})
-    # o49b: retire other job entries for the same shotId before insert
     for old_jid in list(jobs.keys()):
         if old_jid == jid:
             continue
         rec_old = jobs.get(old_jid)
-        if isinstance(rec_old, dict) and str(rec_old.get("shotId") or "").strip() == sid:
+        if isinstance(rec_old, dict) and str(rec_old.get("shotId") or rec_old.get("nodeId") or "").strip() == sid:
             del jobs[old_jid]
     rec = {
         "shotId": sid,
+        "nodeId": str(extra.get("nodeId") or sid).strip(),
         "backend": (backend or "").strip(),
         "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -130,6 +134,7 @@ def clear_pending(job_id: str) -> bool:
 def first_saved_url(data: dict | None) -> str:
     if not isinstance(data, dict):
         return ""
+
     def first(arr):
         if not arr:
             return ""
@@ -139,6 +144,7 @@ def first_saved_url(data: dict | None) -> str:
         if isinstance(x, dict):
             return str(x.get("url") or x.get("path") or x.get("previewUrl") or "").strip()
         return ""
+
     hit = first(data.get("saved")) or first(data.get("files"))
     if hit:
         return hit
@@ -151,11 +157,7 @@ def first_saved_url(data: dict | None) -> str:
 
 
 def find_local_out_saved(job_id: str, out_dir: Path | None = None) -> list[dict]:
-    """If upstream poll fails but materialize already wrote /out, rebuild saved[].
-
-    Naming from save_media_urls: stem = job_id with | and / → _, then `{stem}_{i}.ext`.
-    Also match `{backend}_{opaque}_*` and bare opaque fragment.
-    """
+    """If upstream poll fails but materialize already wrote /out, rebuild saved[]."""
     from .http import DEFAULT_OUT, parse_job_id
 
     jid = (job_id or "").strip()
@@ -180,17 +182,17 @@ def find_local_out_saved(job_id: str, out_dir: Path | None = None) -> list[dict]
                 continue
             if fp.suffix.lower() not in media_ext:
                 continue
-            # prefer exact stem_N over loose *opaque*
             key = fp.name
             if key not in found:
                 found[key] = fp
     if not found:
         return []
-    # sort by trailing _N before ext
+
     def sort_key(name: str):
         import re
         m = re.search(r"_(\d+)\.[^.]+$", name)
         return (int(m.group(1)) if m else 9999, name)
+
     ordered = sorted(found.keys(), key=sort_key)
     saved = []
     for name in ordered:
@@ -202,3 +204,91 @@ def find_local_out_saved(job_id: str, out_dir: Path | None = None) -> list[dict]
             "source": "local-out",
         })
     return saved
+
+
+def node_id_of(rec: dict[str, Any] | None) -> str:
+    if not isinstance(rec, dict):
+        return ""
+    return str(rec.get("nodeId") or rec.get("shotId") or "").strip()
+
+
+def read_storyboard_graph(path: Path | None = None) -> dict[str, Any]:
+    fp = Path(path or GRAPH_PATH)
+    if not fp.exists():
+        return {"cam": {"x": 0, "y": 0, "s": 1}, "nodes": [], "edges": []}
+    try:
+        data = json.loads(fp.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"cam": {"x": 0, "y": 0, "s": 1}, "nodes": [], "edges": []}
+    if not isinstance(data, dict):
+        return {"cam": {"x": 0, "y": 0, "s": 1}, "nodes": [], "edges": []}
+    data.setdefault("nodes", [])
+    data.setdefault("edges", [])
+    return data
+
+
+def write_storyboard_graph(graph: dict[str, Any], path: Path | None = None) -> None:
+    fp = Path(path or GRAPH_PATH)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(graph, ensure_ascii=False, indent=2) + "\n"
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{fp.name}.", suffix=".tmp", dir=fp.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, fp)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def apply_job_media_to_graph(
+    graph: dict[str, Any],
+    job_id: str,
+    media_url: str,
+    pending: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Write media onto the originating node. No node id → incomplete, not Pass."""
+    rec = pending if isinstance(pending, dict) else get_pending(job_id)
+    if not rec:
+        return {"updated": False, "skipped": "no_pending", "incomplete": True}
+    nid = node_id_of(rec)
+    if not nid:
+        return {"updated": False, "skipped": "no_node", "incomplete": True}
+    url = (media_url or "").strip()
+    if not url:
+        return {"updated": False, "skipped": "no_media", "incomplete": True}
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+    hit = None
+    for node in nodes:
+        if isinstance(node, dict) and str(node.get("id") or "") == nid:
+            hit = node
+            break
+    if hit is None:
+        return {"updated": False, "skipped": "node_missing", "incomplete": True, "nodeId": nid}
+    hit["url"] = url
+    hit["mediaUrl"] = url
+    hit["_jobId"] = (job_id or "").strip()
+    submitted = rec.get("submittedInput")
+    if submitted is not None:
+        hit["submittedInput"] = submitted
+    return {"updated": True, "nodeId": nid, "url": url, "incomplete": False}
+
+
+def complete_pending_job(job_id: str, media_url: str) -> dict[str, Any]:
+    """Apply media to the persisted storyboard graph and drop the pending row on success."""
+    rec = get_pending(job_id)
+    if not rec:
+        return {"updated": False, "skipped": "no_pending", "incomplete": True}
+    if not node_id_of(rec):
+        return {"updated": False, "skipped": "no_node", "incomplete": True}
+    graph = read_storyboard_graph()
+    result = apply_job_media_to_graph(graph, job_id, media_url, pending=rec)
+    if result.get("updated"):
+        write_storyboard_graph(graph)
+        clear_pending(job_id)
+    return result
