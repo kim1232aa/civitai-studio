@@ -1,6 +1,6 @@
 # Civitai API 用法
 
-适配器：`providers/civitai.py`（+ `civitai_workflows.py`）。capabilities：`lora=air`，`progress=rate`，`cancel=True`，`estimate=buzz`，`resolution=free_wh`，`negative=True`，`sampler=True`，`i2v=sourceImage`，`maxRefs=9`，`refImagesField=images`。
+适配器：`providers/civitai.py`（+ `civitai_workflows.py` + `civitai_lora_shape.py`）。capabilities：`lora=air`，`progress=rate`，`cancel=True`，`estimate=buzz`，`resolution=free_wh`，`negative=True`，`sampler=True`，`i2v=sourceImage`，`maxRefs=9`，`refImagesField=images`。
 
 ## Auth
 
@@ -47,14 +47,14 @@
 | `width`/`height`/`steps`/`cfgScale`/`seed` | |
 | `sampler`/`scheduler` | 归一到 `SAMPLERS`/`SCHEDULERS` |
 | `diffusionModel` | AIR |
-| `loras[]` | `{air, strength, name, versionId, …}` — **air 必填才出站** |
+| `loras[]` | `{air, strength, name, versionId, …}` — **air 必填才出站**；`strength=null` 保持 null |
 | `mediaUrl` | 原图 |
 
 本地 PNG：`handle_import` → `io_meta.parse_media_bytes` + `enrich_local_parse`。
 
 ## Generate 出站字段表
 
-Studio payload → orchestration `steps[0].input`（`build_workflow`）：
+Studio payload → orchestration `steps[0].input`（`build_workflow` 后 `civitai_lora_shape.reshape_workflow_loras`）：
 
 | Studio key | Vendor field | 必填? | 备注 |
 | --- | --- | --- | --- |
@@ -64,13 +64,13 @@ Studio payload → orchestration `steps[0].input`（`build_workflow`）：
 | `width`/`height` | `width`/`height` | 视 required | clamp 16–2048 |
 | `steps` | `steps` | 否 | 1–150 |
 | `cfgScale` | `cfgScale` | 视 required | float |
-| `seed` | `seed` | 否 | int；空/`random` 不发；**无 int32 clamp**（clamp=none） |
+| `seed` | `seed` | 否 | int；空/`random` 不发；**无 int32 clamp** |
 | `sampler`/`scheduler` | 同名 | 否 | 仅 Civitai 有意义 |
 | `denoise` | `denoise` | 否 | float |
 | `quantity` | `quantity` | 否 | 1–12 |
 | `duration`/`aspectRatio`/`resolution` | 同名 | 视频 | kling duration→str |
 | `diffusionModel` | `diffusionModel` | 否 | AIR |
-| `loras[]` | `loras` | 否 | **`{air: strength}` dict**；无 air **静默跳过该条**（chip 应保证有 air） |
+| `loras[]` | `loras` | 否 | **按 recipe 分形**：Klein/Comfy/LTX2 = `{air:strength}` map；Dev/WAN/Hunyuan = `[{air,strength}]` array；Fal-Krea 拒绝（不静默丢）；无 air 跳过该条 |
 | `firstFrame`/`sourceImage`/`images`… | `apply_frames` → frameFields | i2v/i2i | 见下 |
 | `allowMatureContent` | 顶层 + query | 否 | 默认 True |
 | `engine`/`operation`/`ecosystem`/`model`/`version`/`provider` | 同名覆盖 | 否 | |
@@ -83,7 +83,7 @@ Studio payload → orchestration `steps[0].input`（`build_workflow`）：
 - 尾帧：`lastFrame`/`endImage`/`endSourceImage`
 - 多参考：`images`/`referenceImages`（≤`maxRefs` 9）
 - wan v2.2/2.5/2.6：用 `sourceImage`+`images`，**不发** `startImage`
-- hunyuan：`loras` dict → `[{air,strength}]` 列表
+- hunyuan：官方 `loras` = `[{air,strength}]`
 
 ## LoRA 形态 / 静默丢风险
 
@@ -91,11 +91,11 @@ Studio payload → orchestration `steps[0].input`（`build_workflow`）：
 | --- | --- |
 | 官方形态 | AIR：`urn:air:{eco}:lora:civitai:{modelId}@{versionId}` |
 | Studio chip | `{air, strength|scale, name, versionId, path?, downloadUrl?}` |
-| 出站 | `lora_map`：仅 `air` 非空 → `{air: float(strength)}` |
-| 静默丢 | **无 air 的条目被 continue 掉** — UI 必须保证 import/搜模写入 air |
+| 出站 | `civitai_lora_shape.official_lora_payload` 按 recipe 分 map / array / none |
+| 静默丢 | **无 air 的条目被跳过** — UI 必须保证 import/搜模写入 air |
 | path/url | Civitai orchestration **不吃** http path；那是 Fal/Nano 的事 |
 
-硬闸夹具：`134923572` → air `urn:air:krea2:lora:civitai:2323765@3071582` @ 0.8。
+历史夹具：`134923572` → air `urn:air:krea2:lora:civitai:2323765@3071582` @ 0.8。**不是唯一帖**；页 ↑ 换 hinablue 新图，见 [PAGE-UP-PLAYBOOK.md](PAGE-UP-PLAYBOOK.md)。
 
 ## Seed / 分辨率 / 负面 / 进度 / 取消
 
@@ -104,8 +104,8 @@ Studio payload → orchestration `steps[0].input`（`build_workflow`）：
 | seed | 无 clamp；原样 int |
 | resolution | `free_wh`；视频另可有 `resolution` token（720p/1080p） |
 | negative | 支持 |
-| progress | `rate`：`wait.progress`←`estimatedProgressRate`；`precedingJobs`/`etaSeconds`/`completeAt`（`_wait_snapshot`） |
-| cancel | `DELETE` workflows；Studio `POST|DELETE /api/jobs/{id}/cancel` |
+| progress | `rate`：`wait.progress`←`estimatedProgressRate` |
+| cancel | `DELETE` workflows |
 
 ## Materialize
 
@@ -115,28 +115,18 @@ Civitai blob URL 由 orchestration 返回；本地 `/out` 不经 materialize。�
 
 | 动作 | 位置 |
 | --- | --- |
-| Auth / call | `civitai.py:18-75` |
-| Catalog refresh | `:116-134` |
-| `lora_map` | `:175-185` |
-| `apply_frames` | `:248-330` |
-| `build_workflow` | `:363-443` |
-| `import_image` | `:665-942` |
-| `submit` | `:945-952` |
-| `generate` / `job_status` / `cancel_job` | `:1109-1167` |
-| Provider register | `:1399+` |
+| Auth / call | `civitai.py` |
+| LoRA recipe split | `civitai_lora_shape.py` |
+| `build_workflow` | `civitai.py` + boot hook `install_civitai_lora_shape` |
+| `import_image` | `civitai.py` |
 
-## 已知夹具
-
-- Image `134923572` + LoRA air `urn:air:krea2:lora:civitai:2323765@3071582`
-- Legacy 调查图 `139791102` + version `3231694`（provider-lora.md；审查勿写死单一旧 id）
-
-## 官方对照（2026-09-08，developer.civitai.com recipes）
+## 官方对照（2026-09-11，developer.civitai.com recipes）
 
 索引：https://developer.civitai.com/orchestration/recipes/
 
 - 工作流：`POST https://orchestration.civitai.com/v2/consumer/workflows`（`wait=0` 后 GetWorkflow 轮询）。
-- LoRA 通用形态：`loras: { "urn:air:…": strength }`（与 Studio `lora_map` 一致）。
-- **两条 Krea 勿混**：
-  - **Fal-Krea v2** recipe：`engine:"fal"`, `model:"krea2"`, `size` medium|large — **官方写明不接 LoRA / negative / width·height**（aspectRatio + creativity）。
-  - **Studio 硬闸路径**：`serviceId` `image/comfy/krea2/turbo/createImage`（Comfy + ecosystem `krea2`）— **吃** `urn:air:krea2:lora:…`；夹具 job `12100372-20260908044346005` air@0.8 Pass。
-- 需要 LoRA 的开放权重族：Flux 2 Klein / Flux 1 / SDXL / Qwen sdcpp / ERNIE 等 recipe；勿把 Fal-Krea 文档套到 Comfy-krea2 出站上。
+- LoRA **不是全家一张 dict**：
+  - Flux 2 Klein / Comfy-krea2 / LTX2：`{ "urn:air:…": strength }`
+  - Flux 2 Dev / WAN image / HunyuanVideo：`[{ "air", "strength" }]`
+  - Fal-Krea（`engine:"fal"` + krea）：**不接** LoRA / negative / 自由宽高
+- 两条 Krea 勿混：Fal-Krea v2 ≠ Studio `image/comfy/krea2/turbo/createImage`。
