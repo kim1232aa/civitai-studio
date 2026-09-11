@@ -1,0 +1,24 @@
+/* o76: expanded composer is a right inspector. Never cover the shot row. */
+.dock.show.expanded,
+.dock.expanded {
+  left: auto !important;
+  right: 16px !important;
+  top: 72px !important;
+  bottom: 16px !important;
+  width: 420px !important;
+  max-width: min(420px, calc(100vw - 200px)) !important;
+  min-width: 320px !important;
+  height: auto !important;
+  max-height: calc(100dvh - 96px) !important;
+  transform: none !important;
+}
+.dock.expanded .dock-body {
+  max-height: calc(100dvh - 160px) !important;
+  overflow: auto;
+}
+.chat-rail, .canvas-tip { display: none !important; }
+.param-unsupported { display: none !important; }
+.lora-block.hidden,
+.lora-block.param-lora-off,
+.lora-block.param-unsupported { display: none !important; }
+.bar .param-group.hidden { display: none !important; }
