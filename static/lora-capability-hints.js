@@ -1,15 +1,11 @@
-/*! v0821o67-human-lora-hints
- * Per-backend LoRA rematch hints. Official API is the iron rule:
- * never NANO.concat(FAL) for Civitai / HF / 魔搭.
- * IDs only from that vendor catalog / inventory.
- * HF: Hub mids only, never fal-ai/*lora; confidence=unverified.
- * Nano *-lora list is heuristic (not official supported_parameters.loras).
- * User-facing reason strings stay human; no 不发明 / unverified / 发出≠加载.
+/*! v0821o67-human-copy
+ * Per-backend LoRA rematch hints. Reasons shown in the product UI must be
+ * human copy — no field-board / agent jargon.
  */
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o67-human-lora-hints";
+  const STAMP = "v0821o67-human-copy";
 
   const LORA_HINTS_BY_BACKEND = {
     "nano-gpt": [
@@ -110,7 +106,7 @@
     if (be === "huggingface" && channel && channel !== "fal") {
       return {
         support: "unsupported",
-        reason: "当前通道不支持 LoRA",
+        reason: "这个通道不支持 LoRA",
         confidence: "none",
         shape: shape,
         showBox: true,
@@ -126,13 +122,13 @@
         shape: shape,
         showBox: true,
         enabled: true,
-        badge: unverified ? "unverified" : ""
+        badge: unverified ? "" : ""
       };
     }
     if (supports === false) {
       return {
         support: "unsupported",
-        reason: "当前模型不支持 LoRA",
+        reason: "这个模型不支持 LoRA",
         confidence: "none",
         shape: shape,
         showBox: true,
