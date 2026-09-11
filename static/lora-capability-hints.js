@@ -1,14 +1,15 @@
-/*! v0821o57-six-lora-hints
+/*! v0821o67-human-lora-hints
  * Per-backend LoRA rematch hints. Official API is the iron rule:
  * never NANO.concat(FAL) for Civitai / HF / 魔搭.
  * IDs only from that vendor catalog / inventory.
  * HF: Hub mids only, never fal-ai/*lora; confidence=unverified.
  * Nano *-lora list is heuristic (not official supported_parameters.loras).
+ * User-facing reason strings stay human; no 不发明 / unverified / 发出≠加载.
  */
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o57-six-lora-hints";
+  const STAMP = "v0821o67-human-lora-hints";
 
   const LORA_HINTS_BY_BACKEND = {
     "nano-gpt": [
@@ -109,7 +110,7 @@
     if (be === "huggingface" && channel && channel !== "fal") {
       return {
         support: "unsupported",
-        reason: "本通道未接入 LoRA",
+        reason: "当前通道不支持 LoRA",
         confidence: "none",
         shape: shape,
         showBox: true,
@@ -120,9 +121,7 @@
       const unverified = confidence === "unverified" || confidence === "heuristic";
       return {
         support: "supported",
-        reason: confidence === "unverified"
-          ? "发出≠加载 / 无官方 /lora sibling"
-          : (confidence === "heuristic" ? "supportsLora 为 *-lora 启发式，非官方字段" : ""),
+        reason: "",
         confidence: confidence,
         shape: shape,
         showBox: true,
@@ -133,7 +132,7 @@
     if (supports === false) {
       return {
         support: "unsupported",
-        reason: "本模型官方不接 LoRA",
+        reason: "当前模型不支持 LoRA",
         confidence: "none",
         shape: shape,
         showBox: true,
@@ -142,7 +141,7 @@
     }
     return {
       support: "unknown",
-      reason: "未确认",
+      reason: "",
       confidence: "unknown",
       shape: shape,
       showBox: true,
