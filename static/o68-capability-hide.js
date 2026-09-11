@@ -1,6 +1,6 @@
-/* v0821o68-capability-hide — load AFTER composer-field-adapt.js + o61-group-hide.js
- * User rule: if this model supports LoRA/seed/sampler/wh/duration, show the input.
- * If not, the input must not appear (not a grey ·不支持 box).
+/* v0821o68-capability-hide — load AFTER composer-field-adapt.js + storyboard.js
+ * If this model supports LoRA/seed/sampler/wh/duration, show the input.
+ * If not, the input must not appear.
  */
 (function () {
   function hide(el) {
@@ -46,9 +46,11 @@
       }
 
       var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
-      var loraBlock = (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
-      var hasModel = !!(item.id || ctx.serviceId);
-      var showLora = hasModel && supportsLora === true;
+      var loraBlock = ctx.$("loraBlock") || (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || document.getElementById("loraBlock");
+      var svcEl = ctx.$("service");
+      var svcVal = (ctx.serviceId || (svcEl && svcEl.value) || (item && item.id) || "").trim();
+      var hasModel = !!(item.id || svcVal);
+      var showLora = (be === "civitai" && hasModel) || (hasModel && supportsLora === true);
       if (showLora) {
         show(loraBlock);
         if (loraBlock && loraBlock.classList) loraBlock.classList.remove("param-lora-off");
@@ -56,9 +58,6 @@
         hide(loraBlock);
         if (loraBlock && loraBlock.classList) loraBlock.classList.add("param-lora-off");
       }
-
-      var refs = ctx.$("refs") || ctx.$("refSlot") || ctx.$("refImages");
-      if (caps.image_to_image === false || item.task === "text-to-image") hide(refs);
 
       var strip = ctx.$("paramSupportStrip");
       if (strip) {
@@ -69,5 +68,6 @@
     api._o68 = true;
     api.STAMP = "v0821o68-capability-hide";
   }
-  install();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
+  else install();
 })();

@@ -1,7 +1,7 @@
 /* v0821o69-group-hide — load AFTER composer-field-adapt.js
  * Civitai image must not keep #falParams visible.
- * Fal width is supported, so the width!=unsupported fallback must NOT open #comfyParams.
- * o69: hide unsupported fields (not grey badge). LoRA only when supportsLora===true,
+ * Fal T2I uses comfy group (w/h/seed); video duration group only when mode=video.
+ * Unsupported fields hide. LoRA only when supportsLora===true,
  * except Civitai AIR which always shows LoRA after a model is selected.
  */
 (function () {
@@ -32,10 +32,11 @@
       var textish = ctx.mode === "text" || ctx.mode === "audio";
       var ic = typeof api.itemCaps === "function" ? api.itemCaps(ctx) : {};
       var hasDurationEnum = Array.isArray(ic.durationEnum) && ic.durationEnum.length > 0;
-      var showFal = !textish && (be === "fal" || (vid && hasDurationEnum));
-      var showComfy = !textish && !nano && be !== "fal" && (
+      var showFal = !textish && vid && (be === "fal" || hasDurationEnum);
+      var showComfy = !textish && !nano && (
         be === "civitai" || be === "huggingface" ||
-        be === "modelscope-ai" || be === "modelscope-cn"
+        be === "modelscope-ai" || be === "modelscope-cn" ||
+        (be === "fal" && !vid)
       );
       var showNano = nano;
       var fal = ctx.$("falParams");
@@ -66,7 +67,7 @@
       }
 
       var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
-      var loraBlock = (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
+      var loraBlock = ctx.$("loraBlock") || (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
       var hasModel = !!(item.id || ctx.serviceId);
       var showLora = be === "civitai" ? hasModel : (hasModel && supportsLora === true);
       if (showLora) {
@@ -76,10 +77,6 @@
         hide(loraBlock);
         if (loraBlock && loraBlock.classList) loraBlock.classList.add("param-lora-off");
       }
-
-      var refs = ctx.$("refs") || ctx.$("refSlot") || ctx.$("refImages");
-      if (caps.image_to_image === false || item.task === "text-to-image") hide(refs);
-      if (caps.image_to_image === true || item.task === "image-to-image") show(refs);
 
       var strip = ctx.$("paramSupportStrip");
       if (strip) {
@@ -91,5 +88,6 @@
     api._o69 = true;
     api.STAMP = "v0821o69-group-hide";
   }
-  install();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
+  else install();
 })();
