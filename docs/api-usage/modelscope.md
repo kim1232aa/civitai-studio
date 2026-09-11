@@ -1,11 +1,11 @@
 # ModelScope（魔搭 AI / CN）API 用法
 
-适配器：`providers/modelscope.py` — **两家独立** `ModelScopeProvider("ai"|"cn")`。capabilities 相同：`lora=hub_repo`，`loraPath=hub_owner_repo`，`progress=status_only`，`cancel=False`，`seed` mod int32，`i2i=source`，`i2v=image_url`，`maxRefs=1`，`refImagesField=image_url`，`videoAspect=True`，`videoDuration=False`。
+适配器：`providers/modelscope.py` — **两家独立** `ModelScopeProvider("ai"|"cn")`。capabilities 相同：`lora=hub_repo`，`loraPath=hub_owner_repo`，`progress=status_only`，`cancel=False`，`seed` clamp=`reject` min=0 max=2147483647（**-1/空/「random」省略不发**，**禁止 mod**），`i2i=source`，`i2v=image_url`，`maxRefs=3`（天花板；目录可收紧），`refImagesField=image_url`，`videoAspect=True`，`videoDuration=False`。
 
 ## Auth / Base（禁止交叉）
 
 | | modelscope-ai | modelscope-cn |
-| --- | --- | --- |
+| --- | --- |
 | Token 文件 | `~/.config/modelscope/token` | `~/.config/modelscope-cn/token` |
 | Env 回退 | `MODELSCOPE_API_TOKEN` 等 | `MODELSCOPE_CN_API_TOKEN` |
 | Generate base | `https://api-inference.modelscope.ai/v1` | `https://api-inference.modelscope.cn/v1` |
@@ -33,13 +33,13 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 | Studio | Vendor | 必填? | 备注 |
 | --- | --- | --- | --- |
 | `serviceId` | `model`（owner/repo） | 是 | Civitai id→400；`payload.model` 与 serviceId 不一致→400 拒 remap |
-| `prompt` | `prompt` | 是 | |
-| `negativePrompt` | `negative_prompt` | 否 | |
-| `seed` | `seed` | 否 | `_clamp_seed` int32 mod |
-| `steps` | `steps` | 否 | |
-| `cfgScale` | `guidance` | 否 | 注意字段名 **guidance** 非 guidance_scale |
+| `prompt` | `prompt` | 是 | 官方表长度 < 2000；**本地不发明上限门闹** |
+| `negativePrompt` | `negative_prompt` | 否 | 官方表长度 < 2000 |
+| `seed` | `seed` | 否 | 官方 **[0, 2147483647]**；reject 不 wrap；**-1 / random / 空 → 省略不 POST** |
+| `steps` | `steps` | 否 | 官方表 [1,100] |
+| `cfgScale` | `guidance` | 否 | 字段名 **guidance** 非 guidance_scale；官方表 [1.5,20] |
 | `width`+`height` | `size` `"WxH"` | 否 | |
-| refs / firstFrame | `image_url` | i2i/i2v | maxRefs=1；多图仅当 edit 且 list |
+| refs / firstFrame | `image_url` | i2i/i2v | 天花板 3；Edit-2509 官方 `images` 1–3 |
 | `loras[]` | `loras` | 否 | **仅 Hub owner/repo** |
 
 官方键集合：`model,prompt,negative_prompt,size,seed,steps,guidance,image_url,loras`。多余键 4xx 时会 slim 重试。
@@ -48,29 +48,31 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 ## LoRA / 静默丢
 
-权威：`providers/modelscope.py` `_modelscope_loras`（2026-09-09/10 实测 + 单测）。旧「单条也用 `[{model,weight}]`」已作废。
+权威：官方 AIGC 表 + `providers/modelscope.py` `_modelscope_loras`。
 
 | | |
 | --- | --- |
 | 单条（无 weight） | 出站 **字符串** `"owner/repo"` |
-| 单条带 weight/scale/strength | **本地 400**「单条 LoRA 官方字段是 owner/repo 字符串，没有 weight」——不改成 `{repo:w}`、也不丢权重 |
-| 多条 | 出站 `{ "owner/repo": weight, …}`，且 **weight 之和必须 = 1.0**；缺 weight → 400（拒默认 1.0） |
-| 勿发 | `[{ "model": "owner/repo", "weight": 0.8 }]`（Krea 实测 400：`loras[0] is not a string`）；单条 `{repo: weight}`（CN 实测 500 模型不存在） |
-| http / Civitai / AIR | **硬拒**（ValueError / 400），不再 `continue` 跳过只出底模 |
-| Hub 搜 | `GET /api/search?backend=modelscope-ai|modelscope-cn&q=`（**不是** `/api/search-loras`） |
-| 禁止 | Civitai→Hub 自动换模对照表（v0753 已撤）；发明默认 strength |
+| 单条带 weight/scale/strength | **本地 400**：单条官方字段是 owner/repo 字符串，没有 weight |
+| 多条 | 出站 `{ "owner/repo": weight, …}`，且 **weight 之和必须 = 1.0**，最多 6；缺 weight → 400（拒默认 1.0） |
+| 勿发 | `[{ "model": "owner/repo", "weight": 0.8 }]`；单条 `{repo: weight}` |
+| http / Civitai / AIR | **硬拒** 400，不再 `continue` 只出底模 |
+| Hub 搜 | `GET /api/search?backend=modelscope-ai|modelscope-cn&q=` |
+| 禁止 | Civitai→Hub 自动换模；发明默认 strength |
 
-夹具：path `…/3231694` → 非 Hub → 400（`test_p0_wiring` / `test_storyboard_graph`）。
+夹具：path `…/3231694` → 非 Hub → 400。
 
-现场债（2026-09-10）：`Tongyi-MAI/Z-Image-Turbo` + 单条字符串 `DiffSynth-Studio/Z-Image-Turbo-DistillPatch`（strength 未填）→ Infer 500 `Model does not exist`。Hub GET 两模型均 200。待无 LoRA 底模 ↑ 隔离是底模还是该 LoRA 不可 API 下载。
+现场债（2026-09-10）：`Tongyi-MAI/Z-Image-Turbo` + 单条字符串 `DiffSynth-Studio/Z-Image-Turbo-DistillPatch` → Infer 500 `Model does not exist`。待无 LoRA 底模 ↑ 隔离。
 
 ## Seed / 进度 / 取消
 
 | 项 | 行为 |
 | --- | --- |
-| seed | mod int32 |
-| progress | `status_only`：wait.progress=None；状态 PENDING/RUNNING/SUCCEED… |
+| seed | 官方 [0, 2^31-1]；reject 不 wrap；-1/random 省略（`providers/modelscope_seed.py` + `aec35f6` boot） |
+| progress | `status_only` |
 | cancel | False |
+
+注：Civision **网页** 「-1=每次随机」不等于 API-Inference 表。API 区间从 0 起；Studio -1 只表省略键，不 POST -1，也不改成本地 randint。
 
 ## Materialize
 
@@ -81,7 +83,8 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 | 动作 | 行 |
 | --- | --- |
 | Token / BASE | `modelscope.py:15-21` |
-| `_clamp_seed` / `_modelscope_loras` | `:78-180`（单条字符串 / 多条 dict） |
+| `_clamp_seed` / `_modelscope_loras` | `:78-180` |
+| seed -1 省略 | `providers/modelscope_seed.py` |
 | Hub fetch | `:201-275` |
 | `generate` | `:427-531` |
 | `job_status` | `:533-582` |
@@ -93,36 +96,26 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 ## Catalog 钉选 vs Hub 发现
 
-钉选文件：`docs/ms-models.json`（Studio 常用 7 条，见 [models/modelscope-inventory.md](models/modelscope-inventory.md)）。
+钉选：`docs/ms-models.json`（见 [models/modelscope-inventory.md](models/modelscope-inventory.md)）。
 
-Hub 列表（AI/CN **共用**搜目录，**不**共用生成 base）：
-
-| | |
-| --- | --- |
-| Hub | `GET https://www.modelscope.cn/openapi/v1/models` |
-| 任务 slug | `text-to-image-synthesis`（**不是** `text-to-image`，后者 0 条）、`image-to-image`、`text-to-video-synthesis`、`image-to-video` |
-| 分页 | `page_size=50`，最多 `_HUB_PAGES=2` |
-| LoRA 搜 | Hub search → 返回 `path=owner/repo`（`search_loras`） |
-| Studio | `GET /api/catalog?backend=modelscope-ai|modelscope-cn` |
+Hub（AI/CN **共用**搜目录，**不**共用生成 base）：`GET https://www.modelscope.cn/openapi/v1/models`；slug `text-to-image-synthesis`（不是 `text-to-image`）。
 
 钉选样本：`Tongyi-MAI/Z-Image-Turbo`、`Qwen/Qwen-Image`、`Qwen/Qwen-Image-Edit`、`krea/Krea-2-Turbo`、`krea/Krea-2-Raw`、`krea/krea-realtime-video`。
 
-异步：提交头 `X-ModelScope-Async-Mode: true`；轮询 `X-ModelScope-Task-Type: image_generation`；任务 id `{backend}|{task_id}`。
-
-## 静默丢 / drift（再钉）
+## 静默丢 / drift
 
 | 风险 | 行为 |
 | --- | --- |
-| Civitai `serviceId`（`image/...`） | 400「当前选中的是 Civitai 服务…」 |
+| Civitai `serviceId` | 400 |
 | `payload.model` ≠ `serviceId` | 400 拒 remap |
-| http / AIR LoRA | `_modelscope_loras` **硬拒 400**（不再 continue 只出底模） |
-| AI 主机失败 | **禁止**改走 CN（文案声明） |
-| 旧域 `api.modelscope.ai` | 已 NXDOMAIN |
+| http / AIR LoRA | 400 |
+| AI 主机失败 | **禁止**改走 CN |
+| 旧域 `api.modelscope.ai` | NXDOMAIN |
 
-## 官方对照（2026-09-08）
+## 官方对照（2026-09-11）
 
-- Hub OpenAPI：`https://www.modelscope.cn/openapi/v1/models`（filter.task 用 synthesis slug）。
-- 生成：`POST https://api-inference.modelscope.{ai|cn}/v1/images/generations`；官方键集合见上表（多余键 4xx 时 slim 重试）。
-- LoRA：单条出站字符串 `"owner/repo"`（带 weight→本地 400）；多条 `{repo:weight}` 且和为 1.0。勿发 `[{model,weight}]` / 单条 `{repo:w}` / Civitai 链。
-- 能力表：`lora=hub_repo`，`progress=status_only`，`cancel=False`，`maxRefs=1`，`refImagesField=image_url`。
-- 全量 Hub 不在本仓库落盘 → inventory 只保证钉选 + 发现端点诚实。
+- API-Inference：https://www.modelscope.cn/docs/model-service/API-Inference/intro
+- Edit-2509 多图 1–3：https://www.modelscope.cn/learn/2577
+- seed **[0, 2^31-1]**，禁 wrap；Studio -1=随机 → 省略。
+- LoRA：单条 `"owner/repo"`；多条 `{repo:weight}` 且和为 1.0，最多 6。
+- 能力表：`maxRefs=3`（不是 1），`refImagesField=image_url`。
