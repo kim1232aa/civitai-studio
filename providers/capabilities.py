@@ -365,6 +365,7 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
 # Provider maxRefs ceiling = 3 (official max for image_url list / Edit-2509).
 # Do NOT copy Nano's 5 (different API: input_references). Catalog may only
 # tighten per model (Edit=1, t2i=1, Edit-2509=3).
+# Do NOT guess i2i from id/name containing "edit" (REQUIREMENTS §3.5).
 MODELSCOPE_REF_POLICY: dict[str, dict[str, Any]] = {
     "Qwen/Qwen-Image": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
     "Qwen/Qwen-Image-Edit": {"task": "image-to-image", "image_to_image": True, "maxRefs": 1},
@@ -386,13 +387,16 @@ def _modelscope_mid(service_id: str | None) -> str:
 
 
 def overlay_modelscope_catalog_item(row: dict | None) -> dict:
-    """Fill image_to_image / maxRefs from official policy, Hub task, or id."""
+    """Fill image_to_image / maxRefs from official policy or Hub task/tags.
+
+    Unknown (no policy, no Hub task/tags, no needsSource) stays unknown:
+    do not invent i2i / maxRefs=1 from the word "edit" in the model id.
+    """
     row = dict(row or {})
     mid = _modelscope_mid(row.get("id") or row.get("model") or "")
     policy = MODELSCOPE_REF_POLICY.get(mid)
     task = str(row.get("task") or row.get("hubTask") or (policy or {}).get("task") or "").strip().lower()
     tags = [str(t).lower() for t in (row.get("tags") or []) if t]
-    blob = (mid + " " + str(row.get("name") or "")).lower()
 
     eats: bool | None = None
     max_r = 1
@@ -409,9 +413,7 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
         elif task in ("text-to-image", "text-to-video") or "t2i" in tags or "t2v" in tags:
             eats = False
             max_r = 1
-        elif "image-edit" in blob or "/edit" in blob or blob.endswith("-edit"):
-            eats = True
-            max_r = 1
+        # Name containing "edit" is not an official schema. Leave eats=None.
 
     caps = dict(row["capabilities"]) if isinstance(row.get("capabilities"), dict) else {}
     if eats is True:
@@ -439,7 +441,7 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
 
 
 def overlay_modelscope_catalog(body: dict | None) -> dict:
-    """HTTP-boundary overlay so /api/catalog items are never capabilities=None."""
+    """HTTP-boundary overlay: policy/task rows get caps; unknown rows stay unknown."""
     if not isinstance(body, dict):
         return {}
     out = dict(body)
@@ -466,4 +468,3 @@ def modelscope_t2i_refs_error(service_id: str | None, n_refs: int, item: dict | 
             "请改选 Qwen Image Edit 或断开参考连线，不能静默忽略"
         )
     return None
-

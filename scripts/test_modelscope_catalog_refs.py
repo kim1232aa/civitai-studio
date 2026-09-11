@@ -2,6 +2,7 @@
 """魔搭 catalog ref policy: t2i does not eat refs; Edit is 1; 2509 official 3 is recorded.
 
 Do NOT copy Nano's maxRefs=5 onto modelscope-cn.
+Do NOT guess i2i from the word edit in an unknown model id (o56 / REQUIREMENTS 3.5).
 """
 from __future__ import annotations
 
@@ -55,6 +56,14 @@ def main():
     check(hub_t2i["capabilities"]["image_to_image"] is False, hub_t2i)
     hub_i2i = overlay_modelscope_catalog_item({"id": "someone/unknown-edit", "task": "image-to-image", "tags": ["i2i"]})
     check(hub_i2i["capabilities"]["image_to_image"] is True and hub_i2i["needsSource"] is True, hub_i2i)
+
+    # o56: name containing "edit" without policy/task/tags must not invent i2i.
+    guessed = overlay_modelscope_catalog_item({"id": "someone/cool-edit-model"})
+    guessed_caps = guessed.get("capabilities") if isinstance(guessed.get("capabilities"), dict) else {}
+    check(guessed_caps.get("image_to_image") is not True, "must not guess i2i from edit in id")
+    check(guessed_caps.get("maxRefs") is None, "unknown row must not invent maxRefs=1")
+    check(modelscope_t2i_refs_error("someone/cool-edit-model", 2, guessed) is None,
+          "unknown edit-named mid is not a t2i hard-block")
 
     pins = json.loads((ROOT / "docs" / "ms-models.json").read_text())["items"]
     body = overlay_modelscope_catalog({"backend": "modelscope-cn", "items": pins})
