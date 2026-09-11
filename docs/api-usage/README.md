@@ -16,11 +16,11 @@
 | **调查总报告 / 六家矩阵 / 硬闸** | [REPORT.md](REPORT.md) |
 | **模型清单与 JSON/CSV 索引** | [models/](models/) |
 | Studio 本地路由（import / generate / jobs / catalog / upload-out / providers） | [studio-routes.md](studio-routes.md) |
-| Civitai orchestration（AIR LoRA、Buzz、rate 进度、cancel） | [civitai.md](civitai.md) |
+| Civitai orchestration（AIR LoRA 按 recipe 分形、Buzz、rate 进度、cancel） | [civitai.md](civitai.md) |
 | Fal queue（`/out`→data: materialize、`loras[{path,scale}]`、queue 进度） | [fal.md](fal.md) |
-| Hugging Face Router（sync、loraConfidence=unverified） | [huggingface.md](huggingface.md) |
-| 魔搭 AI / CN（两套 token+base，hub_repo LoRA） | [modelscope.md](modelscope.md) |
-| NanoGPT（catalog_token 分辨率、≤3 LoRA B2 直链、promptMax 1200） | [nanogpt.md](nanogpt.md) |
+| Hugging Face Router（sync、loraConfidence=unverified，seed 无 int32 wrap） | [huggingface.md](huggingface.md) |
+| 魔搭 AI / CN（两套 token+base，hub_repo LoRA，seed 省略 -1） | [modelscope.md](modelscope.md) |
+| NanoGPT（catalog_token 分辨率；官方无 promptMax / 无 loras 键；*-lora heuristic） | [nanogpt.md](nanogpt.md) |
 
 ## 六家 id（勿写错）
 
@@ -42,7 +42,7 @@
 1. **禁止静默丢字段**：UI 芯片还挂着 LoRA / 负面 / seed，出站却删掉且不报错 = P0。该 skip 的必须带 `warning` 或硬 400（魔搭 http LoRA→warning；Nano 无直链→400 `lora_no_direct_url`；Fal AIR 不当 path→不塞 `loras`）。
 2. **禁止 provider drift**：`serviceId` 是 Civitai 形态（`image/...`）时发给 Fal/HF/魔搭/Nano → 400「当前选中的是 Civitai 服务…」。魔搭 AI 失败**禁止**改走 CN（base/token 不交叉）。
 3. **Civitai empty service 硬错**：storyboard / Composer 无 `serviceId` → 阻断生成（文案含「缺少 serviceId」/「请先选择 Civitai 服务」），不得静默落到 Fal 默认端点。
-4. **Civitai LoRA 必须有 `air`**：出站 `loras` = `{air: strength}`（`lora_map`）；无 air 的条目跳过。硬闸夹具见下。
+4. **Civitai LoRA 必须有 `air`**：出站按 recipe 分形（Klein/Comfy/LTX2 = `{air:strength}`；Dev/WAN/Hunyuan = `[{air,strength}]`；Fal-Krea 拒）。无 air 的条目跳过。
 5. **能力表不得抬高**：catalog override 只能收紧（`merge_catalog_override`）；`lora=none` 不可抬成 path/air；`progress=none` 禁止假百分比。
 6. **参考图按 caps**：`maxRefs`/`refImagesField` 见 `providers/ref_images.py`；画布 `image_urls`/`input_references` 入站并集，`/api/generate` 调 `normalize_payload_refs`。
 7. **Materialize**：Fal（及任何外网拉图的家）本地 `/out/...` 必须先变 `data:`（`materialize_fal_media`）；缺文件硬错，不发相对路径。
@@ -55,7 +55,7 @@
 | 图 `134923572`；LoRA `urn:air:krea2:lora:civitai:2323765@3071582` strength `0.8` | Civitai import→chip→outbound air | `docs/superpowers/plans/2026-09-08-storyboard-134923572-lora-air-hardgate.md`；`scripts/test_storyboard_graph.py` `test_v0821n_krea2_import_hardgate` |
 | LoRA version `3231694`（Asian Mix）；下载链 `https://civitai.com/api/download/models/3231694` | Fal/HF/Nano path；魔搭必须 skip | `docs/provider-lora.md`；`scripts/test_p0_wiring.py` |
 | AIR-only Fal：`{"air":"urn:air:sdxl:lora:civitai:1@2"}` → body **无** `loras` | AIR 不当 path | `scripts/test_fal_fields.py` |
-| Nano prompt >1200 → `prompt_too_long` | FE+server 双拦 | `nanogpt.NANO_PROMPT_MAX` |
+| Nano 官方无 promptMax | 适配器 `NANO_PROMPT_MAX=None`；禁止发明 1200 门闹 | `providers/nanogpt.py` |
 
 ## 读源顺序
 
@@ -63,10 +63,12 @@
 
 ## 官方文档快照
 
-2026-09-08 对照过官方页（Context7 月配额满时改走 WebFetch）：
+2026-09-11 对照过官方页：
 
 - Fal queue：https://fal.ai/docs/documentation/model-apis/inference/queue
 - HF Inference Providers：https://huggingface.co/docs/inference-providers/guides/first-api-call
 - Civitai orch recipes：https://developer.civitai.com/orchestration/recipes/
+- 魔搭 AIGC：https://www.modelscope.cn/docs/model-service/API-Inference/intro
+- Nano Image：https://docs.nano-gpt.com
 
 详见各 provider 文末「官方对照」节。**Comfy-krea2+AIR ≠ Fal-Krea v2**。

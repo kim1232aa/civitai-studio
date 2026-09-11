@@ -1,6 +1,6 @@
 # Hugging Face API 用法
 
-适配器：`providers/huggingface.py`。capabilities：`lora=path`，`loraConfidence=**unverified**`，`progress=none`，`cancel=False`，`estimate=none`，`seed` min=-1 max=2147483647 clamp=`mod`，`i2i=none`（映射 fal 通道可带图），`maxRefs=9`，`refImagesField=image_urls`。
+适配器：`providers/huggingface.py`。capabilities：`lora=path`，`loraConfidence=**unverified**`，`progress=none`，`cancel=False`，`estimate=none`，`seed` clamp=`none`（**禁止 mod int32**），`i2i=none`（映射 fal 通道可带图），`maxRefs=9`，`refImagesField=image_urls`。
 
 ## Auth
 
@@ -26,7 +26,7 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 
 - 钉选：`docs/hf-models.json`
 - 搜索：`search_hf` → Hub `?search=&limit=50`，pipeline ∈ text-to-image / image-to-image / text-to-video / image-to-video
-- LoRA 搜：`GET …/models?search=&filter=lora`
+- LoRA 搜：`GET …/models?search=&filter=lora`（**Hub tag ≠ supportsLora**）
 
 ## Import
 
@@ -43,13 +43,13 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 | `serviceId` | Hub mid → mapped providerId | 是 | Civitai id → 400 |
 | `prompt` | `prompt` | 是 | |
 | `negativePrompt` | `negative_prompt` | 否 | |
-| `seed` | `seed` | 否 | **mod int32**（`_prompt_body`） |
+| `seed` | `seed` | 否 | 整数原样；**禁止 mod int32** |
 | `steps` | `num_inference_steps` | 否 | |
 | `cfgScale` | `guidance_scale` | 否 | |
 | `width`+`height` | `image_size:{w,h}` | 否 | |
 | `scheduler` | `scheduler` | 否 | 仅 fal 通道 |
 | refs | `image_url` / `image_urls` | i2i 类 endpoint | `wants_img` 启发式 |
-| `loras[]` | `loras[{path,scale}]` | 否 | `apply_fal_loras` + `_force_loras`；**路由无 `/lora` sibling** |
+| `loras[]` | `loras[{path,scale}]` | 否 | `apply_fal_loras` + `_force_loras`；**路由无 `/lora` sibling**；unverified |
 
 ### OpenAI 通道
 
@@ -57,7 +57,7 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 | --- | --- | --- |
 | prompt | `prompt` | |
 | width×height | `size` `"WxH"` | |
-| loras/scheduler | **忽略** | |
+| loras/scheduler | **忽略** | 官方 OpenAI 通道无 loras |
 
 ### Bytes / hf-inference
 
@@ -69,6 +69,7 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 - UI **禁止**把 `loraConfidence=unverified` 当绿勾「已加载」。
 - `_maybe_lora_pid`：**不**改成 `…/turbo/lora`（Router「Model not supported」）。
 - AIR 经 `_fal_lora_path` 丢弃；无 path 则该条不进。
+- 官方 Inference Providers 请求表 **没有 loras**。
 
 夹具 path：`https://civitai.com/api/download/models/3231694`。
 
@@ -76,7 +77,7 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 
 | 项 | 行为 |
 | --- | --- |
-| seed | `n<-1→-1`；`n>2147483647→n%limit`（0→limit） |
+| seed | 官方 integer 无 min/max；适配器不 wrap；禁止抄魔搭 int32 |
 | progress | `none` — job_status 直接 succeeded + progress=1；**禁止假百分比动画当真实** |
 | cancel | False |
 
@@ -98,14 +99,14 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 
 `test_p0_wiring`：`_maybe_lora_pid` 保持 turbo；`_force_loras` 塞 3231694。
 
-## 官方对照（2026-09-08，Inference Providers）
+## 官方对照（2026-09-11，Inference Providers）
 
 来源：https://huggingface.co/docs/inference-providers/guides/first-api-call
 
 - SDK：`huggingface_hub.InferenceClient` / `@huggingface/inference`；`api_key` = `HF_TOKEN`。
 - 图：`text_to_image(prompt, model=…)`；可选 `provider="auto"|"fal-ai"|"replicate"|…`。
-- 常见参数：`negative_prompt`、`num_inference_steps`、`guidance_scale`、`target_size`（部分 provider）。
-- Studio 走 **Router**（`router.huggingface.co`）映射通道，不是裸 Hub widget；`loraConfidence=unverified` 仍成立——官方 client 示例也不保证 LoRA sibling。
+- 常见参数：`negative_prompt`、`num_inference_steps`、`guidance_scale`、`target_size`、`seed`（integer，**无公布 max**）。
+- Studio 走 **Router**（`router.huggingface.co`）映射通道，不是裸 Hub widget；`loraConfidence=unverified` 仍成立。
 
 ## v0821o33 HF score honesty
 
@@ -113,4 +114,3 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 - Default: `backend=huggingface` + those sids → **400** `HF Router 不托管该 Fal LoRA 端点，请换家 Fal`；`scoresAsHfClosedLoop=false`；chips kept in Composer.
 - Debug only: `HF_ALLOW_FAL_TRANSPORT=1` re-enables o32 Path A (Fal key → `queue.fal.run`); still `transport=fal` / **not** HF closed-loop score.
 - Real HF outbound: Hub mid → `router.huggingface.co` + HF token；`submittedInput` must **not** carry `transport=fal`.
-
