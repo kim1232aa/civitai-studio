@@ -88,3 +88,9 @@ def install_catalog_stamps(providers_map: dict | None) -> None:
         install_civitai_lora_shape()
     except Exception as e:
         print("[civitai] o57 lora shape skip", e, flush=True)
+
+    try:
+        from .modelscope_seed import install_modelscope_seed
+        install_modelscope_seed()
+    except Exception as e:
+        print("[modelscope] o57 seed omit skip", e, flush=True)
