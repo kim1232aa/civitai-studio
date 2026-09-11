@@ -1,16 +1,15 @@
-/*! v0821o56-gate-honesty
- * o56: seed int32 hint only 魔搭 (reject, no wrap). Nano/HF have no official max.
+/*! v0821o57-item-match
+ * o57: Composer reads the current catalog item for all six backends.
+ * Family board is fallback when ctx.item is missing.
+ * duration options copy item.capabilities.durationEnum only — never invent 5/12/16.
+ * LoRA box follows LoraCapabilityHints.loraBoxState when present.
+ * o56 kept: seed int32 hint only 魔搭; Nano/HF have no official max.
  * Video i2v-unsupported does not block text-to-video; only blocks when refs are attached.
- * unsupported/none → disable + plain「不支持」(never hide as-complete).
- * strength/scale null →「未填」; never invent 0.8/1.0.
- * Live caps from GET /api/providers + catalog may only tighten.
- * Parallel-safe: Composer field visibility only (Fal endpoint pin owned by o29).
- * o30: filled unsupported (sampler/…) warn-only — hard-block i2v only when refs attached.
  */
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o56-gate-honesty";
+  const STAMP = "v0821o57-item-match";
   const BOARD_SRC = "docs/api-usage/composer-field-board.md";
 
   const COMPOSER_FIELD_BOARD = {
@@ -115,6 +114,24 @@
     };
   }
 
+  function itemCaps(ctx) {
+    const item = (ctx && ctx.item && typeof ctx.item === "object") ? ctx.item : {};
+    const caps = (item.capabilities && typeof item.capabilities === "object") ? item.capabilities : {};
+    const sp = (item.supported_parameters && typeof item.supported_parameters === "object") ? item.supported_parameters : {};
+    let supportsLora = caps.supportsLora;
+    if (supportsLora == null) supportsLora = item.supportsLora;
+    return {
+      item: item,
+      caps: caps,
+      supportsLora: supportsLora,
+      loraShape: caps.loraShape || item.loraShape || "",
+      loraConfidence: caps.loraConfidence || item.loraConfidence || "",
+      loraChannel: caps.loraChannel || item.loraChannel || "",
+      durationEnum: caps.durationEnum || item.durationEnum || null,
+      resolutionTokens: caps.resolutionTokens || sp.resolutions || item.resolutionTokens || null
+    };
+  }
+
   function tighten(support, next) {
     const rank = { unsupported: 0, unknown: 1, catalog: 2, supported: 3 };
     const a = rank[support] != null ? rank[support] : 1;
@@ -128,13 +145,17 @@
     const board = fieldBoardFor(be);
     let support = board[field] || "unknown";
     const caps = ctx.caps || {};
+    const ic = itemCaps(ctx);
 
     if (field === "negative" && caps.negative === false) support = tighten(support, "unsupported");
     if (field === "sampler") {
       if (caps.sampler === false) support = tighten(support, "unsupported");
       if (caps.sampler === true && be === "civitai") support = "supported";
     }
-    if (field === "duration" && caps.videoDuration === false) support = tighten(support, "unsupported");
+    if (field === "duration") {
+      if (caps.videoDuration === false) support = tighten(support, "unsupported");
+      if (Array.isArray(ic.durationEnum) && ic.durationEnum.length) support = "catalog";
+    }
     if (field === "aspect" && caps.videoAspect === false && ctx.mode === "video") {
       support = tighten(support, "unsupported");
     }
@@ -252,21 +273,109 @@
     }
   }
 
+  function loraUiState(ctx) {
+    const hints = root.LoraCapabilityHints;
+    if (hints && typeof hints.loraBoxState === "function") {
+      return hints.loraBoxState(ctx);
+    }
+    const ic = itemCaps(ctx);
+    const board = fieldBoardFor((ctx && ctx.backend) || "");
+    const shape = ic.loraShape || board.lora || "unknown";
+    if (ic.supportsLora === true) {
+      const unverified = ic.loraConfidence === "unverified" || ic.loraConfidence === "heuristic";
+      return {
+        support: "supported",
+        reason: unverified ? "发出≠加载" : "",
+        confidence: ic.loraConfidence || board.loraConfidence || "unknown",
+        shape: shape,
+        showBox: true,
+        enabled: true,
+        badge: unverified ? "unverified" : ""
+      };
+    }
+    if (ic.supportsLora === false) {
+      return {
+        support: "unsupported",
+        reason: "本模型官方不接 LoRA",
+        confidence: "none",
+        shape: shape,
+        showBox: true,
+        enabled: false
+      };
+    }
+    return {
+      support: "unknown",
+      reason: "未确认",
+      confidence: "unverified",
+      shape: shape,
+      showBox: true,
+      enabled: true
+    };
+  }
+
+  function applyLoraUi(ctx) {
+    const $ = ctx && ctx.$;
+    if (!$) return;
+    const state = loraUiState(ctx);
+    const box = $("loraBox") || $("loraParams") || $("loras");
+    if (box && box.classList) {
+      box.classList.toggle("param-unsupported", state.support === "unsupported");
+      box.classList.toggle("param-unknown", state.support === "unknown");
+      box.classList.toggle("param-catalog", state.support === "catalog");
+      box.title = state.reason || "";
+    }
+    const hint = $("loraHint") || $("loraShapeHint");
+    if (hint) {
+      const shapeText = LORA_SHAPE_HINT[state.shape] || LORA_SHAPE_HINT.unknown;
+      hint.textContent = [shapeText, state.reason, state.badge].filter(Boolean).join(" · ");
+    }
+  }
+
+  function fillDurationOptions(ctx) {
+    const $ = ctx && ctx.$;
+    if (!$ || typeof document === "undefined") return;
+    const el = $("duration");
+    if (!el || String(el.tagName || "").toUpperCase() !== "SELECT") return;
+    const ic = itemCaps(ctx);
+    const vals = ic.durationEnum;
+    if (!Array.isArray(vals) || !vals.length) return;
+    const want = vals.map(function (v) { return String(v); });
+    const cur = String(el.value || "");
+    el.innerHTML = "";
+    want.forEach(function (v) {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      el.appendChild(opt);
+    });
+    if (want.indexOf(cur) >= 0) el.value = cur;
+  }
+
   function fieldSupportStripText(ctx) {
     const be = (ctx && ctx.backend) || "?";
     const meta = COMPOSER_FIELD_BOARD._meta || {};
     const board = fieldBoardFor(be);
+    const ic = itemCaps(ctx);
     const bits = [];
     bits.push(meta.stamp || STAMP);
     bits.push(be);
     if (board.resolutionMode && board.resolutionMode !== "unknown") bits.push("分辨率=" + board.resolutionMode);
-    if (board.lora && board.lora !== "unknown") {
+    const loraState = loraUiState(ctx);
+    if (loraState.shape && loraState.shape !== "unknown") {
+      let loraBit = "LoRA=" + loraState.shape;
+      if (loraState.confidence === "unverified" || loraState.badge === "unverified") loraBit += "(unverified)";
+      if (loraState.support === "unsupported") loraBit += "(off)";
+      bits.push(loraBit);
+    } else if (board.lora && board.lora !== "unknown") {
       let loraBit = "LoRA=" + board.lora;
       if (board.loraConfidence === "unverified") loraBit += "(unverified)";
       bits.push(loraBit);
     }
+    if (Array.isArray(ic.durationEnum) && ic.durationEnum.length) {
+      bits.push("durationEnum=" + ic.durationEnum.join("/"));
+    }
     const caps = (ctx && ctx.caps) || {};
-    const mr = Number(caps.maxRefs || caps.maxImages || 0);
+    const mr = Number(caps.maxRefs || caps.maxImages || ic.caps.maxRefs || 0);
     if (mr > 0) bits.push("maxRefs=" + mr);
     const unsupported = ["sampler", "scheduler", "steps", "cfg", "width", "height", "nanoRes", "i2v"]
       .filter(function (f) { return resolveFieldSupport(f, ctx) === "unsupported"; });
@@ -393,7 +502,7 @@
       title = title.replace(/\s*·\s*本家 seed[一-鿿A-Za-z0-9 \[\]\/,-]+限?/g, "");
       title = title.replace(/\s*·\s*魔搭 seed[一-鿿A-Za-z0-9 \[\]\/,-]+/g, "");
       if (be2 === "modelscope-ai" || be2 === "modelscope-cn") {
-        const hint = "魔搭 seed 出站 reject[-1,2147483647]，不 wrap / 不发明默认";
+        const hint = "魔搭 seed 官方 [0,2147483647]；-1/random 省略不发（原 reject[-1,2147483647] 不 wrap）";
         seedEl.title = title ? (title + " · " + hint) : hint;
       } else if (be2 === "huggingface" || be2 === "nano-gpt") {
         const hint = "本家 seed 无官方 max，禁止 mod int32 / 发明上限";
@@ -403,6 +512,9 @@
       }
     })();
     applyNegative($("negative"), ctx);
+
+    fillDurationOptions(ctx);
+    applyLoraUi(ctx);
 
     applyFieldSupport($("duration"), "duration", !vid, ctx);
     applyFieldSupport($("aspect"), "aspect", textish, ctx);
@@ -421,6 +533,10 @@
     STAMP: STAMP,
     BOARD: COMPOSER_FIELD_BOARD,
     fieldBoardFor: fieldBoardFor,
+    itemCaps: itemCaps,
+    loraUiState: loraUiState,
+    fillDurationOptions: fillDurationOptions,
+    applyLoraUi: applyLoraUi,
     resolveFieldSupport: resolveFieldSupport,
     applyFieldSupport: applyFieldSupport,
     applyToSurface: applyToSurface,
