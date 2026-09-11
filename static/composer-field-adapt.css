@@ -23,12 +23,21 @@ textarea.param-unsupported-control{
 .lora-hint.lora-unverified{color:#c9b56a}
 .lora-str::placeholder{color:#8b8b94;font-style:italic}
 
-/* v0821o60-expanded-bar-flex: loaded after storyboard-ui.css; capsule params wrap; #send stays in dock */
+/* v0821o62: expanded dock can outgrow the short #viewport so #send stays visible */
+.dock.expanded {
+  height: auto !important;
+  max-height: min(78vh, 720px) !important;
+  overflow: visible !important;
+}
+.dock.expanded .dock-body {
+  overflow: visible !important;
+  max-height: none !important;
+}
 .dock.expanded .dock-prompt { overflow: hidden; min-height: 148px; flex: 1 1 auto; }
 .dock.expanded .dock-foot {
   flex: 0 0 auto;
-  max-height: none;
-  overflow: visible;
+  max-height: none !important;
+  overflow: visible !important;
 }
 .dock.expanded .lora-block { max-height: 88px; overflow: auto; }
 .dock.expanded .bar {
