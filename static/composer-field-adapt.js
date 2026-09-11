@@ -1,20 +1,18 @@
-/*! v0821o47-composer-board-sync
- * Continues o28. Board sync: Magao maxRefs ceiling 3; seed int32 clamp hint.
- * Composer field adapt from docs/api-usage/composer-field-board.md §硬规则 1–6.
+/*! v0821o56-gate-honesty
+ * o56: seed int32 hint only 魔搭 (reject, no wrap). Nano/HF have no official max.
+ * Video i2v-unsupported does not block text-to-video; only blocks when refs are attached.
  * unsupported/none → disable + plain「不支持」(never hide as-complete).
  * strength/scale null →「未填」; never invent 0.8/1.0.
  * Live caps from GET /api/providers + catalog may only tighten.
  * Parallel-safe: Composer field visibility only (Fal endpoint pin owned by o29).
- * o30: filled unsupported (sampler/…) warn-only — hard-block only i2v unsupported.
+ * o30: filled unsupported (sampler/…) warn-only — hard-block i2v only when refs attached.
  */
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o47-composer-board-sync";
+  const STAMP = "v0821o56-gate-honesty";
   const BOARD_SRC = "docs/api-usage/composer-field-board.md";
 
-  // Values: supported | catalog | unsupported | unknown
-  // Aligned to authoritative board (not skeleton).
   const COMPOSER_FIELD_BOARD = {
     _meta: { source: BOARD_SRC, status: "board", stamp: STAMP },
     civitai: {
@@ -124,7 +122,6 @@
     return b < a ? next : support;
   }
 
-  /** Live caps may only tighten (supported→catalog/unsupported). */
   function resolveFieldSupport(field, ctx) {
     ctx = ctx || {};
     const be = ctx.backend || "";
@@ -135,7 +132,6 @@
     if (field === "negative" && caps.negative === false) support = tighten(support, "unsupported");
     if (field === "sampler") {
       if (caps.sampler === false) support = tighten(support, "unsupported");
-      // civitai board already supported; catalog true cannot raise unsupported→supported for other houses
       if (caps.sampler === true && be === "civitai") support = "supported";
     }
     if (field === "duration" && caps.videoDuration === false) support = tighten(support, "unsupported");
@@ -179,10 +175,6 @@
     else span.textContent = base;
   }
 
-  /**
-   * modeHide: mode-conditional hide (e.g. duration when not video) — OK to hide.
-   * unsupported: NEVER hide as-complete — disable + plain「不支持」.
-   */
   function applyFieldSupport(el, field, modeHide, ctx) {
     if (!el) return;
     const wrap = wrapFor(el);
@@ -243,7 +235,6 @@
     if (!el) return;
     const support = resolveFieldSupport("negative", ctx);
     const reason = FIELD_SUPPORT_REASONS[support] || FIELD_SUPPORT_REASONS.unknown;
-    // Keep visible always — hard rule 2: 禁止藏掉当已齐
     el.classList.remove("hidden");
     el.classList.toggle("param-unsupported-control", support === "unsupported");
     if (support === "unsupported") {
@@ -313,10 +304,6 @@
     return "strength 未填：出站省略数值（不写 1.0/0.8）";
   }
 
-  /**
-   * Warn-only: filled unsupported fields that outbound simply omits.
-   * o30: NEVER hard-block ↑ for these (铁律8 禁止多余门阀) — surface in strip/paramWarn.
-   */
   function filledUnsupportedWarnings(ctx) {
     const $ = ctx && ctx.$;
     if (!$) return [];
@@ -339,24 +326,38 @@
     return msgs;
   }
 
-  /** Hard-block only (capability truly unavailable). */
+  function _hasI2vInput(ctx) {
+    if (!ctx) return false;
+    if (ctx.hasRefs === true || ctx.hasFirstFrame === true) return true;
+    if (ctx.hasRefs === false && ctx.hasFirstFrame === false) return false;
+    const $ = ctx.$;
+    if (typeof $ !== "function") return false;
+    const keys = ["firstFrame", "sourceImage", "startImage", "image_url"];
+    for (let i = 0; i < keys.length; i++) {
+      const el = $(keys[i]);
+      if (el && String(el.value || el.src || "").trim()) return true;
+    }
+    const refs = $("refs");
+    if (refs && refs.querySelector) {
+      if (refs.querySelector("img, video, .chip.on, .frame-slot:not(.missing)")) return true;
+    }
+    return false;
+  }
+
   function blockingUnsupportedMessages(ctx) {
     const msgs = [];
     if (ctx && ctx.mode === "video" && resolveFieldSupport("i2v", ctx) === "unsupported") {
-      msgs.push("本家不支持 i2v · Composer 已禁用该能力（明文不支持）");
+      if (_hasI2vInput(ctx)) {
+        msgs.push("本家不支持把参考图当 i2v 首帧 · 请断开参考或改用支持 i2v 的模型（文生视频仍可发）");
+      }
     }
     return msgs;
   }
 
-  /** @deprecated o30: prefer filledUnsupportedWarnings + blockingUnsupportedMessages */
   function filledUnsupportedMessages(ctx) {
     return blockingUnsupportedMessages(ctx).concat(filledUnsupportedWarnings(ctx));
   }
 
-  /**
-   * Drive Composer show/disable from board + live caps.
-   * ctx: { $, backend, mode, caps, fillNanoResOptions }
-   */
   function applyToSurface(ctx) {
     ctx = ctx || {};
     const $ = ctx.$;
@@ -370,7 +371,6 @@
     const comfyBox = $("comfyParams");
     const nanoBox = $("nanoParams");
 
-    // Keep groups mounted: hide only when every child is mode-hidden (text/audio).
     const showFalGroup = !textish;
     const showComfyGroup = true;
     const showNanoGroup = nano || resolveFieldSupport("nanoRes", ctx) === "supported";
@@ -385,16 +385,21 @@
     applyFieldSupport($("width"), "width", false, ctx);
     applyFieldSupport($("height"), "height", false, ctx);
     applyFieldSupport($("seed"), "seed", false, ctx);
-    // o47: HF / Magao / Nano seed mod int32 — honest clamp hint (board)
     (function () {
       const seedEl = $("seed");
       if (!seedEl) return;
-      const be = String(ctx.backend || "");
-      const needsClamp = be === "huggingface" || be === "modelscope-ai" || be === "modelscope-cn" || be === "nano-gpt";
-      if (needsClamp) {
-        const prev = String(seedEl.title || "");
-        const hint = "本家 seed 出站 mod int32（不发明默认；超范围按适配器 clamp/reject）";
-        if (!/mod int32/.test(prev)) seedEl.title = prev ? (prev + " · " + hint) : hint;
+      const be2 = String(ctx.backend || "");
+      let title = String(seedEl.title || "");
+      title = title.replace(/\s*·\s*本家 seed[一-鿿A-Za-z0-9 \[\]\/,-]+限?/g, "");
+      title = title.replace(/\s*·\s*魔搭 seed[一-鿿A-Za-z0-9 \[\]\/,-]+/g, "");
+      if (be2 === "modelscope-ai" || be2 === "modelscope-cn") {
+        const hint = "魔搭 seed 出站 reject[-1,2147483647]，不 wrap / 不发明默认";
+        seedEl.title = title ? (title + " · " + hint) : hint;
+      } else if (be2 === "huggingface" || be2 === "nano-gpt") {
+        const hint = "本家 seed 无官方 max，禁止 mod int32 / 发明上限";
+        seedEl.title = title ? (title + " · " + hint) : hint;
+      } else {
+        seedEl.title = title;
       }
     })();
     applyNegative($("negative"), ctx);
