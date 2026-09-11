@@ -118,7 +118,7 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
 /* v0821o24: positionDock() 锚底自适应 — width follows content; stick bottom / selected node (not mid-float, not full bottom-bar). */
 .dock {
   right: auto; bottom: auto; width: max-content; min-width: 280px;
-  max-width: min(560px, calc(100% - 48px)); transform: none;
+  max-width: min(720px, calc(100% - 48px)); transform: none;
   border-radius: 18px; border-color: #3c3c43; background: #1b1b1ef5;
   box-shadow: 0 12px 36px #0005;
 }
@@ -138,13 +138,17 @@ svg.wires path.edge:hover { stroke: var(--teal); stroke-width: 3.2; opacity: 1; 
   scrollbar-gutter: stable; padding: 14px; min-height: 0;
 }
 .dock.expanded .dock-scroll {
-  overflow: auto; overflow-anchor: none; min-height: 0; height: 100%; flex: 1 1 0;
+  overflow: auto; overflow-anchor: none; min-height: 0; height: auto; flex: 0 1 auto; max-height: 28%;
 }
-.dock-foot { background: transparent; padding-top: 4px; overflow: visible; }
+.dock-prompt {
+  flex: 1 1 auto; min-height: 148px; display: flex; flex-direction: column; min-width: 0; gap: 8px;
+}
+.dock.collapsed .dock-prompt { display: none; }
+.dock-foot { background: transparent; padding-top: 4px; overflow: auto; max-height: 42%; }
 .dock.expanded .lora-block { max-height: 140px; overflow: auto; }
 #prompt {
-  position: sticky; top: 0; z-index: 4;
-  background: #141416;
+  position: static; z-index: 4;
+  background: #141416; min-height: 120px; flex: 1 1 auto;
 }
 .prompt.neg { position: static; }
 .modes { width: max-content; max-width: 100%; border-radius: 12px; gap: 4px; flex-wrap: nowrap; align-items: center; flex: 0 0 auto; }

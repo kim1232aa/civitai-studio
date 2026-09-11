@@ -2086,10 +2086,12 @@
     }
     dock.style.width = prevW;
     dock.style.maxWidth = prevMaxW;
-    const minW = expanded ? 360 : 280;
-    const maxW = Math.min(expanded ? 520 : 560, areaW);
+    const minW = expanded ? 420 : 280;
+    const maxW = Math.min(expanded ? 720 : 560, areaW);
     let dockW = Math.min(maxW, Math.max(minW, natural));
-    const height = expanded ? 380 : Math.max(132, Math.min(200, Math.ceil(dock.scrollHeight || 160)));
+    const height = expanded
+      ? Math.max(440, Math.min(520, area.bottom - area.top - 80))
+      : Math.max(132, Math.min(200, Math.ceil(dock.scrollHeight || 160)));
     let maxH = Math.min(height, Math.max(112, area.bottom - area.top));
     // Horizontal: prefer under selected node, bias bottom-right of usable canvas.
     let left = x + (nw - dockW) / 2;
