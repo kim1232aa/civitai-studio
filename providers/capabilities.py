@@ -339,8 +339,11 @@ def merge_catalog_override(provider_caps: dict, override: dict | None) -> dict:
         "imageFields",
         "aspectRatioField",
         "durationField",
+        "durationEnum",
         "promptField",
         "loraShape",
+        "loraChannel",
+        "loraSource",
     ):
         if k in o:
             out[k] = o[k]
@@ -391,6 +394,7 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
 
     Unknown (no policy, no Hub task/tags, no needsSource) stays unknown:
     do not invent i2i / maxRefs=1 from the word "edit" in the model id.
+    o57: also stamp supportsLora / loraShape from official AIGC keys, not name guess.
     """
     row = dict(row or {})
     mid = _modelscope_mid(row.get("id") or row.get("model") or "")
@@ -433,6 +437,26 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
         caps.setdefault("maxImages", 1)
         caps.setdefault("refImagesField", "image_url")
         caps.setdefault("imageFields", [])
+
+    # o57: official AIGC image keys include loras
+    # https://www.modelscope.cn/docs/model-service/API-Inference/intro
+    # Video adapter does not wire loras. Unknown mid does not invent supportsLora.
+    cat = str(row.get("category") or "").strip().lower()
+    if cat == "video" or task in ("text-to-video", "image-to-video") or "t2v" in tags or "i2v" in tags:
+        caps.setdefault("supportsLora", False)
+        caps.setdefault("loraShape", "hub_repo")
+        caps.setdefault("loraSource", "official-aigc-image-keys-not-wired-for-video")
+    elif cat == "image" or task in ("text-to-image", "image-to-image") or "t2i" in tags or "i2i" in tags:
+        caps.setdefault("supportsLora", True)
+        caps.setdefault("loraShape", "hub_repo")
+        caps.setdefault("loraConfidence", "official")
+        caps.setdefault("loraSource", "official-aigc-keys")
+    else:
+        caps.setdefault("loraShape", "hub_repo")
+        caps.setdefault("loraSource", "unknown")
+    if "supportsLora" in caps and row.get("supportsLora") is None:
+        row["supportsLora"] = caps["supportsLora"]
+
     if caps:
         row["capabilities"] = caps
     if mid and not row.get("id"):
@@ -468,3 +492,74 @@ def modelscope_t2i_refs_error(service_id: str | None, n_refs: int, item: dict | 
             "请改选 Qwen Image Edit 或断开参考连线，不能静默忽略"
         )
     return None
+
+
+def overlay_civitai_catalog_item(row: dict | None) -> dict:
+    """Stamp Civitai service rows with item-level LoRA / duration match fields.
+
+    Official sources:
+    - GET https://orchestration.civitai.com/v2/services parameters schema
+    - Fal-Krea recipe: engine=fal model=krea2 does NOT accept LoRA / negative / free WxH
+      https://developer.civitai.com/orchestration/recipes/
+    - Comfy-krea2 `image/comfy/krea2/turbo/createImage` accepts AIR `{air: strength}`
+    Never invent duration 5/12/16.
+    """
+    row = dict(row or {})
+    sid = str(row.get("id") or row.get("serviceId") or "").strip()
+    params = row.get("parameters") if isinstance(row.get("parameters"), dict) else {}
+    engine = str(row.get("engine") or params.get("engine") or "").strip().lower()
+    model = str(row.get("model") or params.get("model") or "").strip().lower()
+    ecosystem = str(row.get("ecosystem") or params.get("ecosystem") or "").strip().lower()
+    sid_l = sid.lower()
+    caps = dict(row["capabilities"]) if isinstance(row.get("capabilities"), dict) else {}
+
+    has_loras_key = "loras" in params
+    fal_krea = engine == "fal" and (
+        "krea" in model or "krea" in ecosystem or "krea" in sid_l
+    )
+    comfy = engine == "comfy" or "/comfy/" in sid_l
+
+    if fal_krea and not has_loras_key:
+        caps["supportsLora"] = False
+        caps["loraShape"] = "none"
+        caps["loraSource"] = "official-fal-krea-recipe-no-lora"
+    elif has_loras_key or comfy:
+        caps.setdefault("supportsLora", True)
+        caps.setdefault("loraShape", "air")
+        caps.setdefault("loraConfidence", "official")
+        caps.setdefault("loraSource", "orch-v2-services" if has_loras_key else "comfy-air")
+    else:
+        caps.setdefault("loraShape", "air")
+        caps.setdefault("loraSource", "unknown")
+
+    if "durationEnum" not in caps:
+        raw_dur = params.get("duration") or params.get("videoDuration")
+        enum = None
+        if isinstance(raw_dur, dict):
+            enum = raw_dur.get("enum") or raw_dur.get("options") or raw_dur.get("oneOf")
+        elif isinstance(raw_dur, list):
+            enum = raw_dur
+        if isinstance(enum, list) and enum:
+            caps["durationEnum"] = list(enum)
+
+    frame = row.get("frameFields") or params.get("frameFields") or caps.get("imageFields")
+    if isinstance(frame, list) and frame:
+        caps.setdefault("imageFields", list(frame))
+
+    if caps:
+        row["capabilities"] = caps
+    if "supportsLora" in caps and row.get("supportsLora") is None:
+        row["supportsLora"] = caps["supportsLora"]
+    return row
+
+
+def overlay_civitai_catalog(body: dict | None) -> dict:
+    """HTTP-boundary overlay for Civitai /v2/services rows."""
+    if not isinstance(body, dict):
+        return {}
+    out = dict(body)
+    items = out.get("items")
+    if not isinstance(items, list):
+        return out
+    out["items"] = [overlay_civitai_catalog_item(x) if isinstance(x, dict) else x for x in items]
+    return out
