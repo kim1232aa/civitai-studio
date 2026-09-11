@@ -9,7 +9,7 @@
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o57-item-match";
+  const STAMP = "v0821o61-group-hide";
   const BOARD_SRC = "docs/api-usage/composer-field-board.md";
 
   const COMPOSER_FIELD_BOARD = {
@@ -480,9 +480,18 @@
     const comfyBox = $("comfyParams");
     const nanoBox = $("nanoParams");
 
-    const showFalGroup = !textish;
-    const showComfyGroup = true;
-    const showNanoGroup = nano || resolveFieldSupport("nanoRes", ctx) === "supported";
+    // o61: never dump fal+comfy together. Civitai image was showing
+    // duration/aspect/res AND width/height, which made .bar ~499px and hid #send.
+    // Fal group only for fal, or video items that actually publish durationEnum.
+    const icSurf = itemCaps(ctx);
+    const hasDurationEnum = Array.isArray(icSurf.durationEnum) && icSurf.durationEnum.length > 0;
+    const showFalGroup = !textish && (be === "fal" || (vid && hasDurationEnum));
+    const showComfyGroup = !textish && !nano && (
+      be === "civitai" || be === "huggingface" ||
+      be === "modelscope-ai" || be === "modelscope-cn" ||
+      resolveFieldSupport("width", ctx) !== "unsupported"
+    );
+    const showNanoGroup = nano;
     if (falBox) falBox.classList.toggle("hidden", !showFalGroup);
     if (comfyBox) comfyBox.classList.toggle("hidden", !showComfyGroup);
     if (nanoBox) nanoBox.classList.toggle("hidden", !showNanoGroup);
