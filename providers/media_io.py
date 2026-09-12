@@ -151,6 +151,9 @@ def upload_out_request(payload: dict | None, out_dir: Path | None = None) -> tup
         return 400, {"error": "dataUrl 不是合法 base64 或为空", "code": "invalid_data_url"}
     if len(raw) > MAX_UPLOAD_BYTES:
         return 400, {"error": f"文件过大（{len(raw)}>{MAX_UPLOAD_BYTES}）", "code": "too_large"}
+    from .http import is_blank_image
+    if is_blank_image(raw=raw):
+        return 400, {"error": "这是空图/1×1 占位，不入库", "code": "blank_image"}
     mime = _mime_from_header(header)
     ext, kind = sniff_media(raw)
     if ext == ".bin":

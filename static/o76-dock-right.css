@@ -1,20 +1,19 @@
-/* o76: expanded composer is a right inspector. Never cover the shot row. */
+/* o91: Composer 贴选中节点。收起=窄胶囊；展开=节点旁抽屉。禁止右侧整栏检查器。 */
 .dock.show.expanded,
 .dock.expanded {
-  left: auto !important;
-  right: 16px !important;
-  top: 72px !important;
-  bottom: 16px !important;
-  width: 420px !important;
-  max-width: min(420px, calc(100vw - 200px)) !important;
-  min-width: 320px !important;
-  height: auto !important;
-  max-height: calc(100dvh - 96px) !important;
-  transform: none !important;
+  width: min(420px, calc(100vw - 48px));
+  max-width: min(420px, calc(100vw - 48px));
+  min-width: 280px;
+  transform: none;
 }
 .dock.expanded .dock-body {
-  max-height: calc(100dvh - 160px) !important;
+  max-height: min(70dvh, 640px);
   overflow: auto;
+}
+.dock.collapsed {
+  min-width: 260px;
+  max-width: min(420px, calc(100vw - 48px));
+  border-radius: 22px;
 }
 .chat-rail, .canvas-tip { display: none !important; }
 .param-unsupported { display: none !important; }

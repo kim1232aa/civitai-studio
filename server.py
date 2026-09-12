@@ -1332,10 +1332,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/pending-jobs":
             from providers import pending_jobs as pj
             return self._json(200, {"jobs": pj.list_pending()})
-        if path in ("/", "/index.html"):
-            return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
-        # Seko storyboard canvas (PLAN-v0789): /storyboard + /cloud-nodes share one shell.
-        if path in ("/storyboard.html", "/storyboard", "/cloud-nodes.html", "/cloud-nodes"):
+        if path in ("/", "/storyboard.html", "/storyboard", "/cloud-nodes.html", "/cloud-nodes"):
             fp = STATIC / "storyboard.html"
             if not fp.exists():
                 return self._json(404, {"error": "storyboard.html missing"})
@@ -1345,6 +1342,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(fp.stat().st_size))
             self.end_headers()
             self.wfile.write(fp.read_bytes())
+            return
+        if path in ("/index.html", "/desk", "/recipe"):
+            return self._bytes(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
         # LiteGraph legacy shell (top-bar link /litegraph)
         if path in ("/litegraph.html", "/litegraph"):
@@ -1441,6 +1441,7 @@ class Handler(BaseHTTPRequestHandler):
             code, data = civitai(f"{ORCH}/v2/services?limit={urllib.parse.quote(str(limit))}&offset={urllib.parse.quote(str(offset))}")
             return self._json(code, data)
         if path == "/api/outs":
+            from providers.http import is_blank_image
             items = []
             for fp in sorted(OUT.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
                 if not fp.is_file():
@@ -1448,10 +1449,27 @@ class Handler(BaseHTTPRequestHandler):
                 ext = fp.suffix.lower()
                 if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".wav", ".mp3"):
                     continue
+                try:
+                    size = fp.stat().st_size
+                except OSError:
+                    continue
+                blank = size < 256
+                if not blank and ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+                    try:
+                        blank = is_blank_image(path=fp)
+                    except Exception:
+                        blank = False
+                if blank:
+                    if size < 256:
+                        try:
+                            fp.unlink()
+                        except OSError:
+                            pass
+                    continue
                 items.append({
                     "file": fp.name,
                     "url": f"/out/{fp.name}",
-                    "bytes": fp.stat().st_size,
+                    "bytes": size,
                     "kind": "video" if ext in (".mp4", ".webm") else ("audio" if ext in (".wav", ".mp3") else "image"),
                 })
             return self._json(200, {"items": items[:60]})

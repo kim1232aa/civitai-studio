@@ -614,7 +614,8 @@
     transition: border-color .15s;
   }
   .card:hover { border-color: color-mix(in srgb, var(--buzz) 40%, var(--line)); }
-  .card img, .card video { width: 100%; max-height: 420px; object-fit: contain; display: block; background: #000; }
+  .card img, .card video { width: 100%; max-height: 420px; object-fit: contain; display: block; background: #111114; }
+  .card-miss { min-height: 120px; display:flex; align-items:center; justify-content:center; color: var(--muted); background: #141418; }
   .card .meta { padding: 8px 10px; color: var(--muted); font-size: 12px; }
 
 
@@ -2729,6 +2730,17 @@ function renderGallery() {
       </div>
     </article>`;
   }).join('');
+  grid.querySelectorAll('img').forEach(img => {
+    img.addEventListener('error', () => {
+      img.replaceWith(Object.assign(document.createElement('div'), { className: 'card-miss', textContent: '裂图' }));
+    });
+    img.addEventListener('load', () => {
+      if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
+        const card = img.closest('.card');
+        if (card) card.remove();
+      }
+    });
+  });
   bindGallery();
 }
 function addCard(src, meta, isVideo) {

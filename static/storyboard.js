@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o91: capsule-on-node + tools-on-select + 九宫格/故事推演; stamp v0821o91-seko-tools
   // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
   // v0821o54b: LoRA rematch pulls full /api/catalog roster like o53d; import chips auto-rematch; stamp v0821o54b-lora-roster-rematch
   // v0821o54: LoRA capability rematch via supportsLora (chips kept + 一键匹配); stamp v0821o54-lora-capability-match
@@ -363,6 +364,7 @@
       });
     });
     if (!state.editor || typeof state.editor !== "object") state.editor = {};
+    if (!state.editor.track) state.editor.track = "picture";
     if (!state.editor.activeShotId || !nodeById(state.editor.activeShotId)) {
       state.editor.activeShotId = shots()[0] ? shots()[0].id : null;
     }
@@ -489,12 +491,25 @@
     if (!state.editor.activeShotId && sequence[0]) state.editor.activeShotId = sequence[0].shot.id;
     if (state.editor.activeShotId && !nodeById(state.editor.activeShotId)) state.editor.activeShotId = sequence[0] ? sequence[0].shot.id : null;
     const active = nodeById(state.editor.activeShotId);
+    const track = (state.editor && state.editor.track) || "picture";
+    const trackTabs = '<div class="editor-tracks" role="tablist" aria-label="编辑器轨道">' +
+      '<button type="button" data-editor-track="picture"' + (track === "picture" ? ' class="on"' : "") + '>画面</button>' +
+      '<button type="button" data-editor-track="voice"' + (track === "voice" ? ' class="on"' : "") + '>配音</button>' +
+      '<button type="button" data-editor-track="music"' + (track === "music" ? ' class="on"' : "") + '>音乐</button></div>';
+    const activeFields = !active
+      ? '<div class="editor-fields editor-fields-empty">选择一个分镜后，在这里编辑标题、画面提示词和负面提示。</div>'
+      : (track === "voice"
+        ? '<div class="editor-fields"><label><span>台词 / 配音提示</span><textarea data-editor-field="voicePrompt" placeholder="这一镜的对白、语气、声线">' + esc(active.voicePrompt || "") + '</textarea></label>' +
+          (active.voiceUrl ? '<audio controls src="' + esc(active.voiceUrl) + '"></audio>' : '<div class="workspace-note">还没有配音文件。点「上传配音」挂上音频轨，不会偷偷触发生成。</div>') +
+          '<button type="button" class="workspace-btn" data-editor-act="upload-voice">上传配音</button></div>'
+        : (track === "music"
+          ? '<div class="editor-fields"><label><span>音乐提示</span><textarea data-editor-field="musicPrompt" placeholder="这一镜的配乐风格、节奏、乐器">' + esc(active.musicPrompt || "") + '</textarea></label>' +
+            (active.musicUrl ? '<audio controls src="' + esc(active.musicUrl) + '"></audio>' : '<div class="workspace-note">还没有音乐文件。点「上传音乐」挂上音频轨。</div>') +
+            '<button type="button" class="workspace-btn" data-editor-act="upload-music">上传音乐</button></div>'
+          : '<div class="editor-fields"><label><span>镜头标题</span><input data-editor-field="title" value="' + esc(active.title || "分镜") + '"></label>' +
+            '<label><span>画面提示词</span><textarea data-editor-field="prompt" placeholder="描述这一镜的主体、动作、构图与光线">' + esc(active.prompt || "") + '</textarea></label>' +
+            '<label><span>负面提示</span><textarea data-editor-field="negative" placeholder="可选：不希望出现的内容">' + esc(active.negativePrompt || "") + '</textarea></label></div>'));
     const total = sequence.reduce((n, item) => n + shotDurationSeconds(item.shot), 0);
-    const activeFields = active
-      ? '<div class="editor-fields"><label><span>镜头标题</span><input data-editor-field="title" value="' + esc(active.title || "分镜") + '"></label>' +
-        '<label><span>画面提示词</span><textarea data-editor-field="prompt" placeholder="描述这一镜的主体、动作、构图与光线">' + esc(active.prompt || "") + '</textarea></label>' +
-        '<label><span>负面提示</span><textarea data-editor-field="negative" placeholder="可选：不希望出现的内容">' + esc(active.negativePrompt || "") + '</textarea></label></div>'
-      : '<div class="editor-fields editor-fields-empty">选择一个分镜后，在这里编辑标题、画面提示词和负面提示。</div>';
     const grouped = state.script.scenes.map((scene) => {
       const rows = (scene.shotIds || []).map((id, i) => {
         const shot = nodeById(id);
@@ -524,13 +539,14 @@
     panel.innerHTML =
       '<div class="workspace-shell"><div class="workspace-top"><div>' +
       '<div class="workspace-kicker">EDIT TIMELINE</div><h1 class="workspace-title" id="editorWorkspaceTitle">编辑器</h1>' +
-      '<p class="workspace-subtitle">把已生成的分镜按场次编排，调整顺序与时长；这里不会偷偷触发生成。</p></div>' +
+      '<p class="workspace-subtitle">画面 / 配音 / 音乐三条轨，按场次编排顺序与时长；这里不会偷偷触发生成。</p></div>' +
       '<div class="workspace-actions"><button type="button" class="workspace-btn primary" data-editor-act="play">' + (state.editor.playing ? '暂停播放' : '播放序列') + '</button>' +
       '<button type="button" class="workspace-btn" data-editor-act="next">下一镜</button><button type="button" class="workspace-btn" data-editor-act="open-canvas">打开画布</button></div></div>' +
       '<div class="editor-layout"><div class="workspace-card editor-timeline"><div class="workspace-card-hd"><h2>时间线</h2><span class="muted">' + sequence.length + ' 镜头</span></div>' +
       '<div class="workspace-card-body"><div class="editor-stats"><span>总时长 <strong>' + esc(formatDuration(total)) + '</strong></span><span>已生成 <strong>' + sequence.filter((item) => !!item.shot.url).length + '/' + sequence.length + '</strong></span></div>' +
       '<div class="editor-rows">' + editorContent + '</div></div></div>' +
       '<div class="editor-preview"><div class="editor-preview-head"><strong>' + esc(active ? active.title : "未选择分镜") + '</strong><span class="muted">' + (active ? formatDuration(shotDurationSeconds(active)) : "") + '</span></div>' +
+      trackTabs +
       '<div class="editor-preview-media">' + workspaceMedia(active) + '</div>' +
       activeFields +
       '<div class="workspace-note">' + esc(active && active.prompt ? active.prompt : "选择时间线中的分镜查看画面提示词。") + '</div></div></div></div>';
@@ -734,6 +750,13 @@
         persist();
         return;
       }
+      const trackBtn = e.target.closest("[data-editor-track]");
+      if (trackBtn) {
+        state.editor.track = trackBtn.dataset.editorTrack || "picture";
+        renderWorkspace();
+        persist();
+        return;
+      }
       const act = e.target.closest("[data-editor-act]");
       if (act) {
         if (act.dataset.editorAct === "play") toggleEditorPlayback();
@@ -742,6 +765,10 @@
         else if (act.dataset.editorAct === "open-script") setWorkspace("script");
         else if (act.dataset.editorAct === "add-shot") addWorkspaceShot();
         else if (act.dataset.editorAct === "delete-shot") deleteWorkspaceShot(act.dataset.shotId);
+        else if (act.dataset.editorAct === "upload-voice" || act.dataset.editorAct === "upload-music") {
+          state._editorAudioField = act.dataset.editorAct === "upload-voice" ? "voiceUrl" : "musicUrl";
+          if ($("file")) $("file").click();
+        }
         return;
       }
       const move = e.target.closest("[data-editor-move]");
@@ -1086,6 +1113,7 @@
       el.disabled = !targets.length || state.runningGroup;
       el.title = why;
     });
+    try { syncNodeTools(); } catch (_) {}
   }
   function syncGroupRunBtn() {
     const btn = $("btnGroupRun");
@@ -1848,11 +1876,20 @@
         : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
       const dur = shotDurationLabel(n);
       const busy = n._busy ? " busy" : "";
+      const crop = (state._cropShotId === n.id) ? " cropping" : "";
       const b = box(n);
-      return '<div class="card shot' + sel + multi + busy + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
+      const acts = (state.selected === n.id && n.url)
+        ? '<div class="node-acts">' +
+          '<button type="button" data-node-act="download" data-id="' + esc(n.id) + '">下载</button>' +
+          '<button type="button" data-node-act="edit" data-id="' + esc(n.id) + '">编辑</button>' +
+          '<button type="button" data-node-act="crop" data-id="' + esc(n.id) + '">局部摘取</button>' +
+          '</div>'
+        : "";
+      return '<div class="card shot' + sel + multi + busy + crop + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
+        acts +
         '<button class="port in" data-side="in" type="button" aria-label="输入"></button>' +
         '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
     }
@@ -2523,6 +2560,7 @@
     renderDock();
     syncLoraUi();
     syncGroupRunBtn();
+    syncNodeTools();
     if (state.workspace !== "canvas") renderWorkspace();
   }
   function clientToWorld(cx, cy) {
@@ -3495,7 +3533,7 @@
     }
     if (card) {
       const n = nodeById(card.dataset.id);
-      if (e.target.closest("textarea,[data-textact],.acts")) {
+      if (e.target.closest("textarea,[data-textact],[data-node-act],.acts,.node-acts")) {
         if (state.selected !== n.id || e.shiftKey) {
           selectNode(n.id, { shift: !!(e.shiftKey) });
         }
@@ -3820,6 +3858,25 @@
     const input = $("file");
     const files = input && input.files;
     if (!files || !files.length) return;
+    if (state._editorAudioField) {
+      const field = state._editorAudioField;
+      state._editorAudioField = "";
+      const shot = nodeById(state.editor && state.editor.activeShotId) || nodeById(state.selected);
+      if (!shot) { setMsg("先选一个分镜再上传音轨", "warn"); return; }
+      const f = files[0];
+      input.value = "";
+      setMsg("正在上传音轨…");
+      uploadOut(f).then(function (url) {
+        if (!url) return;
+        shot[field] = url;
+        persist();
+        renderWorkspace();
+        setMsg("音轨已挂上这一镜", "ok");
+      }).catch(function (e) {
+        setMsg("上传失败：" + ((e && e.message) || e), "bad");
+      });
+      return;
+    }
     const list = [];
     for (let i = 0; i < files.length; i++) list.push(files[i]);
     input.value = "";
@@ -8172,6 +8229,29 @@
   syncSelBar();
 
   $("btnAdd").onclick = () => {
+    const pop = $("addPop");
+    if (!pop) { addBlankShot(); return; }
+    pop.hidden = !pop.hidden;
+  };
+  if ($("addPop")) {
+    $("addPop").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-add]");
+      if (!btn) return;
+      $("addPop").hidden = true;
+      if (btn.dataset.add === "upload") {
+        if ($("file")) $("file").click();
+        return;
+      }
+      addBlankShot();
+    });
+  }
+  document.addEventListener("click", (e) => {
+    const pop = $("addPop");
+    if (!pop || pop.hidden) return;
+    if (e.target.closest("#addPop,#btnAdd")) return;
+    pop.hidden = true;
+  });
+  function addBlankShot() {
     const n = shots().length;
     const id = uid("shot");
     const pos = newShotPosition(n);
@@ -8187,7 +8267,269 @@
     compactShotsAt100();
     constrainShotsToViewport();
     selectNode(id, { preserveLayout: state.cam.s >= 1 }); persist();
-  };
+  }
+  function syncNodeTools() {
+    const tools = document.querySelector(".tools");
+    if (!tools) return;
+    const shot = nodeById(state.selected);
+    const hasShot = !!(shot && shot.kind === "shot");
+    const multi = !!(state.multi && state.multi.length >= 2);
+    tools.classList.toggle("has-shot", hasShot);
+    tools.classList.toggle("has-multi", multi);
+    const needUrl = !!(hasShot && shot.url);
+    ["btnDownload", "btnCrop", "btnNine", "btnPano"].forEach(function (id) {
+      const el = $(id);
+      if (el) el.disabled = !needUrl;
+    });
+    if ($("btnEditNode")) $("btnEditNode").disabled = !hasShot;
+    if ($("btnStory")) $("btnStory").disabled = !hasShot;
+  }
+  function selectedShot() {
+    const n = nodeById(state.selected);
+    return (n && n.kind === "shot") ? n : null;
+  }
+  function loadImageEl(url) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error("读图失败")); };
+      img.src = url;
+    });
+  }
+  async function uploadDataUrl(dataUrl, filename) {
+    const r = await fetch("/api/upload-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: dataUrl, filename: filename || "crop.jpg" }),
+    });
+    let j = null;
+    try { j = await r.json(); } catch (_) {}
+    if (r.ok && j && j.url) return j.url;
+    throw new Error((j && j.error) || ("上传失败 HTTP " + r.status));
+  }
+  function downloadShot(shot) {
+    if (!shot || !shot.url) { setMsg("这一镜还没有成片", "warn"); return; }
+    const a = document.createElement("a");
+    a.href = shot.url;
+    a.download = (shot.title || "shot") + (isVideoUrl(shot.url) ? ".mp4" : ".jpg");
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function editSelectedShot() {
+    const shot = selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    state.dockMode = "expanded";
+    selectNode(shot.id, { expand: true, preserveLayout: true });
+  }
+  async function nineGridFromShot(shot) {
+    shot = shot || selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再切九宫格", "warn"); return; }
+    setMsg("正在切九宫格…");
+    try {
+      const img = await loadImageEl(shot.url);
+      const tw = Math.max(8, Math.floor(img.naturalWidth / 3));
+      const th = Math.max(8, Math.floor(img.naturalHeight / 3));
+      const canvas = document.createElement("canvas");
+      canvas.width = tw;
+      canvas.height = th;
+      const ctx = canvas.getContext("2d");
+      const created = [];
+      let i = 0;
+      for (let gy = 0; gy < 3; gy++) {
+        for (let gx = 0; gx < 3; gx++) {
+          ctx.clearRect(0, 0, tw, th);
+          ctx.drawImage(img, gx * tw, gy * th, tw, th, 0, 0, tw, th);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+          const url = await uploadDataUrl(dataUrl, (shot.title || "shot") + "-g" + (i + 1) + ".jpg");
+          const id = uid("shot");
+          const node = {
+            id: id,
+            kind: "shot",
+            title: (shot.title || "分镜") + " · 宫" + (i + 1),
+            x: shot.x + box(shot).w + 36 + gx * (Math.round(box(shot).w * 0.42) + 16),
+            y: shot.y + gy * (Math.round(box(shot).h * 0.42) + 16),
+            url: url,
+            prompt: shot.prompt || "",
+            negativePrompt: shot.negativePrompt || "",
+            mode: "image",
+          };
+          state.nodes.push(node);
+          state.edges.push({ from: shot.id, to: id });
+          created.push(node);
+          i += 1;
+        }
+      }
+      ensureWorkspaceModel();
+      const scene = sceneById(shot.sceneId) || (state.script && state.script.scenes[0]);
+      if (scene) created.forEach(function (n) { assignShotToScene(n.id, scene.id); });
+      renderCards(); drawWires(); persist(); persistServer();
+      setMsg("九宫格已铺到画布 · " + created.length + " 张，点 ↑ 可再生成", "ok");
+    } catch (e) {
+      setMsg("九宫格失败：" + ((e && e.message) || e), "bad");
+    }
+  }
+  function storyAdvanceFromShot(shot, seconds) {
+    shot = shot || selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    const id = uid("shot");
+    const node = {
+      id: id,
+      kind: "shot",
+      title: (shot.title || "分镜") + " · +" + seconds + "s",
+      x: shot.x + box(shot).w + 48,
+      y: shot.y + (seconds === 5 ? Math.round(box(shot).h * 0.55) : 0),
+      url: "",
+      firstFrameId: shot.url ? shot.id : (shot.firstFrameId || ""),
+      prompt: ((shot.prompt || "").trim() + "\n下一镜，往后 " + seconds + " 秒的画面，承接上一镜的动作、空间与角色位置。").trim(),
+      negativePrompt: shot.negativePrompt || "",
+      mode: shot.mode || "image",
+    };
+    state.nodes.push(node);
+    state.edges.push({ from: shot.id, to: id });
+    ensureWorkspaceModel();
+    const scene = sceneById(shot.sceneId) || (state.script && state.script.scenes[0]);
+    if (scene) assignShotToScene(id, scene.id);
+    selectNode(id, { collapsed: true, preserveLayout: true });
+    persist(); persistServer();
+    setMsg("已推演 +" + seconds + " 秒新分镜 · 不会自动生成，确认后点 ↑", "ok");
+  }
+  function beginCrop(shot) {
+    shot = shot || selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再局部摘取", "warn"); return; }
+    state._cropShotId = shot.id;
+    renderCards();
+    setMsg("在成片上拖出要摘的区域", "ok");
+  }
+  async function finishCropRect(shot, nx, ny, nw, nh) {
+    try {
+      const img = await loadImageEl(shot.url);
+      const sx = Math.max(0, Math.floor(nx * img.naturalWidth));
+      const sy = Math.max(0, Math.floor(ny * img.naturalHeight));
+      const sw = Math.max(8, Math.floor(nw * img.naturalWidth));
+      const sh = Math.max(8, Math.floor(nh * img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = sw;
+      canvas.height = sh;
+      canvas.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      const url = await uploadDataUrl(canvas.toDataURL("image/jpeg", 0.92), (shot.title || "shot") + "-crop.jpg");
+      const id = uid("shot");
+      const node = {
+        id: id, kind: "shot", title: (shot.title || "分镜") + " · 摘取",
+        x: shot.x + box(shot).w + 36, y: shot.y,
+        url: url, prompt: shot.prompt || "", negativePrompt: shot.negativePrompt || "", mode: "image",
+      };
+      state.nodes.push(node);
+      state.edges.push({ from: shot.id, to: id });
+      renderCards(); drawWires(); persist(); persistServer();
+      setMsg("局部摘取已成新节点", "ok");
+    } catch (e) {
+      setMsg("摘取失败：" + ((e && e.message) || e), "bad");
+    }
+  }
+  function panoFromShot(shot) {
+    shot = shot || selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+    let hit = "";
+    Object.keys(pool).forEach(function (id) {
+      const row = pool[id] || {};
+      const s = (id + " " + (row.name || "") + " " + (row.id || "")).toLowerCase();
+      if (!hit && /360|panorama|equirect|720/.test(s)) hit = row.id || id;
+    });
+    if (!hit) {
+      setMsg("当前目录没有 720° 全景端点（不装接）", "warn");
+      return;
+    }
+    const sel = $("service");
+    if (sel) {
+      ensureSelectOpt(sel, hit);
+      sel.value = hit;
+      shot.serviceId = hit;
+      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+    }
+    setMsg("已选全景端点 " + hit + " · 确认后点 ↑", "ok");
+  }
+  if ($("btnDownload")) $("btnDownload").onclick = function () { downloadShot(selectedShot()); };
+  if ($("btnEditNode")) $("btnEditNode").onclick = function () { editSelectedShot(); };
+  if ($("btnCrop")) $("btnCrop").onclick = function () { beginCrop(selectedShot()); };
+  if ($("btnNine")) $("btnNine").onclick = function () { nineGridFromShot(selectedShot()); };
+  if ($("btnStory")) {
+    $("btnStory").onclick = function (e) {
+      e.stopPropagation();
+      let pop = $("storyPop");
+      if (!pop) {
+        pop = document.createElement("div");
+        pop.id = "storyPop";
+        pop.className = "story-pop";
+        pop.innerHTML = '<button type="button" data-story="3">往后 3 秒</button><button type="button" data-story="5">往后 5 秒</button>';
+        document.body.appendChild(pop);
+        pop.addEventListener("click", function (ev) {
+          const b = ev.target.closest("[data-story]");
+          if (!b) return;
+          pop.hidden = true;
+          storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3);
+        });
+      }
+      const r = $("btnStory").getBoundingClientRect();
+      pop.style.left = r.right + 8 + "px";
+      pop.style.top = r.top + "px";
+      pop.hidden = !pop.hidden;
+    };
+  }
+  if ($("btnPano")) $("btnPano").onclick = function () { panoFromShot(selectedShot()); };
+  world.addEventListener("click", function (e) {
+    const act = e.target.closest("[data-node-act]");
+    if (!act) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const shot = nodeById(act.getAttribute("data-id"));
+    if (!shot) return;
+    const kind = act.getAttribute("data-node-act");
+    if (kind === "download") downloadShot(shot);
+    else if (kind === "edit") { state.selected = shot.id; editSelectedShot(); }
+    else if (kind === "crop") beginCrop(shot);
+  });
+  vp.addEventListener("pointerdown", function (e) {
+    if (!state._cropShotId) return;
+    const card = e.target.closest(".card.shot");
+    if (!card || card.dataset.id !== state._cropShotId) return;
+    const face = card.querySelector(".face");
+    if (!face) return;
+    e.stopPropagation();
+    const r = face.getBoundingClientRect();
+    state._cropDrag = {
+      id: state._cropShotId,
+      x0: (e.clientX - r.left) / r.width,
+      y0: (e.clientY - r.top) / r.height,
+    };
+  }, true);
+  vp.addEventListener("pointerup", function (e) {
+    if (!state._cropDrag) return;
+    const drag = state._cropDrag;
+    state._cropDrag = null;
+    const shot = nodeById(drag.id);
+    state._cropShotId = "";
+    const card = document.querySelector('.card.shot[data-id="' + drag.id + '"]');
+    const face = card && card.querySelector(".face");
+    renderCards();
+    if (!shot || !face) return;
+    const r = face.getBoundingClientRect();
+    const x1 = (e.clientX - r.left) / r.width;
+    const y1 = (e.clientY - r.top) / r.height;
+    const nx = Math.max(0, Math.min(drag.x0, x1));
+    const ny = Math.max(0, Math.min(drag.y0, y1));
+    const nw = Math.abs(x1 - drag.x0);
+    const nh = Math.abs(y1 - drag.y0);
+    if (nw < 0.05 || nh < 0.05) {
+      setMsg("框太小，再拖一次", "warn");
+      return;
+    }
+    finishCropRect(shot, nx, ny, nw, nh);
+  }, true);
   if ($("btnText")) {
     $("btnText").onclick = () => {
       const base = nodeById(state.selected);

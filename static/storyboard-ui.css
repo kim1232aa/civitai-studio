@@ -112,4 +112,96 @@ header {
   display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px;
   border: 1px solid rgba(94,224,197,.35); color: #dffcf5; font-size: 10px; letter-spacing: .02em;
 }
+.add-pop {
+  position: absolute;
+  left: 52px;
+  top: 8px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  padding: 6px;
+  background: #16161af2;
+  border: 1px solid #34343e;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+}
+.add-pop[hidden] { display: none !important; }
+.add-pop button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e8e8ec;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.add-pop button:hover { background: #2a2a32; }
+.tools { position: relative; }
+.tools .node-only,
+.tools .group-only { display: none; }
+.tools.has-shot .node-only { display: inline-flex; }
+.tools.has-multi .group-only { display: inline-flex; }
+.node-acts {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  pointer-events: auto;
+}
+.node-acts button {
+  background: #16161af2;
+  border: 1px solid #3a3a42;
+  color: #e8e8ec;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.node-acts button:hover { border-color: var(--teal); color: #fff; }
+.card.shot.cropping .face { cursor: crosshair; outline: 1px dashed var(--teal); }
+.editor-tracks {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.editor-tracks button {
+  background: #1c1c1f;
+  border: 1px solid #303034;
+  color: #c8c8d0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.editor-tracks button.on { background: #38383d; color: #fff; border-color: #5ee0c5; }
+.story-pop {
+  position: absolute;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 6px;
+  background: #16161af2;
+  border: 1px solid #34343e;
+  border-radius: 12px;
+}
+.story-pop[hidden] { display: none !important; }
+.story-pop button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e8e8ec;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.story-pop button:hover { background: #2a2a32; }
+
 

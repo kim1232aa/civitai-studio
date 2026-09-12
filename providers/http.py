@@ -190,6 +190,7 @@ def collect_urls(obj) -> list[str]:
         for key in (
             "images", "image", "videos", "video", "blobs", "audio", "audios",
             "image_url", "video_url", "audio_url", "output", "output_images",
+            "output_videos", "output_video",
             "result", "json_output", "data", "urls", "files", "payload",
             "response",
         ):
@@ -234,12 +235,15 @@ def raw_call(url: str, method="POST", headers=None, body=None, timeout=120):
 
 
 def is_blank_image(path=None, raw=None) -> bool:
-    """True if the file is a real PNG that is essentially all black. Stdlib only."""
+    """True if the file is not a real picture: empty, tiny, 1×1, or essentially all black."""
     import zlib
     try:
         if raw is None and path:
             raw = Path(path).read_bytes()
         if not raw:
+            return True
+        # 1×1 PNG is 69 bytes; a real photo is kilobytes. Don't let junk into the gallery.
+        if len(raw) < 256:
             return True
         if raw[:8] != b"\x89PNG\r\n\x1a\n":
             return False
@@ -263,8 +267,10 @@ def is_blank_image(path=None, raw=None) -> bool:
             elif ctype == b"IEND":
                 break
             offset = end + 4
+        if w <= 2 or h <= 2:
+            return True
         if not idat or w <= 0 or h <= 0:
-            return False
+            return True
         data = zlib.decompress(b"".join(idat))
         if not data:
             return True

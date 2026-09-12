@@ -7,9 +7,9 @@
 <title>画布 · Night Lab</title>
 
 <link rel="stylesheet" href="/static/storyboard-ui-base.css?v=o76base">
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=o90lora">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=o91seko">
   <link rel="stylesheet" href="/static/composer-field-adapt.css?v=o75seko" />
-<link rel="stylesheet" href="/static/o76-dock-right.css?v=o76dock" />
+<link rel="stylesheet" href="/static/o76-dock-right.css?v=o91cap" />
 </head>
 <body>
 <div class="app">
@@ -23,7 +23,7 @@
     </nav>
     <div class="mode-mini">
       <button class="tool-mini" id="canvasManagerToggle" type="button">项目</button>
-      <a href="/">配方台</a>
+      <a href="/index.html">配方台</a>
       <a href="/litegraph">LiteGraph</a>
       <span class="stamp" hidden aria-hidden="true"></span>
     </div>
@@ -33,17 +33,29 @@
     <div class="workspace-panel" id="scriptWorkspace" role="region" aria-labelledby="scriptWorkspaceTitle" hidden></div>
     <div class="workspace-panel" id="editorWorkspace" role="region" aria-labelledby="editorWorkspaceTitle" hidden></div>
     <div class="tools canvas-only" aria-label="画布工具">
-      <button class="tool" id="btnAdd" title="添加分镜">+</button>
+      <button class="tool" id="btnAdd" title="添加：空白节点或上传本地">+</button>
+      <div class="add-pop" id="addPop" hidden>
+        <button type="button" data-add="blank">空白节点</button>
+        <button type="button" data-add="upload">上传本地文件</button>
+      </div>
       <button class="tool" id="btnText" title="添加提示词节点">文</button>
       <button class="tool" id="btnRev" title="提示词反推">↻</button>
       <button class="tool" id="btnAuto" title="自动布局">▦</button>
       <button class="tool" id="btnFit" title="适配">◎</button>
       <button class="tool" id="btnImport" title="导入分镜素材">⇪</button>
-      <div class="tools-sep" aria-hidden="true"></div>
-      <div class="tools-hint">分组</div>
-      <button class="tool lbl" id="btnGroup" title="成组 · Shift多选后点">成组</button>
-      <button class="tool lbl" id="btnUngroup" title="解组">解组</button>
-      <button class="tool lbl" id="btnGroupRun" title="整组执行（逐步）" disabled>▶ 整组</button>
+      <div class="tools-sep node-only" aria-hidden="true"></div>
+      <div class="tools-hint node-only">节点</div>
+      <button class="tool lbl node-only" id="btnDownload" title="下载成片">下载</button>
+      <button class="tool lbl node-only" id="btnEditNode" title="打开 Composer 编辑">编辑</button>
+      <button class="tool lbl node-only" id="btnCrop" title="从成片局部摘取">局部摘取</button>
+      <button class="tool lbl node-only" id="btnNine" title="九宫格切分">九宫格</button>
+      <button class="tool lbl node-only" id="btnStory" title="往后推演 3 秒 / 5 秒">故事推演</button>
+      <button class="tool lbl node-only" id="btnPano" title="720° 全景">720°</button>
+      <div class="tools-sep group-only" aria-hidden="true"></div>
+      <div class="tools-hint group-only">分组</div>
+      <button class="tool lbl group-only" id="btnGroup" title="成组 · Shift多选后点">成组</button>
+      <button class="tool lbl group-only" id="btnUngroup" title="解组">解组</button>
+      <button class="tool lbl group-only" id="btnGroupRun" title="整组执行（逐步）" disabled>▶ 整组</button>
     </div>
     <div class="selbar" id="selBar" role="toolbar" aria-label="多选操作">
       <span>已选 <span class="n" id="selCount">0</span> 项</span>
@@ -218,11 +230,11 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<!-- v0821o54b-lora-roster-rematch o54blorarosterrematch v0821o90-cross-lora-search o90crosslora -->
+<!-- v0821o54b-lora-roster-rematch o54blorarosterrematch v0821o90-cross-lora-search o90crosslora v0821o91-seko-tools o91sekotools -->
 <script src="/static/lora-capability-hints.js?v=o70lora"></script>
 <script src="/static/composer-field-adapt.js?v=o75caps"></script>
 <script src="/static/o61-group-hide.js?v=o75seko"></script>
-<script src="/static/storyboard.js?v=o90cross"></script>
+<script src="/static/storyboard.js?v=o91seko"></script>
 <script src="/static/o68-capability-hide.js?v=o75caps"></script>
 <script src="/static/o75-catalog-busy.js?v=o75busy"></script>
 <script src="/static/o76-model-fields.js?v=o76fields"></script>
