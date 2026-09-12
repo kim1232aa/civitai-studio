@@ -1,5 +1,6 @@
 /* v0821o67-human-copy + o97 pin inline
- * Product copy scrub + attach collapsed composer to selected shot.
+ * v0821o103-wide-desk v0821o102-seko v0821o101-shell v0821o100-desk v0821o99-capsule-row
+ * Product copy scrub + attach composer to fallback bottom desk.
  * Inlined because storyboard.html on main (o96) does not load o97-dock-pin.js.
  */
 (function () {
@@ -141,7 +142,7 @@
     }
   }
 
-  var PIN = "v0821o102-seko";
+  var PIN = "v0821o103-wide-desk";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -153,9 +154,8 @@
     css.textContent = [
       ".chip{width:44px !important;height:44px !important;overflow:hidden !important}",
       ".chip img,.chip video{width:44px !important;height:44px !important;object-fit:cover !important}",
-      ".dock.show{width:480px !important;max-width:min(480px,calc(100% - 88px)) !important;transform:none !important;}",
-      ".dock.show.collapsed{height:auto !important;max-height:220px !important;}",
-      ".dock.show.expanded{max-height:min(42vh,340px) !important;}"
+      ".dock.show,.dock.show.collapsed,.dock.show.expanded{left:72px !important;right:20px !important;bottom:12px !important;top:auto !important;width:auto !important;max-width:min(1600px,calc(100% - 96px)) !important;transform:none !important;height:auto !important;max-height:min(32vh,260px) !important;}",
+      ".dock.show #dockExpand,.dock.show #dockCollapse,.dock.show #dockHint,.dock.show .expand-only,.dock.show .collapse-only{display:none !important}"
     ].join("");
     document.head.appendChild(css);
   }
@@ -230,10 +230,11 @@
     } else {
       // fallback bottom desk
       dock.style.setProperty("left", "72px", "important");
+      dock.style.setProperty("right", "20px", "important");
       dock.style.setProperty("bottom", "12px", "important");
       dock.style.setProperty("top", "auto", "important");
-      dock.style.setProperty("width", "480px", "important");
-      dock.style.setProperty("max-width", "480px", "important");
+      dock.style.setProperty("width", "auto", "important");
+      dock.style.setProperty("max-width", "min(1600px, calc(100% - 96px))", "important");
       dock.style.setProperty("transform", "none", "important");
     }
     pinning = false;

@@ -1,10 +1,10 @@
-/* v0821o99-capsule-row — 收起=提示词+家+模型+↑，贴选中分镜下沿；展开不撑出视口 */
-.dock.show.collapsed {
-  max-width: 280px !important;
-  min-width: 200px !important;
-  max-height: 112px !important;
-  border-radius: 14px !important;
-  overflow: hidden !important;
+/* v0821o103-wide-desk — 大屏底栏书桌。收起条不再缩成 280。 */
+.dock.show.collapsed,
+.dock.show.expanded,
+.dock.expanded {
+  max-width: min(1600px, calc(100% - 96px)) !important;
+  max-height: min(32vh, 260px) !important;
+  min-width: 0 !important;
 }
 .dock.show.collapsed #paramWarn,
 .dock.show.collapsed #msg,
@@ -17,6 +17,7 @@
 .dock.show.collapsed #dockExpand {
   white-space: nowrap !important;
   flex: 0 0 auto !important;
+  display: none !important;
 }
 .dock.show.collapsed #dockTitle,
 .dock.show.collapsed .dock-title {
@@ -24,13 +25,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap !important;
-}
-.dock.collapsed {
-  min-width: 220px;
-  max-width: 280px;
-}
-.dock.show.expanded,
-.dock.expanded {
-  max-width: min(720px, calc(100vw - 72px)) !important;
-  max-height: min(36vh, 320px) !important;
 }

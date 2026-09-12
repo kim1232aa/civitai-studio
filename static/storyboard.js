@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o103: 大屏底栏书桌，↑=生成，无展开; stamp v0821o103-wide-desk
   // v0821o102: Seko 胶囊贴选中分镜，参考图小芯片; stamp v0821o102-seko
   // v0821o101: Composer 底栏重构，不再贴卡; stamp v0821o101-shell
   // v0821o100: 收起贴选中分镜底部；展开无侧位就沉到底栏（o93 desk）; stamp v0821o100-desk
@@ -233,7 +234,7 @@
     runningGroup: false,
     groupRunAbort: false,
     uploading: 0,
-    dockMode: "collapsed",
+    dockMode: "expanded",
     _overview100: false,
     workspace: "canvas",
     script: { title: "未命名故事", logline: "", scenes: [] },
@@ -2162,7 +2163,8 @@
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(reset);
   }
   function setDockMode(mode) {
-    if (mode !== "collapsed" && mode !== "expanded" && mode !== "closed") mode = "collapsed";
+    if (mode === "collapsed") mode = "expanded";
+    if (mode !== "expanded" && mode !== "closed") mode = "expanded";
     state.dockMode = mode;
     renderDock();
     if (mode === "expanded") {
@@ -2201,52 +2203,39 @@
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
     const stage = dock.closest(".stage") || vp.parentElement;
     const sr = stage.getBoundingClientRect();
-    const expanded = state.dockMode === "expanded";
-    const gap = 8;
-    const wantW = 480;
-    const wantH = expanded ? 300 : 188;
-    let left = 72, top = Math.max(48, sr.height - wantH - 12);
-    const card = world.querySelector('.card.shot[data-id="' + n.id + '"]');
-    if (card) {
-      const cr = card.getBoundingClientRect();
-      const others = [...world.querySelectorAll(".card.shot")].filter((el) => el !== card)
-        .map((el) => {
-          const r = el.getBoundingClientRect();
-          return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top };
-        });
-      const sameRow = others.filter((o) => o.t < (cr.bottom - sr.top) - 8 && o.b > (cr.top - sr.top) + 8);
-      const nextRight = sameRow.reduce((m, o) => Math.min(m, o.l), sr.width - 16);
-      const room = nextRight - (cr.left - sr.left) - 12;
-      const canHug = room >= 360;
-      if (canHug) {
-        left = Math.round(cr.left - sr.left);
-        top = Math.round(cr.bottom - sr.top + gap);
-        const hits = others.some((o) =>
-          !(left + wantW <= o.l + 12 || left >= o.r - 12 || top + wantH <= o.t + 12 || top >= o.b - 12));
-        if (hits || top + wantH > sr.height - 8) {
-          // fallback bottom desk — never cover neighbor shots
-          left = 72;
-          top = Math.max(48, sr.height - wantH - 12);
-        }
-      }
-    }
+    // v0821o103-wide-desk: always pin as fallback bottom desk — large-screen writing surface
+    const left = 72;
+    const right = 20;
+    const bottom = 12;
+    const maxW = Math.min(1600, Math.max(480, sr.width - 96));
+    const top = Math.max(48, sr.height - Math.min(sr.height * 0.32, 260) - bottom);
     Object.assign(dock.style, {
-      left: left + "px", top: top + "px", right: "auto", bottom: "auto",
-      width: wantW + "px", maxWidth: wantW + "px",
-      height: "auto", minHeight: expanded ? "240px" : "160px",
-      maxHeight: wantH + "px",
-      transform: "none", visibility: "",
+      left: left + "px",
+      right: right + "px",
+      bottom: bottom + "px",
+      top: "auto",
+      width: "auto",
+      maxWidth: maxW + "px",
+      height: "auto",
+      minHeight: "160px",
+      maxHeight: "min(32vh, 260px)",
+      transform: "none",
+      visibility: "",
     });
     dock.classList.add("near");
     const area = canvasArea();
     ["skillbox", "atbox", "picker"].forEach((id) => {
       const el = $(id);
       if (!el) return;
-      const w = Math.min(400, wantW);
-      const px = left + wantW + gap + w <= sr.width - 16 ? left + wantW + gap : left;
+      const w = Math.min(400, maxW);
+      const px = left;
       Object.assign(el.style, {
-        left: px + "px", right: "auto", top: top + "px", bottom: "auto",
-        width: w + "px", maxHeight: Math.min(320, area.bottom - top) + "px", transform: "none",
+        left: px + "px", right: "auto",
+        top: "auto",
+        bottom: (sr.height - top + 8) + "px",
+        width: w + "px",
+        maxHeight: Math.min(320, area.bottom - top) + "px",
+        transform: "none",
       });
     });
   }
@@ -2431,6 +2420,7 @@
       requestAnimationFrame(positionDock);
       return;
     }
+    if (state.dockMode === "collapsed") state.dockMode = "expanded";
     const expanded = state.dockMode === "expanded";
     dock.classList.add("show");
     dock.classList.toggle("collapsed", !expanded);
@@ -2617,14 +2607,11 @@
         constrainCameraToShots(n);
         applyCam();
       }
-      // v0819b-expand-prompt: boot/first paint stays collapsed (canvas = stage);
-      // intentional shot click expands; {collapsed:true} keeps bottom bar; expand capsule still works.
+      // v0821o103-wide-desk: large screen always writes on the desk; no toy collapsed bar.
       if (opts.keepClosed) {
         /* leave dockMode (closed/chip path) */
-      } else if (opts.expand) {
-        state.dockMode = "expanded";
       } else {
-        state.dockMode = "collapsed";
+        state.dockMode = "expanded";
       }
     }
     renderCards();
