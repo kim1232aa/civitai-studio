@@ -1,16 +1,12 @@
-/* v0821o98-capsule-fit — 收起条贴选中分镜，禁止 420 岛盖成片，标题一行不拆字 */
+/* v0821o99-capsule-row — 收起=提示词+家+模型+↑，贴选中分镜下沿；展开不撑出视口 */
 .dock.show.collapsed {
   width: 280px !important;
   max-width: 280px !important;
   min-width: 220px !important;
-  max-height: 96px !important;
+  max-height: 112px !important;
   border-radius: 14px !important;
   overflow: hidden !important;
 }
-.dock.show.collapsed .dock-foot,
-.dock.show.collapsed .bar,
-.dock.show.collapsed #backend,
-.dock.show.collapsed #service,
 .dock.show.collapsed #paramWarn,
 .dock.show.collapsed #msg,
 .dock.show.collapsed .msg,
@@ -33,4 +29,9 @@
 .dock.collapsed {
   min-width: 220px;
   max-width: 280px;
+}
+.dock.show.expanded,
+.dock.expanded {
+  max-width: min(360px, calc(100vw - 72px)) !important;
+  max-height: min(48vh, 360px) !important;
 }

@@ -137,7 +137,7 @@
     }
   }
 
-  var PIN = "v0821o98-capsule-fit";
+  var PIN = "v0821o99-capsule-row";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -147,13 +147,14 @@
     var css = document.createElement("style");
     css.id = "o97PinCss";
     css.textContent = [
-      ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:96px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
+      ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:112px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
       ".dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}",
       ".dock.show.collapsed .dock-hd{flex-wrap:nowrap !important;overflow:hidden;align-items:center;}",
       ".dock.show.collapsed #dockExpand{white-space:nowrap !important;flex:0 0 auto !important;}",
       ".dock.show.collapsed #dockTitle,.dock.show.collapsed .dock-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;}",
       ".dock.show.collapsed #paramWarn,.dock.show.collapsed #msg,.dock.show.collapsed .msg,.dock.show.collapsed #catalogStatus{display:none !important;}",
-      ".dock.show.collapsed #sendCap{width:28px !important;height:28px !important;flex:0 0 28px !important;}"
+      ".dock.show.collapsed #sendCap{width:28px !important;height:28px !important;flex:0 0 28px !important;}",
+      ".dock.show.expanded,.dock.expanded{max-width:360px !important;max-height:min(48vh,360px) !important;}"
     ].join("");
     document.head.appendChild(css);
   }
@@ -233,7 +234,7 @@
     var others = neighborRects(card, sr);
     var left, top, dockW, dockH;
     if (expanded) {
-      dockW = Math.min(400, Math.max(280, areaR - areaL));
+      dockW = Math.min(360, Math.max(280, areaR - areaL));
       dockH = 220;
       var side = areaR - (x + nw + gap);
       if (side >= 280 && !hitsOthers(x + nw + gap, y, Math.min(400, side), dockH, others)) {
@@ -246,7 +247,7 @@
       }
       if (top + 200 > areaB) top = Math.max(areaT, areaB - 220);
     } else {
-      dockW = 280; dockH = 88;
+      dockW = 280; dockH = 108;
       // Under the selected card, centered on it. Never sit beside it
       // (that covers the next shot in the row at 50% zoom).
       var underLeft = x + Math.max(0, (nw - dockW) / 2);
@@ -281,7 +282,10 @@
     dock.style.setProperty("transform", "none", "important");
     if (!expanded) {
       dock.style.setProperty("height", "auto", "important");
-      dock.style.setProperty("max-height", "96px", "important");
+      dock.style.setProperty("max-height", "112px", "important");
+    } else {
+      var remain = Math.max(180, areaB - top);
+      dock.style.setProperty("max-height", Math.min(360, remain) + "px", "important");
     }
     pinning = false;
   }

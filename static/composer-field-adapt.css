@@ -41,7 +41,7 @@ textarea.param-unsupported-control{
   max-width: 280px !important;
   min-width: 220px !important;
   height: auto !important;
-  max-height: 108px !important;
+  max-height: 112px !important;
   border-radius: 14px !important;
 }
 .dock.show.collapsed .dock-body {
@@ -150,8 +150,8 @@ textarea.param-unsupported-control{
   display: none !important;
 }
 .dock.show.expanded {
-  max-width: min(400px, calc(100vw - 72px));
-  max-height: min(62vh, 520px) !important;
+  max-width: min(360px, calc(100vw - 72px));
+  max-height: min(48vh, 360px) !important;
   min-width: 280px;
   overflow: hidden;
 }

@@ -281,7 +281,7 @@ header {
 .dock.collapsed {
   min-width: 220px;
   max-width: 280px;
-  max-height: 96px;
+  max-height: 112px;
   border-radius: 16px;
   overflow: hidden;
 }
@@ -307,8 +307,8 @@ header {
   font-size: 18px;
 }
 .dock.expanded {
-  width: min(400px, calc(100vw - 48px));
-  max-width: min(400px, calc(100vw - 48px));
+  width: min(360px, calc(100vw - 48px));
+  max-width: min(360px, calc(100vw - 48px));
 }
 .light-pop, .cam-pop, .last-pop {
   position: absolute;
@@ -424,5 +424,24 @@ header {
   border-color: rgba(94,224,197,.45);
   color: #dffcf5;
 }
+.card { overflow: visible; }
+.port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #121214;
+  background: #c8c8d0;
+  top: 50%;
+  margin-top: -6px;
+  z-index: 6;
+  box-shadow: 0 0 0 1px #2a2a30;
+}
+.port.in { left: -7px; }
+.port.out { right: -7px; }
+.card.shot .port { top: 54%; }
+.card.text .port { top: 48px; margin-top: 0; }
+
 
 

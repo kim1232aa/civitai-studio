@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o99: 收起条含家+模型；展开高度跟视口；缩放条不再当左墙; stamp v0821o99-capsule-row
   // v0821o98: collapsed 280 + under selected shot, no 420 island, no 胶囊 wrap; stamp v0821o98-capsule-fit
   // v0821o96: 展开抽屉不盖成片、↑不压种子、LoRA 提示只留一行; stamp v0821o96-expand-clean
   // v0821o92: 打光/换机位/超清/消除/文生视频/尾帧 · 点选工具+目录重匹配，不自动生成; stamp v0821o92-seko-fill
@@ -2170,15 +2171,14 @@
     vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar,.chat-rail").forEach((el) => {
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height) return;
-      // On narrow canvases the tool/asset rail is an overlay, not a top
-      // boundary. Reserving it here collapses the usable area and leaves an
-      // expanded Composer with only a 100px viewport.
       if (el.classList.contains("selbar")) {
         area.top = Math.max(area.top, b.bottom - r.top + 12);
-      } else if (el.classList.contains("chat-rail") || (b.left - r.left) > r.width * 0.55) {
+      } else if (el.classList.contains("chat-rail")) {
         area.right = Math.min(area.right, b.left - r.left - 12);
-      } else if (!narrow) {
+      } else if (el.classList.contains("tools") && !narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
+      } else if (el.classList.contains("rail") || el.classList.contains("minimap") || el.classList.contains("zoom")) {
+        area.bottom = Math.min(area.bottom, b.top - r.top - 8);
       }
     });
     return area;
@@ -2199,9 +2199,8 @@
     const nh = cr ? cr.height : box(n).h * state.cam.s;
     const sideRoom = area.right - (x + nw + gap);
     const dockW = expanded
-      ? Math.min(480, Math.max(280, sideRoom >= 280 ? sideRoom : (area.right - area.left)))
+      ? Math.min(360, Math.max(280, sideRoom >= 280 ? Math.min(360, sideRoom) : 360))
       : 280;
-    const wantH = expanded ? Math.min(area.bottom - area.top - 24, 520) : 96;
     let left, top;
     if (expanded) {
       if (sideRoom >= 280) {
@@ -2239,6 +2238,9 @@
       top = y + nh + gap;
       if (top + 88 > area.bottom) top = Math.max(area.top, y + Math.max(36, nh - 88));
     }
+    const wantH = expanded
+      ? Math.min(360, Math.max(180, area.bottom - top - 8))
+      : 112;
     Object.assign(dock.style, {
       width: dockW + "px", height: expanded ? "auto" : "auto", maxHeight: wantH + "px",
       left: left + "px", top: top + "px",

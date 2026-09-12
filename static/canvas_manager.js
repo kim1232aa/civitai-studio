@@ -21,12 +21,9 @@
       .replace(/'/g, "&#39;");
   }
 
-  // 页头/标题栏用：名字后跟 id 短码，重名项目也能从界面上分辨内容落在哪一个。
   function projectLabel(project) {
     if (!project) return "";
-    const name = String(project.name == null ? "" : project.name).trim() || "未命名项目";
-    const short = String(project.id == null ? "" : project.id).replace(/^project-/, "").slice(0, 8);
-    return short ? `${name} · ${short}` : name;
+    return String(project.name == null ? "" : project.name).trim() || "未命名项目";
   }
 
   function projectPath(apiRoot, projectId, ...parts) {

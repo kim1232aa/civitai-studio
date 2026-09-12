@@ -217,7 +217,7 @@ FakeServer.prototype.handle = async function (url, options) {
   manager.workspace = "editor";
   const editorHead = manager.renderWorkspace(headProject, headProject.canvases, headProject.assets, headProject.activeCanvasId);
   const emptyHead = manager.renderWorkspace(null, [], [], "");
-  const wantLabel = "当前项目：镜头A · a";
+  const wantLabel = "当前项目：镜头A";
   console.log("workspace head shows active project:", storyHead.includes(wantLabel) && editorHead.includes(wantLabel));
   if (!storyHead.includes(wantLabel) || !editorHead.includes(wantLabel)) throw new Error("workspace head missing active project name");
   if (!storyHead.includes('data-active-project="project-a"')) throw new Error("workspace head not anchored to active project id");

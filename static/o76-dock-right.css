@@ -2,7 +2,7 @@
 .dock:not(.show) { display: none !important; }
 .dock.show.expanded,
 .dock.expanded {
-  max-width: min(480px, calc(100vw - 72px));
+  max-width: min(360px, calc(100vw - 72px));
   min-width: 280px;
   transform: none;
 }
