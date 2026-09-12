@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o104: 点分镜工具贴上、写字台贴下; stamp v0821o104-seko-attach
   // v0821o103: 大屏底栏书桌，↑=生成，无展开; stamp v0821o103-wide-desk
   // v0821o102: Seko 胶囊贴选中分镜，参考图小芯片; stamp v0821o102-seko
   // v0821o101: Composer 底栏重构，不再贴卡; stamp v0821o101-shell
@@ -1825,7 +1826,7 @@
     if (Math.hypot(event.clientX - link.clientX, event.clientY - link.clientY) < 6) return false;
     const el = document.elementFromPoint(event.clientX, event.clientY);
     return !!(el && vp.contains(el) && !el.closest(
-      ".card,.dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar,.group-bound,path.edge"));
+      ".card,.dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar,.shot-bar,.group-bound,path.edge"));
   }
 
   function nearestCompatiblePort(wx, wy, fromId, fromSide) {
@@ -2191,49 +2192,162 @@
         area.right = Math.min(area.right, b.left - r.left - 12);
       } else if (el.classList.contains("tools") && !narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
-      } else if (el.classList.contains("rail") || el.classList.contains("minimap") || el.classList.contains("zoom") || el.classList.contains("dock")) {
+      } else if (el.classList.contains("rail") || el.classList.contains("minimap") || el.classList.contains("zoom")) {
         area.bottom = Math.min(area.bottom, b.top - r.top - 8);
       }
     });
     return area;
   }
 
+  function hideShotBar() {
+    const bar = $("shotBar");
+    if (!bar) return;
+    bar.hidden = true;
+    bar.classList.remove("show");
+  }
+
+  function openLaneForDock(n, needScreen) {
+    if (!n || openLaneForDock._for === n.id) return false;
+    const s = Math.max(0.15, state.cam.s);
+    const need = needScreen / s;
+    const b = box(n);
+    let moved = false;
+    state.nodes.forEach(function (o) {
+      if (!o || o.id === n.id) return;
+      if (o.kind !== "shot" && o.kind !== "asset" && o.kind !== "text") return;
+      const ob = box(o);
+      if (o.x + ob.w <= n.x + 12 || o.x >= n.x + b.w - 12) return;
+      if (o.y >= n.y + b.h - 8 && o.y < n.y + b.h + need) {
+        o.y = n.y + b.h + need + 40;
+        moved = true;
+      }
+    });
+    if (moved) openLaneForDock._for = n.id;
+    return moved;
+  }
+
   function positionDock() {
     const n = nodeById(state.selected);
-    if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
+    if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) {
+      hideShotBar();
+      return;
+    }
     const stage = dock.closest(".stage") || vp.parentElement;
     const sr = stage.getBoundingClientRect();
-    // v0821o103-wide-desk: always pin as fallback bottom desk — large-screen writing surface
-    const left = 72;
-    const right = 20;
-    const bottom = 12;
-    const maxW = Math.min(1600, Math.max(480, sr.width - 96));
-    const top = Math.max(48, sr.height - Math.min(sr.height * 0.32, 260) - bottom);
-    Object.assign(dock.style, {
-      left: left + "px",
-      right: right + "px",
-      bottom: bottom + "px",
-      top: "auto",
-      width: "auto",
-      maxWidth: maxW + "px",
-      height: "auto",
-      minHeight: "160px",
-      maxHeight: "min(32vh, 260px)",
-      transform: "none",
-      visibility: "",
-    });
+    const gap = 8;
+    const wantH = 220;
+    const barH = 36;
+    const card = world.querySelector('.card.shot[data-id="' + n.id + '"]');
+    let left = 72, top = Math.max(48, sr.height - wantH - 12), w = 480;
+
+    function hitsRect(L, T, W, H, others) {
+      return others.some(function (o) {
+        return !(L + W <= o.l - 6 || L >= o.r + 6 || T + H <= o.t - 6 || T >= o.b + 6);
+      });
+    }
+
+    if (card) {
+      const cr = card.getBoundingClientRect();
+      const cx = cr.left - sr.left;
+      const cy = cr.top - sr.top;
+      const cw = cr.width;
+      const ch = cr.height;
+      const others = [...world.querySelectorAll(".card")].filter(function (el) { return el !== card; })
+        .map(function (el) {
+          const r = el.getBoundingClientRect();
+          return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top };
+        });
+      const sameRow = others.filter(function (o) { return o.t < cy + ch - 8 && o.b > cy + 8; });
+      const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
+        .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
+      w = Math.max(280, Math.min(480, cw, nextRight - cx - 12));
+      if (!isFinite(w) || w < 240) w = Math.min(480, Math.max(280, cw || 320));
+      const h = wantH;
+      const clampX = function (x) { return Math.max(64, Math.min(x, sr.width - w - 12)); };
+      const belowT = cy + ch + gap;
+      const aboveT = cy - gap - h;
+      const L = clampX(cx);
+      let belowOk = belowT >= 48 && belowT + h <= sr.height - 8 && !hitsRect(L, belowT, w, h, others);
+      const aboveOk = aboveT >= 48 && !hitsRect(L, aboveT, w, h, others);
+      if (!belowOk && !aboveOk && !positionDock._opening && openLaneForDock(n, wantH + 24)) {
+        positionDock._opening = true;
+        renderCards();
+        drawWires();
+        positionDock._opening = false;
+        positionDock();
+        return;
+      }
+      if (belowOk) {
+        left = L; top = belowT;
+      } else if (aboveOk) {
+        left = L; top = aboveT;
+      } else {
+        const band = others.filter(function (o) { return o.r > L + 8 && o.l < L + w - 8; });
+        const lowest = band.reduce(function (m, o) { return Math.max(m, o.b); }, cy + ch);
+        const shifted = lowest + gap;
+        if (shifted + h <= sr.height - 8 && !hitsRect(L, shifted, w, h, others)) {
+          left = L; top = shifted;
+        } else {
+          // fallback bottom desk — never cover neighbor shots
+          left = 72;
+          top = Math.max(48, sr.height - h - 12);
+          w = Math.min(480, Math.max(320, sr.width - 96));
+          if (hitsRect(left, top, w, h, others)) {
+            left = L;
+            top = belowT;
+          }
+        }
+      }
+
+      const bar = $("shotBar");
+      if (bar) {
+        bar.hidden = false;
+        bar.classList.add("show");
+        const bw = Math.min(640, Math.max(cw, 320));
+        let bx = cx + (cw - bw) / 2;
+        bx = Math.max(64, Math.min(bx, sr.width - 12 - 200));
+        let by = cy - gap - barH;
+        if (by < 44) by = 44;
+        if (top + h <= cy + 4) {
+          by = Math.min(cy - gap - barH, Math.max(44, top + h + 4));
+        }
+        Object.assign(bar.style, {
+          left: Math.round(bx) + "px",
+          top: Math.round(by) + "px",
+          right: "auto",
+          bottom: "auto",
+          width: "auto",
+          maxWidth: bw + "px",
+          transform: "none",
+        });
+      }
+    } else {
+      hideShotBar();
+    }
+
+    dock.style.setProperty("left", Math.round(left) + "px", "important");
+    dock.style.setProperty("top", Math.round(top) + "px", "important");
+    dock.style.setProperty("right", "auto", "important");
+    dock.style.setProperty("bottom", "auto", "important");
+    dock.style.setProperty("width", Math.round(w) + "px", "important");
+    dock.style.setProperty("max-width", Math.round(w) + "px", "important");
+    dock.style.setProperty("height", "auto", "important");
+    dock.style.setProperty("min-height", "168px", "important");
+    dock.style.setProperty("max-height", wantH + "px", "important");
+    dock.style.setProperty("transform", "none", "important");
+    dock.style.visibility = "";
     dock.classList.add("near");
     const area = canvasArea();
-    ["skillbox", "atbox", "picker"].forEach((id) => {
+    ["skillbox", "atbox", "picker"].forEach(function (id) {
       const el = $(id);
       if (!el) return;
-      const w = Math.min(400, maxW);
-      const px = left;
+      const px = left + w + gap + 360 <= sr.width - 16 ? left + w + gap : left;
       Object.assign(el.style, {
-        left: px + "px", right: "auto",
-        top: "auto",
-        bottom: (sr.height - top + 8) + "px",
-        width: w + "px",
+        left: Math.round(px) + "px",
+        right: "auto",
+        top: Math.round(top) + "px",
+        bottom: "auto",
+        width: "360px",
         maxHeight: Math.min(320, area.bottom - top) + "px",
         transform: "none",
       });
@@ -2394,6 +2508,7 @@
       dock.classList.remove("near");
       dock.classList.remove("collapsed");
       dock.classList.remove("expanded");
+      hideShotBar();
       hideSkillbox();
       hideAtbox();
       const picker = $("picker");
@@ -2410,6 +2525,7 @@
       dock.classList.remove("collapsed");
       dock.classList.remove("expanded");
       dock.classList.remove("near");
+      hideShotBar();
       hideSkillbox();
       hideAtbox();
       const picker = $("picker");
@@ -2426,6 +2542,7 @@
     dock.classList.toggle("collapsed", !expanded);
     dock.classList.toggle("expanded", expanded);
     dock.classList.remove("near");
+    try { dock.setAttribute("data-shot", n.id); } catch (_) {}
     if ($("dockTitle")) {
       const op = (typeof currentGraphOp === "function") ? currentGraphOp() : "";
       const opLabel = (typeof graphOpLabel === "function" && graphOpLabel(op)) || modeLabelOf(state.mode);
@@ -2602,6 +2719,7 @@
       state.lastComposerShot = n.id;
       state._scriptShotId = n.id;
       if (state.editor) state.editor.activeShotId = n.id;
+      try { openLaneForDock._for = null; } catch (_) {}
       if (state.cam.s >= 1 && !opts.preserveLayout) {
         if (constrainShotsToViewport()) renderCards();
         constrainCameraToShots(n);
@@ -3670,7 +3788,7 @@
       state.snapTarget = null;
       const releaseEl = document.elementFromPoint(e.clientX, e.clientY);
       const onCanvas = releaseEl && vp.contains(releaseEl) && !releaseEl.closest(
-        ".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar");
+        ".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar,.shot-bar");
       if (onCanvas && target && target.id !== link.from) {
         const a = nodeById(link.from);
         const src = link.side === "in" ? target : a;
@@ -9088,6 +9206,29 @@
     };
   }
   if ($("btnPano")) $("btnPano").onclick = function () { panoFromShot(selectedShot()); };
+  if ($("shotBar")) {
+    $("shotBar").addEventListener("click", function (e) {
+      const tool = e.target.closest("[data-shot-tool]");
+      if (tool) {
+        e.preventDefault();
+        e.stopPropagation();
+        const el = $(tool.getAttribute("data-shot-tool"));
+        if (el) el.click();
+        return;
+      }
+      const act = e.target.closest("[data-shot-act]");
+      if (!act) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const shot = selectedShot();
+      if (!shot) return;
+      const kind = act.getAttribute("data-shot-act");
+      if (kind === "download") downloadShot(shot);
+      else if (kind === "edit") { state.selected = shot.id; editSelectedShot(); }
+      else if (kind === "crop") beginCrop(shot);
+      else if (kind === "more") showMorePop(act);
+    });
+  }
   if ($("btnLight")) $("btnLight").onclick = function (e) { e.stopPropagation(); showLightPop(); };
   if ($("btnCamera")) $("btnCamera").onclick = function (e) { e.stopPropagation(); showCamPop(); };
   if ($("btnUpscale")) $("btnUpscale").onclick = function () { upscaleFromShot(selectedShot()); };
@@ -9095,7 +9236,7 @@
   if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
   if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(); };
   document.addEventListener("click", function (e) {
-    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#btnLight,#btnCamera,#btnLast,#btnStory,[data-node-act]")) return;
+    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#btnLight,#btnCamera,#btnLast,#btnStory,[data-node-act],#shotBar")) return;
     hideToolPops();
   });
   world.addEventListener("click", function (e) {

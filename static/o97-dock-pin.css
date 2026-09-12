@@ -1,10 +1,10 @@
-/* v0821o103-wide-desk — 大屏底栏书桌。收起条不再缩成 280。 */
+/* v0821o104-seko-attach — 贴选中分镜上下。max 480px。fallback bottom: 12px */
 .dock.show.collapsed,
 .dock.show.expanded,
 .dock.expanded {
-  max-width: min(1600px, calc(100% - 96px)) !important;
-  max-height: min(32vh, 260px) !important;
-  min-width: 0 !important;
+  max-width: 480px !important;
+  max-height: 240px !important;
+  min-width: 280px !important;
 }
 .dock.show.collapsed #paramWarn,
 .dock.show.collapsed #msg,

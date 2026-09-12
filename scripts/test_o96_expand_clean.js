@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "..");
 const js = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const adapt = fs.readFileSync(path.join(root, "static/composer-field-adapt.css"), "utf8");
 const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8");
-assert.ok(js.includes("v0821o96-expand-clean") || js.includes("v0821o101-shell") || js.includes("v0821o100-desk") || js.includes("v0821o102-seko") || js.includes("v0821o103-wide-desk"), "stamp");
+assert.ok(js.includes("v0821o96-expand-clean") || js.includes("v0821o101-shell") || js.includes("v0821o100-desk") || js.includes("v0821o102-seko") || js.includes("v0821o103-wide-desk") || js.includes("v0821o104-seko-attach"), "stamp");
 assert.ok(js.includes("bottom: \"12px\"") || js.includes("top = y + nh + gap") || js.includes("hitsCard") || js.includes("bottom desk") || js.includes("fallback bottom desk"), "expanded desk");
 assert.ok(adapt.includes("dock.show #sendCap") || adapt.includes(".dock.show.expanded #sendCap"), "send in header");
 assert.ok(adapt.includes("dock.show.expanded #send") || adapt.includes("dock.expanded #send"), "bar send hidden");

@@ -1,4 +1,4 @@
-/* v0821o103-wide-desk — 大屏底栏书桌。↑=生成。无展开。fallback bottom: 12px */
+/* v0821o104-seko-attach — 点分镜：工具贴上、写字台贴下。↑=生成。无展开。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -11,7 +11,7 @@
   width: 48px !important;
   gap: 4px !important;
   padding: 6px !important;
-  max-height: calc(100% - 280px) !important;
+  max-height: calc(100% - 96px) !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   z-index: 20 !important;
@@ -26,22 +26,48 @@
 
 .rail { display: none !important; }
 
-.node-acts {
-  position: absolute !important;
-  top: 30px !important;
-  right: 8px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 4 !important;
-  display: flex !important;
-  gap: 6px !important;
-  justify-content: flex-end !important;
-  pointer-events: auto !important;
+.node-acts { display: none !important; }
+
+.shot-bar {
+  display: none;
+  position: absolute;
+  z-index: 26;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #1a1a1ef5;
+  border: 1px solid #2e2e36;
+  box-shadow: 0 8px 24px #0006;
+  white-space: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: min(720px, calc(100% - 80px));
+}
+.shot-bar.show { display: flex !important; }
+.shot-bar button {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #d0d0d8;
+  font-size: 12px;
+  border-radius: 8px;
+  white-space: nowrap !important;
+  cursor: pointer;
+}
+.shot-bar button:hover { background: #2a2a32; color: #fff; }
+.shot-bar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: #3a3a44;
+  flex: 0 0 1px;
 }
 
 .minimap {
   left: 12px !important;
-  bottom: 276px !important;
+  bottom: 16px !important;
   width: 132px !important;
   height: 76px !important;
   z-index: 18 !important;
@@ -52,7 +78,7 @@
 }
 .zoom {
   left: 152px !important;
-  bottom: 276px !important;
+  bottom: 16px !important;
   z-index: 18 !important;
   display: flex !important;
   flex-direction: row !important;
@@ -73,38 +99,44 @@
 }
 .zpresets { display: none !important; }
 
+/* JS pins left/top to the selected shot. Size only — do not pin bottom. */
 .dock.show,
 .dock.show.collapsed,
 .dock.show.expanded {
   display: flex !important;
   flex-direction: column !important;
   position: absolute !important;
-  left: 72px !important;
-  right: 20px !important;
-  bottom: 12px !important;
-  top: auto !important;
+  right: auto !important;
   width: auto !important;
-  min-width: 0 !important;
-  max-width: min(1600px, calc(100% - 96px)) !important;
+  min-width: 280px !important;
+  max-width: 480px !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
   overflow: hidden !important;
-  background: #16161af2 !important;
+  background: #16161af5 !important;
+  border: 1px solid #2a2a32;
+  box-shadow: 0 12px 36px #0008;
   height: auto !important;
-  min-height: 160px !important;
-  max-height: min(32vh, 260px) !important;
+  min-height: 168px !important;
+  max-height: 240px !important;
 }
 
 .dock.show .dock-hd {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap !important;
-  gap: 8px;
+  position: absolute !important;
+  right: 8px;
+  bottom: 8px;
+  left: auto;
+  top: auto;
   height: 36px;
-  padding: 0 10px 0 14px;
-  overflow: hidden;
-  flex: 0 0 36px;
+  width: auto;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible !important;
 }
 .dock.show #dockExpand,
 .dock.show #dockCollapse,
@@ -112,49 +144,29 @@
 .dock.show .expand-only,
 .dock.show .collapse-only,
 .dock.show .dock-hd > .grow,
+.dock.show #dockTitle,
+.dock.show .dock-title,
+.dock.show #dockClose,
 .dock.show.collapsed #dockExpand,
 .dock.show.collapsed #dockCollapse,
 .dock.show.collapsed #dockHint,
 .dock.show.collapsed .expand-only,
-.dock.show.collapsed .collapse-only { display: none !important; }
-.dock.show #dockClose {
-  white-space: nowrap !important;
-  flex: 0 0 auto !important;
-  height: 28px;
-  width: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: #2a2a32;
-  color: #e8e8ec;
-  font-size: 16px;
-}
-.dock.show .dock-title,
-.dock.show #dockTitle {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap !important;
-  font-size: 13px;
-}
+.dock.show.collapsed .collapse-only,
+.dock.show.collapsed #paramWarn { display: none !important; }
 .dock.show #sendCap {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  width: auto !important;
-  min-width: 72px !important;
+  display: grid !important;
+  place-items: center;
+  pointer-events: auto !important;
+  width: 36px !important;
   height: 36px !important;
-  flex: 0 0 auto !important;
-  padding: 0 14px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
   border: 0;
-  border-radius: 18px !important;
+  border-radius: 50% !important;
   background: #fff;
   color: #111;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
 }
 
 .chip {
@@ -210,36 +222,22 @@
 }
 .composer-acts,
 .dock.show .composer-acts,
-.dock.show.collapsed .composer-acts {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 6px !important;
-  padding: 0 !important;
-}
-.composer-acts .act-btn {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #2e2e36;
-  border-radius: 8px;
-  background: #1a1a1f;
-  color: #c8c8d0;
-  font-size: 12px;
-}
+.dock.show.collapsed .composer-acts { display: none !important; }
 .param-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 72px;
+  gap: 2px;
+  min-width: 64px;
 }
 .param-field > span {
-  font-size: 11px;
+  font-size: 10px;
   color: #a0a0a8;
   white-space: nowrap;
 }
 .param-field input,
 .param-field select {
-  height: 32px;
-  min-width: 72px;
+  height: 28px;
+  min-width: 64px;
   box-sizing: border-box;
 }
 .param-field.param-unsupported,
@@ -250,8 +248,8 @@
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  overflow: auto !important;
-  padding: 0 14px 10px;
+  overflow: hidden !important;
+  padding: 10px 12px 8px;
   gap: 6px;
 }
 .dock.show .dock-scroll,
@@ -269,20 +267,20 @@
 .dock.show .modes,
 .dock.show.collapsed .modes {
   display: flex !important;
-  gap: 6px;
+  gap: 4px;
   padding: 0 !important;
   margin: 0 !important;
 }
 .dock.show .modes button {
   border: 0;
-  background: #2a2a32;
-  color: #c8c8d0;
-  border-radius: 999px;
-  padding: 4px 12px;
+  background: transparent;
+  color: #9a9aa3;
+  border-radius: 8px;
+  padding: 4px 8px;
   font-size: 12px;
   white-space: nowrap;
 }
-.dock.show .modes button.on { background: #ececef; color: #171719; }
+.dock.show .modes button.on { background: #2a2a32; color: #ececef; }
 .dock.show .refs,
 .dock.show #refs,
 .dock.show.collapsed .refs,
@@ -300,16 +298,16 @@
 .dock.show.collapsed .dock-prompt {
   display: flex !important;
   flex: 1 1 auto;
-  min-height: 64px !important;
-  max-height: 80px !important;
+  min-height: 52px !important;
+  max-height: 72px !important;
   padding: 0;
 }
 .dock.show #prompt,
 .dock.show.collapsed #prompt {
-  min-height: 64px !important;
-  max-height: 80px !important;
-  height: 72px !important;
-  padding: 8px 12px;
+  min-height: 52px !important;
+  max-height: 72px !important;
+  height: 56px !important;
+  padding: 8px 10px;
   resize: none;
 }
 .dock.show #negative,
@@ -321,47 +319,43 @@
   display: flex !important;
   flex-direction: column;
   flex: 0 0 auto;
-  padding: 0;
+  padding: 0 44px 0 0;
   overflow: visible !important;
   max-height: none !important;
 }
 .dock.show .lora-block,
 .dock.show.collapsed .lora-block {
   display: block !important;
-  max-height: 56px;
+  max-height: 40px;
   overflow: auto;
-  margin: 2px 0;
+  margin: 0;
 }
 .dock.show .bar,
 .dock.show.collapsed .bar {
   display: flex !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
   align-items: flex-end;
   gap: 8px;
   margin: 0;
+  overflow-x: auto;
 }
 .dock.show .param-group,
 .dock.show.collapsed .param-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: flex-end;
+  overflow-x: auto;
 }
 .dock.show #backend,
 .dock.show #service,
 .dock.show.collapsed #backend,
 .dock.show.collapsed #service {
   display: block !important;
-  height: 36px;
-  min-width: 140px;
-  max-width: 320px;
-  flex: 0 1 220px;
-}
-.dock.show.collapsed .param-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-end;
+  height: 32px;
+  min-width: 96px;
+  max-width: 180px;
+  flex: 0 1 160px;
 }
 .dock.show #msg,
 .dock.show .msg {
@@ -373,6 +367,8 @@
   color: #8b8b94;
   max-height: 1.4em;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
 }
 
 .canvas-manager {
