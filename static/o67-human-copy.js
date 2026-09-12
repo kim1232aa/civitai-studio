@@ -1,6 +1,6 @@
-/* v0821o67-human-copy — product UI is for people, not agents.
- * Hide test playbook / field-board jargon that leaked onto the canvas.
- * Load AFTER composer-field-adapt.js and storyboard.js.
+/* v0821o67-human-copy + o97 pin inline
+ * Product copy scrub + attach collapsed composer to selected shot.
+ * Inlined because storyboard.html on main (o96) does not load o97-dock-pin.js.
  */
 (function () {
   var ROBOT = /不发明|点胶囊|灌满测试|path\/downloadUrl|air\+strength|发出≠加载|field board|unverified|null→未填|\/ \+ skill|使用 Skill/;
@@ -109,14 +109,21 @@
     }
     var nodes = root.querySelectorAll("button, a, span, p, label, small, .mode-tag, .dock-hint, .ref-cap-hint, .chat-rail, .cm-note, [placeholder]");
     for (var i = 0; i < nodes.length; i++) scrubNode(nodes[i]);
-    var title = root.querySelector(".title, #title, header .title");
-    // Keep the live project name. qa- fixtures are real projects, not robot chrome.
-    if (title && !String(title.textContent || "").trim()) {
-      title.textContent = "未命名画布";
+    var title = root.querySelector(".title, #title, header .title, #projTitle");
+    if (title) {
+      var raw = String(title.textContent || "").trim();
+      var cleaned = raw.replace(/\s*[（(]胶囊[)）]/g, "").replace(/\s*[·•]\s*[0-9a-f]{6,10}\s*$/i, "").trim();
+      if (cleaned && cleaned !== raw) title.textContent = cleaned;
+    }
+    var dockTitle = root.querySelector("#dockTitle");
+    if (dockTitle) {
+      var dt = String(dockTitle.textContent || "");
+      var dc = dt.replace(/\s*[（(]胶囊[)）]/g, "").replace(/\s+/g, " ").trim();
+      if (dc && dc !== dt) dockTitle.textContent = dc;
     }
   }
 
-  function install() {
+  function installScrub() {
     patchApi();
     if (typeof document === "undefined") return;
     scrubTree(document);
@@ -129,9 +136,178 @@
       document.documentElement._o67obs = obs;
     }
   }
+
+  var PIN = "v0821o97-dock-pin";
+  var pinning = false;
+  var lastKey = "";
+  function $(id) { return document.getElementById(id); }
+
+  function injectPinCss() {
+    if (document.getElementById("o97PinCss")) return;
+    var css = document.createElement("style");
+    css.id = "o97PinCss";
+    css.textContent = ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:108px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;}.dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}";
+    document.head.appendChild(css);
+  }
+
+  function stageOf(dock) {
+    return (dock && dock.closest && dock.closest(".stage")) || document.querySelector(".stage");
+  }
+
+  function selectedCard() {
+    var dock = $("dock");
+    var id = dock && dock.getAttribute("data-shot");
+    if (!id && window.state && window.state.selected) id = window.state.selected;
+    var card = null;
+    if (id) {
+      try { card = document.querySelector('.card.shot[data-id="' + CSS.escape(String(id)) + '"]'); }
+      catch (e) { card = document.querySelector('.card.shot[data-id="' + String(id) + '"]'); }
+    }
+    if (card) return card;
+    return document.querySelector(".card.shot.sel") || document.querySelector(".card.shot.on") || document.querySelector(".card.shot.active") || document.querySelector(".card.shot");
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function relRect(el, sr) {
+    var r = el.getBoundingClientRect();
+    return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top, w: r.width, h: r.height };
+  }
+
+  function neighborRects(card, sr) {
+    var all = document.querySelectorAll(".card.shot");
+    var out = [];
+    for (var i = 0; i < all.length; i++) if (all[i] !== card) out.push(relRect(all[i], sr));
+    return out;
+  }
+
+  function hitsOthers(left, top, w, h, others, pad) {
+    pad = pad == null ? 6 : pad;
+    var R = left + w, B = top + h;
+    for (var i = 0; i < others.length; i++) {
+      var o = others[i];
+      if (!(R <= o.l + pad || left >= o.r - pad || B <= o.t + pad || top >= o.b - pad)) return true;
+    }
+    return false;
+  }
+
+  function tallNeighbors(card, sr) {
+    var others = neighborRects(card, sr);
+    var cr = relRect(card, sr);
+    for (var i = 0; i < others.length; i++) {
+      if (others[i].h >= cr.h + 40 && others[i].l < cr.r + 40 && others[i].r > cr.l - 40) return true;
+    }
+    return others.length > 0 && cr.h < 220;
+  }
+
+  function belowBand(x, w, cardBottom, others) {
+    var bottom = cardBottom, L = x, R = x + w;
+    for (var i = 0; i < others.length; i++) {
+      var o = others[i];
+      if (o.r > L + 8 && o.l < R - 8) bottom = Math.max(bottom, o.b);
+    }
+    return bottom;
+  }
+
+  function pinDock() {
+    if (pinning) return;
+    var dock = $("dock");
+    if (!dock || !dock.classList.contains("show")) return;
+    var card = selectedCard();
+    if (!card) return;
+    var stage = stageOf(dock);
+    if (!stage) return;
+    var sr = stage.getBoundingClientRect();
+    var cr = relRect(card, sr);
+    var x = cr.l, y = cr.t, nw = cr.w, nh = cr.h;
+    var expanded = dock.classList.contains("expanded");
+    var areaL = 72, areaT = 8, areaR = sr.width - 12, areaB = sr.height - 12, gap = 10;
+    var others = neighborRects(card, sr);
+    var left, top, dockW, dockH;
+    var preferSide = nh < 220 || nw < 260 || tallNeighbors(card, sr);
+    if (expanded) {
+      dockW = Math.min(400, Math.max(280, areaR - areaL));
+      dockH = 220;
+      var side = areaR - (x + nw + gap);
+      if (side >= 280 && !hitsOthers(x + nw + gap, y, Math.min(400, side), dockH, others)) {
+        left = x + nw + gap; top = y; dockW = Math.min(400, side);
+      } else if (x - gap - 280 >= areaL && !hitsOthers(x - gap - Math.min(400, x - gap - areaL), y, Math.min(400, x - gap - areaL), dockH, others)) {
+        dockW = Math.min(400, x - gap - areaL); left = x - gap - dockW; top = y;
+      } else {
+        left = clamp(x, areaL, areaR - dockW);
+        top = belowBand(left, dockW, y + nh, others) + gap;
+      }
+      if (top + 200 > areaB) top = Math.max(areaT, areaB - 220);
+    } else {
+      dockW = 280; dockH = 96;
+      var cands = [{ left: clamp(x, areaL, areaR - dockW), top: belowBand(x, dockW, y + nh, others) + gap }];
+      if (preferSide) {
+        cands.push({ left: x + nw + gap, top: y });
+        cands.push({ left: x - gap - dockW, top: y });
+      }
+      cands.push({ left: clamp(x, areaL, areaR - dockW), top: Math.max(areaT, y - dockH - gap) });
+      var picked = null;
+      for (var i = 0; i < cands.length; i++) {
+        var c = cands[i];
+        if (c.left < areaL || c.left + dockW > areaR + 1) continue;
+        if (c.top < areaT || c.top + 72 > areaB + 8) continue;
+        if (!hitsOthers(c.left, c.top, dockW, dockH, others)) { picked = c; break; }
+      }
+      if (!picked) {
+        picked = {
+          left: clamp(x, areaL, areaR - dockW),
+          top: clamp(belowBand(areaL, areaR - areaL, y + nh, others) + gap, areaT, areaB - 72)
+        };
+      }
+      left = picked.left; top = picked.top;
+    }
+    left = clamp(left, areaL, areaR - dockW);
+    top = clamp(top, areaT, areaB - 72);
+    var key = [expanded ? "e" : "c", Math.round(left), Math.round(top), Math.round(dockW)].join(":");
+    if (key === lastKey) return;
+    lastKey = key;
+    pinning = true;
+    dock.style.setProperty("left", left + "px", "important");
+    dock.style.setProperty("top", top + "px", "important");
+    dock.style.setProperty("width", dockW + "px", "important");
+    dock.style.setProperty("max-width", dockW + "px", "important");
+    dock.style.setProperty("right", "auto", "important");
+    dock.style.setProperty("bottom", "auto", "important");
+    dock.style.setProperty("transform", "none", "important");
+    if (!expanded) {
+      dock.style.setProperty("height", "auto", "important");
+      dock.style.setProperty("max-height", "108px", "important");
+    }
+    pinning = false;
+  }
+
+  function schedulePin() {
+    requestAnimationFrame(function () { requestAnimationFrame(pinDock); });
+  }
+
+  function installPin() {
+    if (document.documentElement._o97pin) return;
+    document.documentElement._o97pin = true;
+    injectPinCss();
+    var dock = $("dock");
+    if (dock) {
+      var obs = new MutationObserver(function () { if (!pinning) schedulePin(); });
+      obs.observe(dock, { attributes: true, attributeFilter: ["class", "style", "data-shot"] });
+    }
+    document.addEventListener("click", schedulePin, true);
+    window.addEventListener("resize", schedulePin);
+    setInterval(pinDock, 800);
+    schedulePin();
+    window.__o97DockPin = { stamp: PIN, pin: pinDock };
+  }
+
+  function boot() {
+    installScrub();
+    installPin();
+  }
   if (typeof document !== "undefined" && document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", install);
+    document.addEventListener("DOMContentLoaded", boot);
   } else {
-    install();
+    boot();
   }
 })();
