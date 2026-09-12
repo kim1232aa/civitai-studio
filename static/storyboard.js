@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o114: 一个框完整显示，不裁切；stamp v0821o114-full
   // v0821o113: 写字台扁宽条贴分镜下，工具贴上；stamp v0821o113-seko
   // v0821o112: 写字台只贴选中分镜上下，宽跟分镜走；stamp v0821o112-attach
   // v0821o110: 剧本策划/编辑器不带写字台; stamp v0821o110-ws
@@ -2266,57 +2267,34 @@
       return nearest;
     }
 
-    // 源站：扁宽条（约 560×240）贴在分镜下，不跟竖图锁成窄高表单
-    const maxW = Math.min(640, Math.max(480, sr.width - 80));
-    const dw = Math.max(480, Math.min(560, maxW));
+    // 一个框贴在分镜下，高度跟内容走，不裁切
+    const maxW = Math.min(720, Math.max(560, sr.width - 72));
+    const dw = Math.min(640, maxW);
     let left = cx + (cw - dw) / 2;
-    left = Math.max(12, Math.min(left, sr.width - dw - 12));
+    left = Math.max(72, Math.min(left, sr.width - dw - 12));
 
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
-    dock.style.setProperty("min-width", Math.min(480, dw) + "px", "important");
+    dock.style.setProperty("min-width", Math.min(560, dw) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
-    dock.style.setProperty("max-height", "248px", "important");
-    const naturalH = Math.min(248, Math.max(168, dock.offsetHeight || 220));
-    const need = naturalH;
+    dock.style.setProperty("max-height", "none", "important");
+    dock.style.setProperty("overflow", "visible", "important");
+    const naturalH = Math.max(180, dock.offsetHeight || 220);
     const spaceBelow = sr.height - (cy + ch + gap) - 8;
     const spaceAbove = cy - gap - 44;
     let top;
-    let maxH = need;
     let attach = "below";
-    if (spaceBelow >= need) {
+    if (spaceBelow >= Math.min(naturalH, 200)) {
       attach = "below";
       top = cy + ch + gap;
-    } else if (spaceAbove >= need) {
+    } else if (spaceAbove >= Math.min(naturalH, 200)) {
       attach = "above";
-      top = cy - gap - need;
-    } else if (spaceBelow >= 160) {
-      attach = "below";
-      top = cy + ch + gap;
-      maxH = spaceBelow;
+      top = Math.max(44, cy - gap - naturalH);
     } else {
-      attach = "above";
-      maxH = Math.max(160, Math.min(need, spaceAbove));
-      top = Math.max(44, cy - gap - maxH);
+      attach = "below";
+      top = cy + ch + gap;
     }
-    if (top < 44) {
-      maxH = Math.max(160, maxH - (44 - top));
-      top = 44;
-    }
-    if (top + 80 > sr.height - 4) {
-      // fallback bottom desk — only when the selected shot is off-screen
-      top = Math.max(44, sr.height - Math.min(naturalH, 220) - 12);
-      maxH = Math.min(naturalH, sr.height - top - 12);
-    }
-    function hitsOthers(L, T, W, H) {
-      return others.some(function (o) {
-        return !(L + W <= o.l + 8 || L >= o.r - 8 || T + H <= o.t + 8 || T >= o.b - 8);
-      });
-    }
-    while (maxH > 140 && hitsOthers(left, top, dw, maxH)) {
-      maxH -= 16;
-      if (attach === "above") top = Math.max(44, cy - gap - maxH);
-    }
+    if (top < 44) top = 44; // fallback bottom desk unused: box follows the shot
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
     dock.style.setProperty("top", Math.round(top) + "px", "important");
@@ -2324,12 +2302,12 @@
     dock.style.setProperty("bottom", "auto", "important");
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
-    dock.style.setProperty("min-width", Math.min(480, dw) + "px", "important");
+    dock.style.setProperty("min-width", Math.min(560, dw) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
     dock.style.setProperty("min-height", "0", "important");
-    dock.style.setProperty("max-height", Math.round(Math.min(248, maxH)) + "px", "important");
+    dock.style.setProperty("max-height", "none", "important");
     dock.style.setProperty("transform", "none", "important");
-    dock.style.setProperty("overflow-y", "hidden", "important");
+    dock.style.setProperty("overflow", "visible", "important");
     dock.style.visibility = "";
     dock.classList.add("near");
     dock.dataset.attach = attach;

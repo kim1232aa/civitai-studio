@@ -1,10 +1,11 @@
-/* v0821o113-seko — 扁宽条贴分镜下 */
+/* v0821o114-full — 一个框，内容完整显示 */
 .dock.show.collapsed,
 .dock.show.expanded,
 .dock.expanded {
-  min-width: min(520px, calc(100% - 80px)) !important;
-  max-width: min(640px, calc(100% - 80px)) !important;
-  max-height: 248px !important;
+  min-width: min(560px, calc(100% - 72px)) !important;
+  max-width: min(720px, calc(100% - 72px)) !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 .dock.show.collapsed #paramWarn,
 .dock.show.collapsed #msg,

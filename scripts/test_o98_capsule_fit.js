@@ -11,8 +11,8 @@ const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8")
 const pinCss = fs.readFileSync(path.join(root, "static/o97-dock-pin.css"), "utf8");
 const shell = fs.readFileSync(path.join(root, "static/storyboard-shell.css"), "utf8");
 
-assert.ok(js.includes("v0821o112-attach") || js.includes("v0821o113-seko") || js.includes("v0821o110-ws"), "js stamp");
-assert.ok(html.includes("o112attach") || html.includes("o113seko") || html.includes("o110ws") || html.includes("o98capsulefit"), "html stamp");
+assert.ok(js.includes("v0821o114-full") || js.includes("v0821o113-seko") || js.includes("v0821o112-attach") || js.includes("v0821o110-ws"), "js stamp");
+assert.ok(html.includes("o114full") || html.includes("o113seko") || html.includes("o112attach") || html.includes("o110ws") || html.includes("o98capsulefit"), "html stamp");
 assert.ok(!/dockTitle"\)\.textContent = .*\(胶囊\)/.test(js), "title does not append 胶囊");
 assert.ok(!/Math\.min\(420, Math\.max\(300, nw\)\)/.test(js), "420 island gone from positionDock");
 assert.ok(adapt.includes("white-space: nowrap") || adapt.includes("white-space:nowrap") || shell.includes("white-space: nowrap"), "expand nowrap");

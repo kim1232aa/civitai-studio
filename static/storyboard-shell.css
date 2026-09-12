@@ -199,7 +199,7 @@ svg.wires path.edge {
 }
 .zpresets { display: none !important; }
 
-/* JS pins left/top to the selected shot. Seko: wide short bar under the card. */
+/* JS pins left/top to the selected shot. One box, content fully visible. */
 .dock.show,
 .dock.show.collapsed,
 .dock.show.expanded {
@@ -207,19 +207,19 @@ svg.wires path.edge {
   flex-direction: column !important;
   position: absolute !important;
   right: auto !important;
-  width: min(560px, calc(100% - 80px)) !important;
-  min-width: min(520px, calc(100% - 80px)) !important;
-  max-width: min(640px, calc(100% - 80px)) !important;
+  width: min(640px, calc(100% - 72px)) !important;
+  min-width: min(560px, calc(100% - 72px)) !important;
+  max-width: min(720px, calc(100% - 72px)) !important;
   transform: none !important;
-  z-index: 24 !important;
+  z-index: 32 !important;
   border-radius: 16px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   background: #16161af5 !important;
   border: 1px solid #2a2a32;
   box-shadow: 0 12px 36px #0008;
   height: auto !important;
   min-height: 0 !important;
-  max-height: 248px !important;
+  max-height: none !important;
 }
 
 .dock.show .dock-hd {
@@ -353,9 +353,9 @@ svg.wires path.edge {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  overflow: hidden !important;
-  padding: 8px 12px 8px;
-  gap: 6px;
+  overflow: visible !important;
+  padding: 8px 12px 10px;
+  gap: 8px;
 }
 .dock.show .dock-scroll,
 .dock.show #dockScroll,
@@ -437,8 +437,8 @@ svg.wires path.edge {
   display: flex !important;
   flex-direction: column;
   flex: 0 0 auto;
-  padding: 0 44px 0 0;
-  overflow: hidden !important;
+  padding: 0 48px 2px 0;
+  overflow: visible !important;
   gap: 6px;
   max-height: none !important;
 }
@@ -448,8 +448,8 @@ svg.wires path.edge {
   flex-direction: row !important;
   align-items: center;
   gap: 8px;
-  max-height: 32px !important;
-  overflow: hidden !important;
+  max-height: none !important;
+  overflow: visible !important;
   margin: 0;
   padding: 0;
   border: 0 !important;
@@ -481,22 +481,21 @@ svg.wires path.edge {
 .dock.show .bar,
 .dock.show.collapsed .bar {
   display: flex !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center;
   gap: 8px;
   margin: 0;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow: visible !important;
 }
 .dock.show .param-group,
 .dock.show.collapsed .param-group {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   overflow: visible !important;
   width: auto !important;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 .dock.show .param-field {
   min-width: 52px;
@@ -532,10 +531,9 @@ svg.wires path.edge {
   margin: 0;
   font-size: 11px;
   color: #8b8b94;
-  max-height: 1.3em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap !important;
+  max-height: none;
+  overflow: visible;
+  white-space: normal !important;
 }
 
 .canvas-manager {

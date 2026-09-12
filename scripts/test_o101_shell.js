@@ -9,12 +9,12 @@ const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 const shell = fs.readFileSync(path.join(root, "static/storyboard-shell.css"), "utf8");
 const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8");
 
-assert.ok(js.includes("v0821o110-ws") || js.includes("v0821o112-attach") || js.includes("v0821o113-seko"), "js stamp");
-assert.ok(html.includes("o110ws") || html.includes("o112attach") || html.includes("o113seko"), "html stamp");
+assert.ok(js.includes("v0821o114-full") || js.includes("v0821o113-seko") || js.includes("v0821o112-attach") || js.includes("v0821o110-ws"), "js stamp");
+assert.ok(html.includes("o114full") || html.includes("o113seko") || html.includes("o110ws") || html.includes("o112attach"), "html stamp");
 assert.ok(html.includes("storyboard-shell.css"), "shell css linked");
 assert.ok(shell.includes("bottom: 12px") || shell.includes("480px"), "composer capsule or desk");
 assert.ok(shell.includes(".rail"), "rail parked");
-assert.ok(o67.includes("v0821o112-attach") || o67.includes("v0821o113-seko") || o67.includes("bottom\", \"12px\""), "pin is desk or seko capsule");
+assert.ok(o67.includes("v0821o114-full") || o67.includes("v0821o113-seko") || o67.includes("v0821o112-attach") || o67.includes("bottom\", \"12px\""), "pin is desk or seko capsule");
 assert.ok(!/top = y \+ Math.max\(36, nh - 108\)/.test(js), "no on-card overlay");
 assert.ok(js.includes("bottom desk") || js.includes("fallback bottom desk"), "positionDock has desk fallback");
 assert.ok(html.includes(">文本<") && html.includes(">图片<") && html.includes(">视频<") && html.includes(">音频<"), "short mode pills");
