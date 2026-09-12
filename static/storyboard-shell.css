@@ -1,4 +1,4 @@
-/* v0821o101-shell — 画布壳子：工具在左，成片在上，Composer 底栏。禁止贴卡岛。 */
+/* v0821o102-seko — Seko 胶囊：贴选中分镜，参考图小芯片，展开不叠层。 fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -11,7 +11,7 @@
   width: 48px !important;
   gap: 4px !important;
   padding: 6px !important;
-  max-height: calc(100% - 132px) !important;
+  max-height: calc(100% - 48px) !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   z-index: 20 !important;
@@ -24,9 +24,7 @@
 .tools.has-group .group-only,
 .tools.has-multi .group-only { display: none !important; }
 
-.rail {
-  display: none !important;
-}
+.rail { display: none !important; }
 
 .node-acts {
   position: absolute !important;
@@ -43,7 +41,7 @@
 
 .minimap {
   left: 12px !important;
-  bottom: 112px !important;
+  bottom: 16px !important;
   width: 132px !important;
   height: 76px !important;
   z-index: 18 !important;
@@ -54,7 +52,7 @@
 }
 .zoom {
   left: 152px !important;
-  bottom: 112px !important;
+  bottom: 16px !important;
   z-index: 18 !important;
   display: flex !important;
   flex-direction: row !important;
@@ -79,13 +77,10 @@
   display: flex !important;
   flex-direction: column !important;
   position: absolute !important;
-  left: 72px !important;
-  right: 20px !important;
-  bottom: 12px !important;
-  top: auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: min(920px, calc(100% - 96px)) !important;
+  width: 480px !important;
+  min-width: 360px !important;
+  max-width: min(480px, calc(100% - 88px)) !important;
+  right: auto !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -93,18 +88,13 @@
   background: #16161af2 !important;
 }
 .dock.show.collapsed {
-  height: 92px !important;
-  max-height: 92px !important;
-  min-width: 0 !important;
-  max-width: min(920px, calc(100% - 96px)) !important;
-  width: auto !important;
+  height: auto !important;
+  max-height: 220px !important;
 }
 .dock.show.expanded {
   height: auto !important;
-  max-height: min(36vh, 300px) !important;
-  min-width: 0 !important;
-  max-width: min(920px, calc(100% - 96px)) !important;
-  width: auto !important;
+  min-height: 240px !important;
+  max-height: min(42vh, 360px) !important;
 }
 
 .dock.show .dock-hd {
@@ -144,6 +134,7 @@
 .dock.show #dockHint { display: none !important; }
 .dock.show.collapsed .collapse-only { display: none !important; }
 .dock.show.expanded .collapse-only { display: inline-flex !important; }
+.dock.show.expanded .expand-only { display: none !important; }
 .dock.show #sendCap {
   display: grid !important;
   width: 36px !important;
@@ -161,18 +152,137 @@
   flex-basis: 32px !important;
 }
 
-.dock.show.collapsed .dock-body {
+.refs {
   display: flex !important;
-  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  max-height: 56px !important;
+  overflow: hidden !important;
+}
+.chip {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  border: 1px solid #2e2e36 !important;
+  background: #1a1a1f !important;
+  overflow: hidden !important;
+  display: grid !important;
+  place-items: center !important;
+}
+.chip img,
+.chip video {
+  width: 44px !important;
+  height: 44px !important;
+  max-width: 44px !important;
+  max-height: 44px !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+.chip.on { border-color: #5ee0c5 !important; }
+.chip-btn,
+.ref-cap-hint {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #2e2e36 !important;
+  background: #1a1a1f !important;
+  color: #c8c8d0 !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+}
+.frame-slot {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 8px;
+  flex: 1 0 100%;
+  font-size: 12px;
+  color: #9a9aa3;
+}
+.frame-slot img {
+  width: 44px !important;
+  height: 44px !important;
+  object-fit: cover !important;
+  border-radius: 8px;
+}
+.composer-acts {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding: 0 12px !important;
+}
+.composer-acts .act-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #2e2e36;
+  border-radius: 8px;
+  background: #1a1a1f;
+  color: #c8c8d0;
+  font-size: 12px;
+}
+
+.param-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 72px;
+}
+.param-field > span {
+  font-size: 11px;
+  color: #a0a0a8;
+  white-space: nowrap;
+  overflow: visible;
+}
+.param-field input,
+.param-field select {
+  height: 32px;
+  min-width: 72px;
+  box-sizing: border-box;
+}
+
+.dock.show.collapsed .dock-body {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0 10px 10px;
   min-height: 0;
   overflow: hidden !important;
 }
-.dock.show.collapsed .dock-scroll,
-.dock.show.collapsed .modes,
-.dock.show.collapsed .refs,
+.dock.show.collapsed .dock-scroll {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px;
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-height: none !important;
+}
+.dock.show.collapsed .modes {
+  display: flex !important;
+  gap: 6px;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: max-content;
+  max-width: 100%;
+}
+.dock.show.collapsed .modes button {
+  border: 0;
+  background: #2a2a32;
+  color: #c8c8d0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.dock.show.collapsed .modes button.on { background: #ececef; color: #171719; }
+.dock.show.collapsed .refs { display: flex !important; }
 .dock.show.collapsed .composer-acts,
 .dock.show.collapsed .lora-block,
 .dock.show.collapsed #negative,
@@ -185,16 +295,16 @@
 .dock.show.collapsed #send { display: none !important; }
 .dock.show.collapsed .dock-prompt {
   display: flex !important;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0 !important;
   max-height: none !important;
   padding: 0;
 }
 .dock.show.collapsed #prompt {
-  min-height: 36px !important;
-  max-height: 36px !important;
-  height: 36px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  height: 40px !important;
   padding: 8px 10px;
   resize: none;
 }
@@ -215,20 +325,33 @@
 .dock.show.collapsed #backend,
 .dock.show.collapsed #service {
   display: block !important;
-  height: 36px;
+  height: 32px;
   min-width: 88px;
   max-width: 160px;
   flex: 0 1 140px;
 }
 
-.dock.show.expanded .expand-only { display: none !important; }
 .dock.show.expanded .dock-body {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
   overflow: auto !important;
 }
-.dock.show.expanded .modes { display: flex !important; gap: 6px; padding: 0 12px; }
+.dock.show.expanded .dock-scroll {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 0 0 auto !important;
+  gap: 8px;
+  padding: 0 0 4px !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.dock.show.expanded .modes {
+  display: flex !important;
+  gap: 6px;
+  padding: 0 12px;
+  margin: 0;
+}
 .dock.show.expanded .modes button {
   border: 0;
   background: #2a2a32;
@@ -236,12 +359,97 @@
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
+  white-space: nowrap;
 }
 .dock.show.expanded .modes button.on { background: #ececef; color: #171719; }
+.dock.show.expanded .modes,
+.dock.show.expanded .refs,
+.dock.show.expanded .composer-acts,
+.dock.show.expanded .dock-prompt,
+.dock.show.expanded .dock-foot {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+.dock.show.expanded .refs { padding: 0 12px; max-height: 56px !important; }
+.param-field.param-unsupported,
+.param-unsupported { display: none !important; }
+.dock.show.expanded .dock-prompt {
+  flex: 1 1 auto !important;
+  min-height: 72px !important;
+  max-height: 96px !important;
+  overflow: hidden !important;
+  padding: 0 12px;
+}
+.dock.show.expanded #prompt {
+  display: block !important;
+  min-height: 72px !important;
+  max-height: 88px !important;
+  height: 80px !important;
+}
+.dock.show.expanded .dock-foot {
+  flex: 0 0 auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 12px 8px;
+}
+.dock.show.expanded .lora-block {
+  max-height: 72px;
+  overflow: auto;
+  margin: 6px 0;
+}
+.dock.show.expanded .bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+.dock.show.expanded .param-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
 .dock.show.expanded #send { display: none !important; }
+.dock.show.expanded #msg,
+.dock.show.expanded .msg {
+  display: block !important;
+  position: static !important;
+  flex: 0 0 auto;
+  padding: 4px 0 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8b8b94;
+  min-height: 0;
+  max-height: 2.8em;
+  overflow: hidden;
+}
 
 .canvas-manager {
   right: 16px;
   left: auto;
   z-index: 32;
+}
+
+.dock.show.expanded #dockScroll {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+}
+.dock.show.expanded #refs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  width: 100% !important;
+  max-height: 48px !important;
+}
+.dock.show.expanded #composerActs {
+  display: flex !important;
+  width: 100% !important;
+  padding: 0 12px !important;
 }

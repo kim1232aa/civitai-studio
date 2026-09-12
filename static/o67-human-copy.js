@@ -77,6 +77,10 @@
       el.style.display = "none";
       return;
     }
+    if (/ · schema/.test(text)) {
+      el.textContent = text.replace(/\s*·\s*schema/g, "");
+      return;
+    }
     if (/点胶囊|选服务后点|选分镜 →/.test(text)) {
       el.hidden = true;
       el.textContent = "";
@@ -137,7 +141,7 @@
     }
   }
 
-  var PIN = "v0821o101-shell";
+  var PIN = "v0821o102-seko";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -147,9 +151,11 @@
     var css = document.createElement("style");
     css.id = "o97PinCss";
     css.textContent = [
-      ".dock.show{left:72px !important;right:20px !important;bottom:12px !important;top:auto !important;width:auto !important;max-width:min(920px,calc(100% - 96px)) !important;transform:none !important;}",
-      ".dock.show.collapsed{height:92px !important;max-height:92px !important;max-width:min(920px,calc(100% - 96px)) !important;min-width:0 !important;}",
-      ".dock.show.expanded{max-height:min(36vh,300px) !important;max-width:min(920px,calc(100% - 96px)) !important;}"
+      ".chip{width:44px !important;height:44px !important;overflow:hidden !important}",
+      ".chip img,.chip video{width:44px !important;height:44px !important;object-fit:cover !important}",
+      ".dock.show{width:480px !important;max-width:min(480px,calc(100% - 88px)) !important;transform:none !important;}",
+      ".dock.show.collapsed{height:auto !important;max-height:220px !important;}",
+      ".dock.show.expanded{max-height:min(42vh,340px) !important;}"
     ].join("");
     document.head.appendChild(css);
   }
@@ -218,22 +224,17 @@
     var dock = $("dock");
     if (!dock || !dock.classList.contains("show")) return;
     stripCapsuleLabel();
-    var expanded = dock.classList.contains("expanded");
     pinning = true;
-    // Never sit beside shots / onCardTop — bottom desk only.
-    dock.style.setProperty("left", "72px", "important");
-    dock.style.setProperty("right", "20px", "important");
-    dock.style.setProperty("bottom", "12px", "important");
-    dock.style.setProperty("top", "auto", "important");
-    dock.style.setProperty("width", "auto", "important");
-    dock.style.setProperty("max-width", "920px", "important");
-    dock.style.setProperty("transform", "none", "important");
-    if (!expanded) {
-      dock.style.setProperty("height", "92px", "important");
-      dock.style.setProperty("max-height", "92px", "important");
+    if (typeof window.positionDock === "function") {
+      try { window.positionDock(); } catch (e) {}
     } else {
-      dock.style.setProperty("height", "auto", "important");
-      dock.style.setProperty("max-height", "300px", "important");
+      // fallback bottom desk
+      dock.style.setProperty("left", "72px", "important");
+      dock.style.setProperty("bottom", "12px", "important");
+      dock.style.setProperty("top", "auto", "important");
+      dock.style.setProperty("width", "480px", "important");
+      dock.style.setProperty("max-width", "480px", "important");
+      dock.style.setProperty("transform", "none", "important");
     }
     pinning = false;
   }
@@ -249,7 +250,7 @@
     var dock = $("dock");
     if (dock) {
       var obs = new MutationObserver(function () { if (!pinning) schedulePin(); });
-      obs.observe(dock, { attributes: true, attributeFilter: ["class", "style", "data-shot"] });
+      obs.observe(dock, { attributes: true, attributeFilter: ["class", "data-shot"] });
     }
     document.addEventListener("click", schedulePin, true);
     window.addEventListener("resize", schedulePin);

@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o102: Seko 胶囊贴选中分镜，参考图小芯片; stamp v0821o102-seko
   // v0821o101: Composer 底栏重构，不再贴卡; stamp v0821o101-shell
   // v0821o100: 收起贴选中分镜底部；展开无侧位就沉到底栏（o93 desk）; stamp v0821o100-desk
   // v0821o99: 收起条含家+模型；展开高度跟视口；缩放条不再当左墙; stamp v0821o99-capsule-row
@@ -2165,7 +2166,13 @@
     state.dockMode = mode;
     renderDock();
     if (mode === "expanded") {
-      requestAnimationFrame(function () { keepComposerPromptVisible(); });
+      requestAnimationFrame(function () {
+        keepComposerPromptVisible();
+        if (typeof fitShotsInView === "function") fitShotsInView();
+        positionDock();
+      });
+    } else {
+      requestAnimationFrame(function () { positionDock(); });
     }
   }
 
@@ -2192,33 +2199,58 @@
   function positionDock() {
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
-    const area = canvasArea();
+    const stage = dock.closest(".stage") || vp.parentElement;
+    const sr = stage.getBoundingClientRect();
     const expanded = state.dockMode === "expanded";
-    const gap = 12;
-    // bottom desk — never on-card overlay
+    const gap = 8;
+    const wantW = 480;
+    const wantH = expanded ? 300 : 188;
+    let left = 72, top = Math.max(48, sr.height - wantH - 12);
+    const card = world.querySelector('.card.shot[data-id="' + n.id + '"]');
+    if (card) {
+      const cr = card.getBoundingClientRect();
+      const others = [...world.querySelectorAll(".card.shot")].filter((el) => el !== card)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top };
+        });
+      const sameRow = others.filter((o) => o.t < (cr.bottom - sr.top) - 8 && o.b > (cr.top - sr.top) + 8);
+      const nextRight = sameRow.reduce((m, o) => Math.min(m, o.l), sr.width - 16);
+      const room = nextRight - (cr.left - sr.left) - 12;
+      const canHug = room >= 360;
+      if (canHug) {
+        left = Math.round(cr.left - sr.left);
+        top = Math.round(cr.bottom - sr.top + gap);
+        const hits = others.some((o) =>
+          !(left + wantW <= o.l + 12 || left >= o.r - 12 || top + wantH <= o.t + 12 || top >= o.b - 12));
+        if (hits || top + wantH > sr.height - 8) {
+          // fallback bottom desk — never cover neighbor shots
+          left = 72;
+          top = Math.max(48, sr.height - wantH - 12);
+        }
+      }
+    }
     Object.assign(dock.style, {
-      left: "72px", right: "20px", bottom: "12px", top: "auto",
-      width: "auto", maxWidth: "920px",
-      height: expanded ? "auto" : "92px",
-      maxHeight: expanded ? "300px" : "92px",
+      left: left + "px", top: top + "px", right: "auto", bottom: "auto",
+      width: wantW + "px", maxWidth: wantW + "px",
+      height: "auto", minHeight: expanded ? "240px" : "160px",
+      maxHeight: wantH + "px",
       transform: "none", visibility: "",
     });
     dock.classList.add("near");
-    const top = Math.max(area.top, area.bottom - (expanded ? 300 : 92) - 12);
-    const left = 72;
-    const dockW = Math.max(280, area.right - left);
+    const area = canvasArea();
     ["skillbox", "atbox", "picker"].forEach((id) => {
       const el = $(id);
       if (!el) return;
-      const w = Math.min(400, dockW);
-      const px = left + Math.min(dockW, 640) + gap + w <= area.right ? left + Math.min(dockW, 640) + gap
-        : left;
+      const w = Math.min(400, wantW);
+      const px = left + wantW + gap + w <= sr.width - 16 ? left + wantW + gap : left;
       Object.assign(el.style, {
         left: px + "px", right: "auto", top: top + "px", bottom: "auto",
         width: w + "px", maxHeight: Math.min(320, area.bottom - top) + "px", transform: "none",
       });
     });
   }
+  window.positionDock = positionDock;
 
   function renderRail() {
     const rail = $("assetRail");
@@ -10634,6 +10666,7 @@
       requestAnimationFrame(function () {
         if (typeof positionDock === "function") positionDock();
         if (typeof fitShotsInView === "function") fitShotsInView();
+        if (typeof positionDock === "function") positionDock();
       });
     } catch (e) { try { console.warn("hydrate ui", e); } catch (_) {} }
     // v0821o46: always try resume pending jobs after hydrate (tab death / OOM mid-poll)
@@ -10675,6 +10708,7 @@
   requestAnimationFrame(function () {
     if (typeof positionDock === "function") positionDock();
     if (typeof fitShotsInView === "function") fitShotsInView();
+    if (typeof positionDock === "function") positionDock();
   });
   renderWorkspace();
   if (/[?&]probe=1\b/.test(String(location.search || ""))) {

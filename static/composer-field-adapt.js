@@ -191,7 +191,7 @@
     const base = LABEL_BASE[field] || (span.getAttribute("data-label-base") || span.textContent.replace(/\s*·\s*不支持.*$/, "").trim() || field);
     span.setAttribute("data-label-base", base);
     if (support === "unsupported") span.textContent = base + " · 不支持";
-    else if (support === "catalog") span.textContent = base + " · schema";
+    else if (support === "catalog") span.textContent = base;
     else if (support === "unknown") span.textContent = base + " · 未确认";
     else span.textContent = base;
   }
