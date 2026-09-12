@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o121: 点参考不丢分镜，首帧不偷连，空白镜不继承上一家
+  // v0821o122: 我的空间画廊；stamp v0821o122-space
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
@@ -1690,8 +1690,79 @@
     const title = $("projTitle");
     if (title) {
       const canvas = canvases.find(function (c) { return c.id === cur; });
-      title.textContent = (canvas && canvas.name) || (project && project.name) || "未命名画布";
+      title.textContent = (canvas && canvas.name) || (project && project.name) || "未命名故事";
     }
+    renderSpaceGrid();
+  }
+  function canvasCoverUrl(canvas) {
+    const nodes = (canvas && canvas.nodes) || [];
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n && n.url && String(n.url).trim() && (typeof isVideoUrl !== "function" || !isVideoUrl(n.url))) return n.url;
+    }
+    return "";
+  }
+  function fmtSpaceDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function renderSpaceGrid() {
+    const grid = $("spaceGrid");
+    if (!grid) return;
+    const cm = window.canvasManager;
+    const tab = state._spaceTab === "story" ? "story" : "canvas";
+    document.querySelectorAll("[data-space-tab]").forEach(function (btn) {
+      btn.classList.toggle("on", btn.getAttribute("data-space-tab") === tab);
+    });
+    if (tab === "story") {
+      const projects = (cm && cm.projects) || [];
+      const activeId = cm && cm.activeProject && cm.activeProject.id;
+      grid.innerHTML = '<button type="button" class="space-card new" data-space-act="new-project"><span class="space-ph plus">+</span><strong>新建故事</strong><small>一个故事可以有多张画布</small></button>' +
+        projects.map(function (p) {
+          const cover = ((p.canvases || []).map(canvasCoverUrl).filter(Boolean)[0]) || "";
+          return '<button type="button" class="space-card' + (p.id === activeId ? " on" : "") + '" data-space-act="open-project" data-id="' + esc(p.id) + '">' +
+            (cover ? '<img src="' + esc(cover) + '" alt="">' : '<span class="space-ph"></span>') +
+            "<strong>" + esc(p.name || "未命名故事") + "</strong>" +
+            "<small>" + esc(fmtSpaceDate(p.updatedAt || p.createdAt)) + "</small></button>";
+        }).join("");
+      return;
+    }
+    const canvases = (cm && cm.activeProject && cm.activeProject.canvases) || [];
+    const cur = cm && cm.activeCanvasId;
+    grid.innerHTML = '<button type="button" class="space-card new" data-space-act="new-canvas"><span class="space-ph plus">+</span><strong>新建画布</strong><small>空白分镜</small></button>' +
+      canvases.map(function (c) {
+        const cover = canvasCoverUrl(c);
+        return '<article class="space-card' + (c.id === cur ? " on" : "") + '">' +
+          '<button type="button" class="space-open" data-space-act="open-canvas" data-id="' + esc(c.id) + '">' +
+          (cover ? '<img src="' + esc(cover) + '" alt="">' : '<span class="space-ph"></span>') +
+          "</button><strong>" + esc(c.name || "未命名故事") + "</strong>" +
+          "<small>" + esc(fmtSpaceDate(c.updatedAt || c.createdAt)) + "</small>" +
+          '<span class="space-acts"><button type="button" data-space-act="rename-canvas" data-id="' + esc(c.id) + '">改名</button>' +
+          '<button type="button" data-space-act="delete-canvas" data-id="' + esc(c.id) + '">删除</button></span></article>';
+      }).join("");
+  }
+  function openSpace() {
+    persistActiveCanvas();
+    const home = $("spaceHome");
+    const menu = $("titleMenu");
+    if (menu) menu.hidden = true;
+    if (home) home.hidden = false;
+    renderSpaceGrid();
+  }
+  function closeSpace() {
+    const home = $("spaceHome");
+    if (home) home.hidden = true;
+  }
+  function placeTitleMenu() {
+    const t = $("projTitle");
+    const m = $("titleMenu");
+    if (!t || !m) return;
+    const r = t.getBoundingClientRect();
+    m.style.left = Math.max(12, r.left) + "px";
+    m.style.top = (r.bottom + 8) + "px";
   }
   function adoptCanvas(project, canvasId, fresh) {
     _canvasAdopted = true;
@@ -1702,6 +1773,7 @@
       _canvasAdopted = true;
       loadEmptyBoard();
       persistActiveCanvas();
+      closeSpace();
       setMsg("已新建空白画布 · " + ((canvas && canvas.name) || "画布"), "ok");
       return;
     }
@@ -1718,6 +1790,7 @@
       if (typeof renderWorkspace === "function") renderWorkspace();
       persist();
       if (typeof fitShotsInView === "function") fitShotsInView();
+      closeSpace();
       return;
     }
     if (!_didFirstSeed && shots().length) {
@@ -1760,6 +1833,84 @@
         cm.setActiveCanvas(e.target.value).catch(function (err) {
           setMsg((err && err.message) || "切换画布失败", "bad");
         });
+      });
+    }
+    if ($("projTitle") && !$("projTitle")._sbBound) {
+      $("projTitle")._sbBound = true;
+      const toggleTitleMenu = function (e) {
+        e.stopPropagation();
+        const menu = $("titleMenu");
+        if (!menu) return;
+        menu.hidden = !menu.hidden;
+        if (!menu.hidden) placeTitleMenu();
+      };
+      $("projTitle").addEventListener("click", toggleTitleMenu);
+      const logo = document.querySelector("header .logo");
+      if (logo) logo.addEventListener("click", toggleTitleMenu);
+    }
+    if ($("btnOpenSpace") && !$("btnOpenSpace")._sbBound) {
+      $("btnOpenSpace")._sbBound = true;
+      $("btnOpenSpace").onclick = function (e) {
+        e.stopPropagation();
+        openSpace();
+      };
+    }
+    document.addEventListener("click", function (e) {
+      const menu = $("titleMenu");
+      if (!menu || menu.hidden) return;
+      if (e.target.closest && e.target.closest("#titleMenu, #projTitle")) return;
+      menu.hidden = true;
+    });
+    const space = $("spaceHome");
+    if (space && !space._sbBound) {
+      space._sbBound = true;
+      space.addEventListener("click", function (e) {
+        const tab = e.target.closest && e.target.closest("[data-space-tab]");
+        if (tab) {
+          state._spaceTab = tab.getAttribute("data-space-tab") === "story" ? "story" : "canvas";
+          renderSpaceGrid();
+          return;
+        }
+        const actEl = e.target.closest && e.target.closest("[data-space-act]");
+        if (!actEl) return;
+        const act = actEl.getAttribute("data-space-act");
+        const id = actEl.getAttribute("data-id");
+        const cm = window.canvasManager;
+        if (!cm) return;
+        if (act === "new-canvas") {
+          Promise.resolve(cm.activeProject ? null : cm.createProject("未命名故事"))
+            .then(function () { return cm.createCanvas("未命名故事"); })
+            .catch(function (err) { setMsg((err && err.message) || "新建画布失败", "bad"); });
+          return;
+        }
+        if (act === "new-project") {
+          cm.createProject("未命名故事").then(function () { renderSpaceGrid(); })
+            .catch(function (err) { setMsg((err && err.message) || "新建故事失败", "bad"); });
+          return;
+        }
+        if (act === "open-canvas" && id) {
+          cm.setActiveCanvas(id).then(function () { closeSpace(); })
+            .catch(function (err) { setMsg((err && err.message) || "打开画布失败", "bad"); });
+          return;
+        }
+        if (act === "open-project" && id) {
+          cm.selectProject(id).then(function () {
+            state._spaceTab = "canvas";
+            renderSpaceGrid();
+          }).catch(function (err) { setMsg((err && err.message) || "打开故事失败", "bad"); });
+          return;
+        }
+        if (act === "rename-canvas" && id) {
+          const name = window.prompt("画布名称") || "";
+          if (name) cm.renameCanvas(id, name).then(renderSpaceGrid)
+            .catch(function (err) { setMsg((err && err.message) || "改名失败", "bad"); });
+          return;
+        }
+        if (act === "delete-canvas" && id) {
+          if (!window.confirm("删除这张画布？")) return;
+          cm.deleteCanvas(id).then(renderSpaceGrid)
+            .catch(function (err) { setMsg((err && err.message) || "删除失败", "bad"); });
+        }
       });
     }
   }

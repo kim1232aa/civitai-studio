@@ -19,6 +19,12 @@ test("HTML has #canvasManager panel", () => {
   assert.match(html, /id="canvasManager"/);
 });
 
+test("HTML has 我的空间 gallery", () => {
+  assert.match(html, /id="spaceHome"/);
+  assert.match(html, /返回我的空间/);
+  assert.match(html, /id="btnOpenSpace"/);
+});
+
 test("HTML has visible new-canvas control", () => {
   assert.match(html, /id="btnNewCanvas"/);
   assert.match(html, /id="canvasSelect"/);
