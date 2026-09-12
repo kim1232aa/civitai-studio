@@ -7821,7 +7821,16 @@
     let serviceId = pickedService;
     // v0821o23: civitai outbound prefers imported shot.serviceId / sdxl eco — never silent krea2.
     if (be === "civitai") {
-      serviceId = resolveCivitaiOutboundServiceId(shot);
+      const opNow = (typeof currentGraphOp === "function") ? currentGraphOp() : op;
+      const pickedFits = pickedService && (typeof catalogItemForService === "function")
+        && serviceFitsOp(catalogItemForService(), opNow);
+      if ((opNow === "i2i" || opNow === "i2v") && pickedFits) {
+        serviceId = pickedService;
+      } else if ((opNow === "i2i" || opNow === "i2v") && pickedService) {
+        serviceId = pickedService;
+      } else {
+        serviceId = resolveCivitaiOutboundServiceId(shot);
+      }
     } else if (!serviceId && be === "huggingface") {
       serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
         || (op === "i2i" ? HF_I2I_PREF_SERVICE : op === "i2v" ? "Wan-AI/Wan2.2-TI2V-5B" : HF_LORA_PREF_SERVICE);
@@ -8469,7 +8478,11 @@
       if (usesCivitaiComfyParams()) {
         // v0821o23: imported sdxl serviceId wins over drifted #service / catalog krea2 pref.
         // Never CIVITAI_PREF / _civitaiDefaultService soft-fill when empty.
-        const sid = resolveCivitaiOutboundServiceId(shot);
+        // i2i/i2v: keep the live #service if it fits the op (import t2i recipe must not steal edit/video).
+        const opNow = (typeof currentGraphOp === "function") ? currentGraphOp() : "";
+        const uiSid = ($("service") && $("service").value) || "";
+        let sid = resolveCivitaiOutboundServiceId(shot);
+        if ((opNow === "i2i" || opNow === "i2v") && uiSid) sid = uiSid;
         if (!sid) {
           return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
         }
