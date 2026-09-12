@@ -23,7 +23,7 @@ textarea.param-unsupported-control{
 .lora-hint.lora-unverified{color:#c9b56a}
 .lora-str::placeholder{color:#8b8b94;font-style:italic}
 
-/* o94: 贴节点胶囊。禁止 o60 底部 720 固定条把成片盖住。 */
+/* o97: 贴选中分镜。收起不超过 280，禁止 420 岛漂在成片上。 */
 .dock:not(.show) { display: none !important; }
 .dock.show {
   display: flex !important;
@@ -37,12 +37,12 @@ textarea.param-unsupported-control{
   overflow: hidden;
 }
 .dock.show.collapsed {
-  width: min(420px, calc(100vw - 96px)) !important;
-  max-width: min(420px, calc(100vw - 96px)) !important;
-  min-width: 280px !important;
+  width: 280px !important;
+  max-width: 280px !important;
+  min-width: 220px !important;
   height: auto !important;
-  max-height: 132px !important;
-  border-radius: 16px !important;
+  max-height: 108px !important;
+  border-radius: 14px !important;
 }
 .dock.show.collapsed .dock-body {
   display: flex !important;
@@ -68,10 +68,10 @@ textarea.param-unsupported-control{
   padding: 0 10px;
 }
 .dock.show.collapsed #prompt {
-  min-height: 36px !important;
-  max-height: 40px !important;
-  height: 36px !important;
-  padding: 8px 10px;
+  min-height: 32px !important;
+  max-height: 36px !important;
+  height: 32px !important;
+  padding: 6px 8px;
 }
 .dock.show.collapsed .dock-foot { padding: 0 10px 8px; overflow: hidden; max-height: none !important; }
 .dock.show.collapsed .bar {
@@ -100,7 +100,7 @@ textarea.param-unsupported-control{
   gap: 8px;
 }
 .dock.show.expanded {
-  max-width: min(480px, calc(100vw - 72px));
+  max-width: min(400px, calc(100vw - 72px));
   max-height: min(62vh, 520px) !important;
   min-width: 280px;
   overflow: hidden;
