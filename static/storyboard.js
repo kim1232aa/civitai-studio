@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o120: 多画布新建/切换/保存；stamp v0821o120-canvas
+  // v0821o121: 点参考不丢分镜，首帧不偷连，空白镜不继承上一家
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
@@ -571,7 +571,7 @@
       '</div>' +
       '<div class="workspace-inline"><select data-script-shot-select aria-label="选择已有分镜"><option value="">选择已有分镜</option>' +
       allShots.map((shot) => '<option value="' + esc(shot.id) + '"' + (shot.id === state._scriptShotId ? ' selected' : '') + '>' + esc(shot.title || "分镜") + '</option>').join("") +
-      '</select><button type="button" class="workspace-btn" data-script-act="assign-shot"' + (activeShot ? '' : ' disabled') + '>加入当前场次</button></div>' +
+      '</select><button type="button" class="workspace-btn" data-script-act="assign-shot"' + (allShots.length ? '' : ' disabled') + '>加入当前场次</button></div>' +
       '<div class="workspace-note">选择已有分镜后加入当前场次；点分镜卡会回到画布并保留当前故事结构。删除场次只会把镜头转移到其他场次，不会删除画布内容。</div>' +
       '</div></section></div></div>';
   }
@@ -925,14 +925,13 @@
     return "";
   }
   function frameAsset(shot) {
+    if (!shot) return null;
     const linked = connectedAssets(shot.id);
-    if (shot.firstFrameId) {
-      const hit = linked.find((a) => a.id === shot.firstFrameId);
-      if (hit) return hit;
-      // orphan firstFrameId (edge gone / asset deleted): heal to linked[0] or clear
-      shot.firstFrameId = linked[0] ? linked[0].id : "";
-    }
-    return linked[0] || null;
+    if (!shot.firstFrameId) return null;
+    const hit = linked.find((a) => a.id === shot.firstFrameId);
+    if (hit) return hit;
+    shot.firstFrameId = "";
+    return null;
   }
   function lastFrameAsset(shot) {
     if (!shot || !shot.lastFrameId) return null;
@@ -1028,7 +1027,7 @@
   async function generateFromText(node) {
     if (!node || node.kind !== "text") return;
     const existing = shots();
-    let shot = existing.find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id));
+    let shot = existing.find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id) && !s.url);
     if (!shot) {
       const i = existing.length;
       const pos = typeof newShotPosition === "function" ? newShotPosition(i) : { x: node.x + 420, y: node.y };
@@ -1053,7 +1052,6 @@
       if (!state.edges.some((e) => e.from === img.id && e.to === shot.id)) {
         state.edges.push({ from: img.id, to: shot.id });
       }
-      if (!shot.firstFrameId) shot.firstFrameId = img.id;
     });
     state.mode = "image";
     selectNode(shot.id, { preserveLayout: true });
@@ -1964,6 +1962,8 @@
       }
     } else {
       state.mode = (shot.mode === "video" || shot.mode === "text" || shot.mode === "audio") ? shot.mode : "image";
+      state.loras = Array.isArray(shot.loras) ? JSON.parse(JSON.stringify(shot.loras)) : [];
+      if ($("service")) $("service").value = shot.serviceId || "";
       applyComfyParamsToUi(shot);
       if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
       if (shot.res && $("res")) $("res").value = shot.res;
@@ -2456,7 +2456,9 @@
     const maxW = Math.min(720, Math.max(560, sr.width - 72));
     const dw = Math.min(640, maxW);
     let left = cx + (cw - dw) / 2;
-    left = Math.max(72, Math.min(left, sr.width - dw - 12));
+    const rail = $("assetRail");
+    const railRight = (rail && rail.getBoundingClientRect().width > 40) ? 72 + 248 + 8 : 72;
+    left = Math.max(railRight, Math.min(left, sr.width - dw - 12));
 
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
@@ -2898,6 +2900,8 @@
     if (dockOpen && composer && composer.kind === "shot" && n && n.id !== composer.id
         && !opts.shift && isImageSource(n) && n.kind !== "shot") {
       try { linkAssetToShot(n, composer); } catch (_) {}
+      state.selected = composer.id;
+      setMulti([composer.id]);
     }
     if (n && n.kind === "shot") {
       state.lastComposerShot = n.id;
@@ -2991,7 +2995,8 @@
       invalidateStageProgress(shot);
     }
     mention(asset, shot);
-    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) {
+    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)
+        && (state.mode === "video" || shot.mode === "video")) {
       shot.firstFrameId = asset.id;
       shot.wantT2v = false;
     }
@@ -8519,7 +8524,7 @@
       setSendVisual(true, "group-running");
       return;
     }
-    const n = nodeById(state.selected);
+    const n = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       setSendVisual(true, "no-shot");
       return;
@@ -8584,7 +8589,7 @@
       btn.setAttribute("data-send-fired-at", String(now));
     } catch (_) {}
     // v0821l: blocking gates BEFORE 已点生成 — empty↑ must stay on red, not get re-acked
-    const n = nodeById(state.selected);
+    const n = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
     if (!n || n.kind !== "shot") {
       if (typeof surfaceSendReject === "function") surfaceSendReject("请先选中分镜再生成", "bad", null);
       else setMsg("请先选中分镜再生成", "bad");
@@ -8697,7 +8702,12 @@
   }
 
   async function generate() {
-    const shot = nodeById(state.selected);
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    if (!shot || shot.kind !== "shot") {
+      setMsg("请先选中分镜再生成", "bad");
+      return;
+    }
+    if (state.selected !== shot.id) state.selected = shot.id;
     if (needsPromptBeforeGenerate()) {
       paintShotFail(shot, "此模型需要提示词", "bad");
       return;
@@ -8870,6 +8880,7 @@
       url: "", firstFrameId: "",
       prompt: "",
       mode: "image",
+      composer: { backend: ($("backend") && $("backend").value) || "civitai", service: "", mode: "image", fields: {}, loras: [] },
     });
     renderCards();
     drawWires();
@@ -8895,8 +8906,10 @@
     if ($("btnLast")) $("btnLast").disabled = !hasShot;
   }
   function selectedShot() {
-    const n = nodeById(state.selected);
-    return (n && n.kind === "shot") ? n : null;
+    return (typeof composerShot === "function" ? composerShot() : null) || (function () {
+      const n = nodeById(state.selected);
+      return (n && n.kind === "shot") ? n : null;
+    })();
   }
   function loadImageEl(url) {
     return new Promise(function (resolve, reject) {
@@ -9138,6 +9151,7 @@
       state.nodes.push(node);
       state.edges.push({ from: shot.id, to: id });
       renderCards(); drawWires(); persist(); persistServer();
+      selectNode(id, { preserveLayout: true });
       setMsg("局部摘取已成新节点", "ok");
     } catch (e) {
       setMsg("摘取失败：" + ((e && e.message) || e), "bad");
@@ -9278,7 +9292,7 @@
     if (op && it && !serviceFitsOp(it, op)) {
       setMsg("当前目录没有可匹配的" + (graphOpLabel(op) || op) + "端点（不装接）", "warn");
     } else if (sid) {
-      setMsg("已匹配" + (graphOpLabel(op) || "") + (sid ? (" · " + sid) : "") + " · 不会自动生成，确认后点 ↑", "ok");
+      setMsg("已匹配" + (graphOpLabel(op) || "") + (sid ? (" · " + sid) : ""), "ok");
     }
   }
   function showLightPop(anchor) {
@@ -9507,7 +9521,12 @@
     state._eraseCv = null;
     if (!shot || !cv) { renderCards(); return; }
     try {
-      const url = await uploadDataUrl(cv.toDataURL("image/png"), (shot.title || "shot") + "-mask.png");
+      const img = await loadImageEl(shot.url);
+      const full = document.createElement("canvas");
+      full.width = Math.max(8, img.naturalWidth || cv.width);
+      full.height = Math.max(8, img.naturalHeight || cv.height);
+      full.getContext("2d").drawImage(cv, 0, 0, full.width, full.height);
+      const url = await uploadDataUrl(full.toDataURL("image/png"), (shot.title || "shot") + "-mask.png");
       const aid = uid("asset");
       const asset = { id: aid, kind: "character", title: (shot.title || "分镜") + " 遮罩", x: shot.x - 160, y: shot.y, url: url };
       state.nodes.push(asset);
@@ -9620,16 +9639,40 @@
     };
   }, true);
   vp.addEventListener("pointermove", function (e) {
-    if (!state._erasePaint || !state._eraseCv) return;
-    const cv = state._eraseCv;
-    const r = cv.getBoundingClientRect();
-    const ctx = cv.getContext("2d");
-    const x = (e.clientX - r.left) * (cv.width / Math.max(1, r.width));
-    const y = (e.clientY - r.top) * (cv.height / Math.max(1, r.height));
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    if (state._erasePaint && state._eraseCv) {
+      const cv = state._eraseCv;
+      const r = cv.getBoundingClientRect();
+      const ctx = cv.getContext("2d");
+      const x = (e.clientX - r.left) * (cv.width / Math.max(1, r.width));
+      const y = (e.clientY - r.top) * (cv.height / Math.max(1, r.height));
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      return;
+    }
+    if (!state._cropDrag) return;
+    const drag = state._cropDrag;
+    const card = document.querySelector('.card.shot[data-id="' + drag.id + '"]');
+    const face = card && card.querySelector(".face");
+    if (!face) return;
+    const r = face.getBoundingClientRect();
+    const x1 = (e.clientX - r.left) / r.width;
+    const y1 = (e.clientY - r.top) / r.height;
+    const nx = Math.max(0, Math.min(drag.x0, x1));
+    const ny = Math.max(0, Math.min(drag.y0, y1));
+    const nw = Math.abs(x1 - drag.x0);
+    const nh = Math.abs(y1 - drag.y0);
+    let boxEl = face.querySelector(".crop-rect");
+    if (!boxEl) {
+      boxEl = document.createElement("div");
+      boxEl.className = "crop-rect";
+      face.appendChild(boxEl);
+    }
+    boxEl.style.left = (nx * 100) + "%";
+    boxEl.style.top = (ny * 100) + "%";
+    boxEl.style.width = (nw * 100) + "%";
+    boxEl.style.height = (nh * 100) + "%";
   }, true);
   vp.addEventListener("pointerup", function (e) {
     if (state._erasePaint) {
@@ -10335,6 +10378,11 @@
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
     if (shot && shot.kind === "shot") return shot;
+    shot = nodeById(state.lastComposerShot);
+    if (shot && shot.kind === "shot") {
+      selectNode(shot.id, { expand: true, preserveLayout: true });
+      return shot;
+    }
     const list = shots();
     if (list.length) {
       selectNode(list[0].id, { expand: true });

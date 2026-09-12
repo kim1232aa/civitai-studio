@@ -30,7 +30,8 @@ svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:3.2}
 .card{position:absolute;border:1px solid #2a2a30;background:var(--card);box-shadow:0 10px 30px rgba(0,0,0,.28);z-index:3}
 .asset{width:132px;border-radius:10px;overflow:visible}
 .shot{width:640px;height:360px;border-radius:16px;background:#121214;overflow:visible}
-.shot .face{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6a6a74;gap:8px;border-radius:15px;overflow:hidden}
+.shot .face{position:relative;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6a6a74;gap:8px;border-radius:15px;overflow:hidden}
+.shot .face .crop-rect{position:absolute;border:1px dashed #7ee0c6;background:#7ee0c633;pointer-events:none;z-index:4}
 .shot .face img,.shot .face video{width:100%;height:100%;object-fit:contain;background:#121214;border-radius:15px}
 .dock{position:absolute;width:max-content;min-width:280px;max-width:min(720px,calc(100% - 48px));z-index:16;background:#16161af2;border:1px solid #34343e;border-radius:18px;display:none;flex-direction:column;max-height:36vh;overflow:hidden}
 .dock.show{display:flex;z-index:26}

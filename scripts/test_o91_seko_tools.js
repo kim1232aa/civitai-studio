@@ -24,5 +24,5 @@ assert.ok(js.includes("function addBlankShot"), "add blank");
 assert.ok(js.includes("data-editor-track"), "editor tracks");
 assert.ok(js.includes("配音"), "voice track copy in js");
 assert.ok(!css.includes("right: 16px !important"), "capsule not right inspector");
-assert.ok(js.includes("不会自动生成"), "story does not auto generate");
+assert.ok(js.includes("generateShotQueue"), "story/nine generate via queue");
 console.log("PASS o91_seko_tools.js");
