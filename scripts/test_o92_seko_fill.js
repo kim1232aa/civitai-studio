@@ -32,8 +32,8 @@ assert.ok(js.includes('t2v: ["fal-ai/kling-video/v3/pro/text-to-video"'), "fal t
 assert.ok(js.includes("fal-ai/esrgan"), "fal upscale pref");
 assert.ok(js.includes("fal-ai/bria/eraser"), "fal erase pref");
 assert.ok(js.includes('opVid === "t2v"'), "t2v send path");
-assert.ok(js.includes("不会自动生成"), "no auto gen copy");
-assert.ok(!/function (?:lightFromShot|upscaleFromShot|t2vFromShot|finishErase)[\s\S]{0,1200}fetch\("\/api\/generate"/.test(js), "tools must not POST generate");
+assert.ok(js.includes("generateShotQueue"), "shared generate queue");
+assert.ok(!/function (?:lightFromShot|upscaleFromShot|t2vFromShot|finishErase)[\s\S]{0,800}fetch\("\/api\/generate"/.test(js), "tools must not inline POST generate");
 assert.ok(js.includes("if (!shot || !frameAsset(shot)"), "video no-frame/no-shot is t2v");
 assert.ok(js.includes("payload.lastFrame"), "pack last frame");
 assert.ok(js.includes("payload.mask_url"), "pack mask");

@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o118: 新建不自动连；打光/机位/全景/超清/视频真生成；stamp v0821o118-fix
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
@@ -1029,14 +1030,6 @@
     const existing = shots();
     let shot = existing.find((s) => state.edges.some((e) => e.from === node.id && e.to === s.id));
     if (!shot) {
-      const isEmpty = function (s) {
-        return s && !s.url && !String(s.prompt || "").trim();
-      };
-      shot = existing.find(function (s) { return isEmpty(s) && /分镜\s*1$/.test(String(s.title || "")); })
-        || existing.find(isEmpty)
-        || existing.find(function (s) { return s && !s.url; });
-    }
-    if (!shot) {
       const i = existing.length;
       const pos = typeof newShotPosition === "function" ? newShotPosition(i) : { x: node.x + 420, y: node.y };
       shot = {
@@ -1907,14 +1900,6 @@
   }
 
   function drawWires() {
-    // v0821o19: if firstFrameId set but edge dropped, re-emit so path.edge actually paints
-    (state.nodes || []).forEach(function (n) {
-      if (!n || n.kind !== "shot" || !n.firstFrameId) return;
-      if (!nodeById(n.firstFrameId)) return;
-      if (!(state.edges || []).some(function (e) { return e && e.from === n.firstFrameId && e.to === n.id; })) {
-        state.edges.push({ from: n.firstFrameId, to: n.id });
-      }
-    });
     const parts = ["<defs></defs>"];
     state.edges.forEach((e, i) => {
       const a = nodeById(e.from), b = nodeById(e.to);
@@ -4168,12 +4153,13 @@
         }
       }
       const shot = nodeById(state.selected);
-      if (shot && shot.kind === "shot") {
+      if (shot && shot.kind === "shot" && !state._uploadFree) {
         created.forEach(function (node) { linkAssetToShot(node, shot); });
         try { await smartMatchService({ announce: true }); } catch (_) {}
       } else if (created.length) {
         selectNode(created[created.length - 1].id);
       }
+      state._uploadFree = false;
       renderCards(); drawWires(); renderDock();
       if (typeof renderChatRail === "function") renderChatRail();
       persist();
@@ -8702,6 +8688,7 @@
       if (!btn) return;
       $("addPop").hidden = true;
       if (btn.dataset.add === "upload") {
+        state._uploadFree = true;
         if ($("file")) $("file").click();
         return;
       }
@@ -8726,10 +8713,10 @@
       prompt: "",
       mode: "image",
     });
-    separateOverlappingShots();
-    compactShotsAt100();
-    constrainShotsToViewport();
-    selectNode(id, { preserveLayout: state.cam.s >= 1 }); persist();
+    renderCards();
+    drawWires();
+    selectNode(id, { preserveLayout: true });
+    persist();
   }
   function syncNodeTools() {
     const tools = document.querySelector(".tools");
@@ -8819,7 +8806,6 @@
       if (!node) return;
       node.x = originX + gx * cellW;
       node.y = originY + gy * cellH;
-      node.url = shot.url;
       created.push(node);
     });
     renderCards(); drawWires(); persist(); persistServer();
@@ -8856,6 +8842,64 @@
     }
     placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnNine"]') || $("btnNine"));
   }
+  function showSplitPop(anchor) {
+    const shot = selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再切分画面", "warn"); return; }
+    hideToolPops();
+    let pop = $("splitPop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "splitPop";
+      pop.className = "story-pop";
+      pop.innerHTML = '<button type="button" data-split="lr">左右切分</button>' +
+        '<button type="button" data-split="tb">上下切分</button>';
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-split]");
+        if (!b) return;
+        pop.hidden = true;
+        splitFromShot(selectedShot(), b.getAttribute("data-split"));
+      });
+    }
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnSplit"]') || $("btnSplit"));
+  }
+  async function splitFromShot(shot, axis) {
+    shot = shot || selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再切分画面", "warn"); return; }
+    try {
+      const img = await loadImageEl(shot.url);
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const parts = axis === "tb"
+        ? [{ title: "上", sx: 0, sy: 0, sw: w, sh: Math.floor(h / 2) }, { title: "下", sx: 0, sy: Math.floor(h / 2), sw: w, sh: h - Math.floor(h / 2) }]
+        : [{ title: "左", sx: 0, sy: 0, sw: Math.floor(w / 2), sh: h }, { title: "右", sx: Math.floor(w / 2), sy: 0, sw: w - Math.floor(w / 2), sh: h }];
+      const canvas = document.createElement("canvas");
+      const created = [];
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        canvas.width = p.sw;
+        canvas.height = p.sh;
+        canvas.getContext("2d").drawImage(img, p.sx, p.sy, p.sw, p.sh, 0, 0, p.sw, p.sh);
+        const url = await uploadDataUrl(canvas.toDataURL("image/jpeg", 0.92), (shot.title || "shot") + "-" + p.title + ".jpg");
+        const node = spawnLinkedShot(shot, {
+          titleSuffix: " · " + p.title,
+          prompt: shot.prompt || "",
+          mode: "image",
+          skipSelect: true,
+          skipPan: true,
+        });
+        if (!node) continue;
+        node.url = url;
+        node.x = shot.x + box(shot).w + 48;
+        node.y = shot.y + i * (box(shot).h + 28);
+        created.push(node);
+      }
+      renderCards(); drawWires(); persist(); persistServer();
+      if (created[0]) panTo(created[0]);
+      setMsg("画面已切成 " + created.length + " 张", "ok");
+    } catch (e) {
+      setMsg("切分失败：" + ((e && e.message) || e), "bad");
+    }
+  }
   function storyAdvanceFromShot(shot, seconds, dir) {
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
@@ -8870,7 +8914,6 @@
       mode: "image",
       firstFrameFromSource: !!shot.url,
     });
-    if (node && shot.url) node.url = shot.url;
     renderCards(); drawWires();
     if (node) panTo(node);
     setMsg((goingBack ? "往前 " : "往后 ") + seconds + " 秒已出分镜 · 正在生成", "ok");
@@ -8891,7 +8934,13 @@
         setMsg((label || "生成") + " " + (i + 1) + "/" + list.length + " · " + (n.title || ""), "ok");
         try {
           selectNode(n.id, { expand: true, preserveLayout: true });
-          await rematchAfterSpawn(n, n.url ? "i2i" : "t2i");
+          const refs = (typeof connectedAssets === "function") ? connectedAssets(n.id) : [];
+          let op = "t2i";
+          if (n.wantUpscale) op = "upscale";
+          else if (n.wantInpaint) op = "inpaint";
+          else if (n.mode === "video") op = (n.url || n.firstFrameId || refs.length) ? "i2v" : "t2v";
+          else if (n.url || refs.length) op = "i2i";
+          await rematchAfterSpawn(n, op);
           await runShotUntilDone(n.id, (label || "") + " " + (i + 1) + "/" + list.length);
         } catch (e) {
           setMsg((n.title || "分镜") + " 失败：" + ((e && e.message) || e), "bad");
@@ -8947,9 +8996,10 @@
       firstFrameFromSource: !!shot.url,
     });
     rematchAfterSpawn(node, shot.url ? "i2i" : "t2i");
+    if (node) generateShotQueue([node], "全景");
   }
   function hideToolPops() {
-    ["lightPop", "camPop", "lastPop", "storyPop", "morePop", "ninePop"].forEach(function (id) {
+    ["lightPop", "camPop", "lastPop", "storyPop", "morePop", "ninePop", "splitPop"].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.hidden = true;
@@ -9041,7 +9091,7 @@
       mode: opts.mode || "image",
       backend: source.backend || "",
     };
-    if (opts.firstFrameFromSource && source.url) node.firstFrameId = source.id;
+    if (opts.firstFrameFromSource && source.url && (opts.mode || "image") === "video") node.firstFrameId = source.id;
     if (opts.wantT2v) node.wantT2v = true;
     if (opts.wantUpscale) node.wantUpscale = true;
     if (opts.wantInpaint) node.wantInpaint = true;
@@ -9107,6 +9157,7 @@
       firstFrameFromSource: true,
     });
     rematchAfterSpawn(node, "i2i");
+    if (node) generateShotQueue([node], "打光");
   }
   function showCamPop(anchor) {
     const shot = selectedShot();
@@ -9142,6 +9193,7 @@
       firstFrameFromSource: true,
     });
     rematchAfterSpawn(node, "i2i");
+    if (node) generateShotQueue([node], "机位");
   }
   function upscaleFromShot(shot) {
     shot = shot || selectedShot();
@@ -9154,6 +9206,7 @@
       wantUpscale: true,
     });
     rematchAfterSpawn(node, "upscale");
+    if (node) generateShotQueue([node], "超清");
   }
   function t2vFromShot(shot) {
     shot = shot || selectedShot();
@@ -9163,6 +9216,7 @@
       state.mode = "video";
       selectNode(shot.id, { expand: true, preserveLayout: true });
       rematchAfterSpawn(shot, "t2v");
+      generateShotQueue([shot], "合成视频");
       return;
     }
     const node = spawnLinkedShot(shot, {
@@ -9172,6 +9226,7 @@
       firstFrameFromSource: true,
     });
     rematchAfterSpawn(node, "i2v");
+    if (node) generateShotQueue([node], "合成视频");
   }
   function showLastPop(anchor) {
     const shot = selectedShot();
@@ -9249,6 +9304,7 @@
     if (id === "btnPano") panoFromShot(selectedShot());
     else if (id === "btnCamera") showCamPop(anchor);
     else if (id === "btnNine") showNinePop(anchor);
+    else if (id === "btnSplit") showSplitPop(anchor);
     else if (id === "btnLight") showLightPop(anchor);
     else if (id === "btnStory") showStoryPop(anchor);
     else if (id === "btnErase") beginErase(selectedShot());
@@ -9286,7 +9342,7 @@
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     state._eraseCv = cv;
-    setMsg("在成片上涂要消除的区域，松手后出遮罩节点 · 不会自动生成", "ok");
+    setMsg("在成片上涂要消除的区域，松手后出遮罩并生成", "ok");
   }
   async function finishErase(shot, cv) {
     state._eraseShotId = "";
@@ -9307,6 +9363,7 @@
         maskAssetId: aid,
       });
       rematchAfterSpawn(node, "inpaint");
+      if (node) generateShotQueue([node], "消除");
     } catch (e) {
       renderCards();
       setMsg("消除遮罩失败：" + ((e && e.message) || e), "bad");
@@ -9316,6 +9373,7 @@
   if ($("btnEditNode")) $("btnEditNode").onclick = function () { editSelectedShot(); };
   if ($("btnCrop")) $("btnCrop").onclick = function () { beginCrop(selectedShot()); };
   if ($("btnNine")) $("btnNine").onclick = function (e) { e.stopPropagation(); showNinePop(e.currentTarget); };
+  if ($("btnSplit")) $("btnSplit").onclick = function (e) { e.stopPropagation(); showSplitPop(e.currentTarget); };
   if ($("btnStory")) {
     $("btnStory").onclick = function (e) {
       e.stopPropagation();
@@ -9352,7 +9410,7 @@
   if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
   if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(e.currentTarget); };
   document.addEventListener("click", function (e) {
-    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#ninePop,#btnLight,#btnCamera,#btnLast,#btnStory,#btnNine,[data-node-act],#shotBar")) return;
+    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#ninePop,#splitPop,#btnLight,#btnCamera,#btnLast,#btnStory,#btnNine,#btnSplit,[data-node-act],#shotBar")) return;
     hideToolPops();
   });
   world.addEventListener("click", function (e) {
