@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o109: 主体库和写字台留空，不挤; stamp v0821o109-room
+  // v0821o110: 剧本策划/编辑器不带写字台; stamp v0821o110-ws
   // v0821o107: 连线不挡、端口可见; stamp v0821o107-wires
   // v0821o106: 节点可拖，写字台不锁宽高、不改别人坐标; stamp v0821o106-drag
   // v0821o105: 写字台框自适应选中分镜; stamp v0821o105-adapt
@@ -489,7 +489,6 @@
     panel.innerHTML =
       '<div class="workspace-shell">' +
       '<div class="workspace-top"><div>' +
-      '<div class="workspace-kicker">SCRIPT PLANNER</div>' +
       '<h1 class="workspace-title" id="scriptWorkspaceTitle">剧本策划</h1>' +
       '<p class="workspace-subtitle">把故事目标、场次节拍和画布分镜放在同一份可持续编辑的工作稿里。</p>' +
       '</div><div class="workspace-actions">' +
@@ -599,7 +598,7 @@
       : '<div class="editor-empty editor-empty-action"><strong>时间线还没有分镜</strong><span>先创建一个分镜，再回到这里编排场次、时长和播放顺序。</span><button type="button" class="workspace-btn primary" data-editor-act="add-shot">＋ 新建分镜</button><button type="button" class="workspace-btn" data-editor-act="open-script">去剧本策划</button></div>';
     panel.innerHTML =
       '<div class="workspace-shell"><div class="workspace-top"><div>' +
-      '<div class="workspace-kicker">EDIT TIMELINE</div><h1 class="workspace-title" id="editorWorkspaceTitle">编辑器</h1>' +
+      '<h1 class="workspace-title" id="editorWorkspaceTitle">编辑器</h1>' +
       '<p class="workspace-subtitle">画面 / 配音 / 音乐三条轨，按场次编排顺序与时长；这里不会偷偷触发生成。</p></div>' +
       '<div class="workspace-actions"><button type="button" class="workspace-btn primary" data-editor-act="play">' + (state.editor.playing ? '暂停播放' : '播放序列') + '</button>' +
       '<button type="button" class="workspace-btn" data-editor-act="next">下一镜</button><button type="button" class="workspace-btn" data-editor-act="open-canvas">打开画布</button></div></div>' +
@@ -625,6 +624,7 @@
       else btn.removeAttribute("aria-current");
     });
     if (stage) stage.classList.toggle("workspace-mode", state.workspace !== "canvas");
+    if (state.workspace !== "canvas") hideShotBar();
     if (state.workspace === "script") renderScriptWorkspace();
     if (state.workspace === "editor") renderEditorWorkspace();
   }
@@ -2215,6 +2215,10 @@
   }
 
   function positionDock() {
+    if (stage && stage.classList.contains("workspace-mode")) {
+      hideShotBar();
+      return;
+    }
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) {
       hideShotBar();

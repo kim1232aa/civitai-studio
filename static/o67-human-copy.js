@@ -142,7 +142,7 @@
     }
   }
 
-  var PIN = "v0821o109-room";
+  var PIN = "v0821o110-ws";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -223,6 +223,8 @@
     if (pinning) return;
     var dock = $("dock");
     if (!dock || !dock.classList.contains("show")) return;
+    var stage = document.querySelector(".stage");
+    if (stage && stage.classList.contains("workspace-mode")) return;
     stripCapsuleLabel();
     pinning = true;
     if (typeof window.positionDock === "function") {

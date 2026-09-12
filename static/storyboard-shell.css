@@ -540,3 +540,22 @@ svg.wires path.edge {
 .split-menu button:hover { background: #2a2a32; }
 .node-menu button.danger,
 .split-menu button.danger { color: #ff8b8b; }
+
+.stage.workspace-mode .canvas-only,
+.stage.workspace-mode .dock,
+.stage.workspace-mode .dock.show,
+.stage.workspace-mode .dock.show.expanded,
+.stage.workspace-mode .dock.show.collapsed,
+.stage.workspace-mode .shot-bar,
+.stage.workspace-mode .shot-bar.show,
+.stage.workspace-mode .rail,
+.stage.workspace-mode .tools,
+.stage.workspace-mode .minimap,
+.stage.workspace-mode .zoom,
+.stage.workspace-mode .picker,
+.stage.workspace-mode .atbox,
+.stage.workspace-mode .skillbox,
+.stage.workspace-mode .node-menu,
+.stage.workspace-mode #nodeContextMenu {
+  display: none !important;
+}
