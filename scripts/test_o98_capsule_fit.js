@@ -11,8 +11,8 @@ const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8")
 const pinCss = fs.readFileSync(path.join(root, "static/o97-dock-pin.css"), "utf8");
 const shell = fs.readFileSync(path.join(root, "static/storyboard-shell.css"), "utf8");
 
-assert.ok(js.includes("v0821o98-capsule-fit") || js.includes("v0821o101-shell") || js.includes("v0821o102-seko") || js.includes("v0821o103-wide-desk") || js.includes("v0821o104-seko-attach") || js.includes("v0821o105-adapt") || js.includes("v0821o106-drag"), "js stamp");
-assert.ok(html.includes("o98capsulefit") || html.includes("o101shell") || html.includes("o102seko") || html.includes("o103wide") || html.includes("o104attach") || html.includes("o105adapt") || html.includes("o106drag"), "html stamp");
+assert.ok(js.includes("v0821o98-capsule-fit") || js.includes("v0821o101-shell") || js.includes("v0821o102-seko") || js.includes("v0821o103-wide-desk") || js.includes("v0821o104-seko-attach") || js.includes("v0821o105-adapt") || js.includes("v0821o106-drag") || js.includes("v0821o107-wires"), "js stamp");
+assert.ok(html.includes("o98capsulefit") || html.includes("o101shell") || html.includes("o102seko") || html.includes("o103wide") || html.includes("o104attach") || html.includes("o105adapt") || html.includes("o106drag") || html.includes("o107wires"), "html stamp");
 assert.ok(!/dockTitle"\)\.textContent = .*\(胶囊\)/.test(js), "title does not append 胶囊");
 assert.ok(!/Math\.min\(420, Math\.max\(300, nw\)\)/.test(js), "420 island gone from positionDock");
 assert.ok(adapt.includes("white-space: nowrap") || adapt.includes("white-space:nowrap") || shell.includes("white-space: nowrap"), "expand nowrap");

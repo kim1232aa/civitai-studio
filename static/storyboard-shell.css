@@ -1,4 +1,4 @@
-/* v0821o106-drag — 节点可拖。写字台不锁宽高。fallback bottom: 12px */
+/* v0821o107-wires — 连线可见，写字台不盖分镜。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -29,6 +29,29 @@
 .node-acts { display: none !important; }
 .card.shot { touch-action: none; user-select: none; }
 .card img, .card video { -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.port {
+  width: 18px !important;
+  height: 18px !important;
+  margin-top: -9px !important;
+  border-radius: 50% !important;
+  border: 2px solid #101014 !important;
+  background: #5ee0c5 !important;
+  z-index: 8 !important;
+  box-shadow: 0 0 0 1px #2a2a32;
+  pointer-events: auto !important;
+}
+.port.in { left: -10px !important; }
+.port.out { right: -10px !important; }
+svg.wires {
+  z-index: 5 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+svg.wires path.edge {
+  stroke: #e8edf4 !important;
+  stroke-width: 2.8 !important;
+  pointer-events: stroke !important;
+}
 
 .shot-bar {
   display: none;

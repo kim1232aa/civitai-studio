@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o107: 连线不挡、端口可见; stamp v0821o107-wires
   // v0821o106: 节点可拖，写字台不锁宽高、不改别人坐标; stamp v0821o106-drag
   // v0821o105: 写字台框自适应选中分镜; stamp v0821o105-adapt
   // v0821o104: 点分镜工具贴上、写字台贴下; stamp v0821o104-seko-attach
@@ -2245,60 +2246,38 @@
       const sameRow = others.filter(function (o) { return o.t < cy + ch - 8 && o.b > cy + 8; });
       const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
         .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
-      w = Math.round(Math.max(160, Math.min(cw || 280, nextRight - cx - 8, sr.width - 80)));
-      if (!isFinite(w) || w < 160) w = Math.round(Math.max(160, cw || 240));
-
       dock.style.setProperty("width", "auto", "important");
       dock.style.setProperty("max-width", "min(420px, calc(100% - 72px))", "important");
       dock.style.setProperty("min-width", "0", "important");
       dock.style.setProperty("height", "auto", "important");
       dock.style.setProperty("max-height", "none", "important");
       dock.style.setProperty("min-height", "0", "important");
-      const natural = Math.max(80, Math.min(420, dock.scrollHeight || 180));
-
-      const nextBelow = others.filter(function (o) { return o.r > cx + 8 && o.l < cx + w - 8 && o.t >= cy + ch - 4; })
-        .reduce(function (m, o) { return Math.min(m, o.t); }, sr.height - 8);
-      const availBelow = Math.max(0, nextBelow - (cy + ch + gap) - 4);
-      const availAbove = Math.max(0, cy - gap - 48);
-      const clampX = function (x) { return Math.max(64, Math.min(x, sr.width - w - 12)); };
-      const L = clampX(cx);
-      let h = Math.min(natural, Math.max(availBelow, availAbove, 140));
-      const belowT = cy + ch + gap;
-      const aboveT = cy - gap - Math.min(natural, Math.max(availAbove, 140));
-      let belowOk = availBelow >= 140 && !hitsRect(L, belowT, w, Math.min(natural, availBelow), others);
-      const aboveOk = availAbove >= 140 && !hitsRect(L, aboveT, w, Math.min(natural, availAbove), others);
-      if (!belowOk && !aboveOk && !positionDock._opening && openLaneForDock(n, natural + 24)) {
-        positionDock._opening = true;
-        renderCards();
-        drawWires();
-        positionDock._opening = false;
-        positionDock();
-        return;
+      const dw = Math.max(200, dock.offsetWidth || 280);
+      const dh = Math.max(80, dock.offsetHeight || 160);
+      const clampX = function (x) { return Math.max(12, Math.min(x, sr.width - dw - 12)); };
+      const clampY = function (y) { return Math.max(44, Math.min(y, sr.height - Math.min(dh, 220) - 8)); };
+      const cands = [
+        { left: clampX(cx), top: cy + ch + gap },
+        { left: clampX(cx), top: cy - gap - dh },
+        { left: clampX(cx + cw + gap), top: cy },
+        { left: clampX(cx - gap - dw), top: cy },
+        { left: 72, top: Math.max(44, sr.height - Math.min(dh, 220) - 12) }
+      ];
+      let placed = null;
+      for (let i = 0; i < cands.length; i++) {
+        const c = cands[i];
+        if (c.top < 44 || c.top + Math.min(dh, 240) > sr.height - 4) continue;
+        if (!hitsRect(c.left, c.top, dw, Math.min(dh, 240), others)) { placed = c; break; }
       }
-      if (belowOk) {
-        left = L; top = belowT; hMax = Math.min(natural, availBelow);
-      } else if (aboveOk) {
-        left = L; top = aboveT; hMax = Math.min(natural, availAbove);
-      } else {
-        const band = others.filter(function (o) { return o.r > L + 8 && o.l < L + w - 8; });
-        const lowest = band.reduce(function (m, o) { return Math.max(m, o.b); }, cy + ch);
-        const shifted = lowest + gap;
-        const availShift = sr.height - 8 - shifted;
-        if (availShift >= 140 && !hitsRect(L, shifted, w, Math.min(natural, availShift), others)) {
-          left = L; top = shifted; hMax = Math.min(natural, availShift);
-        } else {
-          // fallback bottom desk — never cover neighbor shots
-          left = 72;
-          hMax = Math.min(natural, 280);
-          top = Math.max(48, sr.height - hMax - 12);
-          if (hitsRect(left, top, w, hMax, others)) {
-            left = L;
-            top = belowT;
-            hMax = Math.min(natural, Math.max(140, availBelow || natural));
-          }
-        }
+      if (!placed) {
+        // fallback bottom desk — never cover neighbor shots
+        placed = { left: 72, top: Math.max(44, sr.height - Math.min(dh, 180) - 12) };
       }
-      h = hMax;
+      left = placed.left;
+      top = placed.top;
+      hMax = Math.min(dh, Math.max(120, sr.height - top - 8));
+      w = dw;
+      const h = hMax;
 
       const bar = $("shotBar");
       if (bar) {
