@@ -48,7 +48,9 @@ header {
 .tool, .tool.lbl {
   width: 40px; min-width: 40px; height: 40px; flex-shrink: 0;
   padding: 0; border-color: transparent; border-radius: 12px; background: transparent;
+  font-size: 11px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
+.tool.lbl { height: auto; min-height: 36px; padding: 6px 0; width: 40px; }
 .tool:hover { background: #303035; border-color: #45454c; }
 #btnAdd { background: #ececef; color: #171719; border-radius: 50%; font-size: 24px; }
 .tools-hint { display: none !important; }
@@ -69,17 +71,20 @@ header {
 .rail {
   left: 16px;
   top: auto;
-  bottom: 176px;
-  width: 164px;
-  max-height: 36vh;
-  padding: 10px;
-  gap: 8px;
+  bottom: 128px;
+  width: 148px;
+  max-height: 108px;
+  padding: 8px;
+  gap: 6px;
   border: 1px solid #303034;
   border-radius: 14px;
   background: #1a1a1ded;
   box-shadow: 0 6px 20px #0002;
   z-index: 8;
+  overflow: auto;
 }
+.rail .rail-item img,
+.rail .rail-item video { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
 .dock { max-width: min(720px, calc(100% - 48px)); }
 .dock.expanded {
   max-height: min(58vh, 560px);
@@ -95,7 +100,7 @@ header {
   min-width: 0;
   gap: 8px;
 }
-.dock.collapsed .dock-prompt { display: none; }
+.dock.collapsed .dock-prompt { display: flex; min-height: 0; }
 .dock.expanded .dock-scroll { max-height: 28%; flex: 0 1 auto; height: auto; }
 .dock-foot { max-height: 42%; overflow: auto; }
 .dock.expanded #send {
@@ -222,7 +227,8 @@ header {
   display: none;
   position: absolute;
   top: 68px;
-  left: 80px;
+  left: auto;
+  right: 16px;
   z-index: 32;
   width: min(340px, calc(100vw - 32px));
   max-height: min(72vh, 560px);
@@ -272,8 +278,6 @@ header {
 .canvas-manager .cm-note { color: var(--muted); font-size: 11px; margin: 6px 0 0; }
 .canvas-manager .cm-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
 .canvas-manager .cm-tabs { display: none !important; }
-
-.rail { z-index: 8; max-height: 28vh; }
 .dock.collapsed {
   min-width: 240px;
   max-width: min(340px, calc(100vw - 48px));

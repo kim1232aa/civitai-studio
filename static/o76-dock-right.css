@@ -8,9 +8,9 @@
   transform: none;
 }
 .dock.collapsed {
-  min-width: 0;
-  max-width: 320px;
-  border-radius: 22px;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 96px));
+  border-radius: 16px;
 }
 .chat-rail, .canvas-tip { display: none !important; }
 .param-unsupported { display: none !important; }

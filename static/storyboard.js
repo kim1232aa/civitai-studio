@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o94: kill o60 720 bottom bar; capsule-on-node actually visible; stamp v0821o94-cap-on-node
+  // v0821o95: 胶囊带提示词/模型/↑；项目抽屉靠右不挡成片; stamp v0821o95-stage-first
   // v0821o92: 打光/换机位/超清/消除/文生视频/尾帧 · 点选工具+目录重匹配，不自动生成; stamp v0821o92-seko-fill
   // v0821o91: capsule-on-node + tools-on-select + 九宫格/故事推演; stamp v0821o91-seko-tools
   // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
@@ -338,7 +338,20 @@
     return false;
   }
   function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
-  function railAssets() { return assets().filter((n) => !isJunkRailItem(n)); }
+  function railAssets() {
+    const seen = {};
+    const out = [];
+    assets().filter((n) => !isJunkRailItem(n)).forEach((n) => {
+      out.push(n);
+      if (n.url) seen[n.url] = true;
+    });
+    shots().forEach((s) => {
+      if (!s.url || seen[s.url] || isJunkRailItem(s)) return;
+      seen[s.url] = true;
+      out.push({ id: s.id, kind: "shot", url: s.url, title: (s.title || "成片") });
+    });
+    return out;
+  }
   function railHistory() { return (state.history || []).filter((h) => !isJunkRailItem(h)); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
   function sceneById(id) {
@@ -2183,8 +2196,8 @@
     const y = cr ? (cr.top - vpR.top) : (state.cam.y + n.y * state.cam.s);
     const nw = cr ? cr.width : box(n).w * state.cam.s;
     const nh = cr ? cr.height : box(n).h * state.cam.s;
-    const dockW = expanded ? Math.min(400, Math.max(280, area.right - area.left - 24)) : 300;
-    const wantH = expanded ? Math.min(area.bottom - area.top - 24, 420) : 52;
+    const dockW = expanded ? Math.min(400, Math.max(280, area.right - area.left - 24)) : Math.min(420, Math.max(300, nw));
+    const wantH = expanded ? Math.min(area.bottom - area.top - 24, 420) : 132;
     let left, top;
     if (expanded) {
       const rightOf = x + nw + gap;
@@ -2203,7 +2216,7 @@
       if (top + 52 > area.bottom) top = Math.max(area.top, y - 56);
     }
     Object.assign(dock.style, {
-      width: dockW + "px", height: expanded ? "auto" : "52px", maxHeight: wantH + "px",
+      width: dockW + "px", height: expanded ? "auto" : "auto", maxHeight: wantH + "px",
       left: left + "px", top: top + "px",
       right: "auto", bottom: "auto", transform: "none",
       visibility: (x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight) ? "hidden" : "",
@@ -2493,10 +2506,13 @@
     // 成片 chip stays visual-only (data-self-ref) — must NOT inflate numerator to 6/5 after 灌满.
     const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - refCount);
-    const refHint = refCount > refCap
+    const eats = catalogEatsRefs(catalogItemForService());
+    const refHint = (!eats && refCount === 0)
+      ? ""
+      : (refCount > refCap
       ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出上限（不静默丢线）</span>'
       : '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap +
-          (remain ? (' · 还可 ' + remain) : '') + '</span>';
+          (remain ? (' · 还可 ' + remain) : '') + '</span>');
     // Unlinked thumbnails are selectable suggestions, not sent references.
     // Keep them out of this row so the visible count cannot claim 0/n beside
     // a thumbnail that will not be sent.
@@ -2507,15 +2523,15 @@
           '<img src="' + esc(ownUrl) + '" alt=""></button>'
       : "";
     const refsEl = $("refs");
-    // v0821o39: expose FULL cap slots — empty remain chips so N can reach maxRefs (禁半槽).
     const emptySlots = [];
-    for (let si = 0; si < remain; si++) {
-      emptySlots.push(
-        '<button class="chip ref-slot-empty" type="button" data-act="upload" title="空槽 ' +
-          (refCount + si + 1) + '/' + refCap + ' · 上传参考" aria-label="空参考槽"></button>'
-      );
+    if (eats && remain > 0 && expanded) {
+      for (let si = 0; si < remain; si++) {
+        emptySlots.push(
+          '<button class="chip ref-slot-empty" type="button" data-act="upload" title="空槽 ' +
+            (refCount + si + 1) + '/' + refCap + ' · 上传参考" aria-label="空参考槽"></button>'
+        );
+      }
     }
-    const eats = catalogEatsRefs(catalogItemForService());
     const sibId = (!eats && refCount > 0) ? editSiblingId(catalogItemForService()) : "";
     const smartBtn = sibId
       ? '<button class="chip-btn smart-edit" type="button" data-act="apply-edit-sibling" title="一键改选图生图 Edit">一键改选 Edit</button>'

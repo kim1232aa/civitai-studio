@@ -103,7 +103,8 @@
     var nodes = root.querySelectorAll("button, a, span, p, label, small, .mode-tag, .dock-hint, .ref-cap-hint, .chat-rail, .cm-note, [placeholder]");
     for (var i = 0; i < nodes.length; i++) scrubNode(nodes[i]);
     var title = root.querySelector(".title, #title, header .title");
-    if (title && /^qa-/i.test(String(title.textContent || "").trim())) {
+    // Keep the live project name. qa- fixtures are real projects, not robot chrome.
+    if (title && !String(title.textContent || "").trim()) {
       title.textContent = "未命名画布";
     }
   }

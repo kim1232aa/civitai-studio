@@ -458,10 +458,10 @@
               <button type="button" data-action="toggle-asset" data-id="${escapeHtml(asset.id)}">${bound ? "解绑" : "绑定"}</button>
             </li>`;
           }).join("")
-        : `<li class="cm-empty">暂无资产</li>`;
+        : `<li class="cm-empty">画布上的成片可点「入库」收入本项目</li>`;
       return `<div class="cm-columns">
           <section><h3>画布</h3><button type="button" class="cm-add" data-action="create-canvas"${project ? "" : " disabled"}>+ 新建画布</button><ul>${canvasRows}</ul></section>
-          <section><h3>资产 <small>当前项目</small></h3><ul>${assetRows}</ul><p class="cm-note">资产必须先由真实导入或生成结果提供。</p></section>
+          <section><h3>资产 <small>当前项目</small></h3><ul>${assetRows}</ul><p class="cm-note">成片在画布上。点入库后出现在这里。</p></section>
         </div>`;
     }
 
@@ -479,7 +479,7 @@
       if (title) title.textContent = project ? projectLabel(project) : "未选择项目";
       this.root.innerHTML = `
         <div class="cm-head">
-          <strong>项目</strong>
+          <strong></strong>
           <button type="button" class="cm-close" data-action="close" aria-label="关闭项目面板">×</button>
         </div>
         <div class="cm-controls">
@@ -564,6 +564,7 @@
     const root = global.document && global.document.getElementById("canvasManager");
     if (root) {
       global.canvasManager = mountCanvasManager(root);
+      root.classList.remove("show");
       const toggle = global.document.getElementById("canvasManagerToggle");
       if (toggle) toggle.addEventListener("click", (e) => {
         e.stopPropagation();

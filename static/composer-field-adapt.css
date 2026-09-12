@@ -37,61 +37,103 @@ textarea.param-unsupported-control{
   overflow: hidden;
 }
 .dock.show.collapsed {
-  width: 300px !important;
-  max-width: 320px !important;
-  min-width: 0 !important;
-  height: 52px !important;
-  max-height: 52px !important;
-  border-radius: 22px !important;
+  width: min(420px, calc(100vw - 96px)) !important;
+  max-width: min(420px, calc(100vw - 96px)) !important;
+  min-width: 280px !important;
+  height: auto !important;
+  max-height: 132px !important;
+  border-radius: 16px !important;
 }
-.dock.show.collapsed .dock-body { display: none !important; }
+.dock.show.collapsed .dock-body {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  max-height: none !important;
+}
+.dock.show.collapsed .dock-scroll,
+.dock.show.collapsed .modes,
+.dock.show.collapsed .refs,
+.dock.show.collapsed .composer-acts,
+.dock.show.collapsed .lora-block,
+.dock.show.collapsed .msg,
+.dock.show.collapsed #negative,
+.dock.show.collapsed .param-group { display: none !important; }
 .dock.show.collapsed .collapse-only,
-.dock.show.collapsed .expand-only.dock-hint,
 .dock.show.collapsed #dockHint { display: none !important; }
+.dock.show.collapsed .dock-prompt {
+  display: flex !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
+  padding: 0 10px;
+}
+.dock.show.collapsed #prompt {
+  min-height: 36px !important;
+  max-height: 40px !important;
+  height: 36px !important;
+  padding: 8px 10px;
+}
+.dock.show.collapsed .dock-foot { padding: 0 10px 8px; overflow: hidden; max-height: none !important; }
+.dock.show.collapsed .bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.dock.show.collapsed .bar > :not(#backend):not(#service):not(.send):not(.grow) { display: none !important; }
+.dock.show.collapsed #backend,
+.dock.show.collapsed #service {
+  display: block !important;
+  min-width: 0;
+  flex: 1 1 90px;
+  height: 32px;
+}
+.dock.show.collapsed #send { display: grid !important; width: 40px; height: 40px; flex: 0 0 40px; }
+.dock.show.collapsed #sendCap { display: none !important; }
 .dock.show.collapsed .dock-hd {
-  height: 52px;
-  padding: 6px 8px 6px 10px;
+  height: 36px;
+  padding: 4px 8px 0 12px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.dock.show.collapsed #sendCap { display: grid !important; }
-.dock.show.expanded #sendCap { display: none !important; }
 .dock.show.expanded {
   max-width: min(400px, calc(100vw - 48px)) !important;
   max-height: min(52vh, 420px) !important;
   min-width: 280px;
 }
 .dock.show.expanded .expand-only { display: none !important; }
+.dock.show.expanded #sendCap { display: none !important; }
 .dock.expanded .dock-body {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  max-height: calc(58vh - 48px) !important;
+  max-height: none !important;
   overflow: hidden !important;
 }
 .dock.expanded .dock-scroll {
-  flex: 0 1 auto !important;
-  max-height: 22% !important;
+  flex: 0 0 auto !important;
+  max-height: 72px !important;
   overflow: auto !important;
 }
 .dock.expanded .dock-prompt {
   flex: 1 1 auto !important;
-  min-height: 96px !important;
-  max-height: 36% !important;
+  min-height: 72px !important;
+  max-height: none !important;
   overflow: hidden !important;
 }
 .dock.expanded #prompt {
   display: block !important;
   width: 100% !important;
-  min-height: 96px !important;
+  min-height: 72px !important;
   max-height: 100% !important;
   box-sizing: border-box !important;
 }
 .dock.expanded .dock-foot {
   flex: 0 0 auto !important;
-  max-height: 42% !important;
-  overflow: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 .dock.expanded .bar {
   display: flex !important;
