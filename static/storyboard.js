@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o123: 故事推演沿用原分镜的家，不再误匹配 qwen2+steps
   // v0821o122: 我的空间画廊；stamp v0821o122-space
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
@@ -2109,7 +2110,6 @@
         } else if (shot.serviceId && state.catalogById[shot.serviceId]) {
           ensureSelectOpt($("service"), shot.serviceId);
         }
-        try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
       }
     } else {
       state.mode = (shot.mode === "video" || shot.mode === "text" || shot.mode === "audio") ? shot.mode : "image";
@@ -2118,7 +2118,9 @@
       applyComfyParamsToUi(shot);
       if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
       if (shot.res && $("res")) $("res").value = shot.res;
-      try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
+      if (!(shot.serviceId || (shot.composer && shot.composer.service))) {
+        try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
+      }
     }
     const restoredW = $("width") ? parseInt($("width").value, 10) : NaN;
     const restoredH = $("height") ? parseInt($("height").value, 10) : NaN;
@@ -5737,7 +5739,7 @@
     if (scheduler) out.scheduler = scheduler;
     if (seedRaw !== "" && seedRaw !== "random") {
       const seedNum = Number(seedRaw);
-      out.seed = Number.isFinite(seedNum) ? seedNum : seedRaw;
+      if (Number.isFinite(seedNum) && seedNum >= 0 && seedNum <= 4294967295) out.seed = Math.floor(seedNum);
     }
     return out;
   }
@@ -5776,11 +5778,21 @@
   function packComfyParamsForPayload(shotOpt) {
     const p = readComfyParamsFromUi();
     const be = currentBackend();
+    const sid = String(($("service") && $("service").value) || (shotOpt && (shotOpt.serviceId || (shotOpt.composer && shotOpt.composer.service))) || "");
+    const falSid = be === "fal" || /\/fal\//.test(sid) || /^fal[-.]/i.test(sid);
     if (be === "nano-gpt") {
       delete p.width;
       delete p.height;
       const token = $("nanoRes") && $("nanoRes").value;
       if (token) p.resolution = token;
+    } else if (falSid) {
+      delete p.sampler;
+      delete p.scheduler;
+      delete p.steps;
+      delete p.cfg;
+      delete p.cfgScale;
+      delete p.width;
+      delete p.height;
     } else if (be === "fal") {
       delete p.sampler;
       delete p.scheduler;
@@ -6284,7 +6296,11 @@
         renderServiceOptions(state.catalog, "选择模型");
         syncCatalogPagingUi();
         applyServiceConstraints();
-        try { await smartMatchService({ announce: true }); } catch (_) {}
+        try {
+          const shotNow = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+          const own = shotNow && (shotNow.serviceId || (shotNow.composer && shotNow.composer.service));
+          if (!own) await smartMatchService({ announce: true });
+        } catch (_) {}
         return true;
       } catch (e) {
         if (!current()) return false;
@@ -7829,7 +7845,7 @@
     const genParams = {
       serviceId: serviceId,
     };
-    if (be === "civitai") {
+    if (be === "civitai" && !/\/fal\//.test(String(serviceId || ""))) {
       // width/height/steps/cfgScale/sampler/scheduler — seed packed in runShotStep (wire-only compile rule)
       ["width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler"].forEach(function (k) {
         if (comfy[k] != null) genParams[k] = comfy[k];
@@ -8474,6 +8490,23 @@
     }
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
+    const outSid = String((payload && payload.serviceId) || ($("service") && $("service").value) || "");
+    if (/\/fal\//.test(outSid) || /^fal[-.]ai\//i.test(outSid)) {
+      delete payload.steps;
+      delete payload.cfg;
+      delete payload.cfgScale;
+      delete payload.sampler;
+      delete payload.scheduler;
+    }
+    if (outSid === "image/textToImage") {
+      delete payload.sampler;
+    }
+    if (payload) {
+      const seedNum = Number(payload.seed);
+      if (!Number.isFinite(seedNum) || seedNum < 0 || seedNum > 4294967295) {
+        payload.seed = Math.floor(Math.random() * 0xffffffff);
+      }
+    }
     setShotBusy(shot, true);
     shot._error = "";
     let jobId = "";
@@ -9261,8 +9294,34 @@
           if (n.wantUpscale) op = "upscale";
           else if (n.wantInpaint) op = "inpaint";
           else if (n.mode === "video") op = (n.url || n.firstFrameId || refs.length) ? "i2v" : "t2v";
-          else if (n.url || refs.length) op = "i2i";
-          await rematchAfterSpawn(n, op);
+          else if (n.url || refs.length) {
+            const sid = String(n.serviceId || (n.composer && n.composer.service) || "").toLowerCase();
+            op = /editimage|createvariant|image-to-image/.test(sid) ? "i2i" : "t2i";
+          }
+          const keepHouse = !!(n.serviceId || (n.composer && n.composer.service) || n.backend);
+          if (keepHouse) {
+            smartMatchService._gen = (smartMatchService._gen || 0) + 1;
+            if (n.backend && $("backend")) $("backend").value = n.backend;
+            const sid0 = n.serviceId || (n.composer && n.composer.service) || "";
+            let sid = sid0;
+            if (refs.length && (n.backend === "civitai" || /^image\//.test(sid)) && !/editimage|createvariant/i.test(sid)) {
+              sid = "image/comfy/krea2/edit/editImage";
+              op = "i2i";
+            } else if (sid === "image/textToImage") {
+              sid = CIVITAI_PREF_SERVICE;
+            }
+            if (sid && $("service")) {
+              ensureSelectOpt($("service"), sid);
+              $("service").value = sid;
+              n.serviceId = sid;
+              if (n.composer) n.composer.service = sid;
+            }
+            if (n.composer && Array.isArray(n.composer.loras)) {
+              state.loras = JSON.parse(JSON.stringify(n.composer.loras));
+            }
+          } else {
+            await rematchAfterSpawn(n, op);
+          }
           await runShotUntilDone(n.id, (label || "") + " " + (i + 1) + "/" + list.length);
         } catch (e) {
           setMsg((n.title || "分镜") + " 失败：" + ((e && e.message) || e), "bad");
@@ -9412,8 +9471,15 @@
       prompt: opts.prompt != null ? opts.prompt : (source.prompt || ""),
       negativePrompt: source.negativePrompt || "",
       mode: opts.mode || "image",
-      backend: source.backend || "",
+      backend: source.backend || (source.composer && source.composer.backend) || "",
+      serviceId: source.serviceId || (source.composer && source.composer.service) || "",
     };
+    if (source.composer) {
+      try { node.composer = JSON.parse(JSON.stringify(source.composer)); } catch (_) { node.composer = source.composer; }
+    }
+    if (Array.isArray(source.loras)) {
+      try { node.loras = JSON.parse(JSON.stringify(source.loras)); } catch (_) {}
+    }
     if (opts.firstFrameFromSource && source.url && (opts.mode || "image") === "video") node.firstFrameId = source.id;
     if (opts.wantT2v) node.wantT2v = true;
     if (opts.wantUpscale) node.wantUpscale = true;
