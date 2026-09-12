@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
   // v0821o114: 一个框完整显示，不裁切；stamp v0821o114-full
   // v0821o113: 写字台扁宽条贴分镜下，工具贴上；stamp v0821o113-seko
   // v0821o112: 写字台只贴选中分镜上下，宽跟分镜走；stamp v0821o112-attach
@@ -8865,49 +8866,58 @@
   function panoFromShot(shot) {
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
-    const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-    let hit = "";
-    Object.keys(pool).forEach(function (id) {
-      const row = pool[id] || {};
-      const s = (id + " " + (row.name || "") + " " + (row.id || "")).toLowerCase();
-      if (!hit && /360|panorama|equirect|720/.test(s)) hit = row.id || id;
+    const prompt = ((shot.prompt || "").trim() + "\nwide establishing shot, panoramic environment, full surroundings visible, 720 look").trim();
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: " · 全景",
+      prompt: prompt,
+      mode: "image",
+      firstFrameFromSource: !!shot.url,
     });
-    if (!hit) {
-      setMsg("当前目录没有 720° 全景端点（不装接）", "warn");
-      return;
-    }
-    const sel = $("service");
-    if (sel) {
-      ensureSelectOpt(sel, hit);
-      sel.value = hit;
-      shot.serviceId = hit;
-      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
-    }
-    setMsg("已选全景端点 " + hit + " · 确认后点 ↑", "ok");
+    rematchAfterSpawn(node, shot.url ? "i2i" : "t2i");
   }
   function hideToolPops() {
     ["lightPop", "camPop", "lastPop", "storyPop", "morePop"].forEach(function (id) {
-      const el = $(id);
-      if (el) el.hidden = true;
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.hidden = true;
+      el.style.display = "none";
     });
   }
   function toolAnchor(preferred) {
-    if (preferred) {
+    if (preferred && preferred.getBoundingClientRect) {
       const r = preferred.getBoundingClientRect();
       if (r.width > 4 && r.height > 4) return preferred;
     }
-    return document.querySelector(".node-acts [data-node-act='more']")
+    const id = preferred && preferred.id;
+    const fromBar = id && document.querySelector('#shotBar [data-shot-tool="' + id + '"]');
+    if (fromBar) {
+      const r = fromBar.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4) return fromBar;
+    }
+    return document.querySelector("#shotBar button")
       || document.querySelector(".card.shot.sel")
+      || document.querySelector(".card.shot")
       || preferred;
   }
   function placePop(pop, anchor) {
     if (!pop) return;
     const a = toolAnchor(anchor);
-    if (!a) return;
-    const r = a.getBoundingClientRect();
-    pop.style.left = (r.right + 8) + "px";
-    pop.style.top = Math.max(60, r.top) + "px";
+    pop.style.position = "fixed";
+    pop.style.zIndex = "50";
+    pop.style.display = "";
     pop.hidden = false;
+    const r = a ? a.getBoundingClientRect() : { left: 80, right: 80, top: 80, bottom: 120, width: 40 };
+    let left = r.left;
+    let top = r.bottom + 8;
+    pop.style.left = Math.round(left) + "px";
+    pop.style.top = Math.round(top) + "px";
+    const pr = pop.getBoundingClientRect();
+    if (left + pr.width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pr.width - 8);
+    if (top + pr.height > window.innerHeight - 8) top = Math.max(8, r.top - pr.height - 8);
+    if (left < 8) left = 8;
+    if (top < 8) top = 8;
+    pop.style.left = Math.round(left) + "px";
+    pop.style.top = Math.round(top) + "px";
   }
   function showMorePop(anchor) {
     hideToolPops();
@@ -8934,8 +8944,10 @@
         const b = ev.target.closest("[data-more]");
         if (!b) return;
         pop.hidden = true;
-        const el = $(b.getAttribute("data-more"));
-        if (el) el.click();
+        const id = b.getAttribute("data-more");
+        const barBtn = document.querySelector('#shotBar [data-shot-tool="' + id + '"]')
+          || document.querySelector('#shotBar [data-shot-act="more"]');
+        runShotTool(id, barBtn);
       });
     }
     placePop(pop, anchor);
@@ -8987,7 +8999,7 @@
       setMsg("已匹配" + (graphOpLabel(op) || "") + (sid ? (" · " + sid) : "") + " · 不会自动生成，确认后点 ↑", "ok");
     }
   }
-  function showLightPop() {
+  function showLightPop(anchor) {
     const shot = selectedShot();
     if (!shot || !shot.url) { setMsg("先有成片再打光", "warn"); return; }
     hideToolPops();
@@ -9007,7 +9019,7 @@
         lightFromShot(selectedShot(), b.getAttribute("data-light"));
       });
     }
-    placePop(pop, $("btnLight"));
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnLight"]') || $("btnLight"));
   }
   function lightFromShot(shot, presetId) {
     shot = shot || selectedShot();
@@ -9022,7 +9034,7 @@
     });
     rematchAfterSpawn(node, "i2i");
   }
-  function showCamPop() {
+  function showCamPop(anchor) {
     const shot = selectedShot();
     if (!shot || !shot.url) { setMsg("先有成片再换机位", "warn"); return; }
     hideToolPops();
@@ -9042,7 +9054,7 @@
         cameraFromShot(selectedShot(), b.getAttribute("data-cam"));
       });
     }
-    placePop(pop, $("btnCamera"));
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnCamera"]') || $("btnCamera"));
   }
   function cameraFromShot(shot, presetId) {
     shot = shot || selectedShot();
@@ -9073,23 +9085,21 @@
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
     if (!shot.url) {
-      shot.wantT2v = true;
       shot.mode = "video";
       state.mode = "video";
-      if (shot.firstFrameId) shot.firstFrameId = "";
       selectNode(shot.id, { expand: true, preserveLayout: true });
       rematchAfterSpawn(shot, "t2v");
       return;
     }
     const node = spawnLinkedShot(shot, {
-      titleSuffix: " · 文生视频",
+      titleSuffix: " · 视频",
       prompt: shot.prompt || "",
       mode: "video",
-      wantT2v: true,
+      firstFrameFromSource: true,
     });
-    rematchAfterSpawn(node, "t2v");
+    rematchAfterSpawn(node, "i2v");
   }
-  function showLastPop() {
+  function showLastPop(anchor) {
     const shot = selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
     hideToolPops();
@@ -9135,7 +9145,43 @@
             return '<button type="button" data-last="' + esc(n.id) + '">' + esc(sourceTitle(n) || n.title || n.id) + "</button>";
           }).join("")
         : '<button type="button" disabled>画布上还没有别的成片</button>');
-    placePop(pop, $("btnLast") || $("btnT2v"));
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnLast"]') || $("btnLast"));
+  }
+  function showStoryPop(anchor) {
+    if (!selectedShot()) { setMsg("先点一个分镜", "warn"); return; }
+    let pop = $("storyPop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "storyPop";
+      pop.className = "story-pop";
+      pop.hidden = true;
+      pop.innerHTML = '<button type="button" data-story="3">往后 3 秒</button><button type="button" data-story="5">往后 5 秒</button>';
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-story]");
+        if (!b) return;
+        pop.hidden = true;
+        storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3);
+      });
+    }
+    if (!pop.hidden) { pop.hidden = true; return; }
+    hideToolPops();
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnStory"]') || $("btnStory"));
+  }
+  function runShotTool(id, anchor) {
+    if (id === "btnPano") panoFromShot(selectedShot());
+    else if (id === "btnCamera") showCamPop(anchor);
+    else if (id === "btnNine") nineGridFromShot(selectedShot());
+    else if (id === "btnLight") showLightPop(anchor);
+    else if (id === "btnStory") showStoryPop(anchor);
+    else if (id === "btnErase") beginErase(selectedShot());
+    else if (id === "btnUpscale") upscaleFromShot(selectedShot());
+    else if (id === "btnT2v") t2vFromShot(selectedShot());
+    else if (id === "btnLast") showLastPop(anchor);
+    else {
+      const el = $(id);
+      if (el) el.click();
+    }
   }
   function beginErase(shot) {
     shot = shot || selectedShot();
@@ -9196,23 +9242,7 @@
   if ($("btnStory")) {
     $("btnStory").onclick = function (e) {
       e.stopPropagation();
-      let pop = $("storyPop");
-      if (!pop) {
-        pop = document.createElement("div");
-        pop.id = "storyPop";
-        pop.className = "story-pop";
-        pop.innerHTML = '<button type="button" data-story="3">往后 3 秒</button><button type="button" data-story="5">往后 5 秒</button>';
-        document.body.appendChild(pop);
-        pop.addEventListener("click", function (ev) {
-          const b = ev.target.closest("[data-story]");
-          if (!b) return;
-          pop.hidden = true;
-          storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3);
-        });
-      }
-      if (!pop.hidden) { pop.hidden = true; return; }
-      hideToolPops();
-      placePop(pop, e.currentTarget);
+      showStoryPop(e.currentTarget);
     };
   }
   if ($("btnPano")) $("btnPano").onclick = function () { panoFromShot(selectedShot()); };
@@ -9222,8 +9252,7 @@
       if (tool) {
         e.preventDefault();
         e.stopPropagation();
-        const el = $(tool.getAttribute("data-shot-tool"));
-        if (el) el.click();
+        runShotTool(tool.getAttribute("data-shot-tool"), tool);
         return;
       }
       const act = e.target.closest("[data-shot-act]");
@@ -9239,12 +9268,12 @@
       else if (kind === "more") showMorePop(act);
     });
   }
-  if ($("btnLight")) $("btnLight").onclick = function (e) { e.stopPropagation(); showLightPop(); };
-  if ($("btnCamera")) $("btnCamera").onclick = function (e) { e.stopPropagation(); showCamPop(); };
+  if ($("btnLight")) $("btnLight").onclick = function (e) { e.stopPropagation(); showLightPop(e.currentTarget); };
+  if ($("btnCamera")) $("btnCamera").onclick = function (e) { e.stopPropagation(); showCamPop(e.currentTarget); };
   if ($("btnUpscale")) $("btnUpscale").onclick = function () { upscaleFromShot(selectedShot()); };
   if ($("btnErase")) $("btnErase").onclick = function () { beginErase(selectedShot()); };
   if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
-  if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(); };
+  if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(e.currentTarget); };
   document.addEventListener("click", function (e) {
     if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#btnLight,#btnCamera,#btnLast,#btnStory,[data-node-act],#shotBar")) return;
     hideToolPops();
