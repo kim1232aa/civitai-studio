@@ -23,71 +23,46 @@ textarea.param-unsupported-control{
 .lora-hint.lora-unverified{color:#c9b56a}
 .lora-str::placeholder{color:#8b8b94;font-style:italic}
 
-/* v0821o62: expanded dock can outgrow the short #viewport so #send stays visible */
-.dock.expanded {
-  /* o60 overrides o62 visible overflow — keep composer inside viewport */
-  height: auto !important;
-  max-height: min(58vh, 560px) !important;
-  overflow: hidden !important;
-}
-.dock.expanded .dock-body {
-  overflow: hidden !important;
-  max-height: calc(58vh - 48px) !important;
-}
-.dock.expanded .dock-prompt { overflow: hidden; min-height: 148px; flex: 1 1 auto; }
-.dock.expanded .dock-foot {
-  flex: 0 0 auto;
-  max-height: none !important;
-  overflow: visible !important;
-}
-.dock.expanded .lora-block { max-height: 88px; overflow: auto; }
-.dock.expanded .bar {
-  display: flex !important;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-  height: auto;
-  max-height: none;
-}
-.dock.expanded .bar .grow { display: block !important; flex: 1 1 8px; min-width: 8px; }
-.dock.expanded .send {
-  grid-column: auto;
-  justify-self: auto;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  margin: 0 0 0 auto;
-}
-.dock.expanded .bar :is(select, input[type=number], input[type=text], input[type=search]) {
-  width: auto;
-  min-width: 88px;
-  max-width: 220px;
-}
-.dock.expanded .bar input#serviceFilter { width: 110px; flex: 0 0 110px; }
-.dock.expanded .bar #seed { width: auto; min-width: 168px; flex: 1 1 168px; max-width: 240px; }
-.dock.expanded .bar .param-group.hidden { display: none !important; }
-.dock.expanded .bar .param-field { min-width: 88px; }
-.dock.expanded #prompt { min-height: 120px; }
-
-/* v0821o60-clip-fix: pin dock to viewport */
-.dock,
-.dock.expanded {
-  position: fixed !important;
-  left: 50% !important;
-  right: auto !important;
-  bottom: 12px !important;
-  top: auto !important;
-  transform: translateX(-50%) !important;
-  width: min(720px, calc(100vw - 48px)) !important;
-  max-width: min(720px, calc(100vw - 48px)) !important;
-  max-height: min(58vh, 560px) !important;
-  height: auto !important;
-  z-index: 40 !important;
-  overflow: hidden !important;
+/* o94: 贴节点胶囊。禁止 o60 底部 720 固定条把成片盖住。 */
+.dock:not(.show) { display: none !important; }
+.dock.show {
   display: flex !important;
   flex-direction: column !important;
+  position: absolute !important;
+  transform: none !important;
+  right: auto !important;
+  bottom: auto !important;
+  min-width: 0 !important;
+  z-index: 26 !important;
+  overflow: hidden;
 }
+.dock.show.collapsed {
+  width: 300px !important;
+  max-width: 320px !important;
+  min-width: 0 !important;
+  height: 52px !important;
+  max-height: 52px !important;
+  border-radius: 22px !important;
+}
+.dock.show.collapsed .dock-body { display: none !important; }
+.dock.show.collapsed .collapse-only,
+.dock.show.collapsed .expand-only.dock-hint,
+.dock.show.collapsed #dockHint { display: none !important; }
+.dock.show.collapsed .dock-hd {
+  height: 52px;
+  padding: 6px 8px 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dock.show.collapsed #sendCap { display: grid !important; }
+.dock.show.expanded #sendCap { display: none !important; }
+.dock.show.expanded {
+  max-width: min(400px, calc(100vw - 48px)) !important;
+  max-height: min(52vh, 420px) !important;
+  min-width: 280px;
+}
+.dock.show.expanded .expand-only { display: none !important; }
 .dock.expanded .dock-body {
   display: flex !important;
   flex-direction: column !important;

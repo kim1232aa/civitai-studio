@@ -1,18 +1,15 @@
-/* o91: Composer 贴选中节点。收起=窄胶囊；展开=节点旁抽屉。禁止右侧整栏检查器。 */
+/* o94: Composer 贴选中节点。收起=窄胶囊；展开=节点旁抽屉。禁止底部 720 条。 */
+.dock:not(.show) { display: none !important; }
 .dock.show.expanded,
 .dock.expanded {
-  width: min(420px, calc(100vw - 48px));
-  max-width: min(420px, calc(100vw - 48px));
+  width: min(400px, calc(100vw - 48px));
+  max-width: min(400px, calc(100vw - 48px));
   min-width: 280px;
   transform: none;
 }
-.dock.expanded .dock-body {
-  max-height: min(70dvh, 640px);
-  overflow: auto;
-}
 .dock.collapsed {
-  min-width: 260px;
-  max-width: min(420px, calc(100vw - 48px));
+  min-width: 0;
+  max-width: 320px;
   border-radius: 22px;
 }
 .chat-rail, .canvas-tip { display: none !important; }

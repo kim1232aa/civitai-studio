@@ -52,6 +52,20 @@ header {
 .tool:hover { background: #303035; border-color: #45454c; }
 #btnAdd { background: #ececef; color: #171719; border-radius: 50%; font-size: 24px; }
 .tools-hint { display: none !important; }
+.selbar {
+  display: none;
+  position: absolute;
+  left: 80px;
+  top: 16px;
+  z-index: 12;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #303034;
+  border-radius: 12px;
+  background: #1b1b1eee;
+}
+.selbar.on { display: flex; }
 .rail {
   left: 16px;
   top: auto;
@@ -208,7 +222,7 @@ header {
   display: none;
   position: absolute;
   top: 68px;
-  left: 16px;
+  left: 80px;
   z-index: 32;
   width: min(340px, calc(100vw - 32px));
   max-height: min(72vh, 560px);
@@ -277,6 +291,17 @@ header {
 .dock.collapsed .dock-body { overflow: hidden; max-height: none; }
 .dock.collapsed .dock-foot { padding: 0 10px 8px; }
 .dock.collapsed .bar { margin: 0; flex-wrap: nowrap; }
+#sendCap {
+  display: none;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 18px;
+}
 .dock.expanded {
   width: min(400px, calc(100vw - 48px));
   max-width: min(400px, calc(100vw - 48px));

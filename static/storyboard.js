@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o93: layout capsule-on-node + project drawer; smart match via /api/search MODEL cross; stamp v0821o93-search-match
+  // v0821o94: kill o60 720 bottom bar; capsule-on-node actually visible; stamp v0821o94-cap-on-node
   // v0821o92: 打光/换机位/超清/消除/文生视频/尾帧 · 点选工具+目录重匹配，不自动生成; stamp v0821o92-seko-fill
   // v0821o91: capsule-on-node + tools-on-select + 九宫格/故事推演; stamp v0821o91-seko-tools
   // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
@@ -2173,38 +2173,40 @@
   function positionDock() {
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
-    const area = canvasArea(), b = box(n), gap = 12;
+    const area = canvasArea();
     const expanded = state.dockMode === "expanded";
-    const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
-    const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
-    const areaW = Math.max(240, area.right - area.left);
-    const dockW = expanded
-      ? Math.min(400, Math.max(300, Math.min(areaW - 24, 400)))
-      : Math.min(320, Math.max(240, Math.min(nw, 320)));
-    const maxH = expanded ? Math.min(area.bottom - area.top - 16, 520) : 96;
+    const gap = 12;
+    const vpR = vp.getBoundingClientRect();
+    const card = vp.querySelector('.card.shot[data-id="' + n.id + '"]');
+    const cr = card ? card.getBoundingClientRect() : null;
+    const x = cr ? (cr.left - vpR.left) : (state.cam.x + n.x * state.cam.s);
+    const y = cr ? (cr.top - vpR.top) : (state.cam.y + n.y * state.cam.s);
+    const nw = cr ? cr.width : box(n).w * state.cam.s;
+    const nh = cr ? cr.height : box(n).h * state.cam.s;
+    const dockW = expanded ? Math.min(400, Math.max(280, area.right - area.left - 24)) : 300;
+    const wantH = expanded ? Math.min(area.bottom - area.top - 24, 420) : 52;
     let left, top;
     if (expanded) {
       const rightOf = x + nw + gap;
-      if (rightOf + dockW <= area.right) {
-        left = rightOf;
-        top = Math.max(area.top, Math.min(y, area.bottom - 180));
-      } else {
-        left = Math.max(area.left, Math.min(x + (nw - dockW) / 2, area.right - dockW));
-        top = y + nh + gap;
-        if (top + 180 > area.bottom) top = Math.max(area.top, y - gap - Math.min(maxH, 280));
-      }
+      const leftOf = x - dockW - gap;
+      if (rightOf + dockW <= area.right) left = rightOf;
+      else if (leftOf >= area.left) left = leftOf;
+      else left = Math.max(area.left, Math.min(x, area.right - dockW));
+      top = y;
+      if (top + wantH > area.bottom) top = Math.max(area.top, area.bottom - wantH);
+      if (top < area.top) top = area.top;
     } else {
       left = x + (nw - dockW) / 2;
       if (left < area.left) left = area.left;
       if (left + dockW > area.right) left = area.right - dockW;
       top = y + nh + gap;
-      if (top + 56 > area.bottom) top = Math.max(area.top, y - 64);
+      if (top + 52 > area.bottom) top = Math.max(area.top, y - 56);
     }
     Object.assign(dock.style, {
-      width: dockW + "px", height: "auto", maxHeight: maxH + "px",
+      width: dockW + "px", height: expanded ? "auto" : "52px", maxHeight: wantH + "px",
       left: left + "px", top: top + "px",
       right: "auto", bottom: "auto", transform: "none",
-      visibility: x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight ? "hidden" : "",
+      visibility: (x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight) ? "hidden" : "",
     });
     dock.classList.add("near");
     ["skillbox", "atbox", "picker"].forEach((id) => {
@@ -8165,18 +8167,19 @@
     return text;
   }
   function setSendVisual(blocked, reason) {
-    const btn = $("send");
-    if (!btn) return;
-    // v0821h P0: NEVER native disabled for gate — browser swallows clicks → no setMsg
-    btn.disabled = false;
     const on = !!blocked;
-    btn.setAttribute("aria-disabled", on ? "true" : "false");
-    btn.classList.toggle("is-blocked", on);
     const why = reason || (on ? "blocked" : "enabled");
-    btn.title = on ? ("不可生成 · " + why) : "生成 · enabled";
-    btn.setAttribute("data-testid", "composer-send");
-    btn.setAttribute("data-enabled", on ? "0" : "1");
-    btn.setAttribute("data-reason", why);
+    ["send", "sendCap"].forEach(function (id) {
+      const btn = $(id);
+      if (!btn) return;
+      btn.disabled = false;
+      btn.setAttribute("aria-disabled", on ? "true" : "false");
+      btn.classList.toggle("is-blocked", on);
+      btn.title = on ? ("不可生成 · " + why) : "生成 · enabled";
+      btn.setAttribute("data-testid", "composer-send");
+      btn.setAttribute("data-enabled", on ? "0" : "1");
+      btn.setAttribute("data-reason", why);
+    });
   }
 
   function markSendBusy(on) {
@@ -8309,16 +8312,17 @@
   }
 
   function bindSendButton() {
-    const btn = $("send");
-    if (!btn || btn.dataset.nlSendBound === "1") return;
-    btn.dataset.nlSendBound = "1";
-    btn.type = "button";
-    btn.disabled = false;
-    btn.setAttribute("data-testid", "composer-send");
-    btn.onclick = null;
-    // capture click + pointerdown fallback (index #go lesson: elevate hit; avoid silent noop)
-    btn.addEventListener("click", fireSend, true);
-    btn.addEventListener("pointerdown", fireSend);
+    ["send", "sendCap"].forEach(function (id) {
+      const btn = $(id);
+      if (!btn || btn.dataset.nlSendBound === "1") return;
+      btn.dataset.nlSendBound = "1";
+      btn.type = "button";
+      btn.disabled = false;
+      btn.setAttribute("data-testid", "composer-send");
+      btn.onclick = null;
+      btn.addEventListener("click", fireSend, true);
+      btn.addEventListener("pointerdown", fireSend);
+    });
     // v0821j: event delegation on #dockFoot for [data-testid=composer-send] (undeniable hit)
     const foot = $("dockFoot");
     if (foot && foot.dataset.nlSendDelegate !== "1") {
