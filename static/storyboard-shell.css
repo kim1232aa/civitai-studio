@@ -133,15 +133,16 @@ svg.wires path.edge {
   position: absolute;
   z-index: 26;
   align-items: center;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: #1a1a1ef5;
   border: 1px solid #2e2e36;
   box-shadow: 0 8px 24px #0006;
-  white-space: nowrap !important;
+  white-space: normal;
   width: max-content !important;
-  max-width: none !important;
+  max-width: min(720px, calc(100% - 80px)) !important;
   overflow: visible !important;
 }
 .shot-bar.show { display: flex !important; }
@@ -496,6 +497,11 @@ svg.wires path.edge {
   overflow: visible !important;
   width: auto !important;
   flex: 1 1 auto;
+}
+.dock.show .param-group.hidden,
+.dock.show.collapsed .param-group.hidden,
+.param-group.hidden {
+  display: none !important;
 }
 .dock.show .param-field {
   min-width: 52px;

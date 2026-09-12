@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o118: 新建不自动连；打光/机位/全景/超清/视频真生成；stamp v0821o118-fix
+  // v0821o119: 100% 不挤卡、工具条不盖住分镜、隐藏不该出现的视频参数；stamp v0821o119-qa
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
@@ -2259,6 +2259,12 @@
       hideShotBar();
       return;
     }
+    const cr0 = card.getBoundingClientRect();
+    const minTop = 52;
+    if (cr0.top - sr.top < minTop) {
+      state.cam.y += minTop - (cr0.top - sr.top);
+      applyCam();
+    }
     const cr = card.getBoundingClientRect();
     const cx = cr.left - sr.left;
     const cy = cr.top - sr.top;
@@ -2339,22 +2345,26 @@
     if (bar) {
       bar.hidden = false;
       bar.classList.add("show");
+      bar.style.maxWidth = Math.min(720, Math.max(280, sr.width - 80)) + "px";
       bar.style.width = "max-content";
-      bar.style.maxWidth = "none";
+      bar.style.flexWrap = "wrap";
+      bar.style.whiteSpace = "normal";
       bar.style.overflow = "visible";
-      const bw = Math.max(bar.offsetWidth || 480, 280);
+      const bw = Math.min(Math.max(bar.offsetWidth || 480, 280), sr.width - 80);
       let bx = cx + (cw - bw) / 2;
       bx = Math.max(64, Math.min(bx, sr.width - bw - 12));
-      let by = cy - gap - barH;
-      if (attach === "above") by = Math.max(8, top - gap - barH);
+      const actualBarH = Math.max(36, bar.offsetHeight || 36);
+      let by = cy - 10 - actualBarH;
+      if (attach === "above") by = Math.max(8, top - 10 - actualBarH);
       if (by < 8) by = 8;
+      if (by + actualBarH > cy - 4) by = Math.max(8, cy - 4 - actualBarH);
       Object.assign(bar.style, {
         left: Math.round(bx) + "px",
         top: Math.round(by) + "px",
         right: "auto",
         bottom: "auto",
         width: "max-content",
-        maxWidth: "none",
+        maxWidth: Math.min(720, sr.width - 80) + "px",
         overflow: "visible",
         transform: "none",
       });
@@ -3408,16 +3418,11 @@
       const it = byKey[k] || state.importSelected[k];
       if (!it || !it.url) return;
       if (it.nodeId && nodeById(it.nodeId)) {
-        const existing = nodeById(it.nodeId);
-        if (shot && shot.kind === "shot") linkAssetToShot(existing, shot);
         placed++;
         return;
       }
       const node = spawnHistoryAt({ url: it.url, title: it.title || "导入素材" }, 220 + (i % 3) * 24, baseY + i * 40);
-      if (node) {
-        placed++;
-        if (shot && shot.kind === "shot") linkAssetToShot(node, shot);
-      }
+      if (node) placed++;
     });
     closeImportModal();
     renderCards(); drawWires(); renderDock(); persist();
@@ -3435,10 +3440,7 @@
     state.cam.s = next;
     state.cam.x = cx - w0.x * next;
     state.cam.y = cy - w0.y * next;
-    const compacted = next === 1 && compactShotsAt100();
-    if (constrainShotsToViewport()) renderCards();
-    if (!compacted) constrainCameraToShots(n);
-    if (compacted) renderCards();
+    constrainCameraToShots(n);
     applyCam(); persist();
     syncZoomPresets();
   }
@@ -10947,7 +10949,6 @@
 
   if (!restore()) loadDemo();
   separateOverlappingShots();
-  if (state.cam.s >= 1) compactShotsAt100();
   ensureWorkspaceModel();
   // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
   hydrateFromServer().then(function (changed) {
