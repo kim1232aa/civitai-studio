@@ -137,7 +137,7 @@
     }
   }
 
-  var PIN = "v0821o97-dock-pin";
+  var PIN = "v0821o98-capsule-fit";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -146,7 +146,15 @@
     if (document.getElementById("o97PinCss")) return;
     var css = document.createElement("style");
     css.id = "o97PinCss";
-    css.textContent = ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:108px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;}.dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}";
+    css.textContent = [
+      ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:96px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
+      ".dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}",
+      ".dock.show.collapsed .dock-hd{flex-wrap:nowrap !important;overflow:hidden;align-items:center;}",
+      ".dock.show.collapsed #dockExpand{white-space:nowrap !important;flex:0 0 auto !important;}",
+      ".dock.show.collapsed #dockTitle,.dock.show.collapsed .dock-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;}",
+      ".dock.show.collapsed #paramWarn,.dock.show.collapsed #msg,.dock.show.collapsed .msg,.dock.show.collapsed #catalogStatus{display:none !important;}",
+      ".dock.show.collapsed #sendCap{width:28px !important;height:28px !important;flex:0 0 28px !important;}"
+    ].join("");
     document.head.appendChild(css);
   }
 
@@ -224,7 +232,6 @@
     var areaL = 72, areaT = 8, areaR = sr.width - 12, areaB = sr.height - 12, gap = 10;
     var others = neighborRects(card, sr);
     var left, top, dockW, dockH;
-    var preferSide = nh < 220 || nw < 260 || tallNeighbors(card, sr);
     if (expanded) {
       dockW = Math.min(400, Math.max(280, areaR - areaL));
       dockH = 220;
@@ -239,32 +246,30 @@
       }
       if (top + 200 > areaB) top = Math.max(areaT, areaB - 220);
     } else {
-      dockW = 280; dockH = 96;
-      var cands = [{ left: clamp(x, areaL, areaR - dockW), top: belowBand(x, dockW, y + nh, others) + gap }];
-      if (preferSide) {
-        cands.push({ left: x + nw + gap, top: y });
-        cands.push({ left: x - gap - dockW, top: y });
+      dockW = 280; dockH = 88;
+      // Under the selected card, centered on it. Never sit beside it
+      // (that covers the next shot in the row at 50% zoom).
+      var underLeft = x + Math.max(0, (nw - dockW) / 2);
+      if (nw >= dockW) {
+        if (underLeft < x) underLeft = x;
+        if (underLeft + dockW > x + nw) underLeft = x + nw - dockW;
       }
-      cands.push({ left: clamp(x, areaL, areaR - dockW), top: Math.max(areaT, y - dockH - gap) });
-      var picked = null;
-      for (var i = 0; i < cands.length; i++) {
-        var c = cands[i];
-        if (c.left < areaL || c.left + dockW > areaR + 1) continue;
-        if (c.top < areaT || c.top + 72 > areaB + 8) continue;
-        if (!hitsOthers(c.left, c.top, dockW, dockH, others)) { picked = c; break; }
+      underLeft = clamp(underLeft, areaL, areaR - dockW);
+      var underTop = y + nh + gap;
+      var onCardTop = y + Math.max(36, nh - dockH);
+      var underOk = (underTop + dockH <= areaB + 8) && !hitsOthers(underLeft, underTop, dockW, dockH, others);
+      if (underOk) {
+        left = underLeft; top = underTop;
+      } else {
+        left = underLeft; top = onCardTop;
       }
-      if (!picked) {
-        picked = {
-          left: clamp(x, areaL, areaR - dockW),
-          top: clamp(belowBand(areaL, areaR - areaL, y + nh, others) + gap, areaT, areaB - 72)
-        };
-      }
-      left = picked.left; top = picked.top;
     }
     left = clamp(left, areaL, areaR - dockW);
     top = clamp(top, areaT, areaB - 72);
     var key = [expanded ? "e" : "c", Math.round(left), Math.round(top), Math.round(dockW)].join(":");
-    if (key === lastKey) return;
+    var curL = dock.style.getPropertyValue("left");
+    var curT = dock.style.getPropertyValue("top");
+    if (key === lastKey && curL === left + "px" && curT === top + "px") return;
     lastKey = key;
     pinning = true;
     dock.style.setProperty("left", left + "px", "important");
@@ -276,7 +281,7 @@
     dock.style.setProperty("transform", "none", "important");
     if (!expanded) {
       dock.style.setProperty("height", "auto", "important");
-      dock.style.setProperty("max-height", "108px", "important");
+      dock.style.setProperty("max-height", "96px", "important");
     }
     pinning = false;
   }

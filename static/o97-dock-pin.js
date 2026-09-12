@@ -3,7 +3,7 @@
  * Load AFTER storyboard.js.
  */
 (function () {
-  var STAMP = "v0821o97-dock-pin";
+  var STAMP = "v0821o98-capsule-fit";
   var lastKey = "";
 
   function $(id) { return document.getElementById(id); }
@@ -71,32 +71,22 @@
       }
       if (top + 200 > areaB) top = Math.max(areaT, areaB - 220);
     } else {
-      var preferSide = nh < 220 || (nw < 260);
-      dockW = preferSide ? 280 : Math.min(Math.max(nw, 240), 280);
-      dockH = 96;
-      if (preferSide && x + nw + gap + dockW <= areaR) {
-        left = x + nw + gap;
-        top = y;
-      } else if (preferSide && x - gap - dockW >= areaL) {
-        left = x - gap - dockW;
-        top = y;
-      } else {
-        left = x;
-        top = y + nh + gap;
-        if (top + dockH > areaB) {
-          if (x + nw + gap + dockW <= areaR) {
-            left = x + nw + gap;
-            top = y;
-          } else {
-            top = Math.max(areaT, y - dockH - gap);
-          }
-        }
+      dockW = 280;
+      dockH = 88;
+      left = x + Math.max(0, (nw - dockW) / 2);
+      if (nw >= dockW) {
+        if (left < x) left = x;
+        if (left + dockW > x + nw) left = x + nw - dockW;
       }
+      top = y + nh + gap;
+      if (top + dockH > areaB) top = y + Math.max(36, nh - dockH);
     }
     left = clamp(left, areaL, areaR - dockW);
     top = clamp(top, areaT, areaB - 72);
     var key = [expanded ? "e" : "c", Math.round(left), Math.round(top), Math.round(dockW)].join(":");
-    if (key === lastKey) return;
+    var curL = dock.style.getPropertyValue("left");
+    var curT = dock.style.getPropertyValue("top");
+    if (key === lastKey && curL === left + "px" && curT === top + "px") return;
     lastKey = key;
     dock.style.setProperty("left", left + "px", "important");
     dock.style.setProperty("top", top + "px", "important");

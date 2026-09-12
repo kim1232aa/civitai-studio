@@ -5,10 +5,15 @@
     if (!s) return;
     var val = String(s.value || "").trim();
     if (val && s.getAttribute("aria-busy") === "true") s.setAttribute("aria-busy", "false");
-    var w = document.getElementById("paramWarn");
-    if (w && val && /模型目录加载中|请稍候/.test(String(w.textContent || ""))) {
-      w.textContent = "";
-      w.className = "param-warn";
+    var msgEl = document.getElementById("msg");
+    if (msgEl && /模型目录加载中|请稍候/.test(String(msgEl.textContent || ""))) {
+      var dock = document.getElementById("dock");
+      if (dock && dock.classList.contains("collapsed")) msgEl.textContent = "";
+    }
+    var warn = document.getElementById("paramWarn");
+    if (warn && val && /模型目录加载中|请稍候/.test(String(warn.textContent || ""))) {
+      warn.textContent = "";
+      warn.className = "param-warn";
     }
     var send = document.getElementById("send");
     if (send && val && send.getAttribute("aria-disabled") === "true") {

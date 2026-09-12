@@ -90,14 +90,64 @@ textarea.param-unsupported-control{
   height: 32px;
 }
 .dock.show.collapsed #send { display: none !important; }
-.dock.show.collapsed #sendCap { display: grid !important; }
-.dock.show.expanded #sendCap { display: grid !important; }
 .dock.show.collapsed .dock-hd {
   height: 36px;
-  padding: 4px 8px 0 12px;
+  padding: 0 8px 0 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: nowrap !important;
+  gap: 6px;
+  overflow: hidden;
+  min-width: 0;
+  flex: 0 0 36px;
+}
+.dock.show.collapsed #dockExpand {
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 8px;
+  height: 26px;
+  border-radius: 8px;
+  border: 0;
+  background: #2a2a32;
+  color: #e8e8ec;
+}
+.dock.show.collapsed .dock-title,
+.dock.show.collapsed #dockTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+  font-size: 12px;
+  line-height: 36px;
+}
+.dock.show.collapsed #dockClose {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #c8c8d0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.dock.show.collapsed #sendCap {
+  display: grid !important;
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px !important;
+  font-size: 14px;
+}
+.dock.show.collapsed #paramWarn,
+.dock.show.collapsed #msg,
+.dock.show.collapsed .msg,
+.dock.show.collapsed #catalogStatus,
+.dock.show.collapsed #dockHint,
+.dock.show.collapsed .dock-hd > .grow {
+  display: none !important;
 }
 .dock.show.expanded {
   max-width: min(400px, calc(100vw - 72px));

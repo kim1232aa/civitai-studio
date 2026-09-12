@@ -1,15 +1,35 @@
-/* v0821o97-dock-pin — 收起条贴选中分镜，禁止 420 岛盖成片 */
+/* v0821o98-capsule-fit — 收起条贴选中分镜，禁止 420 岛盖成片，标题一行不拆字 */
 .dock.show.collapsed {
   width: 280px !important;
   max-width: 280px !important;
   min-width: 220px !important;
   max-height: 96px !important;
   border-radius: 14px !important;
+  overflow: hidden !important;
 }
 .dock.show.collapsed .dock-foot,
 .dock.show.collapsed .bar,
 .dock.show.collapsed #backend,
-.dock.show.collapsed #service { display: none !important; }
+.dock.show.collapsed #service,
+.dock.show.collapsed #paramWarn,
+.dock.show.collapsed #msg,
+.dock.show.collapsed .msg,
+.dock.show.collapsed #catalogStatus { display: none !important; }
+.dock.show.collapsed .dock-hd {
+  flex-wrap: nowrap !important;
+  overflow: hidden;
+}
+.dock.show.collapsed #dockExpand {
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+}
+.dock.show.collapsed #dockTitle,
+.dock.show.collapsed .dock-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+}
 .dock.collapsed {
   min-width: 220px;
   max-width: 280px;
