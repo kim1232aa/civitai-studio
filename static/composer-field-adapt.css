@@ -89,8 +89,9 @@ textarea.param-unsupported-control{
   flex: 1 1 90px;
   height: 32px;
 }
-.dock.show.collapsed #send { display: grid !important; width: 40px; height: 40px; flex: 0 0 40px; }
-.dock.show.collapsed #sendCap { display: none !important; }
+.dock.show.collapsed #send { display: none !important; }
+.dock.show.collapsed #sendCap { display: grid !important; }
+.dock.show.expanded #sendCap { display: grid !important; }
 .dock.show.collapsed .dock-hd {
   height: 36px;
   padding: 4px 8px 0 12px;
@@ -99,35 +100,35 @@ textarea.param-unsupported-control{
   gap: 8px;
 }
 .dock.show.expanded {
-  max-width: min(400px, calc(100vw - 48px)) !important;
-  max-height: min(52vh, 420px) !important;
+  max-width: min(480px, calc(100vw - 72px));
+  max-height: min(62vh, 520px) !important;
   min-width: 280px;
+  overflow: hidden;
 }
 .dock.show.expanded .expand-only { display: none !important; }
-.dock.show.expanded #sendCap { display: none !important; }
 .dock.expanded .dock-body {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
   max-height: none !important;
-  overflow: hidden !important;
+  overflow: auto !important;
 }
 .dock.expanded .dock-scroll {
   flex: 0 0 auto !important;
-  max-height: 72px !important;
-  overflow: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 .dock.expanded .dock-prompt {
-  flex: 1 1 auto !important;
-  min-height: 72px !important;
-  max-height: none !important;
+  flex: 0 1 auto !important;
+  min-height: 64px !important;
+  max-height: 120px !important;
   overflow: hidden !important;
 }
 .dock.expanded #prompt {
   display: block !important;
   width: 100% !important;
-  min-height: 72px !important;
-  max-height: 100% !important;
+  min-height: 64px !important;
+  max-height: 88px !important;
   box-sizing: border-box !important;
 }
 .dock.expanded .dock-foot {
@@ -143,6 +144,12 @@ textarea.param-unsupported-control{
   height: auto !important;
   max-height: none !important;
 }
+.dock.expanded .bar .param-group {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  align-items: flex-end;
+}
 .dock.expanded .bar .param-group.hidden,
 .dock.expanded .bar .param-group[hidden] {
   display: none !important;
@@ -152,13 +159,38 @@ textarea.param-unsupported-control{
 .dock.expanded #nanoParams.hidden {
   display: none !important;
 }
-.dock.expanded #send,
-.dock.expanded .send {
-  position: sticky !important;
-  bottom: 4px !important;
-  flex: 0 0 44px !important;
-  width: 44px !important;
-  height: 44px !important;
-  z-index: 9 !important;
-  pointer-events: auto !important;
+.dock.expanded .param-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
 }
+.dock.expanded .param-field span { font-size: 11px; color: #9a9aa3; }
+.dock.expanded .param-field input,
+.dock.expanded .param-field select {
+  min-width: 88px;
+  max-width: 148px;
+  height: 32px;
+}
+.dock.expanded #sampler { min-width: 120px; }
+.dock.expanded #scheduler { min-width: 120px; }
+.dock.expanded #seed { min-width: 140px; max-width: 180px; }
+.dock.show.expanded #send,
+.dock.expanded #send,
+.dock.expanded .bar > .send {
+  display: none !important;
+}
+.dock.show #sendCap {
+  display: grid !important;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 18px;
+}
+.dock.expanded #negative { min-height: 36px !important; max-height: 44px !important; }
+.dock.expanded .lora-block { max-height: 96px; overflow: auto; }
+.dock.expanded #loraQLbl { font-size: 12px; color: #c8c8d0; }

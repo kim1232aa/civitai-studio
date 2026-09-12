@@ -83,8 +83,15 @@
       return;
     }
     if (ROBOT.test(text)) {
-      if (/LoRA|lora/.test(text)) el.textContent = "填写 LoRA 地址或名称，可留空";
-      else if (/参考/.test(text)) el.textContent = text.replace(/·\s*还可\s*\d+/, "").replace(/参考\s*/, "参考图 ");
+      if (el.id === "loraQLbl") {
+        el.textContent = "LoRA";
+        return;
+      }
+      if (el.id === "loraHint" || (el.classList && el.classList.contains("lora-hint"))) {
+        el.textContent = "填写 LoRA 地址或名称，可留空";
+        return;
+      }
+      if (/参考/.test(text)) el.textContent = text.replace(/·\s*还可\s*\d+/, "").replace(/参考\s*/, "参考图 ");
       else el.textContent = "";
     }
   }

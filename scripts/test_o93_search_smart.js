@@ -14,7 +14,7 @@ const mgr = fs.readFileSync(path.join(root, "static/canvas_manager.js"), "utf8")
 const py = fs.readFileSync(path.join(root, "providers/catalog_search.py"), "utf8");
 const srv = fs.readFileSync(path.join(root, "server.py"), "utf8");
 
-assert.ok(js.includes("v0821o93-search-match") || js.includes("v0821o94-cap-on-node") || js.includes("v0821o95-stage-first"), "js stamp");
+assert.ok(js.includes("v0821o93-search-match") || js.includes("v0821o94-cap-on-node") || js.includes("v0821o95-stage-first") || js.includes("v0821o96-expand-clean"), "js stamp");
 assert.ok(html.includes("o93searchmatch") || html.includes("o94caponnode") || html.includes("o95stagefirst"), "html stamp");
 assert.ok(css.includes(".canvas-manager"), "manager css");
 assert.ok(css.includes(".canvas-manager.show"), "manager show");
