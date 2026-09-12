@@ -7,13 +7,18 @@
     var be = ($id("backend") && $id("backend").value) || "";
     var modeBtn = document.querySelector("#composerModes button.on");
     var mode = (modeBtn && modeBtn.getAttribute("data-mode")) || "image";
+    var svc = ($id("service") && $id("service").value) || "";
+    var item = null;
+    try {
+      if (window.state && window.state.catalogById && svc) item = window.state.catalogById[svc] || null;
+    } catch (_) {}
     adapt.applyToSurface({
       $: $id,
       backend: be,
       mode: mode,
-      caps: {},
-      item: null,
-      serviceId: ($id("service") && $id("service").value) || ""
+      caps: (item && item.capabilities) || {},
+      item: item,
+      serviceId: svc
     });
     if (typeof window.__o68HideUnsupported === "function") {
       try { window.__o68HideUnsupported(); } catch (_) {}

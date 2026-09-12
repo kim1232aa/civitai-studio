@@ -2634,7 +2634,8 @@
       attach = "below";
       top = cy + ch + gap;
     }
-    if (top < 44) top = 44; // fallback bottom desk unused: box follows the shot
+    if (top < 44) top = 44;
+    if (top + naturalH > sr.height - 8) top = Math.max(44, sr.height - 8 - naturalH);
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
     dock.style.setProperty("top", Math.round(top) + "px", "important");
@@ -5674,6 +5675,8 @@
       backend: currentBackend(),
       mode: state.mode,
       caps: catalogCaps(),
+      item: (typeof catalogItemForService === "function") ? catalogItemForService() : null,
+      serviceId: ($("service") && $("service").value) || "",
       fillNanoResOptions: fillNanoResOptions
     };
     if (adapt && typeof adapt.applyToSurface === "function") {
@@ -5739,7 +5742,7 @@
     if (scheduler) out.scheduler = scheduler;
     if (seedRaw !== "" && seedRaw !== "random") {
       const seedNum = Number(seedRaw);
-      if (Number.isFinite(seedNum) && seedNum >= 0 && seedNum <= 4294967295) out.seed = Math.floor(seedNum);
+      if (Number.isFinite(seedNum) && seedNum >= 0) out.seed = Math.floor(seedNum);
     }
     return out;
   }
@@ -8131,6 +8134,7 @@
     try { renderCards(); drawWires(); renderDock(); } catch (_) {}
     persist();
     persistServer();
+    if (typeof persistActiveCanvas === "function") persistActiveCanvas();
     if (live && live._jobId) clearPendingJob(live._jobId);
     else if (shot && shot._jobId) clearPendingJob(shot._jobId);
   }
@@ -8501,11 +8505,9 @@
     if (outSid === "image/textToImage") {
       delete payload.sampler;
     }
-    if (payload) {
+    if (payload && payload.seed != null) {
       const seedNum = Number(payload.seed);
-      if (!Number.isFinite(seedNum) || seedNum < 0 || seedNum > 4294967295) {
-        payload.seed = Math.floor(Math.random() * 0xffffffff);
-      }
+      if (!Number.isFinite(seedNum) || seedNum < 0) delete payload.seed;
     }
     setShotBusy(shot, true);
     shot._error = "";

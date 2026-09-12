@@ -48,8 +48,17 @@ svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:3.2}
 .prompt{width:100%;min-height:120px;background:#121214;border:1px solid #2a2a30;border-radius:12px;padding:10px 12px;color:#e8e8ec}
 .bar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .lora-block{margin:10px 0 0;padding:10px;border:1px solid #2a2a30;border-radius:12px;background:#121216}
-.import-backdrop{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
+.import-backdrop{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:24px}
 .import-backdrop.show{display:flex}
+.import-modal{width:min(720px,100%);max-height:min(86vh,760px);overflow:auto;background:#16161a;border:1px solid #2a2a30;border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.import-hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.import-hd h2{margin:0;font-size:15px}
+.import-x{background:transparent;border:0;color:#c8c8d0;font-size:20px;cursor:pointer}
+.import-url-row{display:flex;gap:8px;flex-wrap:wrap}
+.import-url-row input{flex:1;min-width:200px;background:#101014;border:1px solid #2a2a30;border-radius:8px;padding:8px 10px}
+.import-url-row .primary,.import-ft .primary{background:#5ee0c5;color:#0b0b0d;border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
+.import-ft{display:flex;align-items:center;gap:8px;margin-top:8px}
+.import-body{min-height:80px;max-height:40vh;overflow:auto}
 .workspace-panel{position:absolute;inset:0;overflow:auto;padding:32px 40px 48px;background:#111113}
 .workspace-panel:not([hidden]){display:block}
 .stage.workspace-mode .canvas-only{display:none!important}
