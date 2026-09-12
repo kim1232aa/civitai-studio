@@ -1595,8 +1595,20 @@ class Handler(BaseHTTPRequestHandler):
             cross_raw = (qs.get("cross") or ["0"])[0]
             cross = str(cross_raw).lower() in ("1", "true", "yes")
             if cross:
+                if str(types).upper() in ("MODEL", "SERVICE", "CATALOG"):
+                    from providers.catalog_search import search_models_cross
+                    op = (qs.get("op") or [""])[0]
+                    cat = (qs.get("category") or [""])[0]
+                    code, data = search_models_cross(q, current=backend, category=cat, op=op)
+                    return self._json(code, data)
                 from providers.lora_search import search_loras_cross
                 code, data = search_loras_cross(q, nsfw=nsfw, current=backend, types=types)
+                return self._json(code, data)
+            if str(types).upper() in ("MODEL", "SERVICE", "CATALOG"):
+                from providers.catalog_search import search_models_one
+                op = (qs.get("op") or [""])[0]
+                cat = (qs.get("category") or [""])[0]
+                code, data = search_models_one(backend, q, category=cat, op=op)
                 return self._json(code, data)
             from providers.lora_search import stamp_lora_items
             prov = providers.get(backend) or providers.get("civitai")

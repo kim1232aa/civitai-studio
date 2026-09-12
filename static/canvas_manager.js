@@ -479,11 +479,7 @@
       if (title) title.textContent = project ? projectLabel(project) : "未选择项目";
       this.root.innerHTML = `
         <div class="cm-head">
-          <nav class="cm-tabs" role="tablist" aria-label="工作区">
-            <button type="button" role="tab" data-workspace="story" aria-selected="${this.workspace === "story" ? "true" : "false"}">剧本策划</button>
-            <button type="button" role="tab" data-workspace="canvas" aria-selected="${this.workspace === "canvas" ? "true" : "false"}">画布</button>
-            <button type="button" role="tab" data-workspace="editor" aria-selected="${this.workspace === "editor" ? "true" : "false"}">编辑器</button>
-          </nav>
+          <strong>项目</strong>
           <button type="button" class="cm-close" data-action="close" aria-label="关闭项目面板">×</button>
         </div>
         <div class="cm-controls">
@@ -554,8 +550,6 @@
     const rememberedWorkspace = manager.readStorage(ACTIVE_WORKSPACE_KEY);
     if (WORKSPACES.includes(rememberedWorkspace)) {
       manager.workspace = rememberedWorkspace;
-      // 剧本/编辑器是独立工作区，面板收起就等于把用户扔回画布页；刷新后要停在原处。
-      if (rememberedWorkspace !== "canvas" && target.classList) target.classList.add("show");
     }
     target.classList.add("canvas-manager");
     target.addEventListener("canvas-manager:open", () => target.classList.add("show"));
@@ -571,7 +565,15 @@
     if (root) {
       global.canvasManager = mountCanvasManager(root);
       const toggle = global.document.getElementById("canvasManagerToggle");
-      if (toggle) toggle.addEventListener("click", () => root.classList.toggle("show"));
+      if (toggle) toggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        root.classList.toggle("show");
+      });
+      global.document.addEventListener("click", (e) => {
+        if (!root.classList.contains("show")) return;
+        if (e.target.closest("#canvasManager, #canvasManagerToggle")) return;
+        root.classList.remove("show");
+      });
     }
   }
 

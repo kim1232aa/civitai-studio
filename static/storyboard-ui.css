@@ -16,7 +16,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   outline: 2px solid var(--teal);
   outline-offset: 3px;
 }
-.app { height: 100dvh; }
+.app { height: 100dvh; position: relative; }
 header {
   height: 60px;
   display: grid;
@@ -203,6 +203,84 @@ header {
   cursor: pointer;
 }
 .story-pop button:hover { background: #2a2a32; }
+
+.canvas-manager {
+  display: none;
+  position: absolute;
+  top: 68px;
+  left: 16px;
+  z-index: 32;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(72vh, 560px);
+  overflow: auto;
+  padding: 12px;
+  gap: 10px;
+  background: #16161af5;
+  border: 1px solid #34343e;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  color: #e8e8ec;
+}
+.canvas-manager.show { display: flex; flex-direction: column; }
+.canvas-manager .cm-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.canvas-manager .cm-head strong { font-size: 13px; font-weight: 600; }
+.canvas-manager .cm-close {
+  width: 28px; height: 28px; border: 0; border-radius: 8px;
+  background: transparent; color: #c8c8d0; cursor: pointer;
+}
+.canvas-manager .cm-close:hover { background: #2a2a32; }
+.canvas-manager .cm-controls {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.canvas-manager .cm-controls label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.canvas-manager .cm-controls select,
+.canvas-manager .cm-controls button {
+  background: #1c1c1f; border: 1px solid #303034; color: #e8e8ec;
+  border-radius: 8px; padding: 6px 10px; cursor: pointer;
+}
+.canvas-manager .cm-status { font-size: 11px; color: var(--muted); min-height: 14px; }
+.canvas-manager .cm-columns { display: flex; flex-direction: column; gap: 12px; }
+.canvas-manager .cm-columns h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.canvas-manager .cm-columns ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.canvas-manager .cm-row,
+.canvas-manager .cm-asset {
+  display: flex; align-items: center; gap: 8px;
+}
+.canvas-manager .cm-row button,
+.canvas-manager .cm-asset button,
+.canvas-manager .cm-add {
+  background: #1c1c1f; border: 1px solid #303034; color: #e8e8ec;
+  border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12px;
+}
+.canvas-manager .cm-row.on button { border-color: var(--teal); }
+.canvas-manager .cm-note { color: var(--muted); font-size: 11px; margin: 6px 0 0; }
+.canvas-manager .cm-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+.canvas-manager .cm-tabs { display: none !important; }
+
+.rail { z-index: 8; max-height: 28vh; }
+.dock.collapsed {
+  min-width: 240px;
+  max-width: min(340px, calc(100vw - 48px));
+  max-height: 96px;
+  border-radius: 22px;
+  overflow: hidden;
+}
+.dock.collapsed .dock-scroll,
+.dock.collapsed .dock-prompt,
+.dock.collapsed .modes,
+.dock.collapsed .refs,
+.dock.collapsed .composer-acts,
+.dock.collapsed .lora-block { display: none !important; }
+.dock.collapsed .param-group { display: none !important; }
+.dock.collapsed .dock-body { overflow: hidden; max-height: none; }
+.dock.collapsed .dock-foot { padding: 0 10px 8px; }
+.dock.collapsed .bar { margin: 0; flex-wrap: nowrap; }
+.dock.expanded {
+  width: min(400px, calc(100vw - 48px));
+  max-width: min(400px, calc(100vw - 48px));
+}
 .light-pop, .cam-pop, .last-pop {
   position: absolute;
   z-index: 41;

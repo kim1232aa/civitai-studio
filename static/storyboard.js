@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o93: layout capsule-on-node + project drawer; smart match via /api/search MODEL cross; stamp v0821o93-search-match
   // v0821o92: 打光/换机位/超清/消除/文生视频/尾帧 · 点选工具+目录重匹配，不自动生成; stamp v0821o92-seko-fill
   // v0821o91: capsule-on-node + tools-on-select + 九宫格/故事推演; stamp v0821o91-seko-tools
   // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
@@ -2170,55 +2171,37 @@
   }
 
   function positionDock() {
-    // v0821o24: 锚底自适应 — width follows content; stick bottom / selected-node-aware;
-    // never mid-float overlay at area.top; never full-bleed bottom-bar chrome.
     const n = nodeById(state.selected);
     if (!dock || !n || n.kind !== "shot" || !dock.classList.contains("show")) return;
-    const area = canvasArea(), b = box(n), gap = 18;
+    const area = canvasArea(), b = box(n), gap = 12;
     const expanded = state.dockMode === "expanded";
     const x = state.cam.x + n.x * state.cam.s, y = state.cam.y + n.y * state.cam.s;
     const nw = b.w * state.cam.s, nh = b.h * state.cam.s;
     const areaW = Math.max(240, area.right - area.left);
-    // Measure natural content width so 图片生成/视频生成 never ellipsis-clip.
-    const prevW = dock.style.width;
-    const prevMaxW = dock.style.maxWidth;
-    dock.style.width = "max-content";
-    dock.style.maxWidth = areaW + "px";
-    let natural = Math.ceil(dock.getBoundingClientRect().width) || 0;
-    if (!natural) {
-      const modes = dock.querySelector(".modes");
-      natural = modes ? Math.ceil(modes.scrollWidth + 48) : 320;
+    const dockW = expanded
+      ? Math.min(400, Math.max(300, Math.min(areaW - 24, 400)))
+      : Math.min(320, Math.max(240, Math.min(nw, 320)));
+    const maxH = expanded ? Math.min(area.bottom - area.top - 16, 520) : 96;
+    let left, top;
+    if (expanded) {
+      const rightOf = x + nw + gap;
+      if (rightOf + dockW <= area.right) {
+        left = rightOf;
+        top = Math.max(area.top, Math.min(y, area.bottom - 180));
+      } else {
+        left = Math.max(area.left, Math.min(x + (nw - dockW) / 2, area.right - dockW));
+        top = y + nh + gap;
+        if (top + 180 > area.bottom) top = Math.max(area.top, y - gap - Math.min(maxH, 280));
+      }
+    } else {
+      left = x + (nw - dockW) / 2;
+      if (left < area.left) left = area.left;
+      if (left + dockW > area.right) left = area.right - dockW;
+      top = y + nh + gap;
+      if (top + 56 > area.bottom) top = Math.max(area.top, y - 64);
     }
-    dock.style.width = prevW;
-    dock.style.maxWidth = prevMaxW;
-    const minW = expanded ? 420 : 280;
-    const maxW = Math.min(expanded ? 720 : 560, areaW);
-    let dockW = Math.min(maxW, Math.max(minW, natural));
-    const height = expanded
-      ? Math.max(440, Math.min(520, area.bottom - area.top - 80))
-      : Math.max(132, Math.min(200, Math.ceil(dock.scrollHeight || 160)));
-    let maxH = Math.min(height, Math.max(112, area.bottom - area.top));
-    // Horizontal: prefer under selected node, bias bottom-right of usable canvas.
-    let left = x + (nw - dockW) / 2;
-    if (left + dockW > area.right - 8) left = area.right - dockW - 8;
-    if (left < area.left) left = area.left;
-    if (x + nw / 2 > (area.left + area.right) / 2) {
-      left = Math.max(area.left, Math.min(Math.max(left, area.right - dockW - 12), area.right - dockW));
-    }
-    // Vertical: always 锚底 — sit on area.bottom; may hug just under node inside bottom band.
-    const bottomTop = area.bottom - maxH - gap;
-    const belowNode = y + nh + gap;
-    let top = bottomTop;
-    if (belowNode <= bottomTop && belowNode + 80 <= area.bottom) {
-      top = Math.max(belowNode, bottomTop - 24);
-    }
-    const midY = (area.top + area.bottom) / 2;
-    if (top < midY && bottomTop >= area.top) top = bottomTop;
-    maxH = Math.min(area.bottom - area.top, Math.max(112, maxH));
-    left = Math.max(area.left, Math.min(left, area.right - dockW));
-    top = Math.max(area.top, Math.min(top, area.bottom - Math.min(maxH, 112)));
     Object.assign(dock.style, {
-      width: dockW + "px", height: expanded ? maxH + "px" : "auto", maxHeight: maxH + "px",
+      width: dockW + "px", height: "auto", maxHeight: maxH + "px",
       left: left + "px", top: top + "px",
       right: "auto", bottom: "auto", transform: "none",
       visibility: x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight ? "hidden" : "",
@@ -2603,10 +2586,10 @@
       // intentional shot click expands; {collapsed:true} keeps bottom bar; expand capsule still works.
       if (opts.keepClosed) {
         /* leave dockMode (closed/chip path) */
-      } else if (opts.collapsed) {
-        state.dockMode = "collapsed";
-      } else if (opts.expand || !opts.keepClosed) {
+      } else if (opts.expand) {
         state.dockMode = "expanded";
+      } else {
+        state.dockMode = "collapsed";
       }
     }
     renderCards();
@@ -6221,6 +6204,60 @@
     if (b === "huggingface" || b === "modelscope-ai" || b === "modelscope-cn" || b === "nano-gpt") return !fal && !civ;
     return true;
   }
+  const HOUSE_LABEL = {
+    civitai: "Civitai", fal: "Fal", "nano-gpt": "Nano",
+    huggingface: "HF", "modelscope-ai": "魔搭AI", "modelscope-cn": "魔搭CN",
+  };
+  function smartSearchQuery(op) {
+    const names = (state.loras || []).map(function (l) {
+      return String((l && (l.name || l.path)) || "").trim();
+    }).filter(Boolean);
+    const opQ = ({ t2i: "text-to-image", i2i: "edit", i2v: "image-to-video", t2v: "text-to-video", upscale: "upscale", inpaint: "inpaint" })[op] || "";
+    return (names.slice(0, 2).join(" ") + " " + opQ).trim();
+  }
+  function loraSourceHouses() {
+    const out = [];
+    (state.loras || []).forEach(function (l) {
+      const s = String((l && (l.source || l.backend)) || "").trim();
+      if (s && out.indexOf(s) < 0) out.push(s);
+    });
+    return out;
+  }
+  async function searchModelsForOp(be, op, cross) {
+    const q = smartSearchQuery(op);
+    const cat = (op === "i2v" || op === "t2v") ? "video" : "image";
+    const params = new URLSearchParams({
+      type: "MODEL",
+      backend: be || "",
+      op: op || "",
+      category: cat,
+      q: q,
+      cross: cross ? "1" : "0",
+    });
+    const r = await fetch("/api/search?" + params.toString());
+    if (!r.ok) return [];
+    const j = await r.json();
+    const items = Array.isArray(j.items) ? j.items : [];
+    items.forEach(function (it) { try { injectCatalogRow(it); } catch (_) {} });
+    return items;
+  }
+  function pickFitFromSearch(items, op, preferBe) {
+    const list = Array.isArray(items) ? items : [];
+    function ok(it) { return it && serviceFitsOp(it, op); }
+    if (preferBe) {
+      for (let i = 0; i < list.length; i++) {
+        const it = list[i];
+        const id = String((it && (it.id || it.name)) || "");
+        const hb = String((it && (it.backend || it.source)) || "");
+        if (hb && hb !== preferBe && !serviceBelongsToBackend(id, preferBe)) continue;
+        if (ok(it)) return it;
+      }
+    }
+    for (let i = 0; i < list.length; i++) {
+      if (ok(list[i])) return list[i];
+    }
+    return null;
+  }
   async function smartMatchService(opts) {
     opts = opts || {};
     if (state.mode === "text" || state.mode === "audio") return false;
@@ -6258,27 +6295,65 @@
     const run = (async function () {
       try {
         if (gen !== smartMatchService._gen) return false;
-        const want = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
+        let row = null;
+        let crossHit = false;
+        try {
+          const local = await searchModelsForOp(be, op, false);
+          row = pickFitFromSearch(local, op, be);
+        } catch (_) {}
         if (gen !== smartMatchService._gen) return false;
-        if (!want) {
+        if (!row) {
+          const loraHouses = loraSourceHouses();
+          for (let i = 0; i < loraHouses.length && !row; i++) {
+            const hb = loraHouses[i];
+            if (!hb || hb === be) continue;
+            try {
+              const rows = await searchModelsForOp(hb, op, false);
+              row = pickFitFromSearch(rows, op, hb);
+              if (row) crossHit = true;
+            } catch (_) {}
+          }
+        }
+        if (gen !== smartMatchService._gen) return false;
+        if (!row) {
+          try {
+            const all = await searchModelsForOp(be, op, true);
+            row = pickFitFromSearch(all, op, be) || pickFitFromSearch(all, op, "");
+            const hb = row && String(row.backend || row.source || "");
+            if (row && hb && hb !== be) crossHit = true;
+          } catch (_) {}
+        }
+        if (gen !== smartMatchService._gen) return false;
+        if (!row) {
+          const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
+          if (wantPref) {
+            const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+            row = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+          }
+        }
+        if (!row) {
           sel.value = "";
           writeSmartMatchToShot(shot, "");
           if (typeof syncOpChip === "function") syncOpChip();
           if (opts.announce !== false) {
-            try { setMsg("这家没有可匹配的" + (labels[op] || op) + "模型，请换模型或换家", "warn"); } catch (_) {}
+            try { setMsg("搜索没有可匹配的" + (labels[op] || op) + "模型，请换关键词或换家", "warn"); } catch (_) {}
           }
           try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
           return false;
         }
-        const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-        const row = pool[want] || (state.catalogById && state.catalogById[want]);
-        if (!row) return false;
+        const want = String(row.id || row.name || "");
+        const rowBe = String(row.backend || row.source || be);
+        if (!want) return false;
+        if (rowBe && $("backend") && $("backend").value !== rowBe) $("backend").value = rowBe;
+        injectCatalogRow(row);
         if (typeof ensureSelectOpt === "function") ensureSelectOpt(sel, want);
         sel.value = want;
         writeSmartMatchToShot(shot, want);
         if (typeof syncOpChip === "function") syncOpChip();
         if (opts.announce !== false) {
-          try { setMsg("已智能匹配" + (labels[op] || op) + " · " + ((row && row.name) || want), "ok"); } catch (_) {}
+          const house = HOUSE_LABEL[rowBe] || rowBe;
+          const head = crossHit ? ("跨家搜到 " + house + " · ") : "已搜索匹配";
+          try { setMsg(head + (labels[op] || op) + " · " + ((row && row.name) || want) + " · 确认后点 ↑", "ok"); } catch (_) {}
         }
         try { if (typeof syncParamChrome === "function") syncParamChrome(); } catch (_) {}
         try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
