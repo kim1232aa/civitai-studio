@@ -184,10 +184,25 @@ try {
   }, targetId);
   report.beforeSrc = beforeSrc;
 
-  await page.evaluate(() => {
+  await page.evaluate((args) => {
+    const { backend, op, pref } = args;
+    const be = document.getElementById("backend");
+    if (be) { be.value = backend; be.dispatchEvent(new Event("change", { bubbles: true })); }
+    const modeBtn = document.querySelector(op === "i2v" ? '#composerModes [data-mode="video"]' : '#composerModes [data-mode="image"]');
+    if (modeBtn) modeBtn.click();
+    const svc = document.getElementById("service");
+    if (svc && pref) {
+      if (![...svc.options].some((o) => o.value === pref)) {
+        const o = document.createElement("option");
+        o.value = pref; o.textContent = pref; svc.appendChild(o);
+      }
+      svc.value = pref;
+      svc.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (window.smartMatchService) window.smartMatchService._gen = (window.smartMatchService._gen || 0) + 1;
     const s = document.getElementById("send");
     if (s) { s.scrollIntoView({ block: "center" }); s.click(); }
-  });
+  }, { backend, op, pref: (PREF[backend] || {})[op] });
   report.generate = true;
   await page.waitForTimeout(1500);
   await page.screenshot({ path: shotPath("sending") });
@@ -208,7 +223,7 @@ try {
       report.writeback = true;
       break;
     }
-    if (/失败|不接受|超出|不吃|缺少/.test(last.msg) && !/保存失败/.test(last.msg) && Date.now() - start > 12000) {
+    if (/失败|不接受|超出|不吃|缺少|安全审核/.test(last.msg) && !/保存失败/.test(last.msg) && Date.now() - start > 8000) {
       report.error = last.msg;
       break;
     }
