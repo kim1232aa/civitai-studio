@@ -1196,6 +1196,20 @@ class NanoGptProvider(Provider):
     def has_key(self) -> bool:
         return bool(nano_key())
 
+    def search_loras(self, q: str, nsfw: bool = True):
+        # Nano LoRA path is Hub owner/repo or a download URL — same index Fal uses.
+        from . import huggingface as hf
+        code, payload = hf.search_loras(q)
+        items = []
+        for it in (payload.get("items") if isinstance(payload, dict) else None) or []:
+            if not isinstance(it, dict):
+                continue
+            row = dict(it)
+            row["source"] = "nano-gpt"
+            row["backend"] = "nano-gpt"
+            items.append(row)
+        return code, {"items": items, "backend": "nano-gpt"}
+
     def categories(self) -> list:
         return sorted({x.get("category") for x in fetch_catalog() if x.get("category")})
 

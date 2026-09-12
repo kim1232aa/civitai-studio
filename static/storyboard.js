@@ -1,8 +1,9 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const STORE = "nl-storyboard-v0821o16";
-  const STORE_OLDS = ["nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
+  const STORE = "nl-storyboard-v0821o77-fill";
+  const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
   // v0821o54b: LoRA rematch pulls full /api/catalog roster like o53d; import chips auto-rematch; stamp v0821o54b-lora-roster-rematch
   // v0821o54: LoRA capability rematch via supportsLora (chips kept + 一键匹配); stamp v0821o54-lora-capability-match
   // v0821o53d: rematch pool = roster+catalog (not only paged catalogById); stamp v0821o53d-capacity-rematch-roster
@@ -1323,6 +1324,7 @@
     state.cam = p.cam || state.cam;
     if (state.cam && (state.cam.s == null || state.cam.s < 0.16)) state.cam.s = 0.5;
     state.nodes = p.nodes;
+    if (p.selected) state.selected = p.selected;
     state.edges = p.edges || [];
     state.mode = p.mode === "video" || p.mode === "image" || p.mode === "text" || p.mode === "audio" ? p.mode : "image";
     state.railTab = p.railTab || "assets";
@@ -1509,6 +1511,12 @@
         persist();
         return true;
       }
+      const serverShotN = p.nodes.filter(function (n) { return n && n.kind === "shot"; }).length;
+      if (serverShotN > shots().length) {
+        if (!applyGraph(p)) return false;
+        persist();
+        return true;
+      }
       const byId = {};
       for (let i = 0; i < p.nodes.length; i++) {
         const n = p.nodes[i];
@@ -1630,7 +1638,18 @@
 
   function activateShotComposer(shot) {
     const id = shot && shot.kind === "shot" ? shot.id : null;
-    if (_composerShotId === id) return;
+    const recipe = shot && shot.composer;
+    const wantKey = recipe ? (recipe.backend + ":" + (state.mode === "video" || state.mode === "text" || state.mode === "audio" ? state.mode : (recipe.mode || "image"))) : "";
+    if (_composerShotId === id) {
+      if (id && recipe && $("backend") && $("backend").value !== recipe.backend) {
+        $("backend").value = recipe.backend;
+      }
+      if (id && wantKey && (state._catalogKey !== wantKey)) {
+        state._pendingService = recipe.service || shot.serviceId || "";
+        loadCatalog();
+      }
+      return;
+    }
     saveDisplayedComposer();
     _composerShotId = id;
     if (!id) return;
@@ -1647,19 +1666,23 @@
         el.value = recipe.fields[field];
       });
       if (state._catalogKey !== key || _catalogFlight) {
-        state._pendingService = recipe.service || "";
+        state._pendingService = recipe.service || shot.serviceId || "";
         loadCatalog();
       } else {
         $("service").value = "";
         if (recipe.service && state.catalogById[recipe.service]) {
           ensureSelectOpt($("service"), recipe.service);
+        } else if (shot.serviceId && state.catalogById[shot.serviceId]) {
+          ensureSelectOpt($("service"), shot.serviceId);
         }
+        try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
       }
     } else {
       state.mode = (shot.mode === "video" || shot.mode === "text" || shot.mode === "audio") ? shot.mode : "image";
       applyComfyParamsToUi(shot);
       if (shot.aspect && $("aspect")) $("aspect").value = shot.aspect;
       if (shot.res && $("res")) $("res").value = shot.res;
+      try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
     }
     const restoredW = $("width") ? parseInt($("width").value, 10) : NaN;
     const restoredH = $("height") ? parseInt($("height").value, 10) : NaN;
@@ -1884,7 +1907,9 @@
         if (!w || !h || (shot.mediaWidth === w && shot.mediaHeight === h)) return;
         shot.mediaWidth = w;
         shot.mediaHeight = h;
-        if (state.selected === shot.id) {
+        // A 16:9 UI screenshot must not reshape a portrait shot into a letterboxed landscape card.
+        const wasPortrait = Number(shot.height) > Number(shot.width);
+        if (state.selected === shot.id && !(wasPortrait && w > h)) {
           if ($("width")) $("width").value = String(w);
           if ($("height")) $("height").value = String(h);
           syncAspectFromSize(w, h);
@@ -2316,9 +2341,12 @@
     dock.classList.toggle("expanded", expanded);
     dock.classList.remove("near");
     if ($("dockTitle")) {
-      const ml = modeLabelOf(state.mode) + (isStubMode() ? " · 未接" : "");
+      const op = (typeof currentGraphOp === "function") ? currentGraphOp() : "";
+      const opLabel = (typeof graphOpLabel === "function" && graphOpLabel(op)) || modeLabelOf(state.mode);
+      const ml = opLabel + (isStubMode() ? " · 未接" : "");
       $("dockTitle").textContent = (n.title || "分镜") + " · " + ml + (expanded ? "" : "（胶囊）");
     }
+    if (typeof syncOpChip === "function") syncOpChip();
     $("prompt").value = n.prompt || "";
     if ($("negative")) $("negative").value = n.negativePrompt || "";
     applyComfyParamsToUi(n);
@@ -2336,19 +2364,21 @@
     const stub = isStubMode();
     const capMsg = refCapGateMessage(n);
     const unusedMsg = refUnusedGateMessage(n);
+    const liveMsg = ($("msg") && $("msg").textContent) || "";
+    const keepSmart = liveMsg.indexOf("已智能匹配") >= 0;
     syncSendGate(needFrame, stub);
     if (stub) {
       setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
     } else if (needFrame) {
       // v0821g/o17: missing-frame is hard stop (red); offer 图片生成 or attach frame
-      setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad");
+      if (!keepSmart) setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad");
     } else if (unusedMsg) {
-      setMsg(unusedMsg, "bad");
+      if (!keepSmart) setMsg(unusedMsg, "bad");
     } else if (capMsg) {
-      setMsg(capMsg, "bad");
+      if (!keepSmart) setMsg(capMsg, "bad");
     } else if (n._error) {
       // v0821o9: card 生成失败 + reason must mirror on Composer foot (not card-only)
-      setMsg(n._error, "bad", n._errorDetail || "");
+      if (!keepSmart) setMsg(n._error, "bad", n._errorDetail || "");
     } else if (state.mode !== "video") {
       const msgEl = $("msg");
       const t = (msgEl && msgEl.textContent) || "";
@@ -2356,7 +2386,7 @@
     } else if (state.mode === "video" && frame) {
       // v0821j: do NOT reset to 首帧已就绪 while generate/busy/group in-flight (wipes 校验连线/已点生成)
       // v0821k: also keep bad/warn (Fal job.error / 此模型需要提示词) — empty card must not be silent
-      if (!fireSend._busy && !state.runningGroup) {
+      if (!fireSend._busy && !state.runningGroup && !keepSmart) {
         const msgEl = $("msg");
         const cls = (msgEl && msgEl.className) || "";
         if (!/\bbad\b|\bwarn\b/.test(cls)) {
@@ -2466,7 +2496,7 @@
     const composer = nodeById(state.lastComposerShot);
     const dockOpen = state.dockMode === "expanded" || state.dockMode === "collapsed";
     if (dockOpen && composer && composer.kind === "shot" && n && n.id !== composer.id
-        && !opts.shift && isImageSource(n)) {
+        && !opts.shift && isImageSource(n) && n.kind !== "shot") {
       try { linkAssetToShot(n, composer); } catch (_) {}
     }
     if (n && n.kind === "shot") {
@@ -2569,6 +2599,7 @@
       try { setMsg("首帧已就绪 · 可生成", "ok"); } catch (_) {}
       try { if (typeof renderChatRail === "function") renderChatRail(); } catch (_) {}
     }
+    try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
     return true;
   }
   function unlinkAssetFromShot(asset, shot) {
@@ -2579,6 +2610,7 @@
     state.edges = state.edges.filter((e) => !(e.from === asset.id && e.to === shot.id));
     if (shot && shot.firstFrameId === asset.id) shot.firstFrameId = "";
     if (had) invalidateStageProgress(shot);
+    try { Promise.resolve(smartMatchService({ announce: true })).catch(function () {}); } catch (_) {}
   }
 
   function hideNodeMenu() {
@@ -3812,6 +3844,7 @@
       const shot = nodeById(state.selected);
       if (shot && shot.kind === "shot") {
         created.forEach(function (node) { linkAssetToShot(node, shot); });
+        try { await smartMatchService({ announce: true }); } catch (_) {}
       } else if (created.length) {
         selectNode(created[created.length - 1].id);
       }
@@ -3822,7 +3855,9 @@
       if (created.length) {
         const live = nodeById(state.selected);
         const frameReady = !!(live && live.kind === "shot" && state.mode === "video" && typeof frameAsset === "function" && frameAsset(live));
-        if (frameReady) setMsg("首帧已就绪 · 可生成", "ok");
+        const already = ($("msg") && $("msg").textContent) || "";
+        if (already.indexOf("已智能匹配") >= 0) { /* keep rematch copy */ }
+        else if (frameReady) setMsg("首帧已就绪 · 可生成", "ok");
         else setMsg("已上传到资产库" + (created.length > 1 ? (" · " + created.length + " 张") : ""), "ok");
       }
       if ($("importModal") && $("importModal").classList.contains("show")) {
@@ -3991,27 +4026,14 @@
       const t = (msgEl && msgEl.textContent) || "";
       if (t.indexOf("缺首帧") >= 0) setMsg("");
     }
-    // v0821: refresh service list for image vs i2v; drop silent t2i/flux when video.
-    const be = ($("backend") && $("backend").value) || "fal";
-    const sid = ($("service") && $("service").value) || "";
     if (typeof loadCatalog === "function") {
-      loadCatalog().then(function () {
-        if (mode === "video" && sid) {
-          const it = state.catalogById && state.catalogById[sid];
-          if (it && !catalogItemSupportsI2v(it)) {
-            if ($("service")) $("service").value = "";
-            if (be === "fal" && $("service")) {
-              ensureSelectOpt($("service"), FAL_I2V_DEFAULT);
-              $("service").value = FAL_I2V_DEFAULT;
-            }
-          }
-        }
+      return loadCatalog().then(async function () {
+        try { await smartMatchService({ announce: true }); } catch (_) {}
         renderCards();
         drawWires();
         renderDock();
         persist();
       });
-      return;
     }
     renderCards();
     drawWires();
@@ -4608,17 +4630,11 @@
     block.classList.toggle("lora-unsupported", !!(chips && !support));
     const row = block.querySelector(".lora-row");
     if (row) {
-      if (chips && !support) {
-        row.classList.add("hidden");
-        row.setAttribute("aria-hidden", "true");
-        if ($("loraQ")) $("loraQ").disabled = true;
-        if ($("searchLora")) $("searchLora").disabled = true;
-      } else {
-        row.classList.remove("hidden");
-        row.removeAttribute("aria-hidden");
-        if ($("loraQ")) $("loraQ").disabled = false;
-        if ($("searchLora")) $("searchLora").disabled = false;
-      }
+      // Keep search usable so 跨家检索 → 加芯片 → 一键匹配 can run on a non-LoRA model.
+      row.classList.remove("hidden");
+      row.removeAttribute("aria-hidden");
+      if ($("loraQ")) $("loraQ").disabled = false;
+      if ($("searchLora")) $("searchLora").disabled = false;
     }
     const hd = block.querySelector(".lora-hd");
     let btn = block.querySelector('[data-act="lora-capability-rematch"]');
@@ -4683,10 +4699,7 @@
     }
   }
   async function addLora(v) {
-    if (!catalogItemSupportsLora()) {
-      setLoraNote("当前模型不支持 LoRA，没加进来", true);
-      return false;
-    }
+    const needRematch = !catalogItemSupportsLora();
     const draft = normalizeLora(v);
     if (!loraTypeUsable(draft.type, draft.air)) {
       const kind = normalizeLoraType(draft.type) || airKind(draft.air) || "非 LoRA";
@@ -4734,6 +4747,8 @@
 
     const be = currentBackend();
     if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
+    if (v && v.source && !row.source) row.source = v.source;
+    if (v && v.backend && !row.backend) row.backend = v.backend;
     if (!Array.isArray(state.loras)) state.loras = [];
     const key = row.air || row.path || row.versionId;
     if (state.loras.some(function (it) { return (it.air || it.path || it.versionId) === key; })) {
@@ -4741,11 +4756,14 @@
       return false;
     }
     state.loras.push(row);
-    setLoraNote("");
+    setLoraNote(needRematch ? "当前模型不支持 LoRA，已加芯片 · 正在匹配能吃 LoRA 的端点" : "");
     renderLoras();
     if ($("loraHits")) $("loraHits").innerHTML = "";
     persist();
     if ((be === "fal" || isNanogptBe()) && row.air && !row.path) resolveLorasForBackend();
+    if (needRematch) {
+      try { applyLoraCapabilityRematch(); } catch (_) {}
+    }
     return true;
   }
   async function resolveOneLora(i) {
@@ -5330,6 +5348,16 @@
     else setLoraNote("");
     renderLoras();
   }
+  function loraHouseLabel(src) {
+    const s = String(src || "").toLowerCase();
+    if (s === "civitai") return "Civitai";
+    if (s === "fal") return "Fal";
+    if (s === "huggingface" || s === "hf") return "HF";
+    if (s === "modelscope-ai" || s === "modelscope") return "魔搭AI";
+    if (s === "modelscope-cn") return "魔搭CN";
+    if (s === "nano-gpt" || s === "nanogpt" || s === "nano") return "Nano";
+    return src || "";
+  }
   async function searchLoras() {
     const qEl = $("loraQ");
     const hits = $("loraHits");
@@ -5371,7 +5399,7 @@
       return;
     }
     try {
-      const r = await fetch("/api/search?type=LORA&q=" + encodeURIComponent(q) + "&backend=" + encodeURIComponent(be));
+      const r = await fetch("/api/search?type=LORA&q=" + encodeURIComponent(q) + "&backend=" + encodeURIComponent(be) + "&cross=1");
       const j = await r.json();
       const rows = j.items || [];
       if (!rows.length) { hits.textContent = (j.note || "没有结果"); return; }
@@ -5379,10 +5407,14 @@
         const v = (it.versions || [])[0] || {};
         const path = it.path || "";
         const extra = v.baseModel || v.name || path || "";
-        return '<div data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") +
+        const src = it.source || it.backend || be;
+        const badge = loraHouseLabel(src);
+        return '<div class="lora-hit" data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") +
           '" data-mid="' + esc(it.id || "") + '" data-type="' + esc(it.type || "") +
-          '" data-name="' + esc(it.name || "") + '"><b>' +
-          esc(it.name) + '</b>' + (extra ? (" · " + esc(extra)) : "") + "</div>";
+          '" data-name="' + esc(it.name || "") + '" data-src="' + esc(src) + '"><b>' +
+          esc(it.name) + '</b>' +
+          (badge ? ('<span class="lora-src">' + esc(badge) + '</span>') : "") +
+          (extra ? (" · " + esc(extra)) : "") + "</div>";
       }).join("");
       Array.prototype.forEach.call(hits.children, function (el) {
         el.onclick = async function () {
@@ -5391,16 +5423,18 @@
           const vid = el.getAttribute("data-vid");
           const mid = el.getAttribute("data-mid") || "";
           const typ = el.getAttribute("data-type") || "";
+          const src = el.getAttribute("data-src") || be;
           if (path && (isHttpUrl(path) || isHfRepo(path))) {
-            addLora({ path: path, name: name || path, strength: null, type: typ, modelId: mid });
+            addLora({ path: path, name: name || path, strength: null, type: typ, modelId: mid, source: src });
             return;
           }
-          if (be === "civitai" && vid) {
+          if ((src === "civitai" || be === "civitai") && vid) {
             try {
               const rr = await fetch("/api/model-version/" + encodeURIComponent(vid));
               const data = await rr.json();
               if (!data.modelId && mid) data.modelId = mid;
               if (!data.type && typ) data.type = typ;
+              data.source = src;
               await addLora(data);
             } catch (_) {}
             return;
@@ -5413,10 +5447,11 @@
               type: typ,
               name: name || ("LoRA " + vid),
               strength: null,
+              source: src,
             });
             return;
           }
-          if (path || name) addLora({ path: path || name, name: name || path, strength: null, type: typ, modelId: mid });
+          if (path || name) addLora({ path: path || name, name: name || path, strength: null, type: typ, modelId: mid, source: src });
         };
       });
     } catch (_) {
@@ -5623,6 +5658,7 @@
         renderServiceOptions(state.catalog, "选择模型");
         syncCatalogPagingUi();
         applyServiceConstraints();
+        try { await smartMatchService({ announce: true }); } catch (_) {}
         return true;
       } catch (e) {
         if (!current()) return false;
@@ -5763,7 +5799,10 @@
     // 2) Id path markers for real i2v endpoints.
     if (id.indexOf("image-to-video") >= 0 || id.indexOf("start-end") >= 0 ||
         id.indexOf("reference-to-video") >= 0 || id.indexOf("first-last") >= 0 ||
-        id.indexOf("/i2v") >= 0) return true;
+        id.indexOf("/i2v") >= 0 || id.indexOf("ti2v") >= 0 || /(?:^|[-_/])i2v(?:$|[-_/])/.test(id) ||
+        id.indexOf("imagetovideo") >= 0 || id.indexOf("flf2v") >= 0) return true;
+    const task = String(it.task || it.hubTask || "").toLowerCase();
+    if (task === "image-to-video") return true;
 
     // 3) Catalog imageFields declare first-frame / start_image / image_url for video.
     if (hasFirst && (cat === "video" || cat.indexOf("video") >= 0 || fcat.indexOf("video") >= 0 ||
@@ -5789,14 +5828,28 @@
     const task = String(it.task || it.hubTask || "").toLowerCase();
     const tags = Array.isArray(it.tags) ? it.tags.map(function (t) { return String(t).toLowerCase(); }) : [];
     const id = String(it.id || it.name || "").toLowerCase();
+    const op = String(it.operation || "").toLowerCase();
     if (task === "image-to-image" || tags.indexOf("i2i") >= 0) return true;
-    if (task === "text-to-image" || tags.indexOf("t2i") >= 0) return false;
-    if (id.indexOf("image-to-image") >= 0 || /(?:^|\/|-)edit(?:$|\b|\/)/.test(id)) return true;
+    if (op === "editimage" || op === "createvariant" || op === "proeditimage") return true;
+    if (task === "text-to-image" || tags.indexOf("t2i") >= 0) {
+      if (/editimage|\/edit(?:$|\/)/.test(id)) return true;
+      return false;
+    }
+    if (id.indexOf("image-to-image") >= 0 || /(?:^|\/|-)edit(?:$|\b|\/)/.test(id) || id.indexOf("editimage") >= 0) return true;
     return false;
+  }
+  function composerShot() {
+    const n = nodeById(state.selected);
+    if (n && n.kind === "shot") return n;
+    const remembered = nodeById(state.lastComposerShot);
+    if (remembered && remembered.kind === "shot") return remembered;
+    return (n && n.kind === "shot") ? n : null;
   }
   function selectedShotWantsI2i() {
     if (state.mode === "video" || state.mode === "text" || state.mode === "audio") return false;
-    const shot = nodeById(state.selected) || (typeof shots === "function" ? shots()[0] : null);
+    const shot = (typeof composerShot === "function" ? composerShot() : null)
+      || nodeById(state.selected)
+      || (typeof shots === "function" ? shots()[0] : null);
     if (!shot || shot.kind !== "shot") return false;
     return connectedAssets(shot.id).length > 0;
   }
@@ -5805,6 +5858,225 @@
     if (selectedShotWantsI2i()) return "i2i";
     return "t2i";
   }
+  function graphOpLabel(op) {
+    return ({ t2i: "文生图", i2i: "图生图", i2v: "图生视频" })[op] || "";
+  }
+  function syncOpChip() {
+    const el = $("opChip");
+    if (!el) return;
+    if (state.mode === "text" || state.mode === "audio") {
+      el.hidden = true;
+      el.textContent = "";
+      el.removeAttribute("data-op");
+      return;
+    }
+    const op = currentGraphOp();
+    el.hidden = false;
+    el.textContent = graphOpLabel(op) || modeLabelOf(state.mode);
+    el.setAttribute("data-op", op);
+  }
+
+  const SMART_PREF = {
+    civitai: {
+      t2i: ["image/comfy/krea2/turbo/createImage", "image/sdcpp/zImage/turbo/createImage"],
+      i2i: ["image/flux2/klein/editImage/9b", "image/wan/v2.7/fal/editImage", "image/sdcpp/sdxl/createVariant", "image/comfy/krea2/edit/editImage"],
+      i2v: ["video/minimax-h3-comfy/imageToVideo", "video/wan/v2.2/fal/image-to-video", "video/ltx2.3/firstLastFrameToVideo"]
+    },
+    fal: {
+      t2i: ["fal-ai/krea-2/turbo/lora", "fal-ai/krea-2/turbo", "fal-ai/flux/schnell"],
+      i2i: ["fal-ai/flux-pro/kontext", "fal-ai/nano-banana-2/edit", "fal-ai/z-image/turbo/image-to-image", "fal-ai/flux/dev/image-to-image"],
+      i2v: ["fal-ai/kling-video/v3/pro/image-to-video", "bytedance/seedance-2.5/image-to-video", "fal-ai/minimax/video-01/image-to-video", "minimax/h3-max/image-to-video"]
+    },
+    "nano-gpt": {
+      t2i: ["wavespeed-ai/krea-v2/turbo-lora", "z-image-turbo", "nvidia/cosmos-3-super/text-to-image", "openai/gpt-image-2.5/flare/text-to-image"],
+      i2i: ["z-image-turbo-image-to-image", "openai/gpt-image-2.5/flare/edit", "bernini-r/edit-image", "pruna-ai/p-image/edit-lora"],
+      i2v: ["minimax/h3-max/multi-angle/image-to-video", "infinitetalk", "bytedance/seedance-2.5-spicy"]
+    },
+    huggingface: {
+      t2i: ["krea/Krea-2-Turbo", "black-forest-labs/FLUX.1-schnell"],
+      i2i: ["Qwen/Qwen-Image-Edit"],
+      i2v: ["Wan-AI/Wan2.2-TI2V-5B"]
+    },
+    "modelscope-ai": {
+      t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
+      i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
+      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"]
+    },
+    "modelscope-cn": {
+      t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
+      i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
+      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"]
+    }
+  };
+  function serviceFitsOp(it, op) {
+    if (!it) return false;
+    if (op === "i2v") return catalogItemSupportsI2v(it);
+    if (op === "i2i") return !catalogItemSupportsI2v(it) && catalogItemSupportsI2i(it);
+    return catalogItemSupportsImage(it) && !catalogItemSupportsI2v(it) && !catalogItemSupportsI2i(it);
+  }
+  function pickSmartServiceId(op) {
+    const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
+    const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+    const prefs = (SMART_PREF[be] && SMART_PREF[be][op]) || [];
+    for (let i = 0; i < prefs.length; i++) {
+      const id = prefs[i];
+      const row = pool[id] || (state.catalogById && state.catalogById[id]);
+      if (row && serviceBelongsToBackend(id, be) && serviceFitsOp(row, op)) return id;
+    }
+    const keys = Object.keys(pool);
+    for (let i = 0; i < keys.length; i++) {
+      const row = pool[keys[i]];
+      if (row && serviceBelongsToBackend(String(row.id || keys[i]), be) && serviceFitsOp(row, op)) return String(row.id || keys[i]);
+    }
+    return "";
+  }
+  function injectCatalogRow(row) {
+    if (!row || typeof row !== "object") return;
+    const id = String(row.id || row.name || "").trim();
+    if (!id) return;
+    if (!state.catalogById) state.catalogById = {};
+    state.catalogById[id] = row;
+    function push(arr) {
+      if (!Array.isArray(arr)) return;
+      if (!arr.some(function (x) { return String((x && (x.id || x.name)) || "") === id; })) arr.unshift(row);
+    }
+    if (!state.catalog) state.catalog = [];
+    push(state.catalog);
+    if (!state._catalogRoster) state._catalogRoster = [];
+    push(state._catalogRoster);
+    if (!state._serviceItems) state._serviceItems = [];
+    push(state._serviceItems);
+  }
+  async function fetchCatalogId(be, id, category) {
+    const size = String((typeof CATALOG_PAGE_SIZE === "number" && CATALOG_PAGE_SIZE) || 50);
+    const params = new URLSearchParams({
+      backend: be, q: id, category: category || "", page: "1", pageSize: size
+    });
+    const r = await fetch("/api/catalog?" + params.toString());
+    if (!r.ok) return null;
+    const j = await r.json();
+    const items = Array.isArray(j.items) ? j.items : [];
+    for (let i = 0; i < items.length; i++) {
+      if (String(items[i].id || items[i].name || "") === id) return items[i];
+    }
+    return null;
+  }
+  async function ensureSmartPrefInPool(op) {
+    const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
+    const prefs = (SMART_PREF[be] && SMART_PREF[be][op]) || [];
+    const cat = op === "i2v" ? "video" : "image";
+    for (let i = 0; i < prefs.length; i++) {
+      const id = prefs[i];
+      const pool = rematchCandidatePool();
+      const hit = pool[id];
+      if (hit && serviceFitsOp(hit, op)) return id;
+      let row = null;
+      try { row = await fetchCatalogId(be, id, cat); } catch (_) { row = null; }
+      if (row && String(row.id || row.name) === id && serviceFitsOp(row, op)) {
+        injectCatalogRow(row);
+        return id;
+      }
+    }
+    return "";
+  }
+  function writeSmartMatchToShot(shot, want) {
+    if (!shot || shot.kind !== "shot") return;
+    const house = String(shot.backend || (shot.composer && shot.composer.backend) || "").trim();
+    const be = house
+      || (typeof currentBackend === "function" ? currentBackend() : "")
+      || ($("backend") && $("backend").value)
+      || "";
+    shot.serviceId = want || "";
+    if (be) shot.backend = be;
+    shot.mode = state.mode;
+    if (!shot.composer || typeof shot.composer !== "object") shot.composer = { fields: {}, loras: [] };
+    shot.composer.service = want || "";
+    if (be) shot.composer.backend = be;
+    shot.composer.mode = state.mode;
+    delete shot._error;
+    delete shot._errorDetail;
+  }
+  function serviceBelongsToBackend(sid, be) {
+    const s = String(sid || "").trim();
+    const b = String(be || "").trim();
+    if (!s || !b) return true;
+    const fal = /^fal-ai\//i.test(s) || /^fal\.ai\//i.test(s);
+    const civ = /^(image|video|audio|3d|utility)\//.test(s) || /\/comfy\//.test(s);
+    if (b === "civitai") return civ && !fal;
+    if (b === "fal") return !civ;
+    if (b === "huggingface" || b === "modelscope-ai" || b === "modelscope-cn" || b === "nano-gpt") return !fal && !civ;
+    return true;
+  }
+  async function smartMatchService(opts) {
+    opts = opts || {};
+    if (state.mode === "text" || state.mode === "audio") return false;
+    const sel = $("service");
+    if (!sel) return false;
+    const gen = (smartMatchService._gen = (smartMatchService._gen || 0) + 1);
+    if (smartMatchService._inflight) {
+      try { await smartMatchService._inflight; } catch (_) {}
+    }
+    if (gen !== smartMatchService._gen) return false;
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    const shotBe = shot && shot.kind === "shot"
+      ? String(shot.backend || (shot.composer && shot.composer.backend) || "").trim()
+      : "";
+    if (shotBe && $("backend") && $("backend").value !== shotBe) $("backend").value = shotBe;
+    const op = currentGraphOp();
+    const cur = catalogItemForService();
+    const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
+    const foreign = !serviceBelongsToBackend(sel.value, be);
+    const labels = { t2i: "文生图", i2i: "图生图", i2v: "图生视频" };
+    if (!foreign && serviceFitsOp(cur, op)) {
+      writeSmartMatchToShot(shot, sel.value);
+      if (typeof syncOpChip === "function") syncOpChip();
+      if (opts.announce !== false) {
+        const name = (cur && cur.name) || sel.value;
+        const wantMsg = "已智能匹配" + (labels[op] || op) + " · " + name;
+        const live = ($("msg") && $("msg").textContent) || "";
+        if (live.indexOf("已智能匹配" + (labels[op] || op)) < 0) {
+          try { setMsg(wantMsg, "ok"); } catch (_) {}
+        }
+      }
+      try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
+      return false;
+    }
+    const run = (async function () {
+      try {
+        if (gen !== smartMatchService._gen) return false;
+        const want = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
+        if (gen !== smartMatchService._gen) return false;
+        if (!want) {
+          sel.value = "";
+          writeSmartMatchToShot(shot, "");
+          if (typeof syncOpChip === "function") syncOpChip();
+          if (opts.announce !== false) {
+            try { setMsg("这家没有可匹配的" + (labels[op] || op) + "模型，请换模型或换家", "warn"); } catch (_) {}
+          }
+          try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
+          return false;
+        }
+        const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+        const row = pool[want] || (state.catalogById && state.catalogById[want]);
+        if (!row) return false;
+        if (typeof ensureSelectOpt === "function") ensureSelectOpt(sel, want);
+        sel.value = want;
+        writeSmartMatchToShot(shot, want);
+        if (typeof syncOpChip === "function") syncOpChip();
+        if (opts.announce !== false) {
+          try { setMsg("已智能匹配" + (labels[op] || op) + " · " + ((row && row.name) || want), "ok"); } catch (_) {}
+        }
+        try { if (typeof syncParamChrome === "function") syncParamChrome(); } catch (_) {}
+        try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
+        return true;
+      } finally {
+        if (smartMatchService._inflight && smartMatchService._gen === gen) smartMatchService._inflight = null;
+      }
+    })();
+    smartMatchService._inflight = run;
+    return run;
+  }
+
   function filterCatalogForMode(items) {
     const list = Array.isArray(items) ? items : [];
     // text/audio are stub modes — do not list image models (looks like they work).
@@ -6012,12 +6284,18 @@
   // provider-wide one-image cut.
   function catalogEatsRefs(it) {
     if (!it) return true;
+    if (typeof catalogItemSupportsI2v === "function" && catalogItemSupportsI2v(it)) return true;
     const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
     if (caps.image_to_image === true || caps.inpainting === true) return true;
-    if (it.needsSource) return true;
+    if (it.needsSource || it.needsFirstFrame) return true;
     if (caps.image_to_image === false) return false;
     const backend = String(it.backend || (typeof currentBackend === "function" ? currentBackend() : "") || "").toLowerCase();
-    // o53b: Fal t2i with empty imageFields (e.g. flux-lora pin) does NOT eat refs → show 一键 Edit.
+    if (backend === "civitai") {
+      const id = String(it.id || "").toLowerCase();
+      const op = String(it.operation || "").toLowerCase();
+      if (op === "editimage" || op === "createvariant" || id.indexOf("editimage") >= 0 || /\/edit(?:$|\/)/.test(id)) return true;
+      if (op === "createimage" || id.indexOf("createimage") >= 0) return false;
+    }
     if (backend === "fal") {
       const rawFields = caps.imageFields || it.imageFields || [];
       const fields = Array.isArray(rawFields) ? rawFields : [];
@@ -6711,14 +6989,14 @@
     if (be === "civitai") {
       serviceId = resolveCivitaiOutboundServiceId(shot);
     } else if (!serviceId && be === "huggingface") {
-      // t2i empty → Hub turbo; i2i empty → Qwen-Image-Edit. Never t2i turbo on 图生图.
-      serviceId = (op === "i2i" ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE);
+      serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
+        || (op === "i2i" ? HF_I2I_PREF_SERVICE : op === "i2v" ? "Wan-AI/Wan2.2-TI2V-5B" : HF_LORA_PREF_SERVICE);
     } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
-      // v0821o6: Magao empty → Hub turbo; never fal sibling / 默认模型
-      serviceId = MS_LORA_PREF_SERVICE;
-    } else if (!serviceId && be !== "civitai") {
-      // v0821: i2v must use image-to-video endpoint — plain video-01 drops the frame.
-      // v0821o29: LoRAs → endpoint by AIR base (not hard-pin krea-2).
+      serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
+        || (op === "t2i" ? MS_LORA_PREF_SERVICE : "");
+    } else if (!serviceId && be === "nano-gpt") {
+      serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op)) || "";
+    } else if (!serviceId && be === "fal") {
       if (op !== "i2v" && falHasLoras()) {
         const resolved = resolveFalLoraEndpointFromChips();
         serviceId = resolved.endpoint || "";
@@ -6728,7 +7006,7 @@
       serviceId = pinHfLoraServiceId(serviceId, op);
     }
     if (be === "modelscope-ai" || be === "modelscope-cn") {
-      serviceId = pinMsLoraServiceId(serviceId);
+      serviceId = pinMsLoraServiceId(serviceId, op);
     }
     if (be === "fal" && op !== "i2v") {
       serviceId = pinFalLoraServiceId(serviceId);
@@ -6760,13 +7038,16 @@
         genParams.resolution = res;
       }
       if (op === "i2v" || state.mode === "video") {
+        const pc = (typeof catalogCaps === "function") ? catalogCaps() : {};
         const durEl = $("duration");
-        if (durEl && !durEl.classList.contains("hidden") && !durationGateMessage()) {
+        if (pc.videoDuration && durEl && !durEl.classList.contains("hidden") && !durationGateMessage()) {
           const durN = parseDurationSeconds(durEl.value);
           if (Number.isFinite(durN)) genParams.duration = durN;
         }
         const aspectEl = $("aspect");
-        if (aspectEl && !aspectEl.classList.contains("hidden")) {
+        // Magao official AIGC key is size (width×height already packed). Do not also send aspect_ratio.
+        if (pc.videoAspect && aspectEl && !aspectEl.classList.contains("hidden")
+            && be !== "modelscope-ai" && be !== "modelscope-cn") {
           genParams.aspectRatio = aspect;
         }
       }
@@ -7327,7 +7608,7 @@
           payload.endpoint = pinned;
           ensureHfLoraServiceSelected();
         } else if (currentBackend() === "modelscope-ai" || currentBackend() === "modelscope-cn") {
-          const pinned = pinMsLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "");
+          const pinned = pinMsLoraServiceId(payload.serviceId || ($("service") && $("service").value) || "", currentGraphOp());
           payload.serviceId = pinned;
           payload.endpoint = pinned;
           ensureMsLoraServiceSelected();
@@ -8248,6 +8529,13 @@
   }
   function pinHfLoraServiceId(sid, op) {
     const s = String(sid || "").trim();
+    const wantI2v = op === "i2v" || (op == null && typeof currentGraphOp === "function" && currentGraphOp() === "i2v");
+    if (wantI2v) {
+      if (!s || s === HF_LORA_PREF_SERVICE || looksFalServiceId(s) || looksCivitaiServiceId(s)) {
+        return (typeof pickSmartServiceId === "function" && pickSmartServiceId("i2v")) || "Wan-AI/Wan2.2-TI2V-5B";
+      }
+      return s;
+    }
     const wantI2i = op === "i2i" || (op == null && typeof currentGraphOp === "function" && currentGraphOp() === "i2i");
     // No LoRAs: foreign Fal/Civitai → Hub pref for this op (t2i turbo / i2i Qwen-Edit).
     // Never rewrite Hub → fal-ai/.../lora. Turbo is the t2i pref; rewrite only that to i2i pref.
@@ -8344,10 +8632,15 @@
     return ok;
   }
 
-  function pinMsLoraServiceId(sid) {
+  function pinMsLoraServiceId(sid, op) {
+    op = op || (typeof currentGraphOp === "function" ? currentGraphOp() : "t2i");
     const s = String(sid || "").trim();
-    // Empty / Fal sibling / Civitai image/… → Hub turbo.
-    // Never rewrite a real Hub id (Tongyi-MAI/Z-Image-Turbo) to krea/Krea-2-Turbo.
+    if (op === "i2i" || op === "i2v") {
+      if (!s || s === MS_LORA_PREF_SERVICE || (typeof looksFalServiceId === "function" && looksFalServiceId(s)) || (typeof looksCivitaiServiceId === "function" && looksCivitaiServiceId(s))) {
+        return (typeof pickSmartServiceId === "function" && pickSmartServiceId(op)) || "";
+      }
+      return s;
+    }
     if (s && !looksFalServiceId(s) && !looksCivitaiServiceId(s)) return s;
     return MS_LORA_PREF_SERVICE;
   }
@@ -8363,8 +8656,8 @@
     if (be !== "modelscope-ai" && be !== "modelscope-cn") return;
     const sel = $("service");
     if (!sel) return;
-    const want = pinMsLoraServiceId(sel.value || state._pinMsLoraService || "");
-    ensureSelectOpt(sel, want);
+    const want = pinMsLoraServiceId(sel.value || state._pinMsLoraService || "", typeof currentGraphOp === "function" ? currentGraphOp() : "t2i");
+    if (want) ensureSelectOpt(sel, want);
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         sel.options[i].textContent = msLoraOptionLabel(want, sel.options[i].textContent || "");
@@ -9166,6 +9459,7 @@
       if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
       // Do NOT auto-select CIVITAI_PREF when empty — empty stays empty until user/import picks.
       applyServiceConstraints();
+      try { await smartMatchService({ announce: true }); } catch (_) {}
       if (pinWant && !byId[pinWant]) setMsg("当前目录/模式没有模型 " + pinWant + "，请重新选择（不会替换模型）", "warn");
       return true;
       } catch (e) {
@@ -9238,10 +9532,11 @@
     }
     syncParamSurface();
     const p = loadCatalog();
-    Promise.resolve(p).then(function () {
+    Promise.resolve(p).then(async function () {
       if (be === "fal") ensureFalLoraServiceSelected();
       else if (be === "huggingface") ensureHfLoraServiceSelected();
       else if (be === "modelscope-ai" || be === "modelscope-cn") ensureMsLoraServiceSelected();
+      try { await smartMatchService({ announce: true }); } catch (_) {}
       syncLoraUi();
     }).catch(function () { syncLoraUi(); });
   };
@@ -9341,20 +9636,22 @@
   ensureWorkspaceModel();
   // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
   hydrateFromServer().then(function (changed) {
-    if (changed) {
-      try {
+    try {
+      if (changed) {
         separateOverlappingShots();
         ensureWorkspaceModel();
         applyCam();
         renderCards();
         drawWires();
         renderRail();
-        const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
-        selectNode(state.selected || (firstShot && firstShot.id) || "shot-1", { collapsed: true });
         renderWorkspace();
-        if (typeof renderDock === "function") renderDock();
-      } catch (_) {}
-    }
+      }
+      const firstShot = (state.nodes || []).find(function (n) { return n && n.kind === "shot"; });
+      const pick = state.selected || (firstShot && firstShot.id);
+      if (pick) selectNode(pick, { collapsed: true });
+      if (typeof renderDock === "function") renderDock();
+      if (typeof positionDock === "function") requestAnimationFrame(positionDock);
+    } catch (e) { try { console.warn("hydrate ui", e); } catch (_) {} }
     // v0821o46: always try resume pending jobs after hydrate (tab death / OOM mid-poll)
     return resumePendingJobs();
   }).catch(function () {});
@@ -9431,6 +9728,41 @@
       attachExtraImages: function (payload) {
         const n = nodeById(state.selected);
         return attachExtraImages(payload || {}, n);
+      },
+      selectShot: function (id) {
+        selectNode(id, { expand: true, shift: true });
+        const shot = nodeById(id);
+        if (shot && shot.composer && $("backend")) {
+          $("backend").value = shot.composer.backend || $("backend").value;
+          if (shot.composer.mode && (shot.composer.mode === "image" || shot.composer.mode === "video")) {
+            state.mode = shot.composer.mode;
+          }
+        }
+        state._pendingService = (shot && ((shot.composer && shot.composer.service) || shot.serviceId)) || "";
+        return loadCatalog();
+      },
+      attachQaRef: function (url) {
+        const shot = nodeById(state.selected);
+        if (!shot || shot.kind !== "shot") return false;
+        let asset = nodeById("qa-ref");
+        if (!asset) {
+          asset = { id: "qa-ref", kind: "character", title: "qa-ref", x: 40, y: 40, url: url || "/out/house-civitai.jpg" };
+          state.nodes.push(asset);
+        }
+        linkAssetToShot(asset, shot);
+        return smartMatchService({ announce: true });
+      },
+      clearQaRef: function () {
+        const shot = nodeById(state.selected);
+        const asset = nodeById("qa-ref");
+        if (shot && asset) unlinkAssetFromShot(asset, shot);
+        return smartMatchService({ announce: true });
+      },
+      setMode: function (mode) {
+        return setMode(mode);
+      },
+      smartMatch: function () {
+        return smartMatchService({ announce: true });
       },
     };
   }

@@ -1574,12 +1574,20 @@ class Handler(BaseHTTPRequestHandler):
             nsfw_raw = (qs.get("nsfw") or ["true"])[0]
             nsfw = str(nsfw_raw).lower() in ("1", "true", "yes")
             backend = _alias_backend((qs.get("backend") or ["civitai"])[0])
+            cross_raw = (qs.get("cross") or ["0"])[0]
+            cross = str(cross_raw).lower() in ("1", "true", "yes")
+            if cross:
+                from providers.lora_search import search_loras_cross
+                code, data = search_loras_cross(q, nsfw=nsfw, current=backend, types=types)
+                return self._json(code, data)
+            from providers.lora_search import stamp_lora_items
             prov = providers.get(backend) or providers.get("civitai")
             if backend != "civitai" and hasattr(prov, "search_loras"):
                 code, data = prov.search_loras(q, nsfw=nsfw)
                 if isinstance(data, dict):
                     data.setdefault("backend", backend)
                     data.setdefault("nsfw", nsfw)
+                    data["items"] = stamp_lora_items(data.get("items") or [], backend)
                 return self._json(code, data if isinstance(data, dict) else {"items": []})
             url = (
                 f"{SITE}/models?limit=8&query={urllib.parse.quote(q)}"
@@ -1590,7 +1598,7 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(data, dict):
                 for it in (data.get("items") or [])[:8]:
                     vers = [{"id": v.get("id"), "name": v.get("name"), "baseModel": v.get("baseModel")} for v in (it.get("modelVersions") or [])[:6]]
-                    items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "source": "civitai", "nsfw": it.get("nsfw"), "versions": vers})
+                    items.append({"id": it.get("id"), "name": it.get("name"), "type": it.get("type"), "source": "civitai", "backend": "civitai", "nsfw": it.get("nsfw"), "versions": vers})
             return self._json(code, {"items": items, "nsfw": nsfw, "backend": "civitai"})
         if path.startswith("/out/"):
             name = Path(path.split("/out/", 1)[1]).name

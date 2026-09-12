@@ -95,7 +95,7 @@ Studio payload → orchestration `steps[0].input`（`build_workflow` 后 `civita
 | 静默丢 | **无 air 的条目被跳过** — UI 必须保证 import/搜模写入 air |
 | path/url | Civitai orchestration **不吃** http path；那是 Fal/Nano 的事 |
 
-历史夹具：`134923572` → air `urn:air:krea2:lora:civitai:2323765@3071582` @ 0.8。**不是唯一帖**；页 ↑ 换 hinablue 新图，见 [PAGE-UP-PLAYBOOK.md](PAGE-UP-PLAYBOOK.md)。
+历史夹具：`134923572` → air `urn:air:krea2:lora:civitai:2323765@3071582`。官方 strength 是 `null`，不能编成 0.8/1.0。hinablue 不是老板指定帖。
 
 ## Seed / 分辨率 / 负面 / 进度 / 取消
 
