@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o106: 节点可拖，写字台不锁宽高、不改别人坐标; stamp v0821o106-drag
   // v0821o105: 写字台框自适应选中分镜; stamp v0821o105-adapt
   // v0821o104: 点分镜工具贴上、写字台贴下; stamp v0821o104-seko-attach
   // v0821o103: 大屏底栏书桌，↑=生成，无展开; stamp v0821o103-wide-desk
@@ -2207,24 +2208,8 @@
     bar.classList.remove("show");
   }
 
-  function openLaneForDock(n, needScreen) {
-    if (!n || openLaneForDock._for === n.id) return false;
-    const s = Math.max(0.15, state.cam.s);
-    const need = needScreen / s;
-    const b = box(n);
-    let moved = false;
-    state.nodes.forEach(function (o) {
-      if (!o || o.id === n.id) return;
-      if (o.kind !== "shot" && o.kind !== "asset" && o.kind !== "text") return;
-      const ob = box(o);
-      if (o.x + ob.w <= n.x + 12 || o.x >= n.x + b.w - 12) return;
-      if (o.y >= n.y + b.h - 8 && o.y < n.y + b.h + need) {
-        o.y = n.y + b.h + need + 40;
-        moved = true;
-      }
-    });
-    if (moved) openLaneForDock._for = n.id;
-    return moved;
+  function openLaneForDock() {
+    return false;
   }
 
   function positionDock() {
@@ -2260,16 +2245,16 @@
       const sameRow = others.filter(function (o) { return o.t < cy + ch - 8 && o.b > cy + 8; });
       const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
         .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
-      w = Math.round(Math.max(160, Math.min(cw, nextRight - cx - 8, sr.width - 80)));
+      w = Math.round(Math.max(160, Math.min(cw || 280, nextRight - cx - 8, sr.width - 80)));
       if (!isFinite(w) || w < 160) w = Math.round(Math.max(160, cw || 240));
 
-      dock.style.setProperty("width", w + "px", "important");
-      dock.style.setProperty("max-width", w + "px", "important");
+      dock.style.setProperty("width", "auto", "important");
+      dock.style.setProperty("max-width", "min(420px, calc(100% - 72px))", "important");
       dock.style.setProperty("min-width", "0", "important");
       dock.style.setProperty("height", "auto", "important");
       dock.style.setProperty("max-height", "none", "important");
-      dock.style.setProperty("min-height", "140px", "important");
-      const natural = Math.max(140, Math.min(400, dock.scrollHeight || 180));
+      dock.style.setProperty("min-height", "0", "important");
+      const natural = Math.max(80, Math.min(420, dock.scrollHeight || 180));
 
       const nextBelow = others.filter(function (o) { return o.r > cx + 8 && o.l < cx + w - 8 && o.t >= cy + ch - 4; })
         .reduce(function (m, o) { return Math.min(m, o.t); }, sr.height - 8);
@@ -2345,12 +2330,12 @@
     dock.style.setProperty("top", Math.round(top) + "px", "important");
     dock.style.setProperty("right", "auto", "important");
     dock.style.setProperty("bottom", "auto", "important");
-    dock.style.setProperty("width", Math.round(w) + "px", "important");
-    dock.style.setProperty("max-width", Math.round(w) + "px", "important");
+    dock.style.setProperty("width", "auto", "important");
+    dock.style.setProperty("max-width", "min(420px, calc(100% - 72px))", "important");
     dock.style.setProperty("min-width", "0", "important");
     dock.style.setProperty("height", "auto", "important");
-    dock.style.setProperty("min-height", "140px", "important");
-    dock.style.setProperty("max-height", Math.round(hMax) + "px", "important");
+    dock.style.setProperty("min-height", "0", "important");
+    dock.style.setProperty("max-height", Math.max(120, sr.height - top - 8) + "px", "important");
     dock.style.setProperty("transform", "none", "important");
     dock.style.visibility = "";
     dock.classList.add("near");
@@ -2736,7 +2721,6 @@
       state.lastComposerShot = n.id;
       state._scriptShotId = n.id;
       if (state.editor) state.editor.activeShotId = n.id;
-      try { openLaneForDock._for = null; } catch (_) {}
       if (state.cam.s >= 1 && !opts.preserveLayout) {
         if (constrainShotsToViewport()) renderCards();
         constrainCameraToShots(n);
@@ -3746,9 +3730,11 @@
         }
         return;
       }
-      selectNode(n.id, { shift: !!(e.shiftKey) });
+      e.preventDefault();
+      if (state.selected !== n.id || e.shiftKey) {
+        selectNode(n.id, { shift: !!(e.shiftKey) });
+      }
       if (e.shiftKey) {
-        // multi-toggle only — skip drag start to avoid accidental moves
         return;
       }
       const w = clientToWorld(e.clientX, e.clientY);
@@ -3785,8 +3771,17 @@
     if (state.drag) {
       const w = clientToWorld(e.clientX, e.clientY);
       const n = nodeById(state.drag.id);
-      n.x = w.x - state.drag.dx; n.y = w.y - state.drag.dy;
-      renderCards(); drawWires(); positionDock(); return;
+      if (!n) return;
+      n.x = w.x - state.drag.dx;
+      n.y = w.y - state.drag.dy;
+      const el = world.querySelector('.card[data-id="' + n.id + '"]');
+      if (el) {
+        el.style.left = n.x + "px";
+        el.style.top = n.y + "px";
+      }
+      drawWires();
+      if (n.id === state.selected) positionDock();
+      return;
     }
     if (state.pan) {
       state.cam.x = e.clientX - state.pan.x;

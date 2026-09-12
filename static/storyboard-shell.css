@@ -1,4 +1,4 @@
-/* v0821o105-adapt — 写字台框跟选中分镜自适应。↑=生成。无展开。fallback bottom: 12px */
+/* v0821o106-drag — 节点可拖。写字台不锁宽高。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -27,6 +27,8 @@
 .rail { display: none !important; }
 
 .node-acts { display: none !important; }
+.card.shot { touch-action: none; user-select: none; }
+.card img, .card video { -webkit-user-drag: none; user-select: none; pointer-events: none; }
 
 .shot-bar {
   display: none;
@@ -109,7 +111,7 @@
   right: auto !important;
   width: auto !important;
   min-width: 0 !important;
-  max-width: none !important;
+  max-width: min(420px, calc(100% - 72px)) !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -118,7 +120,7 @@
   border: 1px solid #2a2a32;
   box-shadow: 0 12px 36px #0008;
   height: auto !important;
-  min-height: 140px !important;
+  min-height: 0 !important;
   max-height: none !important;
 }
 
