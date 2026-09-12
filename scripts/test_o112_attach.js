@@ -10,7 +10,7 @@ const shell = fs.readFileSync(path.join(root, "static/storyboard-shell.css"), "u
 const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8");
 
 assert.ok(js.includes("v0821o115-tools") || js.includes("v0821o114-full") || js.includes("v0821o113-seko") || js.includes("v0821o112-attach"), "js stamp");
-assert.ok(html.includes("o115tools") || html.includes("o114full") || html.includes("o113seko") || html.includes("o112attach"), "html stamp");
+assert.ok(html.includes("o116tools") || html.includes("o115tools") || html.includes("o114full") || html.includes("o113seko") || html.includes("o112attach"), "html stamp");
 assert.ok(o67.includes("v0821o114-full") || o67.includes("v0821o113-seko") || o67.includes("v0821o112-attach"), "pin stamp");
 const pos = js.match(/function positionDock\(\)[\s\S]*?window\.positionDock = positionDock/);
 assert.ok(pos, "positionDock present");

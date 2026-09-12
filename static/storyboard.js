@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
   // v0821o114: 一个框完整显示，不裁切；stamp v0821o114-full
   // v0821o113: 写字台扁宽条贴分镜下，工具贴上；stamp v0821o113-seko
@@ -2632,12 +2633,9 @@
     const refCount = countRefUrls(null, n).length;
     const remain = Math.max(0, refCap - refCount);
     const eats = catalogEatsRefs(catalogItemForService());
-    const refHint = (!eats && refCount === 0)
-      ? ""
-      : (refCount > refCap
-      ? '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap + ' · 超出上限（不静默丢线）</span>'
-      : '<span class="ref-cap-hint" title="参考图上限">参考 ' + refCount + '/' + refCap +
-          (remain ? (' · 还可 ' + remain) : '') + '</span>');
+    const refHint = (refCount > refCap)
+      ? '<span class="ref-cap-hint">参考 ' + refCount + '/' + refCap + '</span>'
+      : "";
     // Unlinked thumbnails are selectable suggestions, not sent references.
     // Keep them out of this row so the visible count cannot claim 0/n beside
     // a thumbnail that will not be sent.
@@ -2669,9 +2667,7 @@
           '">一键匹配</button>'
       : "";
     // 灌满测试: only when current model eats refs and still has remain capacity
-    const fillBtn = (eats && remain > 0)
-      ? '<button class="chip-btn fill-cap" type="button" data-act="fill-refs-cap" title="灌满至 maxRefs=' + refCap + '">灌满测试</button>'
-      : "";
+    const fillBtn = ""; // 灌满测试 hidden; data-act="fill-refs-cap" not shown
     const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || rematchBtn || fillBtn);
     // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
     // v0821o39: empty capacity slots count as chips so cap is always visible when dock open.
@@ -8757,6 +8753,11 @@
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
     state.dockMode = "expanded";
     selectNode(shot.id, { expand: true, preserveLayout: true });
+    const p = $("prompt");
+    if (p) {
+      try { p.focus(); p.select(); } catch (_) {}
+    }
+    setMsg("在写字台改提示词，确认后点 ↑", "ok");
   }
   async function nineGridFromShot(shot) {
     shot = shot || selectedShot();
@@ -8771,6 +8772,18 @@
       canvas.height = th;
       const ctx = canvas.getContext("2d");
       const created = [];
+      const src = box(shot);
+      const cellW = Math.max(120, Math.round(src.w * 0.38));
+      const cellH = Math.max(90, Math.round(src.h * 0.38));
+      const view = vp.getBoundingClientRect();
+      const scale = state.cam.s || 1;
+      const viewRight = (view.width - state.cam.x) / scale;
+      let originX = shot.x + src.w + 28;
+      let originY = shot.y;
+      if (originX + cellW * 3 + 40 > viewRight) {
+        originX = shot.x;
+        originY = shot.y + src.h + 28;
+      }
       let i = 0;
       for (let gy = 0; gy < 3; gy++) {
         for (let gx = 0; gx < 3; gx++) {
@@ -8783,8 +8796,8 @@
             id: id,
             kind: "shot",
             title: (shot.title || "分镜") + " · 宫" + (i + 1),
-            x: shot.x + box(shot).w + 36 + gx * (Math.round(box(shot).w * 0.42) + 16),
-            y: shot.y + gy * (Math.round(box(shot).h * 0.42) + 16),
+            x: originX + gx * (cellW + 12),
+            y: originY + gy * (cellH + 12),
             url: url,
             prompt: shot.prompt || "",
             negativePrompt: shot.negativePrompt || "",
@@ -8800,6 +8813,7 @@
       const scene = sceneById(shot.sceneId) || (state.script && state.script.scenes[0]);
       if (scene) created.forEach(function (n) { assignShotToScene(n.id, scene.id); });
       renderCards(); drawWires(); persist(); persistServer();
+      panTo(created[4] || created[0]);
       setMsg("九宫格已铺到画布 · " + created.length + " 张，点 ↑ 可再生成", "ok");
     } catch (e) {
       setMsg("九宫格失败：" + ((e && e.message) || e), "bad");
@@ -8982,6 +8996,7 @@
     if (scene) assignShotToScene(id, scene.id);
     state.mode = node.mode;
     selectNode(id, { expand: true, preserveLayout: true });
+    panTo(node);
     persist(); persistServer();
     return node;
   }

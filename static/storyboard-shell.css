@@ -197,7 +197,7 @@ svg.wires path.edge {
   color: #c8c8d0;
   font-size: 11px;
 }
-.zpresets { display: none !important; }
+#shotBar [data-shot-act="more"] { display: none !important; }
 
 /* JS pins left/top to the selected shot. One box, content fully visible. */
 .dock.show,
