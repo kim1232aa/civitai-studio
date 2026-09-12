@@ -1,0 +1,16 @@
+/* v0821o97-dock-pin — 收起条贴选中分镜，禁止 420 岛盖成片 */
+.dock.show.collapsed {
+  width: 280px !important;
+  max-width: 280px !important;
+  min-width: 220px !important;
+  max-height: 96px !important;
+  border-radius: 14px !important;
+}
+.dock.show.collapsed .dock-foot,
+.dock.show.collapsed .bar,
+.dock.show.collapsed #backend,
+.dock.show.collapsed #service { display: none !important; }
+.dock.collapsed {
+  min-width: 220px;
+  max-width: 280px;
+}
