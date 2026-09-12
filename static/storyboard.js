@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
   // v0821o114: 一个框完整显示，不裁切；stamp v0821o114-full
@@ -215,6 +216,41 @@
     { id: "profile", title: "侧拍", prompt: "profile side angle, 90-degree camera" },
     { id: "orbit", title: "环绕", prompt: "subtle orbiting camera, keep subject centered" },
   ];
+  const NINE_SETS = {
+    camera: [
+      { title: "远景", prompt: "extreme wide establishing shot, same person and wardrobe, environment fully visible" },
+      { title: "全景", prompt: "full-body long shot, same person and wardrobe, readable space" },
+      { title: "中景", prompt: "medium shot waist-up, same person and wardrobe, eye-level" },
+      { title: "近景", prompt: "medium close-up chest-up, same person and wardrobe" },
+      { title: "特写", prompt: "close-up face fills the frame, same person, shallow depth of field" },
+      { title: "仰视", prompt: "low angle looking up, same person and wardrobe, heroic" },
+      { title: "俯视", prompt: "high angle looking down, same person and wardrobe" },
+      { title: "过肩", prompt: "over-the-shoulder, same person, foreground shoulder in frame" },
+      { title: "侧写", prompt: "profile side angle, same person and wardrobe, 90-degree camera" },
+    ],
+    story: [
+      { title: "起幅", prompt: "the beat just before this moment, same person, wider context" },
+      { title: "进入", prompt: "character enters the action, same wardrobe, continuous space" },
+      { title: "对视", prompt: "eye-line exchange, same person, emotional beat" },
+      { title: "动作", prompt: "the key action of this moment continuing, same person" },
+      { title: "反应", prompt: "reaction shot, same person, face readable" },
+      { title: "细节", prompt: "insert detail that belongs to this scene, keep identity" },
+      { title: "环境", prompt: "environment plate of this scene, same lighting" },
+      { title: "推进", prompt: "camera pushes in, same person, rising tension" },
+      { title: "收幅", prompt: "the moment after, same person, breath and space" },
+    ],
+    storm: [
+      { title: "荷兰角", prompt: "dutch angle, same person and wardrobe, uneasy staging" },
+      { title: "鱼眼", prompt: "subtle fisheye, same person, exaggerated space" },
+      { title: "剪影", prompt: "silhouette against bright background, same wardrobe" },
+      { title: "背面", prompt: "from behind, same person walking into the space" },
+      { title: "镜面", prompt: "seen in a reflective surface, same person" },
+      { title: "遮挡", prompt: "foreground occlusion, same person, cinematic frame" },
+      { title: "顶视", prompt: "top-down bird view, same person in the space" },
+      { title: "贴地", prompt: "ground-level camera, same person, large foreground" },
+      { title: "远切", prompt: "smash cut to a much wider view, same scene and wardrobe" },
+    ],
+  };
 
   const state = {
     cam: { x: 110, y: 28, s: 0.5 },
@@ -8759,90 +8795,113 @@
     }
     setMsg("在写字台改提示词，确认后点 ↑", "ok");
   }
-  async function nineGridFromShot(shot) {
+  async function nineGridFromShot(shot, setId) {
     shot = shot || selectedShot();
-    if (!shot || !shot.url) { setMsg("先有成片再切九宫格", "warn"); return; }
-    setMsg("正在切九宫格…");
-    try {
-      const img = await loadImageEl(shot.url);
-      const tw = Math.max(8, Math.floor(img.naturalWidth / 3));
-      const th = Math.max(8, Math.floor(img.naturalHeight / 3));
-      const canvas = document.createElement("canvas");
-      canvas.width = tw;
-      canvas.height = th;
-      const ctx = canvas.getContext("2d");
-      const created = [];
-      const src = box(shot);
-      const cellW = Math.max(120, Math.round(src.w * 0.38));
-      const cellH = Math.max(90, Math.round(src.h * 0.38));
-      const view = vp.getBoundingClientRect();
-      const scale = state.cam.s || 1;
-      const viewRight = (view.width - state.cam.x) / scale;
-      let originX = shot.x + src.w + 28;
-      let originY = shot.y;
-      if (originX + cellW * 3 + 40 > viewRight) {
-        originX = shot.x;
-        originY = shot.y + src.h + 28;
-      }
-      let i = 0;
-      for (let gy = 0; gy < 3; gy++) {
-        for (let gx = 0; gx < 3; gx++) {
-          ctx.clearRect(0, 0, tw, th);
-          ctx.drawImage(img, gx * tw, gy * th, tw, th, 0, 0, tw, th);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-          const url = await uploadDataUrl(dataUrl, (shot.title || "shot") + "-g" + (i + 1) + ".jpg");
-          const id = uid("shot");
-          const node = {
-            id: id,
-            kind: "shot",
-            title: (shot.title || "分镜") + " · 宫" + (i + 1),
-            x: originX + gx * (cellW + 12),
-            y: originY + gy * (cellH + 12),
-            url: url,
-            prompt: shot.prompt || "",
-            negativePrompt: shot.negativePrompt || "",
-            mode: "image",
-          };
-          state.nodes.push(node);
-          state.edges.push({ from: shot.id, to: id });
-          created.push(node);
-          i += 1;
-        }
-      }
-      ensureWorkspaceModel();
-      const scene = sceneById(shot.sceneId) || (state.script && state.script.scenes[0]);
-      if (scene) created.forEach(function (n) { assignShotToScene(n.id, scene.id); });
-      renderCards(); drawWires(); persist(); persistServer();
-      panTo(created[4] || created[0]);
-      setMsg("九宫格已铺到画布 · " + created.length + " 张，点 ↑ 可再生成", "ok");
-    } catch (e) {
-      setMsg("九宫格失败：" + ((e && e.message) || e), "bad");
-    }
+    if (!shot || !shot.url) { setMsg("先有成片再做九宫格", "warn"); return; }
+    const set = NINE_SETS[setId] || NINE_SETS.camera;
+    const src = box(shot);
+    const cellW = src.w + 36;
+    const cellH = src.h + 36;
+    const originX = shot.x + src.w + 72;
+    const originY = shot.y;
+    const created = [];
+    set.forEach(function (cell, i) {
+      const gx = i % 3;
+      const gy = Math.floor(i / 3);
+      const node = spawnLinkedShot(shot, {
+        titleSuffix: " · " + cell.title,
+        prompt: ((shot.prompt || "").trim() + "\n" + cell.prompt + "。keep identity, wardrobe, and lighting.").trim(),
+        mode: "image",
+        firstFrameFromSource: true,
+        skipSelect: true,
+        skipPan: true,
+      });
+      if (!node) return;
+      node.x = originX + gx * cellW;
+      node.y = originY + gy * cellH;
+      node.url = shot.url;
+      created.push(node);
+    });
+    renderCards(); drawWires(); persist(); persistServer();
+    const gridW = cellW * 3;
+    const gridH = cellH * 3;
+    const r = vp.getBoundingClientRect();
+    const needS = Math.min(state.cam.s || 0.5, (r.width * 0.62) / gridW, (r.height * 0.62) / gridH);
+    state.cam.s = Math.max(0.22, needS);
+    state.cam.x = r.width * 0.52 - (originX + gridW / 2) * state.cam.s;
+    state.cam.y = r.height * 0.46 - (originY + gridH / 2) * state.cam.s;
+    applyCam();
+    setMsg("九宫格 9 个机位已铺开 · 正在按成片生成", "ok");
+    generateShotQueue(created, "九宫格");
   }
-  function storyAdvanceFromShot(shot, seconds) {
+  function showNinePop(anchor) {
+    const shot = selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再做九宫格", "warn"); return; }
+    hideToolPops();
+    let pop = $("ninePop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "ninePop";
+      pop.className = "story-pop";
+      pop.innerHTML = '<button type="button" data-nine="camera">多机位</button>' +
+        '<button type="button" data-nine="story">故事叙述</button>' +
+        '<button type="button" data-nine="storm">灵感风暴</button>';
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-nine]");
+        if (!b) return;
+        pop.hidden = true;
+        nineGridFromShot(selectedShot(), b.getAttribute("data-nine"));
+      });
+    }
+    placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnNine"]') || $("btnNine"));
+  }
+  function storyAdvanceFromShot(shot, seconds, dir) {
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
-    const id = uid("shot");
-    const node = {
-      id: id,
-      kind: "shot",
-      title: (shot.title || "分镜") + " · +" + seconds + "s",
-      x: shot.x + box(shot).w + 48,
-      y: shot.y + (seconds === 5 ? Math.round(box(shot).h * 0.55) : 0),
-      url: "",
-      firstFrameId: shot.url ? shot.id : (shot.firstFrameId || ""),
-      prompt: ((shot.prompt || "").trim() + "\n下一镜，往后 " + seconds + " 秒的画面，承接上一镜的动作、空间与角色位置。").trim(),
-      negativePrompt: shot.negativePrompt || "",
-      mode: shot.mode || "image",
-    };
-    state.nodes.push(node);
-    state.edges.push({ from: shot.id, to: id });
-    ensureWorkspaceModel();
-    const scene = sceneById(shot.sceneId) || (state.script && state.script.scenes[0]);
-    if (scene) assignShotToScene(id, scene.id);
-    selectNode(id, { collapsed: true, preserveLayout: true });
-    persist(); persistServer();
-    setMsg("已推演 +" + seconds + " 秒新分镜 · 不会自动生成，确认后点 ↑", "ok");
+    dir = dir || "next";
+    const goingBack = dir === "back";
+    const beat = goingBack
+      ? ("上一镜，时间往回 " + seconds + " 秒。同一角色同一场，拍这一动作开始之前的那一拍，空间和光线连续，不要跳切。")
+      : ("下一镜，时间往后 " + seconds + " 秒。同一角色同一场，拍这一动作的下一拍，空间和光线连续，不要跳切。");
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: goingBack ? (" · -" + seconds + "s") : (" · +" + seconds + "s"),
+      prompt: ((shot.prompt || "").trim() + "\n" + beat).trim(),
+      mode: "image",
+      firstFrameFromSource: !!shot.url,
+    });
+    if (node && shot.url) node.url = shot.url;
+    renderCards(); drawWires();
+    if (node) panTo(node);
+    setMsg((goingBack ? "往前 " : "往后 ") + seconds + " 秒已出分镜 · 正在生成", "ok");
+    if (node) generateShotQueue([node], "故事推演");
+  }
+  function generateShotQueue(nodes, label) {
+    if (!nodes || !nodes.length) return;
+    if (state._genQueueBusy) {
+      state._genQueue = (state._genQueue || []).concat(nodes.map(function (n) { return n; }));
+      return;
+    }
+    state._genQueueBusy = true;
+    (async function () {
+      const list = nodes.slice();
+      for (let i = 0; i < list.length; i++) {
+        const n = list[i];
+        if (!n || !n.id) continue;
+        setMsg((label || "生成") + " " + (i + 1) + "/" + list.length + " · " + (n.title || ""), "ok");
+        try {
+          selectNode(n.id, { expand: true, preserveLayout: true });
+          await rematchAfterSpawn(n, n.url ? "i2i" : "t2i");
+          await runShotUntilDone(n.id, (label || "") + " " + (i + 1) + "/" + list.length);
+        } catch (e) {
+          setMsg((n.title || "分镜") + " 失败：" + ((e && e.message) || e), "bad");
+        }
+      }
+      state._genQueueBusy = false;
+      const extra = state._genQueue || [];
+      state._genQueue = [];
+      if (extra.length) generateShotQueue(extra, label);
+    })();
   }
   function beginCrop(shot) {
     shot = shot || selectedShot();
@@ -8890,7 +8949,7 @@
     rematchAfterSpawn(node, shot.url ? "i2i" : "t2i");
   }
   function hideToolPops() {
-    ["lightPop", "camPop", "lastPop", "storyPop", "morePop"].forEach(function (id) {
+    ["lightPop", "camPop", "lastPop", "storyPop", "morePop", "ninePop"].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.hidden = true;
@@ -8995,8 +9054,8 @@
     const scene = sceneById(source.sceneId) || (state.script && state.script.scenes[0]);
     if (scene) assignShotToScene(id, scene.id);
     state.mode = node.mode;
-    selectNode(id, { expand: true, preserveLayout: true });
-    panTo(node);
+    if (!opts.skipSelect) selectNode(id, { expand: true, preserveLayout: true });
+    if (!opts.skipPan) panTo(node);
     persist(); persistServer();
     return node;
   }
@@ -9170,13 +9229,16 @@
       pop.id = "storyPop";
       pop.className = "story-pop";
       pop.hidden = true;
-      pop.innerHTML = '<button type="button" data-story="3">往后 3 秒</button><button type="button" data-story="5">往后 5 秒</button>';
+      pop.innerHTML = '<button type="button" data-story="3" data-dir="next">往后 3 秒</button>' +
+        '<button type="button" data-story="5" data-dir="next">往后 5 秒</button>' +
+        '<button type="button" data-story="3" data-dir="back">往前 3 秒</button>' +
+        '<button type="button" data-story="5" data-dir="back">往前 5 秒</button>';
       document.body.appendChild(pop);
       pop.addEventListener("click", function (ev) {
         const b = ev.target.closest("[data-story]");
         if (!b) return;
         pop.hidden = true;
-        storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3);
+        storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3, b.getAttribute("data-dir") || "next");
       });
     }
     if (!pop.hidden) { pop.hidden = true; return; }
@@ -9186,7 +9248,7 @@
   function runShotTool(id, anchor) {
     if (id === "btnPano") panoFromShot(selectedShot());
     else if (id === "btnCamera") showCamPop(anchor);
-    else if (id === "btnNine") nineGridFromShot(selectedShot());
+    else if (id === "btnNine") showNinePop(anchor);
     else if (id === "btnLight") showLightPop(anchor);
     else if (id === "btnStory") showStoryPop(anchor);
     else if (id === "btnErase") beginErase(selectedShot());
@@ -9253,7 +9315,7 @@
   if ($("btnDownload")) $("btnDownload").onclick = function () { downloadShot(selectedShot()); };
   if ($("btnEditNode")) $("btnEditNode").onclick = function () { editSelectedShot(); };
   if ($("btnCrop")) $("btnCrop").onclick = function () { beginCrop(selectedShot()); };
-  if ($("btnNine")) $("btnNine").onclick = function () { nineGridFromShot(selectedShot()); };
+  if ($("btnNine")) $("btnNine").onclick = function (e) { e.stopPropagation(); showNinePop(e.currentTarget); };
   if ($("btnStory")) {
     $("btnStory").onclick = function (e) {
       e.stopPropagation();
@@ -9290,7 +9352,7 @@
   if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
   if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(e.currentTarget); };
   document.addEventListener("click", function (e) {
-    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#btnLight,#btnCamera,#btnLast,#btnStory,[data-node-act],#shotBar")) return;
+    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#ninePop,#btnLight,#btnCamera,#btnLast,#btnStory,#btnNine,[data-node-act],#shotBar")) return;
     hideToolPops();
   });
   world.addEventListener("click", function (e) {
