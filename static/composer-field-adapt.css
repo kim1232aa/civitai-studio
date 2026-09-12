@@ -37,9 +37,8 @@ textarea.param-unsupported-control{
   overflow: hidden;
 }
 .dock.show.collapsed {
-  width: 280px !important;
   max-width: 280px !important;
-  min-width: 220px !important;
+  min-width: 200px !important;
   height: auto !important;
   max-height: 112px !important;
   border-radius: 14px !important;
@@ -150,8 +149,8 @@ textarea.param-unsupported-control{
   display: none !important;
 }
 .dock.show.expanded {
-  max-width: min(360px, calc(100vw - 72px));
-  max-height: min(48vh, 360px) !important;
+  max-width: min(720px, calc(100vw - 72px));
+  max-height: min(36vh, 320px) !important;
   min-width: 280px;
   overflow: hidden;
 }

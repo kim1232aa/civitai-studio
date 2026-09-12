@@ -18,7 +18,7 @@ assert.ok(!/Math\.min\(420, Math\.max\(300, nw\)\)/.test(js), "420 island gone f
 assert.ok(adapt.includes("white-space: nowrap") || adapt.includes("white-space:nowrap"), "expand nowrap");
 assert.ok(adapt.includes("text-overflow: ellipsis"), "title ellipsis");
 assert.ok(adapt.includes("collapsed #paramWarn") || adapt.includes("#paramWarn"), "hide catalog warn in collapsed");
-assert.ok(o67.includes("Never sit beside") || o67.includes("onCardTop"), "pin stays on selected card");
+assert.ok(o67.includes("Never sit beside") || o67.includes("onCardTop") || o67.includes("selected shot's own bottom"), "pin stays on selected card");
 assert.ok(!/cands\.push\(\{ left: x \+ nw \+ gap/.test(o67), "collapsed pin does not prefer neighbor side");
 assert.ok(pinCss.includes("white-space: nowrap") || pinCss.includes("white-space:nowrap"), "pin css nowrap");
 assert.ok(html.includes(">展开<"), "expand label is one word");

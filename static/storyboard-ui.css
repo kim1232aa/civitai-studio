@@ -307,8 +307,9 @@ header {
   font-size: 18px;
 }
 .dock.expanded {
-  width: min(360px, calc(100vw - 48px));
-  max-width: min(360px, calc(100vw - 48px));
+  width: min(720px, calc(100vw - 48px));
+  max-width: min(720px, calc(100vw - 48px));
+  max-height: min(36vh, 320px);
 }
 .light-pop, .cam-pop, .last-pop {
   position: absolute;

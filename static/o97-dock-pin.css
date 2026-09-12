@@ -1,8 +1,7 @@
 /* v0821o99-capsule-row — 收起=提示词+家+模型+↑，贴选中分镜下沿；展开不撑出视口 */
 .dock.show.collapsed {
-  width: 280px !important;
   max-width: 280px !important;
-  min-width: 220px !important;
+  min-width: 200px !important;
   max-height: 112px !important;
   border-radius: 14px !important;
   overflow: hidden !important;
@@ -32,6 +31,6 @@
 }
 .dock.show.expanded,
 .dock.expanded {
-  max-width: min(360px, calc(100vw - 72px)) !important;
-  max-height: min(48vh, 360px) !important;
+  max-width: min(720px, calc(100vw - 72px)) !important;
+  max-height: min(36vh, 320px) !important;
 }

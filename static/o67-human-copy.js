@@ -137,7 +137,7 @@
     }
   }
 
-  var PIN = "v0821o99-capsule-row";
+  var PIN = "v0821o100-desk";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -147,14 +147,14 @@
     var css = document.createElement("style");
     css.id = "o97PinCss";
     css.textContent = [
-      ".dock.show.collapsed,.dock.collapsed{width:280px !important;max-width:280px !important;min-width:220px !important;height:auto !important;max-height:112px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
+      ".dock.show.collapsed,.dock.collapsed{max-width:280px !important;min-width:200px !important;height:auto !important;max-height:112px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
       ".dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}",
       ".dock.show.collapsed .dock-hd{flex-wrap:nowrap !important;overflow:hidden;align-items:center;}",
       ".dock.show.collapsed #dockExpand{white-space:nowrap !important;flex:0 0 auto !important;}",
       ".dock.show.collapsed #dockTitle,.dock.show.collapsed .dock-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;}",
       ".dock.show.collapsed #paramWarn,.dock.show.collapsed #msg,.dock.show.collapsed .msg,.dock.show.collapsed #catalogStatus{display:none !important;}",
       ".dock.show.collapsed #sendCap{width:28px !important;height:28px !important;flex:0 0 28px !important;}",
-      ".dock.show.expanded,.dock.expanded{max-width:360px !important;max-height:min(48vh,360px) !important;}"
+      ".dock.show.expanded,.dock.expanded{max-width:min(720px, calc(100vw - 72px)) !important;max-height:min(36vh,320px) !important;}"
     ].join("");
     document.head.appendChild(css);
   }
@@ -234,36 +234,30 @@
     var others = neighborRects(card, sr);
     var left, top, dockW, dockH;
     if (expanded) {
-      dockW = Math.min(360, Math.max(280, areaR - areaL));
-      dockH = 220;
-      var side = areaR - (x + nw + gap);
-      if (side >= 280 && !hitsOthers(x + nw + gap, y, Math.min(400, side), dockH, others)) {
-        left = x + nw + gap; top = y; dockW = Math.min(400, side);
-      } else if (x - gap - 280 >= areaL && !hitsOthers(x - gap - Math.min(400, x - gap - areaL), y, Math.min(400, x - gap - areaL), dockH, others)) {
-        dockW = Math.min(400, x - gap - areaL); left = x - gap - dockW; top = y;
+      // Prefer beside the node. If the row is packed, fall back to o93
+      // bottom desk — never a 360 island floating in the empty canvas.
+      var sideW = Math.min(360, Math.max(280, areaR - (x + nw + gap)));
+      if (sideW >= 280 && !hitsOthers(x + nw + gap, y, sideW, 280, others)) {
+        dockW = sideW; dockH = 280;
+        left = x + nw + gap; top = y;
+      } else if (x - gap - 280 >= areaL && !hitsOthers(x - gap - 280, y, 280, 280, others)) {
+        dockW = 280; dockH = 280;
+        left = x - gap - dockW; top = y;
       } else {
-        left = clamp(x, areaL, areaR - dockW);
-        top = belowBand(left, dockW, y + nh, others) + gap;
+        dockW = Math.min(720, Math.max(420, areaR - areaL));
+        dockH = Math.min(260, Math.max(180, areaB - 24));
+        left = areaL;
+        top = Math.max(areaT, areaB - dockH);
       }
-      if (top + 200 > areaB) top = Math.max(areaT, areaB - 220);
     } else {
-      dockW = 280; dockH = 108;
-      // Under the selected card, centered on it. Never sit beside it
-      // (that covers the next shot in the row at 50% zoom).
-      var underLeft = x + Math.max(0, (nw - dockW) / 2);
-      if (nw >= dockW) {
-        if (underLeft < x) underLeft = x;
-        if (underLeft + dockW > x + nw) underLeft = x + nw - dockW;
-      }
-      underLeft = clamp(underLeft, areaL, areaR - dockW);
-      var underTop = y + nh + gap;
-      var onCardTop = y + Math.max(36, nh - dockH);
-      var underOk = (underTop + dockH <= areaB + 8) && !hitsOthers(underLeft, underTop, dockW, dockH, others);
-      if (underOk) {
-        left = underLeft; top = underTop;
-      } else {
-        left = underLeft; top = onCardTop;
-      }
+      // o95/composer-desk: sit ON the selected shot's own bottom, not in the void below.
+      dockW = Math.min(280, Math.max(200, Math.round(nw)));
+      dockH = 108;
+      left = x + Math.max(0, (nw - dockW) / 2);
+      if (left < x) left = x;
+      if (left + dockW > x + nw) left = Math.max(x, x + nw - dockW);
+      left = clamp(left, areaL, areaR - dockW);
+      top = y + Math.max(36, nh - dockH);
     }
     left = clamp(left, areaL, areaR - dockW);
     top = clamp(top, areaT, areaB - 72);
