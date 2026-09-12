@@ -1,4 +1,4 @@
-/* v0821o108-unhide — 右键删除、加号、主体库回来。框跟内容长，不锁死。fallback bottom: 12px */
+/* v0821o109-room — 主体库和写字台不再挤。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -25,11 +25,80 @@
 
 .rail {
   display: flex !important;
-  left: 12px !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  left: 72px !important;
   bottom: 108px !important;
-  width: 168px !important;
-  max-height: 168px !important;
+  width: 248px !important;
+  max-width: 248px !important;
+  min-width: 248px !important;
+  max-height: min(42vh, 340px) !important;
+  min-height: 160px !important;
+  padding: 10px !important;
+  gap: 8px !important;
   z-index: 19 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+.rail-tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.rail-tabs button {
+  flex: 1;
+  height: 28px;
+  border: 1px solid #303034;
+  border-radius: 8px;
+  background: #1b1b1e;
+  color: #c8c8d0;
+  font-size: 12px;
+}
+.rail-tabs button.on {
+  border-color: rgba(94,224,197,.45);
+  color: #dffcf5;
+}
+.rail-h {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #9a9aa3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 8px;
+  min-height: 48px;
+}
+.rail-item img,
+.rail-item video {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.rail-item span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #e8e8ec;
+}
+.rail-item .pin {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 8px;
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 .node-acts { display: none !important; }
@@ -139,8 +208,8 @@ svg.wires path.edge {
   position: absolute !important;
   right: auto !important;
   width: auto !important;
-  min-width: 280px !important;
-  max-width: min(640px, calc(100% - 96px)) !important;
+  min-width: 320px !important;
+  max-width: min(720px, calc(100% - 96px)) !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -334,17 +403,17 @@ svg.wires path.edge {
 .dock.show.collapsed .dock-prompt {
   display: flex !important;
   flex: 1 1 auto;
-  min-height: 52px !important;
-  max-height: 72px !important;
+  min-height: 64px !important;
+  max-height: none !important;
   padding: 0;
 }
 .dock.show #prompt,
 .dock.show.collapsed #prompt {
-  min-height: 52px !important;
-  max-height: 72px !important;
-  height: 56px !important;
+  min-height: 64px !important;
+  max-height: none !important;
+  height: auto !important;
   padding: 8px 10px;
-  resize: none;
+  resize: vertical;
 }
 .dock.show #negative,
 .dock.show #paramWarn,
@@ -362,26 +431,56 @@ svg.wires path.edge {
 .dock.show .lora-block,
 .dock.show.collapsed .lora-block {
   display: block !important;
-  max-height: 40px;
-  overflow: auto;
-  margin: 0;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+}
+.dock.show .lora-hint,
+.dock.show #loraHint {
+  display: block !important;
+  margin: 2px 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #c9b56a;
+  white-space: normal !important;
+}
+.dock.show .lora-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .dock.show .bar,
 .dock.show.collapsed .bar {
   display: flex !important;
   flex-wrap: wrap !important;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px 12px;
   margin: 0;
-  overflow-x: auto;
+  overflow: visible !important;
 }
 .dock.show .param-group,
 .dock.show.collapsed .param-group {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   align-items: flex-end;
-  overflow-x: auto;
+  overflow: visible !important;
+  width: 100%;
+}
+.dock.show .param-field {
+  min-width: 84px;
+}
+.dock.show .param-field input,
+.dock.show .param-field select {
+  height: 32px;
+  min-width: 84px;
+  width: 96px;
+}
+.dock.show .param-field.param-span input,
+.dock.show #seed {
+  min-width: 160px !important;
+  width: 180px !important;
 }
 .dock.show #backend,
 .dock.show #service,
@@ -389,9 +488,9 @@ svg.wires path.edge {
 .dock.show.collapsed #service {
   display: block !important;
   height: 32px;
-  min-width: 0;
-  max-width: none;
-  flex: 1 1 96px;
+  min-width: 168px;
+  max-width: 280px;
+  flex: 1 1 180px;
 }
 .dock.show #msg,
 .dock.show .msg {

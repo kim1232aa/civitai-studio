@@ -69,19 +69,21 @@ header {
 }
 .selbar.on { display: flex; }
 .rail {
-  left: 16px;
+  left: 72px;
   top: auto;
-  bottom: 130px;
-  width: 160px;
-  max-height: 92px;
-  padding: 8px;
-  gap: 6px;
+  bottom: 108px;
+  width: 248px;
+  max-height: min(42vh, 340px);
+  padding: 10px;
+  gap: 8px;
   border: 1px solid #303034;
   border-radius: 14px;
   background: #1a1a1ded;
   box-shadow: 0 6px 20px #0002;
   z-index: 12;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 .rail .rail-item img,
 .rail .rail-item video { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }

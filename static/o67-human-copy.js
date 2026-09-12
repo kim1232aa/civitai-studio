@@ -142,7 +142,7 @@
     }
   }
 
-  var PIN = "v0821o108-unhide";
+  var PIN = "v0821o109-room";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -154,7 +154,7 @@
     css.textContent = [
       ".chip{width:44px !important;height:44px !important;overflow:hidden !important}",
       ".chip img,.chip video{width:44px !important;height:44px !important;object-fit:cover !important}",
-      ".dock.show,.dock.show.collapsed,.dock.show.expanded{right:auto !important;width:auto !important;min-width:280px !important;max-width:min(640px,calc(100% - 96px)) !important;transform:none !important;height:auto !important;max-height:none !important;min-height:0 !important}",
+      ".dock.show,.dock.show.collapsed,.dock.show.expanded{right:auto !important;width:auto !important;min-width:320px !important;max-width:min(720px,calc(100% - 96px)) !important;transform:none !important;height:auto !important;max-height:none !important;min-height:0 !important}",
       ".dock.show #dockExpand,.dock.show #dockCollapse,.dock.show #dockHint,.dock.show .expand-only,.dock.show .collapse-only{display:none !important}"
     ].join("");
     document.head.appendChild(css);

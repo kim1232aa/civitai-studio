@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o108: 右键删除/加号/主体库回来，框不锁死; stamp v0821o108-unhide
+  // v0821o109: 主体库和写字台留空，不挤; stamp v0821o109-room
   // v0821o107: 连线不挡、端口可见; stamp v0821o107-wires
   // v0821o106: 节点可拖，写字台不锁宽高、不改别人坐标; stamp v0821o106-drag
   // v0821o105: 写字台框自适应选中分镜; stamp v0821o105-adapt
@@ -2248,8 +2248,8 @@
       const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
         .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
       dock.style.setProperty("width", "auto", "important");
-      dock.style.setProperty("max-width", "min(640px, calc(100% - 96px))", "important");
-      dock.style.setProperty("min-width", "280px", "important");
+      dock.style.setProperty("max-width", "min(720px, calc(100% - 96px))", "important");
+      dock.style.setProperty("min-width", "320px", "important");
       dock.style.setProperty("height", "auto", "important");
       dock.style.setProperty("max-height", "none", "important");
       dock.style.setProperty("min-height", "0", "important");
@@ -2315,8 +2315,8 @@
     dock.style.setProperty("right", "auto", "important");
     dock.style.setProperty("bottom", "auto", "important");
     dock.style.setProperty("width", "auto", "important");
-    dock.style.setProperty("max-width", "min(640px, calc(100% - 96px))", "important");
-    dock.style.setProperty("min-width", "280px", "important");
+    dock.style.setProperty("max-width", "min(720px, calc(100% - 96px))", "important");
+    dock.style.setProperty("min-width", "320px", "important");
     dock.style.setProperty("height", "auto", "important");
     dock.style.setProperty("min-height", "0", "important");
     dock.style.setProperty("max-height", "none", "important");
