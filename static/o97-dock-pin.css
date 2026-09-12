@@ -1,10 +1,10 @@
-/* v0821o105-adapt — 框跟分镜自适应。fallback bottom: 12px */
+/* v0821o112-attach — 框跟分镜自适应，高度有上限避免盖住整列分镜 */
 .dock.show.collapsed,
 .dock.show.expanded,
 .dock.expanded {
   min-width: 0 !important;
-  max-width: none !important;
-  max-height: none !important;
+  max-width: min(720px, calc(100% - 80px)) !important;
+  max-height: min(42vh, calc(100% - 48px)) !important;
 }
 .dock.show.collapsed #paramWarn,
 .dock.show.collapsed #msg,

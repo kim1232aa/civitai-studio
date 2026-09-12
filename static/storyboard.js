@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o112: 写字台只贴选中分镜上下，宽跟分镜走；stamp v0821o112-attach
   // v0821o110: 剧本策划/编辑器不带写字台; stamp v0821o110-ws
   // v0821o107: 连线不挡、端口可见; stamp v0821o107-wires
   // v0821o106: 节点可拖，写字台不锁宽高、不改别人坐标; stamp v0821o106-drag
@@ -2224,114 +2225,148 @@
       hideShotBar();
       return;
     }
-    const stage = dock.closest(".stage") || vp.parentElement;
-    const sr = stage.getBoundingClientRect();
+    const stageEl = dock.closest(".stage") || vp.parentElement;
+    const sr = stageEl.getBoundingClientRect();
     const gap = 8;
     const barH = 36;
     const card = world.querySelector('.card.shot[data-id="' + n.id + '"]');
-    let left = 72, top = Math.max(48, sr.height - 180 - 12), w = 320, hMax = 280;
-
-    function hitsRect(L, T, W, H, others) {
-      return others.some(function (o) {
-        return !(L + W <= o.l - 6 || L >= o.r + 6 || T + H <= o.t - 6 || T >= o.b + 6);
+    if (!card) {
+      hideShotBar();
+      return;
+    }
+    const cr = card.getBoundingClientRect();
+    const cx = cr.left - sr.left;
+    const cy = cr.top - sr.top;
+    const cw = cr.width;
+    const ch = cr.height;
+    const others = [...world.querySelectorAll(".card")].filter(function (el) { return el !== card; })
+      .map(function (el) {
+        const r = el.getBoundingClientRect();
+        return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top };
       });
+    function gapBelow(L, W, fromY) {
+      let nearest = sr.height - fromY - 12;
+      others.forEach(function (o) {
+        if (o.r <= L + 8 || o.l >= L + W - 8) return;
+        if (o.b <= fromY + 4) return;
+        if (o.t <= fromY + 4) nearest = 0;
+        else nearest = Math.min(nearest, o.t - fromY);
+      });
+      return nearest;
+    }
+    function gapAbove(L, W, fromY) {
+      let nearest = fromY - 44;
+      others.forEach(function (o) {
+        if (o.r <= L + 8 || o.l >= L + W - 8) return;
+        if (o.t >= fromY - 4) return;
+        if (o.b >= fromY - 4) nearest = 0;
+        else nearest = Math.min(nearest, fromY - o.b);
+      });
+      return nearest;
     }
 
-    if (card) {
-      const cr = card.getBoundingClientRect();
-      const cx = cr.left - sr.left;
-      const cy = cr.top - sr.top;
-      const cw = cr.width;
-      const ch = cr.height;
-      const others = [...world.querySelectorAll(".card")].filter(function (el) { return el !== card; })
-        .map(function (el) {
-          const r = el.getBoundingClientRect();
-          return { l: r.left - sr.left, t: r.top - sr.top, r: r.right - sr.left, b: r.bottom - sr.top };
-        });
-      const sameRow = others.filter(function (o) { return o.t < cy + ch - 8 && o.b > cy + 8; });
-      const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
-        .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
-      dock.style.setProperty("width", "auto", "important");
-      dock.style.setProperty("max-width", "min(720px, calc(100% - 96px))", "important");
-      dock.style.setProperty("min-width", "320px", "important");
-      dock.style.setProperty("height", "auto", "important");
-      dock.style.setProperty("max-height", "none", "important");
-      dock.style.setProperty("min-height", "0", "important");
-      const dw = Math.max(200, dock.offsetWidth || 280);
-      const dh = Math.max(80, dock.offsetHeight || 160);
-      const clampX = function (x) { return Math.max(12, Math.min(x, sr.width - dw - 12)); };
-      const clampY = function (y) { return Math.max(44, Math.min(y, sr.height - Math.min(dh, 220) - 8)); };
-      const cands = [
-        { left: clampX(cx), top: cy + ch + gap },
-        { left: clampX(cx), top: cy - gap - dh },
-        { left: clampX(cx + cw + gap), top: cy },
-        { left: clampX(cx - gap - dw), top: cy },
-        { left: 72, top: Math.max(44, sr.height - Math.min(dh, 220) - 12) }
-      ];
-      let placed = null;
-      for (let i = 0; i < cands.length; i++) {
-        const c = cands[i];
-        if (c.top < 44 || c.top + Math.min(dh, 240) > sr.height - 4) continue;
-        if (!hitsRect(c.left, c.top, dw, Math.min(dh, 240), others)) { placed = c; break; }
-      }
-      if (!placed) {
-        // fallback bottom desk — never cover neighbor shots
-        placed = { left: 72, top: Math.max(44, sr.height - Math.min(dh, 180) - 12) };
-      }
-      left = placed.left;
-      top = placed.top;
-      hMax = Math.min(dh, Math.max(120, sr.height - top - 8));
-      w = dw;
-      const h = hMax;
+    // 宽跟选中分镜走，上限 720；不锁死 420，也不铺半个画布
+    const maxW = Math.min(720, Math.max(280, sr.width - 80));
+    const dw = Math.max(320, Math.min(Math.round(cw), maxW));
+    let left = cx + (cw - dw) / 2;
+    left = Math.max(12, Math.min(left, sr.width - dw - 12));
 
-      const bar = $("shotBar");
-      if (bar) {
-        bar.hidden = false;
-        bar.classList.add("show");
-        bar.style.width = "max-content";
-        bar.style.maxWidth = "none";
-        bar.style.overflow = "visible";
-        const bw = Math.max(bar.offsetWidth || 480, 280);
-        let bx = cx + (cw - bw) / 2;
-        bx = Math.max(64, Math.min(bx, sr.width - bw - 12));
-        let by = cy - gap - barH;
-        if (by < 44) by = 44;
-        if (top + h <= cy + 4) {
-          by = Math.min(cy - gap - barH, Math.max(44, top + h + 4));
-        }
-        Object.assign(bar.style, {
-          left: Math.round(bx) + "px",
-          top: Math.round(by) + "px",
-          right: "auto",
-          bottom: "auto",
-          width: "max-content",
-          maxWidth: "none",
-          overflow: "visible",
-          transform: "none",
-        });
-      }
+    dock.style.setProperty("width", dw + "px", "important");
+    dock.style.setProperty("max-width", dw + "px", "important");
+    dock.style.setProperty("min-width", Math.min(320, dw) + "px", "important");
+    dock.style.setProperty("height", "auto", "important");
+    dock.style.setProperty("max-height", "none", "important");
+    const naturalH = Math.max(128, dock.offsetHeight || 180);
+    const belowRoom = gapBelow(left, dw, cy + ch);
+    const aboveRoom = gapAbove(left, dw, cy);
+    const minSlot = 140;
+    let top;
+    let maxH;
+    let attach = "below";
+    if (belowRoom >= minSlot) {
+      attach = "below";
+      top = cy + ch + gap;
+      maxH = Math.min(naturalH, Math.max(minSlot, belowRoom - gap - 4));
+    } else if (aboveRoom >= minSlot) {
+      attach = "above";
+      maxH = Math.min(naturalH, Math.max(minSlot, aboveRoom - gap - 4));
+      top = cy - gap - maxH;
     } else {
-      hideShotBar();
+      // 上下都挤：仍贴在分镜下，框内滚动。绝不挪到左边盖住别人。
+      attach = "below";
+      top = cy + ch + gap;
+      maxH = Math.min(naturalH, Math.max(120, sr.height - top - 12));
+    }
+    if (top < 44) {
+      maxH = Math.max(120, maxH - (44 - top));
+      top = 44;
+    }
+    if (top + 80 > sr.height - 4) {
+      // fallback bottom desk — only when the selected shot is off-screen
+      top = Math.max(44, sr.height - Math.min(naturalH, 220) - 12);
+      maxH = Math.min(naturalH, sr.height - top - 12);
+    }
+    function hitsOthers(L, T, W, H) {
+      return others.some(function (o) {
+        return !(L + W <= o.l + 8 || L >= o.r - 8 || T + H <= o.t + 8 || T >= o.b - 8);
+      });
+    }
+    while (maxH > 140 && hitsOthers(left, top, dw, maxH)) {
+      maxH -= 16;
+      if (attach === "above") top = Math.max(44, cy - gap - maxH);
     }
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
     dock.style.setProperty("top", Math.round(top) + "px", "important");
     dock.style.setProperty("right", "auto", "important");
     dock.style.setProperty("bottom", "auto", "important");
-    dock.style.setProperty("width", "auto", "important");
-    dock.style.setProperty("max-width", "min(720px, calc(100% - 96px))", "important");
-    dock.style.setProperty("min-width", "320px", "important");
+    dock.style.setProperty("width", dw + "px", "important");
+    dock.style.setProperty("max-width", "min(720px, " + dw + "px)", "important");
+    dock.style.setProperty("min-width", Math.min(320, dw) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
     dock.style.setProperty("min-height", "0", "important");
-    dock.style.setProperty("max-height", "none", "important");
+    dock.style.setProperty("max-height", Math.round(maxH) + "px", "important");
     dock.style.setProperty("transform", "none", "important");
+    dock.style.setProperty("overflow-y", "auto", "important");
     dock.style.visibility = "";
     dock.classList.add("near");
+    dock.dataset.attach = attach;
+
+    const bar = $("shotBar");
+    if (bar) {
+      bar.hidden = false;
+      bar.classList.add("show");
+      bar.style.width = "max-content";
+      bar.style.maxWidth = "none";
+      bar.style.overflow = "visible";
+      const bw = Math.max(bar.offsetWidth || 480, 280);
+      let bx = cx + (cw - bw) / 2;
+      bx = Math.max(64, Math.min(bx, sr.width - bw - 12));
+      let by;
+      if (attach === "below") {
+        by = cy - gap - barH;
+        if (by < 44) by = Math.min(44, Math.max(8, cy - 8));
+      } else {
+        by = top - gap - barH;
+        if (by < 44) by = cy + ch + gap;
+      }
+      Object.assign(bar.style, {
+        left: Math.round(bx) + "px",
+        top: Math.round(by) + "px",
+        right: "auto",
+        bottom: "auto",
+        width: "max-content",
+        maxWidth: "none",
+        overflow: "visible",
+        transform: "none",
+      });
+    }
+
     const area = canvasArea();
     ["skillbox", "atbox", "picker"].forEach(function (id) {
       const el = $(id);
       if (!el) return;
-      const px = left + w + gap + 360 <= sr.width - 16 ? left + w + gap : left;
+      const px = left + dw + gap + 360 <= sr.width - 16 ? left + dw + gap : left;
       Object.assign(el.style, {
         left: Math.round(px) + "px",
         right: "auto",

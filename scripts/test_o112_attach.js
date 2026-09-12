@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("path");
+const root = path.resolve(__dirname, "..");
+const js = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
+const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
+const shell = fs.readFileSync(path.join(root, "static/storyboard-shell.css"), "utf8");
+const o67 = fs.readFileSync(path.join(root, "static/o67-human-copy.js"), "utf8");
+
+assert.ok(js.includes("v0821o112-attach"), "js stamp");
+assert.ok(html.includes("o112attach"), "html stamp");
+assert.ok(o67.includes("v0821o112-attach"), "pin stamp");
+const pos = js.match(/function positionDock\(\)[\s\S]*?window\.positionDock = positionDock/);
+assert.ok(pos, "positionDock present");
+assert.ok(!/const stage = /.test(pos[0]), "does not shadow stage");
+assert.ok(/attach = "below"/.test(pos[0]), "prefers below");
+assert.ok(/attach = "above"/.test(pos[0]), "falls back above");
+assert.ok(!/cx - gap - dw/.test(pos[0]), "does not sit to the left of the card");
+assert.ok(shell.includes(".workspace-field"), "script form has layout");
+assert.ok(shell.includes("flex-direction: column"), "labels stack above inputs");
+assert.ok(shell.includes(".script-shot-main img"), "shot thumbs are sized");
+assert.ok(shell.includes("max-height: min(42vh"), "composer has a height cap");
+assert.ok(js.includes("function renderScriptWorkspace"), "script workspace kept");
+assert.ok(js.includes("function renderEditorWorkspace"), "editor workspace kept");
+assert.ok(js.includes("data-editor-track"), "editor tracks kept");
+assert.ok(html.includes("主体库") || js.includes("主体库") || html.includes('id="assetRail"'), "asset rail kept");
+assert.ok(js.includes("nodeContextMenu"), "right-click menu kept");
+console.log("PASS o112_attach");

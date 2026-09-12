@@ -199,7 +199,7 @@ svg.wires path.edge {
 }
 .zpresets { display: none !important; }
 
-/* JS pins left/top to the selected shot. Size only — do not pin bottom. */
+/* JS pins left/top to the selected shot. Size follows the card — not a 720 wall. */
 .dock.show,
 .dock.show.collapsed,
 .dock.show.expanded {
@@ -209,7 +209,7 @@ svg.wires path.edge {
   right: auto !important;
   width: auto !important;
   min-width: 320px !important;
-  max-width: min(720px, calc(100% - 96px)) !important;
+  max-width: min(720px, calc(100% - 80px)) !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -219,7 +219,7 @@ svg.wires path.edge {
   box-shadow: 0 12px 36px #0008;
   height: auto !important;
   min-height: 0 !important;
-  max-height: none !important;
+  max-height: min(42vh, calc(100% - 48px)) !important;
 }
 
 .dock.show .dock-hd {
@@ -353,7 +353,8 @@ svg.wires path.edge {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
   padding: 10px 12px 8px;
   gap: 6px;
 }
@@ -402,15 +403,15 @@ svg.wires path.edge {
 .dock.show .dock-prompt,
 .dock.show.collapsed .dock-prompt {
   display: flex !important;
-  flex: 1 1 auto;
-  min-height: 64px !important;
-  max-height: none !important;
+  flex: 0 1 auto;
+  min-height: 56px !important;
+  max-height: 88px !important;
   padding: 0;
 }
 .dock.show #prompt,
 .dock.show.collapsed #prompt {
-  min-height: 64px !important;
-  max-height: none !important;
+  min-height: 56px !important;
+  max-height: 88px !important;
   height: auto !important;
   padding: 8px 10px;
   resize: vertical;
@@ -556,6 +557,312 @@ svg.wires path.edge {
 .stage.workspace-mode .atbox,
 .stage.workspace-mode .skillbox,
 .stage.workspace-mode .node-menu,
-.stage.workspace-mode #nodeContextMenu {
+.stage.workspace-mode #nodeContextMenu,
+.stage.workspace-mode .viewport,
+.stage.workspace-mode .world {
   display: none !important;
+}
+
+.workspace-panel {
+  z-index: 40 !important;
+  background: #111113 !important;
+  color: #ececec;
+}
+.workspace-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.workspace-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.workspace-title {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.workspace-subtitle {
+  margin: 0;
+  max-width: 46em;
+  color: #9a9aa3;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workspace-btn,
+.workspace-icon-btn {
+  background: #1c1c1f;
+  border: 1px solid #303034;
+  color: #e8e8ec;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.workspace-btn.primary { background: #5ee0c5; color: #111; border-color: #5ee0c5; }
+.workspace-btn:disabled,
+.workspace-icon-btn:disabled { opacity: .4; cursor: default; }
+.workspace-icon-btn.danger { color: #ff8b8b; }
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.workspace-card {
+  background: #16161a;
+  border: 1px solid #2a2a32;
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+.workspace-card-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.workspace-card-hd h2,
+.workspace-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.workspace-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 18px 0 10px;
+}
+.muted { color: #8b8b94; font-size: 12px; }
+.workspace-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+.workspace-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  position: static;
+}
+.workspace-field.full { grid-column: 1 / -1; }
+.workspace-field label {
+  display: block;
+  position: static;
+  font-size: 12px;
+  color: #9a9aa3;
+  line-height: 1.3;
+}
+.workspace-field input,
+.workspace-field textarea,
+.workspace-inline select,
+.workspace-shot-title,
+.editor-fields input,
+.editor-fields textarea,
+.editor-row select,
+.editor-row input[type="number"] {
+  display: block;
+  width: 100%;
+  position: static;
+  background: #19191d;
+  border: 1px solid #2a2a30;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #ececec;
+  min-width: 0;
+}
+.workspace-field textarea { min-height: 72px; resize: vertical; }
+.script-scenes,
+.script-shot-list,
+.editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.script-scene,
+.script-shot-row,
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #2a2a32;
+  border-radius: 12px;
+  background: #121216;
+}
+.script-scene.on,
+.script-shot-row.on,
+.editor-row.on { border-color: rgba(94,224,197,.45); }
+.script-scene-main,
+.script-shot-main,
+.editor-shot-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+.script-scene-main { flex-direction: column; align-items: flex-start; }
+.script-shot-main img,
+.editor-shot-btn img {
+  width: 72px !important;
+  height: 48px !important;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: 0 0 72px;
+  background: #0b0b0d;
+}
+.workspace-shot-empty {
+  width: 72px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #1c1c22;
+  color: #6a6a74;
+  flex: 0 0 72px;
+}
+.script-shot-copy,
+.editor-shot-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.script-shot-copy strong,
+.editor-shot-copy strong,
+.script-scene-main strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.script-shot-copy small,
+.editor-shot-copy small,
+.script-scene-main small {
+  color: #8b8b94;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-shot-title { max-width: 160px; }
+.workspace-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.workspace-note,
+.workspace-empty,
+.editor-empty {
+  color: #8b8b94;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+.editor-empty-action {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 16px 0;
+}
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 42%) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.editor-preview {
+  background: #16161a;
+  border: 1px solid #2a2a32;
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+.editor-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.editor-preview-media {
+  background: #0b0b0d;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0 0 12px;
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+}
+.editor-preview-media img,
+.editor-preview-media video {
+  width: 100%;
+  max-height: 42vh;
+  object-fit: contain;
+  display: block;
+}
+.editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.editor-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #9a9aa3;
+}
+.editor-fields textarea { min-height: 72px; resize: vertical; }
+.editor-stats {
+  display: flex;
+  gap: 16px;
+  color: #9a9aa3;
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+.editor-index {
+  font-variant-numeric: tabular-nums;
+  color: #8b8b94;
+  width: 28px;
+  flex: 0 0 28px;
+}
+.editor-row-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #6a6a74;
+  padding: 24px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .workspace-grid,
+  .editor-layout { grid-template-columns: 1fr; }
+  .workspace-panel { padding: 20px 16px 40px; }
 }
