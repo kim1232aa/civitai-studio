@@ -6,12 +6,12 @@
 <meta http-equiv="Cache-Control" content="no-store" />
 <title>画布 · Night Lab</title>
 
-<link rel="stylesheet" href="/static/storyboard-ui-base.css?v=o107">
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=o107">
-<link rel="stylesheet" href="/static/composer-field-adapt.css?v=o107" />
-<link rel="stylesheet" href="/static/o76-dock-right.css?v=o107" />
-<link rel="stylesheet" href="/static/o97-dock-pin.css?v=o107" />
-<link rel="stylesheet" href="/static/storyboard-shell.css?v=o107" />
+<link rel="stylesheet" href="/static/storyboard-ui-base.css?v=o108">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=o108">
+<link rel="stylesheet" href="/static/composer-field-adapt.css?v=o108" />
+<link rel="stylesheet" href="/static/o76-dock-right.css?v=o108" />
+<link rel="stylesheet" href="/static/o97-dock-pin.css?v=o108" />
+<link rel="stylesheet" href="/static/storyboard-shell.css?v=o108" />
 </head>
 <body>
 <div class="app">
@@ -37,7 +37,7 @@
     <div class="tools canvas-only" aria-label="画布工具">
       <button class="tool" id="btnAdd" title="添加：空白节点或上传本地">+</button>
       <div class="add-pop" id="addPop" hidden>
-        <button type="button" data-add="blank">空白节点</button>
+        <button type="button" data-add="blank">新建空白节点</button>
         <button type="button" data-add="upload">上传本地文件</button>
       </div>
       <button class="tool" id="btnText" title="添加提示词节点">文</button>
@@ -72,7 +72,7 @@
       <button type="button" id="selUngroup">解组</button>
       <button type="button" id="selGroupRun" disabled>▶ 整组</button>
     </div>
-    <aside class="rail canvas-only" id="assetRail" aria-label="资产索引"></aside>
+    <aside class="rail canvas-only" id="assetRail" aria-label="主体库"></aside>
     <aside class="chat-rail canvas-only" id="chatRail" aria-label="生成路径">
       <div class="chat-rail-hd">
         <span class="chat-rail-mode" id="chatRailMode">图片生成</span>
@@ -107,13 +107,13 @@
     <div class="picker canvas-only" id="picker"></div>
     <div class="shot-bar canvas-only" id="shotBar" hidden>
       <button type="button" data-shot-tool="btnPano">全景</button>
-      <button type="button" data-shot-tool="btnCamera">机位</button>
-      <button type="button" data-shot-tool="btnNine">九宫</button>
+      <button type="button" data-shot-tool="btnCamera">多角度</button>
+      <button type="button" data-shot-tool="btnNine">九宫格</button>
       <button type="button" data-shot-tool="btnLight">打光</button>
-      <button type="button" data-shot-tool="btnStory">推演</button>
-      <button type="button" data-shot-tool="btnErase">消除</button>
-      <button type="button" data-shot-tool="btnUpscale">超清</button>
-      <button type="button" data-shot-tool="btnT2v">视频</button>
+      <button type="button" data-shot-tool="btnStory">故事推演</button>
+      <button type="button" data-shot-tool="btnErase">消除笔</button>
+      <button type="button" data-shot-tool="btnUpscale">图片超清</button>
+      <button type="button" data-shot-tool="btnT2v">合成视频</button>
       <button type="button" data-shot-tool="btnLast">尾帧</button>
       <span class="shot-bar-sep" aria-hidden="true"></span>
       <button type="button" data-shot-act="download">下载</button>
@@ -255,15 +255,15 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<!-- v0821o91-seko-tools o91sekotools v0821o92-seko-fill o92sekofill v0821o93-search-match o93searchmatch v0821o95-stage-first o95stagefirst v0821o96-expand-clean o96expandclean v0821o98-capsule-fit o98capsulefit v0821o99-capsule-row o99capsulerow v0821o100-desk o100desk v0821o101-shell o101shell v0821o102-seko o102seko v0821o103-wide-desk o103wide v0821o104-seko-attach o104attach v0821o105-adapt o105adapt v0821o106-drag o106drag v0821o107-wires o107wires -->
+<!-- v0821o91-seko-tools o91sekotools v0821o92-seko-fill o92sekofill v0821o93-search-match o93searchmatch v0821o95-stage-first o95stagefirst v0821o96-expand-clean o96expandclean v0821o98-capsule-fit o98capsulefit v0821o99-capsule-row o99capsulerow v0821o100-desk o100desk v0821o101-shell o101shell v0821o102-seko o102seko v0821o103-wide-desk o103wide v0821o104-seko-attach o104attach v0821o105-adapt o105adapt v0821o106-drag o106drag v0821o107-wires o107wires v0821o108-unhide o108unhide -->
 <script src="/static/lora-capability-hints.js?v=o70lora"></script>
-<script src="/static/composer-field-adapt.js?v=o107caps"></script>
+<script src="/static/composer-field-adapt.js?v=o108caps"></script>
 <script src="/static/o61-group-hide.js?v=o75seko"></script>
-<script src="/static/storyboard.js?v=o107"></script>
+<script src="/static/storyboard.js?v=o108"></script>
 <script src="/static/o68-capability-hide.js?v=o75caps"></script>
 <script src="/static/o75-catalog-busy.js?v=o98busy"></script>
 <script src="/static/o76-model-fields.js?v=o76fields"></script>
-<script src="/static/o67-human-copy.js?v=o107pin"></script>
+<script src="/static/o67-human-copy.js?v=o108pin"></script>
 <script src="/static/canvas_manager.js?v=o99"></script>
 </body>
 </html>

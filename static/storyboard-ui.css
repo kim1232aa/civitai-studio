@@ -158,7 +158,38 @@ header {
   font-size: 13px;
 }
 .add-pop button:hover { background: #2a2a32; }
-.tools { position: relative; }
+.tools { position: relative; overflow: visible; }
+.split-menu,
+.node-menu {
+  position: absolute;
+  z-index: 50;
+  display: none;
+  min-width: 132px;
+  padding: 6px;
+  background: #16161af8;
+  border: 1px solid #34343e;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px #000a;
+}
+.node-menu button,
+.split-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e8e8ec;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.node-menu button:hover,
+.split-menu button:hover { background: #2a2a32; }
+.node-menu button.danger,
+.split-menu button.danger { color: #ff8b8b; }
+.node-menu button:disabled,
+.split-menu button:disabled { opacity: .4; cursor: default; }
 .tools .node-only,
 .tools .group-only { display: none; }
 .tools.has-shot .node-only { display: inline-flex; }

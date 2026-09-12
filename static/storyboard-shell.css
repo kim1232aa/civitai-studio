@@ -1,4 +1,4 @@
-/* v0821o107-wires — 连线可见，写字台不盖分镜。fallback bottom: 12px */
+/* v0821o108-unhide — 右键删除、加号、主体库回来。框跟内容长，不锁死。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -12,8 +12,7 @@
   gap: 4px !important;
   padding: 6px !important;
   max-height: calc(100% - 96px) !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
+  overflow: visible !important;
   z-index: 20 !important;
 }
 .tools .tools-sep,
@@ -24,7 +23,14 @@
 .tools.has-group .group-only,
 .tools.has-multi .group-only { display: none !important; }
 
-.rail { display: none !important; }
+.rail {
+  display: flex !important;
+  left: 12px !important;
+  bottom: 108px !important;
+  width: 168px !important;
+  max-height: 168px !important;
+  z-index: 19 !important;
+}
 
 .node-acts { display: none !important; }
 .card.shot { touch-action: none; user-select: none; }
@@ -59,15 +65,15 @@ svg.wires path.edge {
   z-index: 26;
   align-items: center;
   gap: 2px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: #1a1a1ef5;
   border: 1px solid #2e2e36;
   box-shadow: 0 8px 24px #0006;
   white-space: nowrap !important;
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-width: min(720px, calc(100% - 80px));
+  width: max-content !important;
+  max-width: none !important;
+  overflow: visible !important;
 }
 .shot-bar.show { display: flex !important; }
 .shot-bar button {
@@ -133,8 +139,8 @@ svg.wires path.edge {
   position: absolute !important;
   right: auto !important;
   width: auto !important;
-  min-width: 0 !important;
-  max-width: min(420px, calc(100% - 72px)) !important;
+  min-width: 280px !important;
+  max-width: min(640px, calc(100% - 96px)) !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -247,7 +253,12 @@ svg.wires path.edge {
 }
 .composer-acts,
 .dock.show .composer-acts,
-.dock.show.collapsed .composer-acts { display: none !important; }
+.dock.show.collapsed .composer-acts {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 .param-field {
   display: flex;
   flex-direction: column;
@@ -401,3 +412,32 @@ svg.wires path.edge {
   left: auto;
   z-index: 32;
 }
+
+.split-menu,
+.node-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 132px;
+  padding: 6px;
+  background: #16161af8;
+  border: 1px solid #34343e;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px #000a;
+}
+.node-menu button,
+.split-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e8e8ec;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.node-menu button:hover,
+.split-menu button:hover { background: #2a2a32; }
+.node-menu button.danger,
+.split-menu button.danger { color: #ff8b8b; }
