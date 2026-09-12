@@ -137,7 +137,7 @@
     }
   }
 
-  var PIN = "v0821o100-desk";
+  var PIN = "v0821o101-shell";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -147,14 +147,9 @@
     var css = document.createElement("style");
     css.id = "o97PinCss";
     css.textContent = [
-      ".dock.show.collapsed,.dock.collapsed{max-width:280px !important;min-width:200px !important;height:auto !important;max-height:112px !important;border-radius:14px !important;transform:none !important;right:auto !important;bottom:auto !important;overflow:hidden !important;}",
-      ".dock.show.collapsed #prompt{min-height:32px !important;max-height:36px !important;height:32px !important;}",
-      ".dock.show.collapsed .dock-hd{flex-wrap:nowrap !important;overflow:hidden;align-items:center;}",
-      ".dock.show.collapsed #dockExpand{white-space:nowrap !important;flex:0 0 auto !important;}",
-      ".dock.show.collapsed #dockTitle,.dock.show.collapsed .dock-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;}",
-      ".dock.show.collapsed #paramWarn,.dock.show.collapsed #msg,.dock.show.collapsed .msg,.dock.show.collapsed #catalogStatus{display:none !important;}",
-      ".dock.show.collapsed #sendCap{width:28px !important;height:28px !important;flex:0 0 28px !important;}",
-      ".dock.show.expanded,.dock.expanded{max-width:min(720px, calc(100vw - 72px)) !important;max-height:min(36vh,320px) !important;}"
+      ".dock.show{left:72px !important;right:20px !important;bottom:12px !important;top:auto !important;width:auto !important;max-width:min(920px,calc(100% - 96px)) !important;transform:none !important;}",
+      ".dock.show.collapsed{height:92px !important;max-height:92px !important;max-width:min(920px,calc(100% - 96px)) !important;min-width:0 !important;}",
+      ".dock.show.expanded{max-height:min(36vh,300px) !important;max-width:min(920px,calc(100% - 96px)) !important;}"
     ].join("");
     document.head.appendChild(css);
   }
@@ -222,64 +217,23 @@
     if (pinning) return;
     var dock = $("dock");
     if (!dock || !dock.classList.contains("show")) return;
-    var card = selectedCard();
-    if (!card) return;
-    var stage = stageOf(dock);
-    if (!stage) return;
-    var sr = stage.getBoundingClientRect();
-    var cr = relRect(card, sr);
-    var x = cr.l, y = cr.t, nw = cr.w, nh = cr.h;
+    stripCapsuleLabel();
     var expanded = dock.classList.contains("expanded");
-    var areaL = 72, areaT = 8, areaR = sr.width - 12, areaB = sr.height - 12, gap = 10;
-    var others = neighborRects(card, sr);
-    var left, top, dockW, dockH;
-    if (expanded) {
-      // Prefer beside the node. If the row is packed, fall back to o93
-      // bottom desk — never a 360 island floating in the empty canvas.
-      var sideW = Math.min(360, Math.max(280, areaR - (x + nw + gap)));
-      if (sideW >= 280 && !hitsOthers(x + nw + gap, y, sideW, 280, others)) {
-        dockW = sideW; dockH = 280;
-        left = x + nw + gap; top = y;
-      } else if (x - gap - 280 >= areaL && !hitsOthers(x - gap - 280, y, 280, 280, others)) {
-        dockW = 280; dockH = 280;
-        left = x - gap - dockW; top = y;
-      } else {
-        dockW = Math.min(720, Math.max(420, areaR - areaL));
-        dockH = Math.min(260, Math.max(180, areaB - 24));
-        left = areaL;
-        top = Math.max(areaT, areaB - dockH);
-      }
-    } else {
-      // o95/composer-desk: sit ON the selected shot's own bottom, not in the void below.
-      dockW = Math.min(280, Math.max(200, Math.round(nw)));
-      dockH = 108;
-      left = x + Math.max(0, (nw - dockW) / 2);
-      if (left < x) left = x;
-      if (left + dockW > x + nw) left = Math.max(x, x + nw - dockW);
-      left = clamp(left, areaL, areaR - dockW);
-      top = y + Math.max(36, nh - dockH);
-    }
-    left = clamp(left, areaL, areaR - dockW);
-    top = clamp(top, areaT, areaB - 72);
-    var key = [expanded ? "e" : "c", Math.round(left), Math.round(top), Math.round(dockW)].join(":");
-    var curL = dock.style.getPropertyValue("left");
-    var curT = dock.style.getPropertyValue("top");
-    if (key === lastKey && curL === left + "px" && curT === top + "px") return;
-    lastKey = key;
     pinning = true;
-    dock.style.setProperty("left", left + "px", "important");
-    dock.style.setProperty("top", top + "px", "important");
-    dock.style.setProperty("width", dockW + "px", "important");
-    dock.style.setProperty("max-width", dockW + "px", "important");
-    dock.style.setProperty("right", "auto", "important");
-    dock.style.setProperty("bottom", "auto", "important");
+    // Never sit beside shots / onCardTop — bottom desk only.
+    dock.style.setProperty("left", "72px", "important");
+    dock.style.setProperty("right", "20px", "important");
+    dock.style.setProperty("bottom", "12px", "important");
+    dock.style.setProperty("top", "auto", "important");
+    dock.style.setProperty("width", "auto", "important");
+    dock.style.setProperty("max-width", "920px", "important");
     dock.style.setProperty("transform", "none", "important");
     if (!expanded) {
-      dock.style.setProperty("height", "auto", "important");
-      dock.style.setProperty("max-height", "112px", "important");
+      dock.style.setProperty("height", "92px", "important");
+      dock.style.setProperty("max-height", "92px", "important");
     } else {
-      var remain = Math.max(180, areaB - top);
-      dock.style.setProperty("max-height", Math.min(360, remain) + "px", "important");
+      dock.style.setProperty("height", "auto", "important");
+      dock.style.setProperty("max-height", "300px", "important");
     }
     pinning = false;
   }

@@ -1,0 +1,247 @@
+/* v0821o101-shell — 画布壳子：工具在左，成片在上，Composer 底栏。禁止贴卡岛。 */
+.chat-rail,
+.canvas-tip,
+.composer-chip,
+.stamp,
+#paramSupportStrip { display: none !important; }
+
+.tools {
+  left: 12px !important;
+  top: 16px !important;
+  width: 48px !important;
+  gap: 4px !important;
+  padding: 6px !important;
+  max-height: calc(100% - 132px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  z-index: 20 !important;
+}
+.tools .tools-sep,
+.tools .tools-hint,
+.tools .node-only,
+.tools .group-only,
+.tools.has-shot .node-only,
+.tools.has-group .group-only,
+.tools.has-multi .group-only { display: none !important; }
+
+.rail {
+  display: none !important;
+}
+
+.node-acts {
+  position: absolute !important;
+  top: 30px !important;
+  right: 8px !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 4 !important;
+  display: flex !important;
+  gap: 6px !important;
+  justify-content: flex-end !important;
+  pointer-events: auto !important;
+}
+
+.minimap {
+  left: 12px !important;
+  bottom: 112px !important;
+  width: 132px !important;
+  height: 76px !important;
+  z-index: 18 !important;
+  border: 1px solid #303034;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #121216;
+}
+.zoom {
+  left: 152px !important;
+  bottom: 112px !important;
+  z-index: 18 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 4px;
+  max-width: none !important;
+  flex-wrap: nowrap !important;
+}
+.zoom button {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: 1px solid #303034;
+  background: #1b1b1e;
+  color: #c8c8d0;
+  font-size: 11px;
+}
+.zpresets { display: none !important; }
+
+.dock.show {
+  display: flex !important;
+  flex-direction: column !important;
+  position: absolute !important;
+  left: 72px !important;
+  right: 20px !important;
+  bottom: 12px !important;
+  top: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: min(920px, calc(100% - 96px)) !important;
+  transform: none !important;
+  z-index: 24 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: #16161af2 !important;
+}
+.dock.show.collapsed {
+  height: 92px !important;
+  max-height: 92px !important;
+  min-width: 0 !important;
+  max-width: min(920px, calc(100% - 96px)) !important;
+  width: auto !important;
+}
+.dock.show.expanded {
+  height: auto !important;
+  max-height: min(36vh, 300px) !important;
+  min-width: 0 !important;
+  max-width: min(920px, calc(100% - 96px)) !important;
+  width: auto !important;
+}
+
+.dock.show .dock-hd {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap !important;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  overflow: hidden;
+  flex: 0 0 32px;
+}
+.dock.show.collapsed .dock-hd { height: 28px; flex-basis: 28px; padding: 0 8px 0 10px; }
+.dock.show #dockExpand,
+.dock.show #dockCollapse,
+.dock.show #dockClose {
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #2a2a32;
+  color: #e8e8ec;
+  font-size: 12px;
+}
+.dock.show .dock-title,
+.dock.show #dockTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap !important;
+  font-size: 12px;
+}
+.dock.show .dock-hd > .grow,
+.dock.show #dockHint { display: none !important; }
+.dock.show.collapsed .collapse-only { display: none !important; }
+.dock.show.expanded .collapse-only { display: inline-flex !important; }
+.dock.show #sendCap {
+  display: grid !important;
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 16px;
+}
+.dock.show.collapsed #sendCap {
+  width: 32px !important;
+  height: 32px !important;
+  flex-basis: 32px !important;
+}
+
+.dock.show.collapsed .dock-body {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 8px;
+  min-height: 0;
+  overflow: hidden !important;
+}
+.dock.show.collapsed .dock-scroll,
+.dock.show.collapsed .modes,
+.dock.show.collapsed .refs,
+.dock.show.collapsed .composer-acts,
+.dock.show.collapsed .lora-block,
+.dock.show.collapsed #negative,
+.dock.show.collapsed .param-group,
+.dock.show.collapsed #paramWarn,
+.dock.show.collapsed #msg,
+.dock.show.collapsed .msg,
+.dock.show.collapsed #catalogStatus,
+.dock.show.collapsed #serviceFilter,
+.dock.show.collapsed #send { display: none !important; }
+.dock.show.collapsed .dock-prompt {
+  display: flex !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0;
+}
+.dock.show.collapsed #prompt {
+  min-height: 36px !important;
+  max-height: 36px !important;
+  height: 36px !important;
+  padding: 8px 10px;
+  resize: none;
+}
+.dock.show.collapsed .dock-foot {
+  display: flex !important;
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: visible !important;
+  max-height: none !important;
+}
+.dock.show.collapsed .bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.dock.show.collapsed #backend,
+.dock.show.collapsed #service {
+  display: block !important;
+  height: 36px;
+  min-width: 88px;
+  max-width: 160px;
+  flex: 0 1 140px;
+}
+
+.dock.show.expanded .expand-only { display: none !important; }
+.dock.show.expanded .dock-body {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+.dock.show.expanded .modes { display: flex !important; gap: 6px; padding: 0 12px; }
+.dock.show.expanded .modes button {
+  border: 0;
+  background: #2a2a32;
+  color: #c8c8d0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.dock.show.expanded .modes button.on { background: #ececef; color: #171719; }
+.dock.show.expanded #send { display: none !important; }
+
+.canvas-manager {
+  right: 16px;
+  left: auto;
+  z-index: 32;
+}

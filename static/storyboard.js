@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o101: Composer 底栏重构，不再贴卡; stamp v0821o101-shell
   // v0821o100: 收起贴选中分镜底部；展开无侧位就沉到底栏（o93 desk）; stamp v0821o100-desk
   // v0821o99: 收起条含家+模型；展开高度跟视口；缩放条不再当左墙; stamp v0821o99-capsule-row
   // v0821o98: collapsed 280 + under selected shot, no 420 island, no 胶囊 wrap; stamp v0821o98-capsule-fit
@@ -204,7 +205,7 @@
   ];
 
   const state = {
-    cam: { x: 90, y: 36, s: 0.5 },
+    cam: { x: 110, y: 28, s: 0.5 },
     nodes: [],
     edges: [],
     selected: null,
@@ -1938,11 +1939,14 @@
       const crop = (state._cropShotId === n.id) ? " cropping" : "";
       const erase = (state._eraseShotId === n.id) ? " erasing" : "";
       const b = box(n);
-      const acts = (state.selected === n.id && n.url)
+      const acts = (state.selected === n.id)
         ? '<div class="node-acts">' +
-          '<button type="button" data-node-act="download" data-id="' + esc(n.id) + '">下载</button>' +
-          '<button type="button" data-node-act="edit" data-id="' + esc(n.id) + '">编辑</button>' +
-          '<button type="button" data-node-act="crop" data-id="' + esc(n.id) + '">局部摘取</button>' +
+          (n.url
+            ? '<button type="button" data-node-act="download" data-id="' + esc(n.id) + '">下载</button>' +
+              '<button type="button" data-node-act="edit" data-id="' + esc(n.id) + '">编辑</button>' +
+              '<button type="button" data-node-act="crop" data-id="' + esc(n.id) + '">摘取</button>'
+            : '<button type="button" data-node-act="edit" data-id="' + esc(n.id) + '">编辑</button>') +
+          '<button type="button" data-node-act="more" data-id="' + esc(n.id) + '">更多</button>' +
           '</div>'
         : "";
       return '<div class="card shot' + sel + multi + busy + crop + erase + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
@@ -2169,7 +2173,7 @@
     const r = vp.getBoundingClientRect();
     const narrow = r.width <= 900;
     const area = { left: 12, top: 48, right: r.width - 12, bottom: r.height - (narrow ? 68 : 16) };
-    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar,.chat-rail").forEach((el) => {
+    vp.parentElement.querySelectorAll(".tools,.rail,.minimap,.zoom,.selbar,.chat-rail,.dock").forEach((el) => {
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height) return;
       if (el.classList.contains("selbar")) {
@@ -2178,7 +2182,7 @@
         area.right = Math.min(area.right, b.left - r.left - 12);
       } else if (el.classList.contains("tools") && !narrow) {
         area.left = Math.max(area.left, b.right - r.left + 12);
-      } else if (el.classList.contains("rail") || el.classList.contains("minimap") || el.classList.contains("zoom")) {
+      } else if (el.classList.contains("rail") || el.classList.contains("minimap") || el.classList.contains("zoom") || el.classList.contains("dock")) {
         area.bottom = Math.min(area.bottom, b.top - r.top - 8);
       }
     });
@@ -2191,59 +2195,24 @@
     const area = canvasArea();
     const expanded = state.dockMode === "expanded";
     const gap = 12;
-    const vpR = vp.getBoundingClientRect();
-    const card = vp.querySelector('.card.shot[data-id="' + n.id + '"]');
-    const cr = card ? card.getBoundingClientRect() : null;
-    const x = cr ? (cr.left - vpR.left) : (state.cam.x + n.x * state.cam.s);
-    const y = cr ? (cr.top - vpR.top) : (state.cam.y + n.y * state.cam.s);
-    const nw = cr ? cr.width : box(n).w * state.cam.s;
-    const nh = cr ? cr.height : box(n).h * state.cam.s;
-    let dockW = expanded ? 360 : Math.min(280, Math.max(200, Math.round(nw)));
-    let left, top;
-    if (expanded) {
-      const hitsCard = (L, T, W, H) => {
-        for (const el of vp.querySelectorAll(".card.shot")) {
-          if (el.getAttribute("data-id") === n.id) continue;
-          const r = el.getBoundingClientRect();
-          const cl = r.left - vpR.left, ct = r.top - vpR.top;
-          if (!(L + W <= cl + 6 || L >= cl + r.width - 6 || T + H <= ct + 6 || T >= ct + r.height - 6)) return true;
-        }
-        return false;
-      };
-      if (x + nw + gap + 280 <= area.right && !hitsCard(x + nw + gap, y, 280, 280)) {
-        left = x + nw + gap;
-        top = y;
-        dockW = Math.min(360, area.right - left);
-      } else {
-        dockW = Math.min(720, Math.max(420, area.right - area.left));
-        left = area.left;
-        top = Math.max(area.top, area.bottom - Math.min(320, area.bottom - area.top - 24));
-      }
-      if (top < area.top) top = area.top;
-    } else {
-      left = x + Math.max(0, (nw - dockW) / 2);
-      if (left < x) left = x;
-      if (left + dockW > x + nw) left = Math.max(x, x + nw - dockW);
-      if (left < area.left) left = area.left;
-      if (left + dockW > area.right) left = area.right - dockW;
-      top = y + Math.max(36, nh - 108);
-    }
-    const wantH = expanded
-      ? Math.min(320, Math.max(180, area.bottom - top - 8))
-      : 112;
+    // bottom desk — never on-card overlay
     Object.assign(dock.style, {
-      width: dockW + "px", height: expanded ? "auto" : "auto", maxHeight: wantH + "px",
-      left: left + "px", top: top + "px",
-      right: "auto", bottom: "auto", transform: "none",
-      visibility: (x + nw < 0 || y + nh < 0 || x > vp.clientWidth || y > vp.clientHeight) ? "hidden" : "",
+      left: "72px", right: "20px", bottom: "12px", top: "auto",
+      width: "auto", maxWidth: "920px",
+      height: expanded ? "auto" : "92px",
+      maxHeight: expanded ? "300px" : "92px",
+      transform: "none", visibility: "",
     });
     dock.classList.add("near");
+    const top = Math.max(area.top, area.bottom - (expanded ? 300 : 92) - 12);
+    const left = 72;
+    const dockW = Math.max(280, area.right - left);
     ["skillbox", "atbox", "picker"].forEach((id) => {
       const el = $(id);
       if (!el) return;
       const w = Math.min(400, dockW);
-      const px = left + dockW + gap + w <= area.right ? left + dockW + gap
-        : left - w - gap >= area.left ? left - w - gap : left;
+      const px = left + Math.min(dockW, 640) + gap + w <= area.right ? left + Math.min(dockW, 640) + gap
+        : left;
       Object.assign(el.style, {
         left: px + "px", right: "auto", top: top + "px", bottom: "auto",
         width: w + "px", maxHeight: Math.min(320, area.bottom - top) + "px", transform: "none",
@@ -3493,7 +3462,7 @@
     };
   }
   function fitCam() {
-    state.cam = { x: 90, y: 36, s: 0.5 };
+    state.cam = { x: 110, y: 28, s: 0.5 };
     applyCam(); persist();
     syncZoomPresets();
   }
@@ -8770,17 +8739,59 @@
     setMsg("已选全景端点 " + hit + " · 确认后点 ↑", "ok");
   }
   function hideToolPops() {
-    ["lightPop", "camPop", "lastPop", "storyPop"].forEach(function (id) {
+    ["lightPop", "camPop", "lastPop", "storyPop", "morePop"].forEach(function (id) {
       const el = $(id);
       if (el) el.hidden = true;
     });
   }
+  function toolAnchor(preferred) {
+    if (preferred) {
+      const r = preferred.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4) return preferred;
+    }
+    return document.querySelector(".node-acts [data-node-act='more']")
+      || document.querySelector(".card.shot.sel")
+      || preferred;
+  }
   function placePop(pop, anchor) {
-    if (!pop || !anchor) return;
-    const r = anchor.getBoundingClientRect();
+    if (!pop) return;
+    const a = toolAnchor(anchor);
+    if (!a) return;
+    const r = a.getBoundingClientRect();
     pop.style.left = (r.right + 8) + "px";
-    pop.style.top = r.top + "px";
-    pop.hidden = !pop.hidden;
+    pop.style.top = Math.max(60, r.top) + "px";
+    pop.hidden = false;
+  }
+  function showMorePop(anchor) {
+    hideToolPops();
+    let pop = $("morePop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "morePop";
+      pop.className = "story-pop";
+      pop.innerHTML = [
+        ["btnNine", "九宫"],
+        ["btnStory", "推演"],
+        ["btnLight", "打光"],
+        ["btnCamera", "机位"],
+        ["btnUpscale", "超清"],
+        ["btnErase", "消除"],
+        ["btnT2v", "视频"],
+        ["btnLast", "尾帧"],
+        ["btnPano", "全景"],
+      ].map(function (it) {
+        return '<button type="button" data-more="' + it[0] + '">' + it[1] + "</button>";
+      }).join("");
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-more]");
+        if (!b) return;
+        pop.hidden = true;
+        const el = $(b.getAttribute("data-more"));
+        if (el) el.click();
+      });
+    }
+    placePop(pop, anchor);
   }
   function spawnLinkedShot(source, opts) {
     opts = opts || {};
@@ -9052,10 +9063,9 @@
           storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3);
         });
       }
-      const r = $("btnStory").getBoundingClientRect();
-      pop.style.left = r.right + 8 + "px";
-      pop.style.top = r.top + "px";
-      pop.hidden = !pop.hidden;
+      if (!pop.hidden) { pop.hidden = true; return; }
+      hideToolPops();
+      placePop(pop, e.currentTarget);
     };
   }
   if ($("btnPano")) $("btnPano").onclick = function () { panoFromShot(selectedShot()); };
@@ -9066,7 +9076,7 @@
   if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
   if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(); };
   document.addEventListener("click", function (e) {
-    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#btnLight,#btnCamera,#btnLast,#btnStory")) return;
+    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#morePop,#btnLight,#btnCamera,#btnLast,#btnStory,[data-node-act]")) return;
     hideToolPops();
   });
   world.addEventListener("click", function (e) {
@@ -9080,6 +9090,11 @@
     if (kind === "download") downloadShot(shot);
     else if (kind === "edit") { state.selected = shot.id; editSelectedShot(); }
     else if (kind === "crop") beginCrop(shot);
+    else if (kind === "more") {
+      const pop = $("morePop");
+      if (pop && !pop.hidden) { hideToolPops(); return; }
+      showMorePop(act);
+    }
   });
   vp.addEventListener("pointerdown", function (e) {
     if (state._eraseShotId) {
@@ -9363,7 +9378,7 @@
     syncSelBar();
   }
   $("btnAuto").onclick = () => { autoLayout(); };
-  $("btnFit").onclick = () => { fitCam(); };
+  $("btnFit").onclick = () => { fitShotsInView(); };
   $("zIn").onclick = () => { setZoomScale(state.cam.s * 1.12); };
   $("zOut").onclick = () => { setZoomScale(state.cam.s * 0.9); };
   if ($("zPresets")) {
@@ -10616,7 +10631,10 @@
       const pick = state.selected || (firstShot && firstShot.id);
       if (pick) selectNode(pick, { collapsed: true });
       if (typeof renderDock === "function") renderDock();
-      if (typeof positionDock === "function") requestAnimationFrame(positionDock);
+      requestAnimationFrame(function () {
+        if (typeof positionDock === "function") positionDock();
+        if (typeof fitShotsInView === "function") fitShotsInView();
+      });
     } catch (e) { try { console.warn("hydrate ui", e); } catch (_) {} }
     // v0821o46: always try resume pending jobs after hydrate (tab death / OOM mid-poll)
     return resumePendingJobs();
@@ -10654,6 +10672,10 @@
   });
   loadOuts();
   selectNode(state.selected || "shot-1", { collapsed: true });
+  requestAnimationFrame(function () {
+    if (typeof positionDock === "function") positionDock();
+    if (typeof fitShotsInView === "function") fitShotsInView();
+  });
   renderWorkspace();
   if (/[?&]probe=1\b/.test(String(location.search || ""))) {
     window.__sbProbe = {
