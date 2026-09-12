@@ -172,11 +172,16 @@
     }
 
     async createCanvas(name) {
+      if (typeof global.__sbPersistCanvas === "function") {
+        try { await global.__sbPersistCanvas(); } catch (_) {}
+      }
       const project = this.requireProject();
+      const n = ((project.canvases || []).length || 0) + 1;
       const body = await this.request(projectPath(this.apiRoot, project.id, "canvases"), {
         method: "POST",
-        body: JSON.stringify(name == null ? {} : { name }),
+        body: JSON.stringify({ name: name || ("画布 " + n) }),
       });
+      this._freshEmpty = true;
       await this.refreshProject(body && body.canvas && body.canvas.id);
       return body && body.canvas;
     }
@@ -193,6 +198,7 @@
 
     async deleteCanvas(canvasId) {
       const project = this.requireProject();
+      if ((project.canvases || []).length <= 1) throw new Error("至少保留一张画布");
       await this.request(projectPath(this.apiRoot, project.id, "canvases", canvasId), { method: "DELETE" });
       await this.refreshProject();
     }
@@ -200,6 +206,10 @@
     async setActiveCanvas(canvasId) {
       const project = this.requireProject();
       if (!project.canvases.some((canvas) => canvas.id === canvasId)) throw new Error("画布不存在");
+      if (canvasId === (this.activeCanvasId || project.activeCanvasId)) return this.activeProject;
+      if (typeof global.__sbPersistCanvas === "function") {
+        try { await global.__sbPersistCanvas(); } catch (_) {}
+      }
       await this.saveState({ activeCanvasId: canvasId });
       return this.activeProject;
     }
@@ -441,7 +451,8 @@
       const canvasRows = canvases.length
         ? canvases.map((canvas) => `<li class="cm-row${canvas.id === currentCanvasId ? " on" : ""}">
             <button type="button" data-action="select-canvas" data-id="${escapeHtml(canvas.id)}">${escapeHtml(canvas.name)}</button>
-            <button type="button" class="cm-icon" data-action="rename-canvas" data-id="${escapeHtml(canvas.id)}" aria-label="重命名画布">⋯</button>
+            <button type="button" class="cm-icon" data-action="rename-canvas" data-id="${escapeHtml(canvas.id)}" aria-label="重命名画布">改名</button>
+            <button type="button" class="cm-icon danger" data-action="delete-canvas" data-id="${escapeHtml(canvas.id)}" aria-label="删除画布"${canvases.length <= 1 ? " disabled" : ""}>删除</button>
           </li>`).join("")
         : `<li class="cm-empty">暂无画布</li>`;
       const assetRows = assets.length
@@ -472,11 +483,9 @@
         .map((item) => `<option value="${escapeHtml(item.id)}"${project && item.id === project.id ? " selected" : ""}>${escapeHtml(item.name)}</option>`)
         .join("");
       const status = escapeHtml(this.statusText());
-      const title = global.document && global.document.getElementById("projTitle");
-      if (title) title.textContent = project ? projectLabel(project) : "未选择项目";
       this.root.innerHTML = `
         <div class="cm-head">
-          <strong></strong>
+          <strong>画布管理</strong>
           <button type="button" class="cm-close" data-action="close" aria-label="关闭项目面板">×</button>
         </div>
         <div class="cm-controls">
@@ -514,6 +523,11 @@
           if (action === "create-canvas") return this.createCanvas(global.prompt("画布名称（可留空）") || undefined);
           if (action === "select-canvas") return this.setActiveCanvas(target.dataset.id);
           if (action === "rename-canvas") return this.renameCanvas(target.dataset.id, global.prompt("新画布名称") || "");
+          if (action === "delete-canvas") {
+            if ((this.activeProject.canvases || []).length <= 1) throw new Error("至少保留一张画布");
+            if (global.confirm("删除这张画布？分镜不会回到其他画布。")) return this.deleteCanvas(target.dataset.id);
+            return;
+          }
           if (action === "toggle-asset") {
             const project = this.requireProject();
             const canvas = (project.canvases || []).find((item) => item.id === (this.activeCanvasId || project.activeCanvasId));
@@ -549,6 +563,9 @@
       manager.workspace = rememberedWorkspace;
     }
     target.classList.add("canvas-manager");
+    if (manager.workspace === "story" || manager.workspace === "editor") {
+      target.classList.add("show");
+    }
     target.addEventListener("canvas-manager:open", () => target.classList.add("show"));
     manager.load();
     return manager;

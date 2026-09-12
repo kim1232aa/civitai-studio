@@ -256,6 +256,32 @@ header {
 }
 .story-pop button:hover { background: #2a2a32; }
 
+.canvas-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+.canvas-switch select {
+  max-width: 160px;
+  background: #1c1c1f;
+  border: 1px solid #303034;
+  color: #e8e8ec;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.canvas-switch button {
+  background: #1c1c1f;
+  border: 1px solid #303034;
+  color: #e8e8ec;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.canvas-switch button:hover { border-color: var(--teal); }
+.canvas-manager .cm-icon.danger { color: #f2b8b8; }
 .canvas-manager {
   display: none;
   position: absolute;

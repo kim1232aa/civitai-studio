@@ -19,6 +19,11 @@ test("HTML has #canvasManager panel", () => {
   assert.match(html, /id="canvasManager"/);
 });
 
+test("HTML has visible new-canvas control", () => {
+  assert.match(html, /id="btnNewCanvas"/);
+  assert.match(html, /id="canvasSelect"/);
+});
+
 test("HTML has visible 项目 toggle #canvasManagerToggle", () => {
   assert.match(html, /id="canvasManagerToggle"/);
   assert.match(html, /<button[^>]*id="canvasManagerToggle"[^>]*>\s*项目\s*<\/button>/);

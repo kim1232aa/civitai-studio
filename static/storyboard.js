@@ -3,7 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
-  // v0821o119: 100% 不挤卡、工具条不盖住分镜、隐藏不该出现的视频参数；stamp v0821o119-qa
+  // v0821o120: 多画布新建/切换/保存；stamp v0821o120-canvas
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
   // v0821o116: 九宫/打光/编辑看得见结果；stamp v0821o116-tools
   // v0821o115: 顶栏工具贴着按钮弹出，不再空壳；stamp v0821o115-tools
@@ -1445,6 +1445,7 @@
         }
       }
       try { sessionStorage.setItem(STORE, payload); } catch (_) {}
+      persistActiveCanvasSoon();
     } catch (_) {}
   }
   /** Apply a parsed graph object into live state. Returns false if empty/robot-demo discarded. */
@@ -1579,7 +1580,16 @@
         }
       }
       const body = JSON.stringify(parsed);
-      // v0821o19: keepalive so writeback PUT survives hard-refresh / tab close race
+      persistActiveCanvasSoon();
+      if (!isMainHouseGraph()) {
+        for (let i = 0; i < (state.nodes || []).length; i++) {
+          const live = state.nodes[i];
+          if (!live || pendingIds.indexOf(live.id) < 0) continue;
+          try { delete live._pendingPut; } catch (_) { live._pendingPut = false; }
+          try { delete live.pendingPut; } catch (_) { live.pendingPut = false; }
+        }
+        return;
+      }
       fetch("/api/storyboard-graph", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1611,6 +1621,152 @@
       });
     } catch (_) {}
   }
+  let _canvasAdopted = false;
+  let _didFirstSeed = false;
+  let _canvasSaveTimer = 0;
+  function isMainHouseGraph() {
+    return (state.nodes || []).some(function (n) { return n && n.id === "shot-civitai"; });
+  }
+  function persistActiveCanvasSoon() {
+    try { clearTimeout(_canvasSaveTimer); } catch (_) {}
+    _canvasSaveTimer = setTimeout(function () { persistActiveCanvas(); }, 450);
+  }
+  function persistActiveCanvas() {
+    const cm = window.canvasManager;
+    if (!cm || !cm.activeProject || !cm.activeCanvasId) return Promise.resolve();
+    let parsed = { nodes: state.nodes || [], edges: state.edges || [] };
+    try { parsed = JSON.parse(graphPayload()); } catch (_) {}
+    const body = {
+      nodes: parsed.nodes || state.nodes || [],
+      edges: parsed.edges || state.edges || [],
+      viewport: { x: state.cam.x, y: state.cam.y, zoom: state.cam.s },
+    };
+    return fetch("/api/canvas-projects/" + encodeURIComponent(cm.activeProject.id) + "/canvases/" + encodeURIComponent(cm.activeCanvasId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).then(function (r) {
+      if (!r || !r.ok) return;
+      const canvas = (cm.activeProject.canvases || []).find(function (c) { return c.id === cm.activeCanvasId; });
+      if (canvas) {
+        canvas.nodes = body.nodes;
+        canvas.edges = body.edges;
+        canvas.viewport = body.viewport;
+      }
+    }).catch(function () {});
+  }
+  window.__sbPersistCanvas = persistActiveCanvas;
+  function loadEmptyBoard() {
+    state.nodes = [];
+    state.edges = [];
+    state.groups = [];
+    state.selected = null;
+    state.multi = [];
+    state.script = { title: "未命名故事", logline: "", scenes: [] };
+    if (typeof addBlankShot === "function") addBlankShot();
+    else {
+      const id = uid("shot");
+      state.nodes.push({ id: id, kind: "shot", title: "分镜1", x: 560, y: 80, url: "", firstFrameId: "", prompt: "", mode: "image" });
+      selectNode(id, { preserveLayout: true });
+    }
+    state.cam = { x: 110, y: 28, s: 0.5 };
+    applyCam();
+    renderCards(); drawWires(); renderDock();
+    if (typeof renderWorkspace === "function") renderWorkspace();
+    persist();
+  }
+  function syncCanvasChrome() {
+    const cm = window.canvasManager;
+    const sel = $("canvasSelect");
+    const project = cm && cm.activeProject;
+    const canvases = (project && project.canvases) || [];
+    const cur = (cm && cm.activeCanvasId) || (project && project.activeCanvasId) || "";
+    if (sel) {
+      sel.innerHTML = canvases.length
+        ? canvases.map(function (c) {
+            return '<option value="' + esc(c.id) + '"' + (c.id === cur ? " selected" : "") + ">" + esc(c.name || "画布") + "</option>";
+          }).join("")
+        : '<option value="">暂无画布</option>';
+    }
+    const title = $("projTitle");
+    if (title) {
+      const canvas = canvases.find(function (c) { return c.id === cur; });
+      title.textContent = (canvas && canvas.name) || (project && project.name) || "未命名画布";
+    }
+  }
+  function adoptCanvas(project, canvasId, fresh) {
+    _canvasAdopted = true;
+    const id = canvasId || (project && project.activeCanvasId) || "";
+    const canvas = project && (project.canvases || []).find(function (c) { return c.id === id; });
+    syncCanvasChrome();
+    if (fresh) {
+      _canvasAdopted = true;
+      loadEmptyBoard();
+      persistActiveCanvas();
+      setMsg("已新建空白画布 · " + ((canvas && canvas.name) || "画布"), "ok");
+      return;
+    }
+    const nodes = (canvas && canvas.nodes) || [];
+    if (nodes.length) {
+      _canvasAdopted = true;
+      const vp = (canvas && canvas.viewport) || {};
+      applyGraph({
+        nodes: nodes,
+        edges: (canvas && canvas.edges) || [],
+        cam: { x: Number(vp.x) || 0, y: Number(vp.y) || 0, s: Number(vp.zoom) || 0.5 },
+      });
+      renderCards(); drawWires(); renderDock();
+      if (typeof renderWorkspace === "function") renderWorkspace();
+      persist();
+      if (typeof fitShotsInView === "function") fitShotsInView();
+      return;
+    }
+    if (!_didFirstSeed && shots().length) {
+      _didFirstSeed = true;
+      _canvasAdopted = true;
+      persistActiveCanvas();
+      return;
+    }
+    _canvasAdopted = true;
+    loadEmptyBoard();
+  }
+  function bindCanvasBoard() {
+    const root = $("canvasManager");
+    if (root && !root._sbBound) {
+      root._sbBound = true;
+      root.addEventListener("canvas-manager:change", function (ev) {
+        const d = (ev && ev.detail) || {};
+        const cm = window.canvasManager;
+        const fresh = !!(cm && cm._freshEmpty);
+        if (cm) cm._freshEmpty = false;
+        adoptCanvas(d.project, d.canvasId, fresh);
+      });
+    }
+    if ($("btnNewCanvas") && !$("btnNewCanvas")._sbBound) {
+      $("btnNewCanvas")._sbBound = true;
+      $("btnNewCanvas").onclick = function () {
+        const cm = window.canvasManager;
+        if (!cm) { setMsg("画布管理还没就绪", "warn"); return; }
+        Promise.resolve()
+          .then(function () { return cm.activeProject ? null : cm.createProject("未命名项目"); })
+          .then(function () { return cm.createCanvas(); })
+          .catch(function (e) { setMsg((e && e.message) || "新建画布失败", "bad"); });
+      };
+    }
+    if ($("canvasSelect") && !$("canvasSelect")._sbBound) {
+      $("canvasSelect")._sbBound = true;
+      $("canvasSelect").addEventListener("change", function (e) {
+        const cm = window.canvasManager;
+        if (!cm || !e.target.value) return;
+        cm.setActiveCanvas(e.target.value).catch(function (err) {
+          setMsg((err && err.message) || "切换画布失败", "bad");
+        });
+      });
+    }
+  }
+  bindCanvasBoard();
+
   function shotsHaveMedia() {
     return (state.nodes || []).some(function (n) { return n && n.kind === "shot" && n.url; });
   }
@@ -10952,6 +11108,7 @@
   ensureWorkspaceModel();
   // v0821o15: server graph is shared-studio source of writeback when localStorage empty (clean profile).
   hydrateFromServer().then(function (changed) {
+    if (_canvasAdopted) return resumePendingJobs();
     try {
       if (changed) {
         separateOverlappingShots();
