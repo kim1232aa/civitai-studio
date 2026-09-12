@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o105: 写字台框自适应选中分镜; stamp v0821o105-adapt
   // v0821o104: 点分镜工具贴上、写字台贴下; stamp v0821o104-seko-attach
   // v0821o103: 大屏底栏书桌，↑=生成，无展开; stamp v0821o103-wide-desk
   // v0821o102: Seko 胶囊贴选中分镜，参考图小芯片; stamp v0821o102-seko
@@ -2235,10 +2236,9 @@
     const stage = dock.closest(".stage") || vp.parentElement;
     const sr = stage.getBoundingClientRect();
     const gap = 8;
-    const wantH = 220;
     const barH = 36;
     const card = world.querySelector('.card.shot[data-id="' + n.id + '"]');
-    let left = 72, top = Math.max(48, sr.height - wantH - 12), w = 480;
+    let left = 72, top = Math.max(48, sr.height - 180 - 12), w = 320, hMax = 280;
 
     function hitsRect(L, T, W, H, others) {
       return others.some(function (o) {
@@ -2260,16 +2260,29 @@
       const sameRow = others.filter(function (o) { return o.t < cy + ch - 8 && o.b > cy + 8; });
       const nextRight = sameRow.filter(function (o) { return o.l >= cx + cw - 12; })
         .reduce(function (m, o) { return Math.min(m, o.l); }, sr.width - 16);
-      w = Math.max(280, Math.min(480, cw, nextRight - cx - 12));
-      if (!isFinite(w) || w < 240) w = Math.min(480, Math.max(280, cw || 320));
-      const h = wantH;
+      w = Math.round(Math.max(160, Math.min(cw, nextRight - cx - 8, sr.width - 80)));
+      if (!isFinite(w) || w < 160) w = Math.round(Math.max(160, cw || 240));
+
+      dock.style.setProperty("width", w + "px", "important");
+      dock.style.setProperty("max-width", w + "px", "important");
+      dock.style.setProperty("min-width", "0", "important");
+      dock.style.setProperty("height", "auto", "important");
+      dock.style.setProperty("max-height", "none", "important");
+      dock.style.setProperty("min-height", "140px", "important");
+      const natural = Math.max(140, Math.min(400, dock.scrollHeight || 180));
+
+      const nextBelow = others.filter(function (o) { return o.r > cx + 8 && o.l < cx + w - 8 && o.t >= cy + ch - 4; })
+        .reduce(function (m, o) { return Math.min(m, o.t); }, sr.height - 8);
+      const availBelow = Math.max(0, nextBelow - (cy + ch + gap) - 4);
+      const availAbove = Math.max(0, cy - gap - 48);
       const clampX = function (x) { return Math.max(64, Math.min(x, sr.width - w - 12)); };
-      const belowT = cy + ch + gap;
-      const aboveT = cy - gap - h;
       const L = clampX(cx);
-      let belowOk = belowT >= 48 && belowT + h <= sr.height - 8 && !hitsRect(L, belowT, w, h, others);
-      const aboveOk = aboveT >= 48 && !hitsRect(L, aboveT, w, h, others);
-      if (!belowOk && !aboveOk && !positionDock._opening && openLaneForDock(n, wantH + 24)) {
+      let h = Math.min(natural, Math.max(availBelow, availAbove, 140));
+      const belowT = cy + ch + gap;
+      const aboveT = cy - gap - Math.min(natural, Math.max(availAbove, 140));
+      let belowOk = availBelow >= 140 && !hitsRect(L, belowT, w, Math.min(natural, availBelow), others);
+      const aboveOk = availAbove >= 140 && !hitsRect(L, aboveT, w, Math.min(natural, availAbove), others);
+      if (!belowOk && !aboveOk && !positionDock._opening && openLaneForDock(n, natural + 24)) {
         positionDock._opening = true;
         renderCards();
         drawWires();
@@ -2278,26 +2291,29 @@
         return;
       }
       if (belowOk) {
-        left = L; top = belowT;
+        left = L; top = belowT; hMax = Math.min(natural, availBelow);
       } else if (aboveOk) {
-        left = L; top = aboveT;
+        left = L; top = aboveT; hMax = Math.min(natural, availAbove);
       } else {
         const band = others.filter(function (o) { return o.r > L + 8 && o.l < L + w - 8; });
         const lowest = band.reduce(function (m, o) { return Math.max(m, o.b); }, cy + ch);
         const shifted = lowest + gap;
-        if (shifted + h <= sr.height - 8 && !hitsRect(L, shifted, w, h, others)) {
-          left = L; top = shifted;
+        const availShift = sr.height - 8 - shifted;
+        if (availShift >= 140 && !hitsRect(L, shifted, w, Math.min(natural, availShift), others)) {
+          left = L; top = shifted; hMax = Math.min(natural, availShift);
         } else {
           // fallback bottom desk — never cover neighbor shots
           left = 72;
-          top = Math.max(48, sr.height - h - 12);
-          w = Math.min(480, Math.max(320, sr.width - 96));
-          if (hitsRect(left, top, w, h, others)) {
+          hMax = Math.min(natural, 280);
+          top = Math.max(48, sr.height - hMax - 12);
+          if (hitsRect(left, top, w, hMax, others)) {
             left = L;
             top = belowT;
+            hMax = Math.min(natural, Math.max(140, availBelow || natural));
           }
         }
       }
+      h = hMax;
 
       const bar = $("shotBar");
       if (bar) {
@@ -2331,9 +2347,10 @@
     dock.style.setProperty("bottom", "auto", "important");
     dock.style.setProperty("width", Math.round(w) + "px", "important");
     dock.style.setProperty("max-width", Math.round(w) + "px", "important");
+    dock.style.setProperty("min-width", "0", "important");
     dock.style.setProperty("height", "auto", "important");
-    dock.style.setProperty("min-height", "168px", "important");
-    dock.style.setProperty("max-height", wantH + "px", "important");
+    dock.style.setProperty("min-height", "140px", "important");
+    dock.style.setProperty("max-height", Math.round(hMax) + "px", "important");
     dock.style.setProperty("transform", "none", "important");
     dock.style.visibility = "";
     dock.classList.add("near");

@@ -1,6 +1,6 @@
 /* v0821o67-human-copy + o97 pin inline
- * v0821o104-seko-attach v0821o103-wide-desk v0821o102-seko v0821o101-shell v0821o100-desk v0821o99-capsule-row
- * Product copy scrub + attach composer above/below selected shot.
+ * v0821o105-adapt v0821o104-seko-attach v0821o103-wide-desk v0821o102-seko v0821o101-shell v0821o100-desk v0821o99-capsule-row
+ * Product copy scrub + attach composer above/below selected shot. Box follows the shot.
  * Inlined because storyboard.html on main (o96) does not load o97-dock-pin.js.
  */
 (function () {
@@ -142,7 +142,7 @@
     }
   }
 
-  var PIN = "v0821o104-seko-attach";
+  var PIN = "v0821o105-adapt";
   var pinning = false;
   var lastKey = "";
   function $(id) { return document.getElementById(id); }
@@ -154,7 +154,7 @@
     css.textContent = [
       ".chip{width:44px !important;height:44px !important;overflow:hidden !important}",
       ".chip img,.chip video{width:44px !important;height:44px !important;object-fit:cover !important}",
-      ".dock.show,.dock.show.collapsed,.dock.show.expanded{right:auto !important;width:auto !important;max-width:480px !important;transform:none !important;height:auto !important;max-height:240px !important;}",
+      ".dock.show,.dock.show.collapsed,.dock.show.expanded{right:auto !important;width:auto !important;min-width:0 !important;max-width:none !important;transform:none !important;height:auto !important;max-height:none !important;}",
       ".dock.show #dockExpand,.dock.show #dockCollapse,.dock.show #dockHint,.dock.show .expand-only,.dock.show .collapse-only{display:none !important}"
     ].join("");
     document.head.appendChild(css);

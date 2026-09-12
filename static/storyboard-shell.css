@@ -1,4 +1,4 @@
-/* v0821o104-seko-attach — 点分镜：工具贴上、写字台贴下。↑=生成。无展开。fallback bottom: 12px */
+/* v0821o105-adapt — 写字台框跟选中分镜自适应。↑=生成。无展开。fallback bottom: 12px */
 .chat-rail,
 .canvas-tip,
 .composer-chip,
@@ -108,8 +108,8 @@
   position: absolute !important;
   right: auto !important;
   width: auto !important;
-  min-width: 280px !important;
-  max-width: 480px !important;
+  min-width: 0 !important;
+  max-width: none !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -118,8 +118,8 @@
   border: 1px solid #2a2a32;
   box-shadow: 0 12px 36px #0008;
   height: auto !important;
-  min-height: 168px !important;
-  max-height: 240px !important;
+  min-height: 140px !important;
+  max-height: none !important;
 }
 
 .dock.show .dock-hd {
@@ -333,7 +333,7 @@
 .dock.show .bar,
 .dock.show.collapsed .bar {
   display: flex !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: flex-end;
   gap: 8px;
   margin: 0;
@@ -353,9 +353,9 @@
 .dock.show.collapsed #service {
   display: block !important;
   height: 32px;
-  min-width: 96px;
-  max-width: 180px;
-  flex: 0 1 160px;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 96px;
 }
 .dock.show #msg,
 .dock.show .msg {
