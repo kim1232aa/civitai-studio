@@ -16,13 +16,13 @@ function check(ok, name) {
 const pos = js.match(/function positionDock\(\)[\s\S]*?window\.positionDock/);
 check(!!pos, "positionDock found");
 check(!!(pos && !/expanded \? 380/.test(pos[0])), "expanded dock is not hard-capped at 380px");
-check(!!(pos && /Math\.min\(720/.test(pos[0]) && /dw/.test(pos[0])), "expanded dock sizes from the selected card, cap 720");
+check(!!(pos && /Math\.min\(560/.test(pos[0]) && /dw/.test(pos[0])), "composer sizes as a wide short bar");
 check(!!(pos && /attach = "below"/.test(pos[0])), "composer prefers below the selected shot");
 check(!!(pos && !/const stage = /.test(pos[0])), "positionDock does not shadow outer stage");
 check(html.includes('id="prompt"'), "prompt textarea exists");
 check(html.includes('class="dock-prompt"'), "prompt lives in a non-shrinking dock-prompt slot");
 check(/\.dock-prompt[\s\S]{0,280}min-height:\s*(?:5[6-9]|[6-9]\d|1[0-9]{2})px/.test(css + html), "prompt slot has a usable min-height");
-check(/max-width:\s*min\(720px/.test(css) || /Math\.min\(720/.test(js), "expanded composer can be wider than 560");
+check(/max-width:\s*min\(640px/.test(css) || /Math\.min\(560/.test(js) || /max-width:\s*min\(720px/.test(css), "composer can be wider than a portrait shot");
 if (fails.length) {
   console.error("FAIL\n" + fails.map((f) => " - " + f).join("\n"));
   process.exit(1);

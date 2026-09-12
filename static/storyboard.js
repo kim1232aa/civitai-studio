@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o113: 写字台扁宽条贴分镜下，工具贴上；stamp v0821o113-seko
   // v0821o112: 写字台只贴选中分镜上下，宽跟分镜走；stamp v0821o112-attach
   // v0821o110: 剧本策划/编辑器不带写字台; stamp v0821o110-ws
   // v0821o107: 连线不挡、端口可见; stamp v0821o107-wires
@@ -2265,40 +2266,41 @@
       return nearest;
     }
 
-    // 宽跟选中分镜走，上限 720；不锁死 420，也不铺半个画布
-    const maxW = Math.min(720, Math.max(280, sr.width - 80));
-    const dw = Math.max(320, Math.min(Math.round(cw), maxW));
+    // 源站：扁宽条（约 560×240）贴在分镜下，不跟竖图锁成窄高表单
+    const maxW = Math.min(640, Math.max(480, sr.width - 80));
+    const dw = Math.max(480, Math.min(560, maxW));
     let left = cx + (cw - dw) / 2;
     left = Math.max(12, Math.min(left, sr.width - dw - 12));
 
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
-    dock.style.setProperty("min-width", Math.min(320, dw) + "px", "important");
+    dock.style.setProperty("min-width", Math.min(480, dw) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
-    dock.style.setProperty("max-height", "none", "important");
-    const naturalH = Math.max(128, dock.offsetHeight || 180);
-    const belowRoom = gapBelow(left, dw, cy + ch);
-    const aboveRoom = gapAbove(left, dw, cy);
-    const minSlot = 140;
+    dock.style.setProperty("max-height", "248px", "important");
+    const naturalH = Math.min(248, Math.max(168, dock.offsetHeight || 220));
+    const need = naturalH;
+    const spaceBelow = sr.height - (cy + ch + gap) - 8;
+    const spaceAbove = cy - gap - 44;
     let top;
-    let maxH;
+    let maxH = need;
     let attach = "below";
-    if (belowRoom >= minSlot) {
+    if (spaceBelow >= need) {
       attach = "below";
       top = cy + ch + gap;
-      maxH = Math.min(naturalH, Math.max(minSlot, belowRoom - gap - 4));
-    } else if (aboveRoom >= minSlot) {
+    } else if (spaceAbove >= need) {
       attach = "above";
-      maxH = Math.min(naturalH, Math.max(minSlot, aboveRoom - gap - 4));
-      top = cy - gap - maxH;
-    } else {
-      // 上下都挤：仍贴在分镜下，框内滚动。绝不挪到左边盖住别人。
+      top = cy - gap - need;
+    } else if (spaceBelow >= 160) {
       attach = "below";
       top = cy + ch + gap;
-      maxH = Math.min(naturalH, Math.max(120, sr.height - top - 12));
+      maxH = spaceBelow;
+    } else {
+      attach = "above";
+      maxH = Math.max(160, Math.min(need, spaceAbove));
+      top = Math.max(44, cy - gap - maxH);
     }
     if (top < 44) {
-      maxH = Math.max(120, maxH - (44 - top));
+      maxH = Math.max(160, maxH - (44 - top));
       top = 44;
     }
     if (top + 80 > sr.height - 4) {
@@ -2321,13 +2323,13 @@
     dock.style.setProperty("right", "auto", "important");
     dock.style.setProperty("bottom", "auto", "important");
     dock.style.setProperty("width", dw + "px", "important");
-    dock.style.setProperty("max-width", "min(720px, " + dw + "px)", "important");
-    dock.style.setProperty("min-width", Math.min(320, dw) + "px", "important");
+    dock.style.setProperty("max-width", dw + "px", "important");
+    dock.style.setProperty("min-width", Math.min(480, dw) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
     dock.style.setProperty("min-height", "0", "important");
-    dock.style.setProperty("max-height", Math.round(maxH) + "px", "important");
+    dock.style.setProperty("max-height", Math.round(Math.min(248, maxH)) + "px", "important");
     dock.style.setProperty("transform", "none", "important");
-    dock.style.setProperty("overflow-y", "auto", "important");
+    dock.style.setProperty("overflow-y", "hidden", "important");
     dock.style.visibility = "";
     dock.classList.add("near");
     dock.dataset.attach = attach;
@@ -2342,14 +2344,9 @@
       const bw = Math.max(bar.offsetWidth || 480, 280);
       let bx = cx + (cw - bw) / 2;
       bx = Math.max(64, Math.min(bx, sr.width - bw - 12));
-      let by;
-      if (attach === "below") {
-        by = cy - gap - barH;
-        if (by < 44) by = Math.min(44, Math.max(8, cy - 8));
-      } else {
-        by = top - gap - barH;
-        if (by < 44) by = cy + ch + gap;
-      }
+      let by = cy - gap - barH;
+      if (attach === "above") by = Math.max(8, top - gap - barH);
+      if (by < 8) by = 8;
       Object.assign(bar.style, {
         left: Math.round(bx) + "px",
         top: Math.round(by) + "px",

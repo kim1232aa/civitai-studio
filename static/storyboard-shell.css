@@ -199,7 +199,7 @@ svg.wires path.edge {
 }
 .zpresets { display: none !important; }
 
-/* JS pins left/top to the selected shot. Size follows the card — not a 720 wall. */
+/* JS pins left/top to the selected shot. Seko: wide short bar under the card. */
 .dock.show,
 .dock.show.collapsed,
 .dock.show.expanded {
@@ -207,9 +207,9 @@ svg.wires path.edge {
   flex-direction: column !important;
   position: absolute !important;
   right: auto !important;
-  width: auto !important;
-  min-width: 320px !important;
-  max-width: min(720px, calc(100% - 80px)) !important;
+  width: min(560px, calc(100% - 80px)) !important;
+  min-width: min(520px, calc(100% - 80px)) !important;
+  max-width: min(640px, calc(100% - 80px)) !important;
   transform: none !important;
   z-index: 24 !important;
   border-radius: 16px !important;
@@ -219,7 +219,7 @@ svg.wires path.edge {
   box-shadow: 0 12px 36px #0008;
   height: auto !important;
   min-height: 0 !important;
-  max-height: min(42vh, calc(100% - 48px)) !important;
+  max-height: 248px !important;
 }
 
 .dock.show .dock-hd {
@@ -353,9 +353,8 @@ svg.wires path.edge {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  padding: 10px 12px 8px;
+  overflow: hidden !important;
+  padding: 8px 12px 8px;
   gap: 6px;
 }
 .dock.show .dock-scroll,
@@ -363,8 +362,9 @@ svg.wires path.edge {
 .dock.show.collapsed .dock-scroll,
 .dock.show.collapsed #dockScroll {
   display: flex !important;
-  flex-direction: column !important;
-  flex-wrap: nowrap !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center;
   gap: 6px;
   flex: 0 0 auto !important;
   overflow: visible !important;
@@ -376,6 +376,7 @@ svg.wires path.edge {
   gap: 4px;
   padding: 0 !important;
   margin: 0 !important;
+  flex: 1 0 100%;
 }
 .dock.show .modes button {
   border: 0;
@@ -397,24 +398,35 @@ svg.wires path.edge {
   gap: 6px;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  max-height: 48px !important;
+  max-height: 44px !important;
   margin: 0 !important;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.composer-acts,
+.dock.show .composer-acts,
+.dock.show.collapsed .composer-acts {
+  display: flex !important;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+  flex: 0 0 auto;
 }
 .dock.show .dock-prompt,
 .dock.show.collapsed .dock-prompt {
   display: flex !important;
-  flex: 0 1 auto;
-  min-height: 56px !important;
-  max-height: 88px !important;
+  flex: 0 0 auto;
+  min-height: 52px !important;
+  max-height: 64px !important;
   padding: 0;
 }
 .dock.show #prompt,
 .dock.show.collapsed #prompt {
-  min-height: 56px !important;
-  max-height: 88px !important;
-  height: auto !important;
+  min-height: 52px !important;
+  max-height: 64px !important;
+  height: 52px !important;
   padding: 8px 10px;
-  resize: vertical;
+  resize: none;
 }
 .dock.show #negative,
 .dock.show #paramWarn,
@@ -426,82 +438,101 @@ svg.wires path.edge {
   flex-direction: column;
   flex: 0 0 auto;
   padding: 0 44px 0 0;
-  overflow: visible !important;
+  overflow: hidden !important;
+  gap: 6px;
   max-height: none !important;
 }
 .dock.show .lora-block,
 .dock.show.collapsed .lora-block {
-  display: block !important;
-  max-height: none !important;
-  overflow: visible !important;
-  margin: 0 0 8px;
-  padding: 8px 10px;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  max-height: 32px !important;
+  overflow: hidden !important;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+}
+.dock.show .lora-hd {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #9a9aa3;
 }
 .dock.show .lora-hint,
 .dock.show #loraHint {
-  display: block !important;
-  margin: 2px 0 8px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: #c9b56a;
-  white-space: normal !important;
+  display: none !important;
 }
 .dock.show .lora-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
+.dock.show .lora-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+}
+.dock.show .lora-hits,
+.dock.show #loras:empty { display: none; }
 .dock.show .bar,
 .dock.show.collapsed .bar {
   display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: flex-end;
-  gap: 10px 12px;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  overflow: visible !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 .dock.show .param-group,
 .dock.show.collapsed .param-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
   overflow: visible !important;
-  width: 100%;
+  width: auto !important;
+  flex: 0 0 auto;
 }
 .dock.show .param-field {
-  min-width: 84px;
+  min-width: 52px;
+  flex-direction: column;
+  gap: 1px;
 }
 .dock.show .param-field input,
 .dock.show .param-field select {
-  height: 32px;
-  min-width: 84px;
-  width: 96px;
+  height: 28px;
+  min-width: 52px;
+  width: 64px;
 }
 .dock.show .param-field.param-span input,
 .dock.show #seed {
-  min-width: 160px !important;
-  width: 180px !important;
+  min-width: 88px !important;
+  width: 110px !important;
 }
 .dock.show #backend,
 .dock.show #service,
 .dock.show.collapsed #backend,
 .dock.show.collapsed #service {
   display: block !important;
-  height: 32px;
-  min-width: 168px;
-  max-width: 280px;
-  flex: 1 1 180px;
+  height: 28px;
+  min-width: 108px;
+  max-width: 168px;
+  flex: 0 1 140px;
 }
 .dock.show #msg,
 .dock.show .msg {
   display: block !important;
   position: static !important;
-  padding: 2px 0 0;
+  padding: 0;
   margin: 0;
   font-size: 11px;
   color: #8b8b94;
-  max-height: 1.4em;
+  max-height: 1.3em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap !important;
