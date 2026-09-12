@@ -2737,6 +2737,11 @@ function renderGallery() {
     img.addEventListener('load', () => {
       if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
         const card = img.closest('.card');
+        const id = card && card.getAttribute('data-id');
+        if (id) {
+          galleryItems = galleryItems.filter(x => x.id !== id);
+          saveGallery();
+        }
         if (card) card.remove();
       }
     });

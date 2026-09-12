@@ -203,5 +203,59 @@ header {
   cursor: pointer;
 }
 .story-pop button:hover { background: #2a2a32; }
+.light-pop, .cam-pop, .last-pop {
+  position: absolute;
+  z-index: 41;
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 6px;
+  padding: 8px;
+  background: #16161af2;
+  border: 1px solid #34343e;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+  max-width: 240px;
+}
+.cam-pop, .last-pop {
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  grid-template-columns: none;
+  max-width: 220px;
+  max-height: 280px;
+  overflow: auto;
+}
+.light-pop[hidden], .cam-pop[hidden], .last-pop[hidden] { display: none !important; }
+.light-pop button {
+  padding: 0;
+  border: 1px solid #34343e;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111113;
+  cursor: pointer;
+  color: #e8e8ec;
+}
+.light-pop button img { display: block; width: 100%; height: 48px; object-fit: cover; }
+.light-pop button span { display: block; font-size: 10px; padding: 3px 4px; text-align: center; }
+.light-pop button:hover, .cam-pop button:hover, .last-pop button:hover { border-color: var(--teal); }
+.cam-pop button, .last-pop button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e8e8ec;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.card.shot.erasing .face { cursor: crosshair; outline: 1px dashed #e8b86d; position: relative; }
+.erase-cv {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .55;
+  pointer-events: none;
+}
 
 

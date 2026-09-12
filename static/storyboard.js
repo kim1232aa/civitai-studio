@@ -3,6 +3,7 @@
   const STORE = "nl-storyboard-v0821o77-fill";
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o92: 打光/换机位/超清/消除/文生视频/尾帧 · 点选工具+目录重匹配，不自动生成; stamp v0821o92-seko-fill
   // v0821o91: capsule-on-node + tools-on-select + 九宫格/故事推演; stamp v0821o91-seko-tools
   // v0821o90: cross-house LoRA search + add-then-rematch; stamp v0821o90-cross-lora-search
   // v0821o54b: LoRA rematch pulls full /api/catalog roster like o53d; import chips auto-rematch; stamp v0821o54b-lora-roster-rematch
@@ -161,6 +162,41 @@
       template: "场景概念图：@场景\n时间：晨 / 黄昏 / 夜\n氛围：\n镜头：广角建立镜头\n细节道具：" },
     { id: "ad-hook", title: "广告前3秒", category: "营销广告",
       template: "广告前3秒钩子：产品出镜 + 痛点一句话。\n产品：\n受众：\n画面：@角色 使用产品\nCTA：" },
+    { id: "relight", title: "打光", category: "成片工作流", action: "light",
+      template: "保持构图与角色，按所选灯位重打光。" },
+    { id: "camera-move", title: "换机位", category: "成片工作流", action: "camera",
+      template: "同一场同一角色，只换机位与构图。" },
+    { id: "upscale-still", title: "超清", category: "成片工作流", action: "upscale",
+      template: "upscale, keep identity and composition, no restyle" },
+    { id: "erase-obj", title: "消除笔", category: "成片工作流", action: "erase",
+      template: "remove the painted object, fill with coherent background" },
+    { id: "t2v-plain", title: "文生视频", category: "成片工作流", action: "t2v",
+      template: "text-to-video, no first frame required" },
+  ];
+
+  const LIGHT_PRESETS = [
+    { id: "01", title: "蓝调暮色", prompt: "cinematic blue-hour lighting, cool rim light, dusk atmosphere" },
+    { id: "02", title: "伦勃朗", prompt: "Rembrandt lighting, triangle cheek highlight, dramatic chiaroscuro" },
+    { id: "03", title: "蝴蝶光", prompt: "butterfly lighting, beauty dish from above, soft glamour" },
+    { id: "04", title: "分割光", prompt: "split lighting, half face in shadow, half in hard key" },
+    { id: "05", title: "窗光", prompt: "soft window light from camera left, natural falloff, indoor daylight" },
+    { id: "06", title: "逆光", prompt: "strong backlight, silhouette rim, volumetric haze" },
+    { id: "07", title: "顶光", prompt: "top-down overhead lighting, short shadows, studio grid" },
+    { id: "08", title: "侧光", prompt: "hard side light 90 degrees, texture-revealing, film noir" },
+    { id: "09", title: "黄金时刻", prompt: "golden hour sunlight, warm low angle, long shadows" },
+    { id: "10", title: "霓虹", prompt: "neon nightlife lighting, magenta and cyan practicals, wet street bounce" },
+    { id: "11", title: "月光", prompt: "moonlight, cool silver key, low contrast night exterior" },
+    { id: "12", title: "三点布光", prompt: "classic three-point lighting, key fill rim, studio portrait" },
+  ];
+  const CAMERA_PRESETS = [
+    { id: "cu", title: "特写", prompt: "close-up shot, face fills the frame, shallow depth of field" },
+    { id: "ms", title: "中景", prompt: "medium shot, waist-up, eye-level camera" },
+    { id: "ws", title: "全景", prompt: "wide establishing shot, full environment visible" },
+    { id: "high", title: "俯视", prompt: "high angle looking down, subject smaller in frame" },
+    { id: "low", title: "仰视", prompt: "low angle looking up, heroic perspective" },
+    { id: "ots", title: "过肩", prompt: "over-the-shoulder shot, foreground shoulder in frame" },
+    { id: "profile", title: "侧拍", prompt: "profile side angle, 90-degree camera" },
+    { id: "orbit", title: "环绕", prompt: "subtle orbiting camera, keep subject centered" },
   ];
 
   const state = {
@@ -830,6 +866,12 @@
       shot.firstFrameId = linked[0] ? linked[0].id : "";
     }
     return linked[0] || null;
+  }
+  function lastFrameAsset(shot) {
+    if (!shot || !shot.lastFrameId) return null;
+    const n = nodeById(shot.lastFrameId);
+    if (n && n.url && !isVideoUrl(n.url)) return n;
+    return null;
   }
   function sourceTitle(n) {
     if (!n) return "";
@@ -1877,6 +1919,7 @@
       const dur = shotDurationLabel(n);
       const busy = n._busy ? " busy" : "";
       const crop = (state._cropShotId === n.id) ? " cropping" : "";
+      const erase = (state._eraseShotId === n.id) ? " erasing" : "";
       const b = box(n);
       const acts = (state.selected === n.id && n.url)
         ? '<div class="node-acts">' +
@@ -1885,7 +1928,7 @@
           '<button type="button" data-node-act="crop" data-id="' + esc(n.id) + '">局部摘取</button>' +
           '</div>'
         : "";
-      return '<div class="card shot' + sel + multi + busy + crop + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
+      return '<div class="card shot' + sel + multi + busy + crop + erase + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -2255,7 +2298,7 @@
     const shotOk = !!(shot && shot.kind === "shot");
     const stub = isStubMode();
     const frame = shotOk ? frameAsset(shot) : null;
-    const needFrame = state.mode === "video" && !frame;
+    const needFrame = state.mode === "video" && (typeof currentGraphOp !== "function" || currentGraphOp() !== "t2v") && !frame;
     const ml = modeLabelOf(state.mode);
     const modeEl = $("chatRailMode");
     const tagEl = $("chatRailTag");
@@ -2285,7 +2328,8 @@
       { on: !!sid && !stub, warn: false, text: sid ? ("服务 · " + svcLabel) : "选服务后点胶囊 ↑" },
     ];
     if (state.mode === "video") {
-      steps.push({ on: !!frame, warn: needFrame, text: frame ? "首帧已就绪" : "缺首帧 · 上传或选择" });
+      const t2v = (typeof currentGraphOp === "function" && currentGraphOp() === "t2v");
+      steps.push({ on: !!frame || t2v, warn: needFrame, text: frame ? "首帧已就绪" : (t2v ? "文生视频 · 不需要首帧" : "缺首帧 · 上传或选择") });
     }
     if (pathEl) {
       pathEl.innerHTML = steps.map((s) =>
@@ -2397,7 +2441,8 @@
     const list = assets();
     const linked = connectedAssets(n.id);
     const frame = frameAsset(n);
-    const needFrame = state.mode === "video" && !frame;
+    const opNow = (typeof currentGraphOp === "function") ? currentGraphOp() : "";
+    const needFrame = state.mode === "video" && opNow !== "t2v" && !frame;
     const stub = isStubMode();
     const capMsg = refCapGateMessage(n);
     const unusedMsg = refUnusedGateMessage(n);
@@ -2434,11 +2479,20 @@
     let frameHtml = "";
     if (state.mode === "video") {
       if (frame) {
+        const last = lastFrameAsset(n);
         frameHtml = '<div class="frame-slot">首帧 <img src="' + esc(frame.url) + '" alt="">' + esc(sourceTitle(frame)) +
-          linked.filter((a) => a.url && a.id !== frame.id).map((a) => {
+          linked.filter((a) => a.url && a.id !== frame.id && a.id !== (n.lastFrameId || "")).map((a) => {
             return '<button class="frame-chip" type="button" data-frame="' + esc(a.id) + '" title="设为首帧">' +
               (a.url ? '<img src="' + esc(a.url) + '" alt="">' : "") + esc(sourceTitle(a)) + "</button>";
           }).join("") + "</div>";
+        frameHtml += last
+          ? '<div class="frame-slot">尾帧 <img src="' + esc(last.url) + '" alt="">' + esc(sourceTitle(last)) +
+            '<button class="chip-btn" type="button" data-act="clear-last">去掉</button></div>'
+          : '<div class="frame-slot missing">尾帧（可选）' +
+            '<button class="chip-btn" type="button" data-act="upload-last">上传</button>' +
+            '<button class="chip-btn" type="button" data-act="pick-last">选择</button></div>';
+      } else if (opNow === "t2v") {
+        frameHtml = '<div class="frame-slot">文生视频 · 不需要首帧</div>';
       } else {
         frameHtml = '<div class="frame-slot missing">缺首帧' +
           '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
@@ -2631,7 +2685,10 @@
       invalidateStageProgress(shot);
     }
     mention(asset, shot);
-    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) shot.firstFrameId = asset.id;
+    if (shot && shot.kind === "shot" && !shot.firstFrameId && isImageSource(asset)) {
+      shot.firstFrameId = asset.id;
+      shot.wantT2v = false;
+    }
     // v0821o18: explicit attach only — never steal recipe-desk history; announce when video first frame lands
     if (shot && shot.kind === "shot" && state.mode === "video" && isImageSource(asset) && shot.firstFrameId === asset.id) {
       try { setMsg("首帧已就绪 · 可生成", "ok"); } catch (_) {}
@@ -3003,6 +3060,16 @@
   }
   function applySkill(skill) {
     if (!skill) return;
+    if (skill.action) {
+      hideSkillbox();
+      const shot = selectedShot();
+      if (skill.action === "light") showLightPop();
+      else if (skill.action === "camera") showCamPop();
+      else if (skill.action === "upscale") upscaleFromShot(shot);
+      else if (skill.action === "erase") beginErase(shot);
+      else if (skill.action === "t2v") t2vFromShot(shot);
+      return;
+    }
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") return;
     const ta = $("prompt");
@@ -3707,6 +3774,20 @@
     if (!act) return;
     if (act.dataset.act === "upload") $("file").click();
     if (act.dataset.act === "pick") openImportModal();
+    if (act.dataset.act === "upload-last") {
+      state._uploadLastFrame = true;
+      if ($("file")) $("file").click();
+      return;
+    }
+    if (act.dataset.act === "pick-last") {
+      showLastPop();
+      return;
+    }
+    if (act.dataset.act === "clear-last") {
+      const shot = nodeById(state.selected);
+      if (shot) { shot.lastFrameId = ""; renderDock(); persist(); }
+      return;
+    }
     if (act.dataset.act === "apply-edit-sibling") {
       if (!applyEditSibling()) {
         setMsg(refUnusedGateMessage(nodeById(state.selected)) || "目录无 Edit 兄弟模型，请改选图生图或断开参考（不静默忽略）", "bad");
@@ -3858,6 +3939,28 @@
     const input = $("file");
     const files = input && input.files;
     if (!files || !files.length) return;
+    if (state._uploadLastFrame) {
+      state._uploadLastFrame = false;
+      const shot = nodeById(state.selected);
+      if (!shot || shot.kind !== "shot") { setMsg("先点一个分镜再挂尾帧", "warn"); return; }
+      const f = files[0];
+      input.value = "";
+      setMsg("正在上传尾帧…");
+      uploadOut(f).then(function (url) {
+        if (!url) return;
+        const id = uid("asset");
+        const node = { id: id, kind: "character", title: (f.name || "尾帧").replace(/\.[^.]+$/, ""), x: shot.x - 160, y: shot.y + 48, url: url };
+        state.nodes.push(node);
+        linkAssetToShot(node, shot);
+        shot.lastFrameId = id;
+        persist(); persistServer();
+        renderCards(); drawWires(); renderDock();
+        setMsg("尾帧已挂上 · 确认后点 ↑", "ok");
+      }).catch(function (e) {
+        setMsg("上传失败：" + ((e && e.message) || e), "bad");
+      });
+      return;
+    }
     if (state._editorAudioField) {
       const field = state._editorAudioField;
       state._editorAudioField = "";
@@ -5868,6 +5971,33 @@
     // NEVER: category=video && !text-to-video substring — that let video-01 through.
     return false;
   }
+  function catalogItemSupportsT2v(it) {
+    if (!it) return false;
+    if (catalogItemSupportsI2v(it)) return false;
+    const id = String(it.id || it.name || "").toLowerCase();
+    const cat = String(it.category || it.kind || it.falCategory || "").toLowerCase();
+    const fcat = String(it.falCategory || "").toLowerCase();
+    const task = String(it.task || it.hubTask || it.operation || "").toLowerCase();
+    if (id.indexOf("text-to-video") >= 0 || id.indexOf("/t2v") >= 0 || /(?:^|[-_/])t2v(?:$|[-_/])/.test(id)) return true;
+    if (fcat.indexOf("text-to-video") >= 0) return true;
+    if (task === "text-to-video") return true;
+    if (id === "fal-ai/minimax/video-01" || /\/video-01$/.test(id)) return true;
+    if ((cat.indexOf("video") >= 0 || it.kind === "video") && !catalogItemSupportsI2v(it) &&
+        id.indexOf("upscal") < 0 && id.indexOf("inpaint") < 0) return true;
+    return false;
+  }
+  function catalogItemSupportsUpscale(it) {
+    if (!it) return false;
+    const blob = [it.id, it.name, it.category, it.operation, it.task, it.step, it.kind]
+      .map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
+    return /upscal|esrgan|realesrgan|aura-sr|clarity-upscaler|imageupscaler|superscale|seedvr\/upscale/.test(blob);
+  }
+  function catalogItemSupportsInpaint(it) {
+    if (!it) return false;
+    const blob = [it.id, it.name, it.category, it.operation, it.task, it.step, it.kind]
+      .map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
+    return /inpaint|eraser|object-removal|\/erase(?:$|\/)|finegrain-eraser/.test(blob);
+  }
   function catalogItemSupportsImage(it) {
     if (!it) return true;
     const id = String(it.id || it.name || "").toLowerCase();
@@ -5911,12 +6041,18 @@
     return connectedAssets(shot.id).length > 0;
   }
   function currentGraphOp() {
-    if (state.mode === "video") return "i2v";
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    if (state.mode === "video") {
+      if (!shot || !frameAsset(shot) || (shot.wantT2v && !frameAsset(shot))) return "t2v";
+      return "i2v";
+    }
+    if (shot && shot.wantUpscale) return "upscale";
+    if (shot && shot.wantInpaint) return "inpaint";
     if (selectedShotWantsI2i()) return "i2i";
     return "t2i";
   }
   function graphOpLabel(op) {
-    return ({ t2i: "文生图", i2i: "图生图", i2v: "图生视频" })[op] || "";
+    return ({ t2i: "文生图", i2i: "图生图", i2v: "图生视频", t2v: "文生视频", upscale: "超清", inpaint: "消除" })[op] || "";
   }
   function syncOpChip() {
     const el = $("opChip");
@@ -5937,39 +6073,60 @@
     civitai: {
       t2i: ["image/comfy/krea2/turbo/createImage", "image/sdcpp/zImage/turbo/createImage"],
       i2i: ["image/flux2/klein/editImage/9b", "image/wan/v2.7/fal/editImage", "image/sdcpp/sdxl/createVariant", "image/comfy/krea2/edit/editImage"],
-      i2v: ["video/minimax-h3-comfy/imageToVideo", "video/wan/v2.2/fal/image-to-video", "video/ltx2.3/firstLastFrameToVideo"]
+      i2v: ["video/minimax-h3-comfy/imageToVideo", "video/wan/v2.2/fal/image-to-video", "video/ltx2.3/firstLastFrameToVideo"],
+      t2v: ["video/wan/v2.2/fal/text-to-video", "video/wan/v3.0/text-to-video", "video/sora/text-to-video"],
+      upscale: ["image/imageUpscaler"],
+      inpaint: []
     },
     fal: {
       t2i: ["fal-ai/krea-2/turbo/lora", "fal-ai/krea-2/turbo", "fal-ai/flux/schnell"],
       i2i: ["fal-ai/flux-pro/kontext", "fal-ai/nano-banana-2/edit", "fal-ai/z-image/turbo/image-to-image", "fal-ai/flux/dev/image-to-image"],
-      i2v: ["fal-ai/kling-video/v3/pro/image-to-video", "bytedance/seedance-2.5/image-to-video", "fal-ai/minimax/video-01/image-to-video", "minimax/h3-max/image-to-video"]
+      i2v: ["fal-ai/kling-video/v3/pro/image-to-video", "bytedance/seedance-2.5/image-to-video", "fal-ai/minimax/video-01/image-to-video", "minimax/h3-max/image-to-video"],
+      t2v: ["fal-ai/kling-video/v3/pro/text-to-video", "bytedance/seedance-2.5/text-to-video", "minimax/h3-max/text-to-video", "fal-ai/minimax/video-01"],
+      upscale: ["fal-ai/esrgan", "fal-ai/clarity-upscaler", "fal-ai/seedvr/upscale/image"],
+      inpaint: ["fal-ai/bria/eraser", "fal-ai/image-editing/object-removal", "fal-ai/qwen-image-edit/inpaint"]
     },
     "nano-gpt": {
       t2i: ["wavespeed-ai/krea-v2/turbo-lora", "z-image-turbo", "nvidia/cosmos-3-super/text-to-image", "openai/gpt-image-2.5/flare/text-to-image"],
       i2i: ["z-image-turbo-image-to-image", "openai/gpt-image-2.5/flare/edit", "bernini-r/edit-image", "pruna-ai/p-image/edit-lora"],
-      i2v: ["minimax/h3-max/multi-angle/image-to-video", "infinitetalk", "bytedance/seedance-2.5-spicy"]
+      i2v: ["minimax/h3-max/multi-angle/image-to-video", "infinitetalk", "bytedance/seedance-2.5-spicy"],
+      t2v: ["minimax/h3-max/text-to-video", "bytedance/seedance-2.5/text-to-video"],
+      upscale: [],
+      inpaint: []
     },
     huggingface: {
       t2i: ["krea/Krea-2-Turbo", "black-forest-labs/FLUX.1-schnell"],
       i2i: ["Qwen/Qwen-Image-Edit"],
-      i2v: ["Wan-AI/Wan2.2-TI2V-5B"]
+      i2v: ["Wan-AI/Wan2.2-TI2V-5B"],
+      t2v: ["tencent/HunyuanVideo", "Lightricks/LTX-Video-0.9.8-13B-distilled"],
+      upscale: [],
+      inpaint: []
     },
     "modelscope-ai": {
       t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
-      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"]
+      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"],
+      t2v: ["krea/krea-realtime-video"],
+      upscale: [],
+      inpaint: []
     },
     "modelscope-cn": {
       t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
-      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"]
+      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"],
+      t2v: ["krea/krea-realtime-video"],
+      upscale: [],
+      inpaint: []
     }
   };
   function serviceFitsOp(it, op) {
     if (!it) return false;
     if (op === "i2v") return catalogItemSupportsI2v(it);
+    if (op === "t2v") return catalogItemSupportsT2v(it);
+    if (op === "upscale") return catalogItemSupportsUpscale(it);
+    if (op === "inpaint") return catalogItemSupportsInpaint(it) || catalogItemSupportsI2i(it);
     if (op === "i2i") return !catalogItemSupportsI2v(it) && catalogItemSupportsI2i(it);
-    return catalogItemSupportsImage(it) && !catalogItemSupportsI2v(it) && !catalogItemSupportsI2i(it);
+    return catalogItemSupportsImage(it) && !catalogItemSupportsI2v(it) && !catalogItemSupportsI2i(it) && !catalogItemSupportsUpscale(it);
   }
   function pickSmartServiceId(op) {
     const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
@@ -6021,7 +6178,7 @@
   async function ensureSmartPrefInPool(op) {
     const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
     const prefs = (SMART_PREF[be] && SMART_PREF[be][op]) || [];
-    const cat = op === "i2v" ? "video" : "image";
+    const cat = (op === "i2v" || op === "t2v") ? "video" : "image";
     for (let i = 0; i < prefs.length; i++) {
       const id = prefs[i];
       const pool = rematchCandidatePool();
@@ -6083,7 +6240,7 @@
     const cur = catalogItemForService();
     const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
     const foreign = !serviceBelongsToBackend(sel.value, be);
-    const labels = { t2i: "文生图", i2i: "图生图", i2v: "图生视频" };
+    const labels = { t2i: "文生图", i2i: "图生图", i2v: "图生视频", t2v: "文生视频", upscale: "超清", inpaint: "消除" };
     if (!foreign && serviceFitsOp(cur, op)) {
       writeSmartMatchToShot(shot, sel.value);
       if (typeof syncOpChip === "function") syncOpChip();
@@ -6138,8 +6295,29 @@
     const list = Array.isArray(items) ? items : [];
     // text/audio are stub modes — do not list image models (looks like they work).
     if (state.mode === "text" || state.mode === "audio") return [];
-    if (state.mode === "video") return list.filter(catalogItemSupportsI2v);
+    if (state.mode === "video") {
+      const op = (typeof currentGraphOp === "function") ? currentGraphOp() : "i2v";
+      if (op === "t2v") {
+        const t2v = list.filter(catalogItemSupportsT2v);
+        return t2v.length ? t2v : list.filter(function (it) {
+          const id = String((it && (it.id || it.name)) || "").toLowerCase();
+          return id.indexOf("video") >= 0 && !catalogItemSupportsI2v(it);
+        });
+      }
+      return list.filter(catalogItemSupportsI2v);
+    }
     if (state.mode === "image") {
+      const op = (typeof currentGraphOp === "function") ? currentGraphOp() : "t2i";
+      if (op === "upscale") {
+        const ups = list.filter(catalogItemSupportsUpscale);
+        return ups.length ? ups : list.filter(catalogItemSupportsImage);
+      }
+      if (op === "inpaint") {
+        const inp = list.filter(catalogItemSupportsInpaint);
+        if (inp.length) return inp;
+        const i2i = list.filter(catalogItemSupportsI2i);
+        return i2i.length ? i2i : list.filter(catalogItemSupportsImage);
+      }
       const imgs = list.filter(catalogItemSupportsImage);
       if (!selectedShotWantsI2i()) return imgs;
       const i2i = imgs.filter(catalogItemSupportsI2i);
@@ -6946,6 +7124,28 @@
         }
       }
     }
+    const last = lastFrameAsset(shot);
+    if (last && last.url) {
+      payload.lastFrame = last.url;
+      payload.end_image_url = last.url;
+      payload.last_frame_url = last.url;
+      const lastFields = catalogImageFields(catalogItemForService());
+      lastFields.forEach(function (f) {
+        const n = String(f || "").toLowerCase();
+        if (n === "last_frame_url" || n === "end_image_url" || n === "end_image" || n === "last_frame_image" || n === "lastframe") {
+          if (!payload[f]) payload[f] = last.url;
+        }
+      });
+    }
+    if (shot.maskUrl) {
+      payload.mask = shot.maskUrl;
+      payload.mask_url = shot.maskUrl;
+      payload.mask_image_url = shot.maskUrl;
+      const maskFields = catalogImageFields(catalogItemForService());
+      maskFields.forEach(function (f) {
+        if (/mask/.test(String(f || "").toLowerCase()) && !payload[f]) payload[f] = shot.maskUrl;
+      });
+    }
     return payload;
   }
 
@@ -7541,15 +7741,18 @@
     if (isStubMode()) {
       return fail((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "blocked", "warn");
     }
-    if (state.mode === "video" && !frameAsset(shot)) {
-      return fail("缺首帧 · 切到图片生成，或先上传/选择首帧（视频需要先连一张首帧图，不能偷配方台）", "blocked");
-    }
-    // v0821b: do not silently run i2v on t2i flux / pure t2v that drops the frame.
     if (state.mode === "video") {
+      const opVid = (typeof currentGraphOp === "function") ? currentGraphOp() : "i2v";
+      if (opVid === "i2v" && !frameAsset(shot)) {
+        return fail("缺首帧 · 切到图片生成，或先上传/选择首帧（图生视频需要首帧；文生视频点「文生视频」）", "blocked");
+      }
       const sidVid = ($("service") && $("service").value) || "";
       const itVid = catalogItemForService() || (sidVid ? { id: sidVid } : null);
-      if (sidVid && !catalogItemSupportsI2v(itVid)) {
+      if (opVid === "i2v" && sidVid && !catalogItemSupportsI2v(itVid)) {
         return fail("当前服务不吃首帧（非 i2v），请改选视频/图生视频模型", "blocked");
+      }
+      if (opVid === "t2v" && sidVid && catalogItemSupportsI2v(itVid) && !catalogItemSupportsT2v(itVid)) {
+        return fail("当前是图生视频模型，文生视频请改选 text-to-video 端点", "blocked");
       }
     }
     // v0821k: before POST — fal i2v / catalog-required prompt; hard red, no soft-fill
@@ -7918,7 +8121,7 @@
       setSendVisual(true, "no-shot");
       return;
     }
-    const needFrame = state.mode === "video" && !frameAsset(n);
+    const needFrame = state.mode === "video" && (typeof currentGraphOp !== "function" || currentGraphOp() !== "t2v") && !frameAsset(n);
     syncSendGate(needFrame, isStubMode());
   }
 
@@ -7994,7 +8197,7 @@
       failUi((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接");
       return;
     }
-    if (state.mode === "video" && !frameAsset(n)) {
+    if (state.mode === "video" && (typeof currentGraphOp !== "function" || currentGraphOp() !== "t2v") && !frameAsset(n)) {
       failUi("缺首帧 · 切到图片生成，或先上传/选择首帧");
       return;
     }
@@ -8277,12 +8480,14 @@
     tools.classList.toggle("has-shot", hasShot);
     tools.classList.toggle("has-multi", multi);
     const needUrl = !!(hasShot && shot.url);
-    ["btnDownload", "btnCrop", "btnNine", "btnPano"].forEach(function (id) {
+    ["btnDownload", "btnCrop", "btnNine", "btnPano", "btnLight", "btnCamera", "btnUpscale", "btnErase"].forEach(function (id) {
       const el = $(id);
       if (el) el.disabled = !needUrl;
     });
     if ($("btnEditNode")) $("btnEditNode").disabled = !hasShot;
     if ($("btnStory")) $("btnStory").disabled = !hasShot;
+    if ($("btnT2v")) $("btnT2v").disabled = !hasShot;
+    if ($("btnLast")) $("btnLast").disabled = !hasShot;
   }
   function selectedShot() {
     const n = nodeById(state.selected);
@@ -8453,6 +8658,268 @@
     }
     setMsg("已选全景端点 " + hit + " · 确认后点 ↑", "ok");
   }
+  function hideToolPops() {
+    ["lightPop", "camPop", "lastPop", "storyPop"].forEach(function (id) {
+      const el = $(id);
+      if (el) el.hidden = true;
+    });
+  }
+  function placePop(pop, anchor) {
+    if (!pop || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = (r.right + 8) + "px";
+    pop.style.top = r.top + "px";
+    pop.hidden = !pop.hidden;
+  }
+  function spawnLinkedShot(source, opts) {
+    opts = opts || {};
+    if (!source) return null;
+    const id = uid("shot");
+    const node = {
+      id: id,
+      kind: "shot",
+      title: (source.title || "分镜") + (opts.titleSuffix || ""),
+      x: source.x + box(source).w + 48,
+      y: source.y + (opts.yOff || 0),
+      url: "",
+      prompt: opts.prompt != null ? opts.prompt : (source.prompt || ""),
+      negativePrompt: source.negativePrompt || "",
+      mode: opts.mode || "image",
+      backend: source.backend || "",
+    };
+    if (opts.firstFrameFromSource && source.url) node.firstFrameId = source.id;
+    if (opts.wantT2v) node.wantT2v = true;
+    if (opts.wantUpscale) node.wantUpscale = true;
+    if (opts.wantInpaint) node.wantInpaint = true;
+    if (opts.maskUrl) node.maskUrl = opts.maskUrl;
+    if (opts.lastFrameId) node.lastFrameId = opts.lastFrameId;
+    state.nodes.push(node);
+    state.edges.push({ from: source.id, to: id });
+    if (opts.maskAssetId) state.edges.push({ from: opts.maskAssetId, to: id });
+    ensureWorkspaceModel();
+    const scene = sceneById(source.sceneId) || (state.script && state.script.scenes[0]);
+    if (scene) assignShotToScene(id, scene.id);
+    state.mode = node.mode;
+    selectNode(id, { expand: true, preserveLayout: true });
+    persist(); persistServer();
+    return node;
+  }
+  async function rematchAfterSpawn(shot, op) {
+    if (!shot) return;
+    try {
+      if (typeof loadCatalog === "function") await loadCatalog();
+    } catch (_) {}
+    try { await smartMatchService({ announce: true }); } catch (_) {}
+    const sid = ($("service") && $("service").value) || shot.serviceId || "";
+    const it = catalogItemForService();
+    if (op && it && !serviceFitsOp(it, op)) {
+      setMsg("当前目录没有可匹配的" + (graphOpLabel(op) || op) + "端点（不装接）", "warn");
+    } else if (sid) {
+      setMsg("已匹配" + (graphOpLabel(op) || "") + (sid ? (" · " + sid) : "") + " · 不会自动生成，确认后点 ↑", "ok");
+    }
+  }
+  function showLightPop() {
+    const shot = selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再打光", "warn"); return; }
+    hideToolPops();
+    let pop = $("lightPop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "lightPop";
+      pop.className = "light-pop";
+      pop.innerHTML = LIGHT_PRESETS.map(function (p) {
+        return '<button type="button" data-light="' + p.id + '"><img src="/static/light-preset-' + p.id + '.jpg" alt=""><span>' + esc(p.title) + "</span></button>";
+      }).join("");
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-light]");
+        if (!b) return;
+        pop.hidden = true;
+        lightFromShot(selectedShot(), b.getAttribute("data-light"));
+      });
+    }
+    placePop(pop, $("btnLight"));
+  }
+  function lightFromShot(shot, presetId) {
+    shot = shot || selectedShot();
+    const p = LIGHT_PRESETS.find(function (x) { return x.id === presetId; });
+    if (!shot || !p) return;
+    const prompt = ((shot.prompt || "").trim() + "\n打光：" + p.title + "。 " + p.prompt).trim();
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: " · " + p.title,
+      prompt: prompt,
+      mode: "image",
+      firstFrameFromSource: true,
+    });
+    rematchAfterSpawn(node, "i2i");
+  }
+  function showCamPop() {
+    const shot = selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再换机位", "warn"); return; }
+    hideToolPops();
+    let pop = $("camPop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "camPop";
+      pop.className = "cam-pop";
+      pop.innerHTML = CAMERA_PRESETS.map(function (p) {
+        return '<button type="button" data-cam="' + p.id + '">' + esc(p.title) + "</button>";
+      }).join("");
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const b = ev.target.closest("[data-cam]");
+        if (!b) return;
+        pop.hidden = true;
+        cameraFromShot(selectedShot(), b.getAttribute("data-cam"));
+      });
+    }
+    placePop(pop, $("btnCamera"));
+  }
+  function cameraFromShot(shot, presetId) {
+    shot = shot || selectedShot();
+    const p = CAMERA_PRESETS.find(function (x) { return x.id === presetId; });
+    if (!shot || !p) return;
+    const prompt = ((shot.prompt || "").trim() + "\n机位：" + p.title + "。 " + p.prompt).trim();
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: " · " + p.title,
+      prompt: prompt,
+      mode: "image",
+      firstFrameFromSource: true,
+    });
+    rematchAfterSpawn(node, "i2i");
+  }
+  function upscaleFromShot(shot) {
+    shot = shot || selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再超清", "warn"); return; }
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: " · 超清",
+      prompt: ((shot.prompt || "").trim() + "\nupscale, keep identity and composition, no restyle").trim(),
+      mode: "image",
+      firstFrameFromSource: true,
+      wantUpscale: true,
+    });
+    rematchAfterSpawn(node, "upscale");
+  }
+  function t2vFromShot(shot) {
+    shot = shot || selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    if (!shot.url) {
+      shot.wantT2v = true;
+      shot.mode = "video";
+      state.mode = "video";
+      if (shot.firstFrameId) shot.firstFrameId = "";
+      selectNode(shot.id, { expand: true, preserveLayout: true });
+      rematchAfterSpawn(shot, "t2v");
+      return;
+    }
+    const node = spawnLinkedShot(shot, {
+      titleSuffix: " · 文生视频",
+      prompt: shot.prompt || "",
+      mode: "video",
+      wantT2v: true,
+    });
+    rematchAfterSpawn(node, "t2v");
+  }
+  function showLastPop() {
+    const shot = selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    hideToolPops();
+    const imgs = state.nodes.filter(function (n) {
+      return n && n.id !== shot.id && isImageSource(n);
+    });
+    let pop = $("lastPop");
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = "lastPop";
+      pop.className = "last-pop";
+      document.body.appendChild(pop);
+      pop.addEventListener("click", function (ev) {
+        const up = ev.target.closest("[data-last-up]");
+        if (up) {
+          pop.hidden = true;
+          state._uploadLastFrame = true;
+          if ($("file")) $("file").click();
+          return;
+        }
+        const b = ev.target.closest("[data-last]");
+        if (!b) return;
+        pop.hidden = true;
+        const src = nodeById(b.getAttribute("data-last"));
+        const live = selectedShot();
+        if (!src || !live) return;
+        live.lastFrameId = src.id;
+        live.wantT2v = false;
+        if (!state.edges.some(function (e) { return e.from === src.id && e.to === live.id; })) {
+          state.edges.push({ from: src.id, to: live.id });
+        }
+        state.mode = "video";
+        live.mode = "video";
+        selectNode(live.id, { expand: true, preserveLayout: true });
+        persist(); persistServer();
+        rematchAfterSpawn(live, "i2v");
+        setMsg("尾帧已挂上 · 确认后点 ↑", "ok");
+      });
+    }
+    pop.innerHTML = '<button type="button" data-last-up="1">上传尾帧</button>' +
+      (imgs.length
+        ? imgs.map(function (n) {
+            return '<button type="button" data-last="' + esc(n.id) + '">' + esc(sourceTitle(n) || n.title || n.id) + "</button>";
+          }).join("")
+        : '<button type="button" disabled>画布上还没有别的成片</button>');
+    placePop(pop, $("btnLast") || $("btnT2v"));
+  }
+  function beginErase(shot) {
+    shot = shot || selectedShot();
+    if (!shot || !shot.url) { setMsg("先有成片再消除", "warn"); return; }
+    state._eraseShotId = shot.id;
+    state._cropShotId = "";
+    renderCards();
+    const card = document.querySelector('.card.shot[data-id="' + shot.id + '"]');
+    const face = card && card.querySelector(".face");
+    if (!face) return;
+    let cv = face.querySelector("canvas.erase-cv");
+    if (!cv) {
+      cv = document.createElement("canvas");
+      cv.className = "erase-cv";
+      face.appendChild(cv);
+    }
+    const r = face.getBoundingClientRect();
+    cv.width = Math.max(8, Math.floor(r.width));
+    cv.height = Math.max(8, Math.floor(r.height));
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 22;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    state._eraseCv = cv;
+    setMsg("在成片上涂要消除的区域，松手后出遮罩节点 · 不会自动生成", "ok");
+  }
+  async function finishErase(shot, cv) {
+    state._eraseShotId = "";
+    state._eraseCv = null;
+    if (!shot || !cv) { renderCards(); return; }
+    try {
+      const url = await uploadDataUrl(cv.toDataURL("image/png"), (shot.title || "shot") + "-mask.png");
+      const aid = uid("asset");
+      const asset = { id: aid, kind: "character", title: (shot.title || "分镜") + " 遮罩", x: shot.x - 160, y: shot.y, url: url };
+      state.nodes.push(asset);
+      const node = spawnLinkedShot(shot, {
+        titleSuffix: " · 消除",
+        prompt: ((shot.prompt || "").trim() + "\nremove the painted object, fill with coherent background, keep identity").trim(),
+        mode: "image",
+        firstFrameFromSource: true,
+        wantInpaint: true,
+        maskUrl: url,
+        maskAssetId: aid,
+      });
+      rematchAfterSpawn(node, "inpaint");
+    } catch (e) {
+      renderCards();
+      setMsg("消除遮罩失败：" + ((e && e.message) || e), "bad");
+    }
+  }
   if ($("btnDownload")) $("btnDownload").onclick = function () { downloadShot(selectedShot()); };
   if ($("btnEditNode")) $("btnEditNode").onclick = function () { editSelectedShot(); };
   if ($("btnCrop")) $("btnCrop").onclick = function () { beginCrop(selectedShot()); };
@@ -8481,6 +8948,16 @@
     };
   }
   if ($("btnPano")) $("btnPano").onclick = function () { panoFromShot(selectedShot()); };
+  if ($("btnLight")) $("btnLight").onclick = function (e) { e.stopPropagation(); showLightPop(); };
+  if ($("btnCamera")) $("btnCamera").onclick = function (e) { e.stopPropagation(); showCamPop(); };
+  if ($("btnUpscale")) $("btnUpscale").onclick = function () { upscaleFromShot(selectedShot()); };
+  if ($("btnErase")) $("btnErase").onclick = function () { beginErase(selectedShot()); };
+  if ($("btnT2v")) $("btnT2v").onclick = function () { t2vFromShot(selectedShot()); };
+  if ($("btnLast")) $("btnLast").onclick = function (e) { e.stopPropagation(); showLastPop(); };
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("#lightPop,#camPop,#lastPop,#storyPop,#btnLight,#btnCamera,#btnLast,#btnStory")) return;
+    hideToolPops();
+  });
   world.addEventListener("click", function (e) {
     const act = e.target.closest("[data-node-act]");
     if (!act) return;
@@ -8494,6 +8971,23 @@
     else if (kind === "crop") beginCrop(shot);
   });
   vp.addEventListener("pointerdown", function (e) {
+    if (state._eraseShotId) {
+      const card = e.target.closest(".card.shot");
+      if (!card || card.dataset.id !== state._eraseShotId) return;
+      const cv = state._eraseCv || (card.querySelector && card.querySelector("canvas.erase-cv"));
+      if (!cv) return;
+      e.stopPropagation();
+      const r = cv.getBoundingClientRect();
+      const ctx = cv.getContext("2d");
+      const x = (e.clientX - r.left) * (cv.width / Math.max(1, r.width));
+      const y = (e.clientY - r.top) * (cv.height / Math.max(1, r.height));
+      state._erasePaint = true;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 0.1, y + 0.1);
+      ctx.stroke();
+      return;
+    }
     if (!state._cropShotId) return;
     const card = e.target.closest(".card.shot");
     if (!card || card.dataset.id !== state._cropShotId) return;
@@ -8507,7 +9001,26 @@
       y0: (e.clientY - r.top) / r.height,
     };
   }, true);
+  vp.addEventListener("pointermove", function (e) {
+    if (!state._erasePaint || !state._eraseCv) return;
+    const cv = state._eraseCv;
+    const r = cv.getBoundingClientRect();
+    const ctx = cv.getContext("2d");
+    const x = (e.clientX - r.left) * (cv.width / Math.max(1, r.width));
+    const y = (e.clientY - r.top) * (cv.height / Math.max(1, r.height));
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }, true);
   vp.addEventListener("pointerup", function (e) {
+    if (state._erasePaint) {
+      state._erasePaint = false;
+      const shot = nodeById(state._eraseShotId);
+      const cv = state._eraseCv;
+      finishErase(shot, cv);
+      return;
+    }
     if (!state._cropDrag) return;
     const drag = state._cropDrag;
     state._cropDrag = null;
