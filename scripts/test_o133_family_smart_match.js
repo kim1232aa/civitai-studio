@@ -1,54 +1,71 @@
 #!/usr/bin/env node
-/** o133: Civitai post family match — keep only same-house + same family.
- * Run: node scripts/test_o133_family_smart_match.js
- * Not a page-↑ acceptance.
- */
+/** o133: Civitai 帖智能匹配按当前家+底模家族，对不上清空，不许 Krea2 顶 SDXL。 */
 "use strict";
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const path = require("path");
-const vm = require("node:vm");
+const api = require(path.resolve(__dirname, "../static/smart-family-match.js"));
 
-const root = path.resolve(__dirname, "..");
-const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
+assert.equal(api.inferModelFamily("image/sdcpp/sdxl/createImage"), "sdxl");
+assert.equal(api.inferModelFamily("image/comfy/krea2/turbo/createImage"), "krea2");
+assert.equal(api.familyFromAir("urn:air:sdxl:lora:civitai:1@2"), "sdxl");
+assert.equal(api.familyFromAir("urn:air:krea2:lora:civitai:2323765@3071582"), "krea2");
+assert.equal(api.familyFromImport({
+  serviceId: "image/sdcpp/sdxl/createImage",
+  checkpointName: "Juggernaut XL",
+  diffusionModel: "urn:air:sdxl:checkpoint:civitai:1@2"
+}), "sdxl");
 
-function extract(fnName) {
-  const start = source.indexOf("function " + fnName);
-  assert.ok(start >= 0, "missing " + fnName + " — family match not merged into storyboard.js");
-  let i = start, depth = 0, began = false;
-  for (; i < source.length; i++) {
-    if (source[i] === "{") { depth++; began = true; }
-    else if (source[i] === "}") { depth--; if (began && depth === 0) { i++; break; } }
-  }
-  return source.slice(start, i);
-}
+const sdxlShot = { checkpointName: "Juggernaut XL", serviceId: "image/sdcpp/sdxl/createImage" };
+assert.equal(api.familyFromShot(sdxlShot), "sdxl");
 
-const sandbox = { console };
-vm.createContext(sandbox);
-vm.runInContext(
-  [
-    extract("inferModelFamily"),
-    extract("itemMatchesFamily"),
-  ].join("\n"),
-  sandbox
-);
+assert.equal(api.keepCurrent({
+  currentId: "image/comfy/krea2/turbo/createImage",
+  item: { id: "image/comfy/krea2/turbo/createImage", name: "Krea2" },
+  op: "t2i",
+  family: "sdxl",
+  fits: function () { return true; }
+}), false, "krea2 must not keep against sdxl post");
 
-const infer = sandbox.inferModelFamily;
-const match = sandbox.itemMatchesFamily;
+assert.equal(api.keepCurrent({
+  currentId: "image/sdcpp/sdxl/createImage",
+  item: { id: "image/sdcpp/sdxl/createImage", name: "SDXL" },
+  op: "t2i",
+  family: "sdxl",
+  fits: function () { return true; }
+}), true);
 
-assert.equal(infer("image/sdcpp/sdxl/createImage"), "sdxl");
-assert.equal(infer("Pony Diffusion XL"), "pony");
-assert.equal(infer("image/comfy/krea2/turbo/createImage"), "krea");
-assert.equal(infer("image/sdcpp/flux1/createImage"), "flux");
-assert.equal(infer("black-forest-labs/FLUX.1-schnell"), "flux");
-assert.equal(infer(""), "");
+const pool = [
+  { id: "image/comfy/krea2/turbo/createImage", name: "Krea2 Turbo" },
+  { id: "image/sdcpp/sdxl/createImage", name: "SDXL" },
+  { id: "image/flux1/dev/createImage", name: "Flux Dev" }
+];
+function fits(it, op) { return op === "t2i"; }
+function belongs(id, be) { return be === "civitai"; }
 
-assert.equal(match({ id: "image/comfy/krea2/turbo/createImage" }, "sdxl"), false);
-assert.equal(match({ id: "image/sdcpp/sdxl/createImage" }, "sdxl"), true);
-assert.equal(match({ id: "image/comfy/krea2/turbo/createImage" }, ""), true);
-assert.equal(match({ id: "image/sdcpp/sdxl/createImage" }, "krea"), false);
+assert.equal(api.pickByFamily({
+  backend: "civitai", op: "t2i", family: "sdxl", pool: pool, fits: fits, belongs: belongs
+}), "image/sdcpp/sdxl/createImage");
 
-assert.ok(!source.includes("跨家搜到") || source.includes("v0821o133-family-match") || source.includes("function inferModelFamily"),
-  "family helper must land in storyboard.js before claiming match work");
+assert.equal(api.preferredId("civitai", "flux", "t2i"), "image/sdcpp/flux1/createImage");
+assert.equal(api.pickByFamily({
+  backend: "civitai", op: "t2i", family: "flux", pool: pool.concat([{ id: "image/sdcpp/flux1/createImage", name: "Flux1" }]), fits: fits, belongs: belongs
+}), "image/sdcpp/flux1/createImage");
+
+assert.equal(api.pickByFamily({
+  backend: "fal", op: "t2i", family: "sdxl", pool: [
+    { id: "fal-ai/krea-2/turbo", name: "Krea 2" },
+    { id: "fal-ai/flux/schnell", name: "Flux" }
+  ], fits: fits, belongs: function (id, be) { return be === "fal"; }
+}), "", "fal has no sdxl twin — must stay empty");
+
+assert.equal(api.pickByFamily({
+  backend: "fal", op: "t2i", family: "flux", pool: [
+    { id: "fal-ai/krea-2/turbo", name: "Krea 2" },
+    { id: "fal-ai/flux/schnell", name: "Flux Schnell" }
+  ], fits: fits, belongs: function (id, be) { return be === "fal"; }
+}), "fal-ai/flux/schnell");
+
+assert.equal(api.preferredId("huggingface", "sdxl", "t2i"), "");
+assert.ok(api.preferredId("civitai", "sdxl", "t2i").indexOf("sdxl") >= 0);
 
 console.log("PASS o133_family_smart_match");
