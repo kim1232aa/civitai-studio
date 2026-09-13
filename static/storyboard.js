@@ -5187,6 +5187,17 @@
     const q = $("loraQ");
     const lbl = $("loraQLbl");
     const hint = $("loraHint");
+    const filt = $("serviceFilter");
+    if (filt) {
+      filt.placeholder = ({
+        civitai: "搜索 Civitai 模型",
+        fal: "搜索 Fal 模型",
+        huggingface: "搜索 HF 模型",
+        "modelscope-ai": "搜索魔搭 AI 模型",
+        "modelscope-cn": "搜索魔搭 CN 模型",
+        "nano-gpt": "搜索 Nano 模型",
+      })[be] || "搜索当前家的模型";
+    }
     const adapt = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
     const shape = adapt && typeof adapt.loraShape === "function" ? adapt.loraShape(be) : "";
     if (be === "fal" || isNanogptBe() || be === "huggingface") {
@@ -6379,6 +6390,13 @@
     const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     const alnumQ = tokens.map(svcAlnum).filter(function (t) { return t.length >= 2; });
     let shown = roster;
+    const beNow = (typeof currentBackend === "function") ? currentBackend() : (($("backend") && $("backend").value) || "");
+    if (beNow && typeof serviceBelongsToBackend === "function") {
+      shown = shown.filter(function (it) {
+        const id = String((it && (it.id || it.name)) || "");
+        return !id || serviceBelongsToBackend(id, beNow);
+      });
+    }
     if (tokens.length) {
       shown = roster.filter(function (it) {
         const blob = svcMatchBlob(it);
