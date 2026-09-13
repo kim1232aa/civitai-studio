@@ -23,9 +23,21 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 CAPTION_PROMPT = (
-    "Describe this image so it can be reused as an image-generation prompt. "
-    "Be specific about subject, appearance, clothing, pose, setting, lighting, and camera. "
-    "Do not invent a backstory. Output only the description."
+    "请用中文按下列标签描述这张图，输出必须能直接当作可编辑的反推提示词。"
+    "没有依据的标签留空，禁止编造角色名、剧情、服装或光线。"
+    "不要前言、不要解释。格式：\n"
+    "【反推提示词】\n"
+    "主体：\n"
+    "外观：\n"
+    "服装：\n"
+    "姿态：\n"
+    "场景：\n"
+    "光线：\n"
+    "构图：\n"
+    "画面：\n"
+    "运镜：\n"
+    "约束：\n"
+    "负面："
 )
 
 

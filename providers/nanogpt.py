@@ -1646,11 +1646,8 @@ def caption_image(image_url: str, model: str = "") -> tuple[int, dict]:
         mid = pick_vision_model(model)
     except CatalogFetchError as e:
         return 503, {"error": str(e), "code": e.code, "backend": "nano-gpt"}
-    prompt = (
-        "Describe this image so it can be reused as an image-generation prompt. "
-        "Be specific about subject, appearance, clothing, pose, setting, lighting, and camera. "
-        "Do not invent a backstory. Output only the description."
-    )
+    from .media_io import CAPTION_PROMPT
+    prompt = CAPTION_PROMPT
     messages = [
         {
             "role": "user",
@@ -1660,7 +1657,7 @@ def caption_image(image_url: str, model: str = "") -> tuple[int, dict]:
             ],
         }
     ]
-    body = {"model": mid, "messages": messages, "max_tokens": 400}
+    body = {"model": mid, "messages": messages, "max_tokens": 700}
     code, data = json_call(CHAT_COMPLETIONS, method="POST", headers=_auth(), body=body, timeout=90)
     if code >= 400 or not isinstance(data, dict):
         return (

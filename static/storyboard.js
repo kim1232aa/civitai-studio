@@ -1,6 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const STORE = "nl-storyboard-v0821o77-fill";
+  // v0821o136: structured reverse prompt + text↔shot sync; no invented character library
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
   // v0821o123: 故事推演沿用原分镜的家，不再误匹配 qwen2+steps
@@ -949,11 +950,18 @@
 
   function describePrompt(asset, caption) {
     if (!asset || !asset.url) return "";
-    return String(caption || "")
+    const raw = String(caption || "")
       .split("\n")
       .map((part) => part.trim())
       .filter(Boolean)
       .join("\n");
+    if (!raw) return "";
+    try {
+      if (typeof PromptBible !== "undefined" && PromptBible.formatReversePrompt) {
+        return PromptBible.formatReversePrompt(raw);
+      }
+    } catch (_) {}
+    return raw;
   }
 
   async function captionFromAsset(asset) {
@@ -1020,6 +1028,7 @@
       state.nodes.push(node);
       state.edges.push({ from: asset.id, to: node.id });
     }
+    syncTextToShots(node);
     selectNode(node.id);
     persist();
     return node;
@@ -1075,6 +1084,37 @@
       return;
     }
     await generate();
+  }
+  function wiredShotsFromText(textId) {
+    return state.edges
+      .filter((e) => e.from === textId)
+      .map((e) => nodeById(e.to))
+      .filter((n) => n && n.kind === "shot");
+  }
+  function wiredTextFromShot(shotId) {
+    return state.edges
+      .filter((e) => e.to === shotId)
+      .map((e) => nodeById(e.from))
+      .filter((n) => n && n.kind === "text")[0] || null;
+  }
+  function syncTextToShots(textNode) {
+    if (!textNode || textNode.kind !== "text") return;
+    const body = textNode.text || "";
+    wiredShotsFromText(textNode.id).forEach(function (shot) {
+      shot.prompt = body;
+    });
+    const shot = typeof composerShot === "function" ? composerShot() : nodeById(state.lastComposerShot);
+    if (shot && $("prompt") && wiredShotsFromText(textNode.id).some(function (s) { return s.id === shot.id; })) {
+      $("prompt").value = body;
+    }
+  }
+  function syncShotToText(shot) {
+    if (!shot || shot.kind !== "shot") return;
+    const t = wiredTextFromShot(shot.id);
+    if (!t) return;
+    t.text = shot.prompt || "";
+    const ta = world.querySelector('textarea[data-text][data-id="' + t.id + '"]');
+    if (ta && document.activeElement !== ta) ta.value = t.text;
   }
   /** Raw outs / provider file ids — must never land in the prompt textarea. */
   function isRawFileTitle(t) {
@@ -2360,6 +2400,15 @@
     });
   }
   function renderCards() {
+    const active = document.activeElement;
+    const keepText = (active && active.matches && active.matches("textarea[data-text]"))
+      ? {
+          id: active.dataset.id,
+          start: active.selectionStart,
+          end: active.selectionEnd,
+          scroll: active.scrollTop,
+        }
+      : null;
     world.querySelectorAll(".card,.group-bound").forEach((el) => el.remove());
     renderGroupBounds();
     state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
@@ -2390,6 +2439,14 @@
     drawMinimap();
     syncGroupRunBtn();
     syncSelBar();
+    if (keepText) {
+      const ta = world.querySelector('textarea[data-text][data-id="' + keepText.id + '"]');
+      if (ta) {
+        ta.focus();
+        try { ta.setSelectionRange(keepText.start, keepText.end); } catch (_) {}
+        ta.scrollTop = keepText.scroll;
+      }
+    }
   }
 
   function worldBounds() {
@@ -3467,7 +3524,47 @@
   }
 
   function insertMention(asset) {
-    const shot = nodeById(state.selected);
+    if (!asset) return;
+    const textTa = (document.activeElement && document.activeElement.matches &&
+      document.activeElement.matches("textarea[data-text]"))
+      ? document.activeElement : null;
+    const selected = nodeById(state.selected);
+    const textNode = textTa
+      ? nodeById(textTa.dataset.id)
+      : (selected && selected.kind === "text" ? selected : null);
+    if (textNode && textNode.kind === "text") {
+      const ta = textTa || world.querySelector('textarea[data-text][data-id="' + textNode.id + '"]');
+      const v = ta ? ta.value : String(textNode.text || "");
+      const caret = ta && ta.selectionStart != null ? ta.selectionStart : v.length;
+      const before = v.slice(0, caret);
+      const at = before.lastIndexOf("@");
+      const tag = "@" + sourceTitle(asset);
+      let next;
+      let caret2;
+      if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
+        next = v.slice(0, at) + tag + " " + v.slice(caret);
+        caret2 = at + tag.length + 1;
+      } else {
+        const pad = v && !/\s$/.test(v) ? " " : "";
+        next = v + pad + tag + " ";
+        caret2 = next.length;
+      }
+      textNode.text = next;
+      if (isImageSource(asset) && !state.edges.some((e) => e.from === asset.id && e.to === textNode.id)) {
+        state.edges.push({ from: asset.id, to: textNode.id });
+      }
+      syncTextToShots(textNode);
+      hideAtbox();
+      hideSkillbox();
+      renderCards(); drawWires(); persist();
+      const ta2 = world.querySelector('textarea[data-text][data-id="' + textNode.id + '"]');
+      if (ta2) {
+        ta2.focus();
+        try { ta2.setSelectionRange(caret2, caret2); } catch (_) {}
+      }
+      return;
+    }
+    const shot = selected;
     if (!shot || shot.kind !== "shot") return;
     // v0817c-no-at-in-prompt: link edge + chip only — never append @图片N / @标题 into prompt.
     linkAssetToShot(asset, shot);
@@ -4221,7 +4318,20 @@
     const n = nodeById(ta.dataset.id);
     if (n && n.kind === "text") {
       n.text = ta.value;
+      if (state.selected !== n.id) {
+        state.selected = n.id;
+        if (typeof setMulti === "function") setMulti([n.id]);
+      }
+      syncTextToShots(n);
       persist();
+      const caret = ta.selectionStart || ta.value.length;
+      const before = String(ta.value || "").slice(0, caret);
+      const at = before.lastIndexOf("@");
+      if (at >= 0 && !/[\s\n]/.test(before.slice(at + 1))) {
+        showAtbox(before.slice(at + 1));
+      } else {
+        hideAtbox();
+      }
     }
   });
   world.addEventListener("click", (e) => {
@@ -4649,8 +4759,16 @@
   }
 
   $("prompt").addEventListener("input", () => {
-    const n = nodeById(state.selected);
-    if (n) { n.prompt = $("prompt").value; persist(); }
+    const n = (typeof composerShot === "function" && composerShot()) || nodeById(state.selected);
+    if (n && n.kind === "shot") {
+      n.prompt = $("prompt").value;
+      syncShotToText(n);
+      persist();
+    } else if (n && n.kind === "text") {
+      n.text = $("prompt").value;
+      syncTextToShots(n);
+      persist();
+    }
     const ta = $("prompt");
     const v = ta.value || "";
     const caret = ta.selectionStart || v.length;

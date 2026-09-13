@@ -680,7 +680,116 @@ header .title:hover { color: #fff; }
 .port.in { left: -7px; }
 .port.out { right: -7px; }
 .card.shot .port { top: 54%; }
+.card.text {
+  width: 320px;
+  height: 280px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  background: #16161a;
+  border: 1px solid #2a2a30;
+  color: #ececec;
+}
+.card.text .label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #c8c8d0;
+  line-height: 1.4;
+}
+.card.text .editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  background: #101014;
+  border: 1px solid #2a2a30;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #ececec;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: auto;
+}
+.card.text .editor:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.card.text .acts {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.card.text .acts button {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid #343438;
+  background: #1b1b1e;
+  color: #e8e8ec;
+  cursor: pointer;
+}
+.card.text .acts button:hover { background: #2a2a32; }
+.card.text .acts button[data-textact="gen"] {
+  background: #5ee0c5;
+  color: #0b0b0d;
+  border-color: transparent;
+  font-weight: 600;
+}
 .card.text .port { top: 48px; margin-top: 0; }
+
+.atbox, .skillbox {
+  position: absolute;
+  left: 50%;
+  bottom: 220px;
+  transform: translateX(-50%);
+  z-index: 28;
+  width: min(420px, 80vw);
+  max-height: 240px;
+  overflow: auto;
+  display: none;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #2c2c34;
+  background: #16161af5;
+  box-shadow: 0 12px 32px #0007;
+}
+.atbox.show, .skillbox.show { display: block; }
+.atbox button, .skillbox .sk-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  background: transparent;
+  border: 0;
+  color: #ddd;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.atbox button:hover, .skillbox .sk-item:hover { background: #222228; }
+.atbox img { width: 28px; height: 28px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.skillbox .sk-hd { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.skillbox .sk-cat {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #343438;
+  background: #1b1b1e;
+  color: #c8c8d0;
+  cursor: pointer;
+}
+.skillbox .sk-cat.on { background: #38383d; color: #fff; border-color: #5ee0c5; }
+.skillbox .sk-item { flex-direction: column; align-items: flex-start; gap: 2px; }
+.skillbox .sk-title { font-weight: 600; color: #ececec; }
+.skillbox .sk-preview { font-size: 11px; color: #8b8b94; line-height: 1.4; }
+.skillbox .sk-empty { color: #8b8b94; padding: 8px; }
 
 
 
