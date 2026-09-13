@@ -65,7 +65,23 @@ assert.equal(api.pickByFamily({
   ], fits: fits, belongs: function (id, be) { return be === "fal"; }
 }), "fal-ai/flux/schnell");
 
+assert.equal(api.familyFromImport({
+  serviceId: "image/comfy/krea2/turbo/createImage",
+  checkpointName: "Flux Asian Utopian",
+  ecosystem: "krea2",
+  diffusionModel: "urn:air:flux1:checkpoint:civitai:705606@852897"
+}), "flux", "AIR flux beats leftover krea2 serviceId");
+
+assert.equal(api.preferredId("fal", "sdxl", "t2i"), "");
 assert.equal(api.preferredId("huggingface", "sdxl", "t2i"), "");
+assert.equal(api.preferredId("modelscope-ai", "sdxl", "t2i"), "");
+assert.equal(api.preferredId("modelscope-cn", "sdxl", "t2i"), "");
+assert.equal(api.preferredId("nano-gpt", "sdxl", "t2i"), "");
 assert.ok(api.preferredId("civitai", "sdxl", "t2i").indexOf("sdxl") >= 0);
+assert.ok(api.preferredId("fal", "krea2", "t2i").indexOf("krea") >= 0);
+assert.ok(api.preferredId("huggingface", "krea2", "t2i").indexOf("Krea") >= 0);
+assert.ok(api.preferredId("nano-gpt", "krea2", "t2i").indexOf("krea") >= 0);
+assert.ok(api.preferredId("modelscope-ai", "krea2", "t2i").indexOf("Krea") >= 0);
+assert.ok(api.preferredId("modelscope-cn", "krea2", "t2i").indexOf("Krea") >= 0);
 
 console.log("PASS o133_family_smart_match");

@@ -964,3 +964,81 @@ svg.wires path.edge {
 .dock.show.collapsed .bar > #serviceFilter { display: inline-block !important; }
 .dock.show.collapsed .bar > #serviceFilterLbl { display: inline !important; }
 .canvas-manager .cm-tabs { display: flex !important; }
+
+/* 短名字也要整段看见：资产条、模型下拉、LoRA 芯片不再裁成 Civita… / FLUX.1 [dev] with */
+.rail {
+  width: 300px !important;
+  max-width: 300px !important;
+  min-width: 260px !important;
+}
+.rail-item {
+  align-items: flex-start !important;
+}
+.rail-item span {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.35 !important;
+  word-break: break-word;
+}
+.dock.show #backend,
+.dock.show.collapsed #backend {
+  min-width: 96px !important;
+  max-width: 140px !important;
+  flex: 0 0 112px !important;
+}
+.dock.show #service,
+.dock.show.collapsed #service,
+.dock.show.expanded #service {
+  min-width: 240px !important;
+  max-width: min(480px, 52vw) !important;
+  width: auto !important;
+  flex: 1 1 280px !important;
+}
+.dock.show .lora-block,
+.dock.show.collapsed .lora-block,
+.dock.show.expanded .lora-block {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  flex-wrap: wrap !important;
+}
+.dock.show #loras {
+  display: flex !important;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  overflow: visible !important;
+}
+.dock.show .lora,
+.dock.show .lora .top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.dock.show .lora-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dock.show .lora-name,
+.dock.show .lora-air {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: break-word;
+  line-height: 1.35;
+}
+.dock.show.collapsed #dockTitle,
+.dock.show #dockTitle {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.3 !important;
+  height: auto !important;
+}
+.tool.lbl {
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  line-height: 1.2 !important;
+}

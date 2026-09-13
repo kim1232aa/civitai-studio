@@ -942,7 +942,7 @@
   }
   function sourceTitle(n) {
     if (!n) return "";
-    if (n.kind === "shot") return (n.title || "分镜") + "成片";
+    if (n.kind === "shot") return String(n.title || "分镜").replace(/成片$/, "") || "分镜";
     if (n.kind === "text") return n.title || "提示词";
     return n.title || "资产";
   }
@@ -6824,7 +6824,16 @@
     const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
     const foreign = !serviceBelongsToBackend(sel.value, be);
     const labels = { t2i: "文生图", i2i: "图生图", i2v: "图生视频", t2v: "文生视频", upscale: "超清", inpaint: "消除" };
-    if (!foreign && serviceFitsOp(cur, op)) {
+    const fam = (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.familyFromShot)
+      ? SmartFamilyMatch.familyFromShot(shot, (shot && (shot.checkpointName || shot.diffusionModel)) || "")
+      : "";
+    const keepNow = (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.keepCurrent)
+      ? SmartFamilyMatch.keepCurrent({
+          currentId: sel.value, item: cur, op: op, family: fam, foreign: foreign,
+          fits: serviceFitsOp
+        })
+      : (!foreign && serviceFitsOp(cur, op));
+    if (keepNow) {
       writeSmartMatchToShot(shot, sel.value);
       if (typeof syncOpChip === "function") syncOpChip();
       if (opts.announce !== false) {
@@ -6843,38 +6852,31 @@
         if (gen !== smartMatchService._gen) return false;
         let row = null;
         let crossHit = false;
-        try {
-          const local = await searchModelsForOp(be, op, false);
-          row = pickFitFromSearch(local, op, be);
-        } catch (_) {}
-        if (gen !== smartMatchService._gen) return false;
-        if (!row) {
-          const loraHouses = loraSourceHouses();
-          for (let i = 0; i < loraHouses.length && !row; i++) {
-            const hb = loraHouses[i];
-            if (!hb || hb === be) continue;
-            try {
-              const rows = await searchModelsForOp(hb, op, false);
-              row = pickFitFromSearch(rows, op, hb);
-              if (row) crossHit = true;
-            } catch (_) {}
+        const fam2 = state._importFamily
+          || ((typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.familyFromShot)
+            ? SmartFamilyMatch.familyFromShot(shot, "")
+            : "");
+        if (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.pickByFamily && fam2) {
+          const poolObj = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+          const poolArr = Array.isArray(poolObj) ? poolObj : Object.keys(poolObj).map(function (k) { return poolObj[k]; });
+          const picked = SmartFamilyMatch.pickByFamily({
+            backend: be, op: op, family: fam2, pool: poolArr,
+            fits: serviceFitsOp, belongs: serviceBelongsToBackend
+          });
+          if (picked) {
+            row = poolObj[picked] || (state.catalogById && state.catalogById[picked]) || { id: picked, name: picked, backend: be };
           }
-        }
-        if (gen !== smartMatchService._gen) return false;
-        if (!row) {
+        } else {
           try {
-            const all = await searchModelsForOp(be, op, true);
-            row = pickFitFromSearch(all, op, be) || pickFitFromSearch(all, op, "");
-            const hb = row && String(row.backend || row.source || "");
-            if (row && hb && hb !== be) crossHit = true;
+            const local = await searchModelsForOp(be, op, false);
+            row = pickFitFromSearch(local, op, be);
           } catch (_) {}
-        }
-        if (gen !== smartMatchService._gen) return false;
-        if (!row) {
-          const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
-          if (wantPref) {
-            const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-            row = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+          if (!row) {
+            const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
+            if (wantPref) {
+              const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+              row = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+            }
           }
         }
         if (!row) {
@@ -6890,7 +6892,7 @@
         const want = String(row.id || row.name || "");
         const rowBe = String(row.backend || row.source || be);
         if (!want) return false;
-        if (rowBe && $("backend") && $("backend").value !== rowBe) $("backend").value = rowBe;
+        if (rowBe && $("backend") && $("backend").value !== rowBe && !state._importFamily) $("backend").value = rowBe;
         injectCatalogRow(row);
         if (typeof ensureSelectOpt === "function") ensureSelectOpt(sel, want);
         sel.value = want;
@@ -7531,6 +7533,7 @@
   }
 
   function applyLoraCapabilityRematch() {
+    if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") return false;
     const shot = nodeById(state.selected);
     if (!shot || shot.kind !== "shot") {
       setMsg("请先选中分镜再匹配 LoRA 端点", "warn");
@@ -10564,6 +10567,7 @@
     return want;
   }
   function ensureFalLoraServiceSelected() {
+    if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") return;
     if (!falHasLoras()) return;
     const be = ($("backend") && $("backend").value) || "";
     if (be !== "fal") return;
@@ -10677,6 +10681,20 @@
     selectNode(id, { expand: true });
     return n;
   }
+  function familyMatchImport(house, j) {
+    const be = String(house || "").trim();
+    const op = (j && j.kind === "video") ? "i2v" : "t2i";
+    let fam = "";
+    if (typeof SmartFamilyMatch !== "undefined") {
+      fam = SmartFamilyMatch.familyFromImport(j) || "";
+    }
+    let sid = "";
+    if (typeof SmartFamilyMatch !== "undefined" && be) {
+      sid = SmartFamilyMatch.preferredId(be, fam, op) || "";
+    }
+    return { backend: be, op: op, family: fam, serviceId: sid };
+  }
+
   // v0820b-apply-import: port index.html applyImport onto storyboard Composer.
   // Never silent-fall back to fal/flux/schnell after a civitai import.
   async function applyImport(j) {
@@ -10686,14 +10704,35 @@
     const falSid = looksFalServiceId(j.serviceId);
     const hfSid = looksHfServiceId(j.serviceId);
     const msBe = String(j.backend || "").trim();
-    const wantMs = j.backend === "modelscope-ai" || j.backend === "modelscope-cn"
+    const wantMsPost = j.backend === "modelscope-ai" || j.backend === "modelscope-cn"
       || msBe === "modelscope" || msBe === "ms" || msBe === "魔搭" || msBe === "魔搭ai" || msBe === "魔搭cn";
     // Explicit backend wins; Magao Hub ids must not steal HF; HF must not fall through to Fal.
-    const wantHf = !wantMs && ((j.backend === "huggingface" || j.backend === "hf")
+    let wantMs = wantMsPost;
+    let wantHf = !wantMs && ((j.backend === "huggingface" || j.backend === "hf")
       || (hfSid && j.backend !== "fal" && j.backend !== "civitai"));
-    const wantCivitai = !wantMs && !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
-    const wantFal = !wantMs && !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
+    let wantCivitai = !wantMs && !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
+    let wantFal = !wantMs && !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
     const shot = ensureActiveShotForImport();
+    const uiHouse = String(($("backend") && $("backend").value) || (shot && (shot.backend || (shot.composer && shot.composer.backend))) || "").trim();
+    const postFromCivitai = !!(wantCivitai || civitaiSid);
+    let wantNano = j.backend === "nano-gpt";
+    let famInfo = familyMatchImport(uiHouse || "civitai", j);
+    state._importFamily = famInfo.family || "";
+    // Stay on the house the user already picked. A Civitai 帖 is a recipe, not a house switch.
+    if (uiHouse && uiHouse !== "civitai" && postFromCivitai) {
+      j = Object.assign({}, j, { backend: uiHouse, serviceId: famInfo.serviceId || "", serviceName: famInfo.serviceId || j.serviceName });
+      lockHouse(uiHouse);
+      wantCivitai = false;
+      wantFal = uiHouse === "fal";
+      wantHf = uiHouse === "huggingface";
+      wantMs = uiHouse === "modelscope-ai" || uiHouse === "modelscope-cn";
+      wantNano = uiHouse === "nano-gpt";
+      if (wantMs) {
+        j.backend = uiHouse;
+      }
+    } else if (uiHouse === "civitai" && postFromCivitai && famInfo.serviceId) {
+      j = Object.assign({}, j, { serviceId: famInfo.serviceId });
+    }
     let hardErr = "";
     let heightAligned = false;
     setDockMode("expanded");
@@ -10727,10 +10766,18 @@
     } else if (wantFal) {
       if ($("backend")) $("backend").value = "fal";
       syncParamSurface();
-      let sid = String(j.serviceId || "").trim() || FAL_LORA_PREF_SERVICE;
+      let sid = String(j.serviceId || "").trim();
+      if (!sid && !state._importFamily) sid = FAL_LORA_PREF_SERVICE;
       // Pin fal-ai/z-image/turbo(/lora) — never drift to Civitai image/comfy/…
       if (looksCivitaiServiceId(sid)) {
         hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
+        sid = "";
+      } else if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
+        sid = "";
+        state._pinFalLoraService = "";
+        state._pendingService = "";
+        try { await loadCatalog(); } catch (_) {}
+        if ($("service")) $("service").value = "";
       } else {
         // v0821o29: if import carries LoRAs, prefer AIR-base endpoint (fixture krea stays krea).
         if (Array.isArray(j.loras) && j.loras.length) {
@@ -10779,7 +10826,9 @@
     } else if (wantHf) {
       if ($("backend")) $("backend").value = "huggingface";
       syncParamSurface();
-      let sid = String(j.serviceId || "").trim() || HF_LORA_PREF_SERVICE;
+      let sid = String(j.serviceId || "").trim();
+      if (!sid && !state._importFamily) sid = HF_LORA_PREF_SERVICE;
+      if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") sid = "";
       // v0821o31: allow official Fal LoRA endpoints (flux-lora / krea-2/turbo/lora) when import carries loras[].
       // Still reject Civitai image/… and bare no-LoRA fal-ai/*/turbo (Router must not silent-swap sibling).
       const importHasLoras = Array.isArray(j.loras) && j.loras.length > 0;
@@ -10819,13 +10868,14 @@
       }
     } else if (wantMs) {
       // AI and CN are separate products — never cross (token/base).
-      if (msBe === "modelscope-cn" || msBe === "魔搭cn") {
-        if ($("backend")) $("backend").value = "modelscope-cn";
-      } else {
-        if ($("backend")) $("backend").value = "modelscope-ai";
-      }
+      const msHouse = (uiHouse === "modelscope-cn" || uiHouse === "modelscope-ai")
+        ? uiHouse
+        : ((msBe === "modelscope-cn" || msBe === "魔搭cn") ? "modelscope-cn" : "modelscope-ai");
+      if ($("backend")) $("backend").value = msHouse;
       syncParamSurface();
-      let sid = String(j.serviceId || "").trim() || MS_LORA_PREF_SERVICE;
+      let sid = String(j.serviceId || "").trim();
+      if (!sid && !state._importFamily) sid = MS_LORA_PREF_SERVICE;
+      if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") sid = "";
       if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
         hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
         sid = "";
@@ -10854,6 +10904,23 @@
           state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
         }
         ensureMsLoraServiceSelected();
+      } else if ($("service")) {
+        $("service").value = "";
+      }
+    } else if (wantNano) {
+      if ($("backend")) $("backend").value = "nano-gpt";
+      syncParamSurface();
+      let sid = String(j.serviceId || "").trim();
+      if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) sid = "";
+      if (!sid) sid = famInfo.serviceId || "";
+      state._pendingService = sid;
+      if (!await loadCatalog() || importToken !== _importToken) return false;
+      if (sid) {
+        ensureSelectOpt($("service"), sid);
+        if ($("service")) $("service").value = sid;
+        if (!state.catalogById) state.catalogById = {};
+        if (!state.catalogById[sid]) state.catalogById[sid] = { id: sid, name: sid };
+        if (shot) shot.serviceId = sid;
       } else if ($("service")) {
         $("service").value = "";
       }
@@ -10957,7 +11024,8 @@
     syncLoraUi();
     // o54b: imported LoRA chips on !supportsLora model → rematch (roster fetch OK)
     try {
-      if (Array.isArray(state.loras) && state.loras.length && !catalogItemSupportsLora()) {
+      const famSkip = state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15";
+      if (!famSkip && Array.isArray(state.loras) && state.loras.length && !catalogItemSupportsLora()) {
         applyLoraCapabilityRematch();
       }
     } catch (_) {}
@@ -10984,6 +11052,38 @@
     if (j.comfyNodeCount) extra.push(j.comfyNodeCount + " 节点 Comfy");
     if (j.importSource) extra.push(j.importSource);
     const extraTxt = extra.length ? " · " + extra.join(" · ") : "";
+    const liveHouse = ($("backend") && $("backend").value) || uiHouse || "";
+    const labels = { t2i: "文生图", i2i: "图生图", i2v: "图生视频" };
+    const famNow = famInfo.family || state._importFamily || "";
+    const opNow = famInfo.op || "t2i";
+    let matched = ($("service") && $("service").value) || "";
+    if (typeof SmartFamilyMatch !== "undefined" && liveHouse && famNow) {
+      const wantFam = SmartFamilyMatch.preferredId(liveHouse, famNow, opNow) || "";
+      if (wantFam) {
+        ensureSelectOpt($("service"), wantFam);
+        if ($("service")) $("service").value = wantFam;
+        matched = wantFam;
+        if (shot) {
+          shot.serviceId = wantFam;
+          shot.backend = liveHouse;
+          if (!shot.composer) shot.composer = {};
+          shot.composer.service = wantFam;
+          shot.composer.backend = liveHouse;
+        }
+        setMsg("已智能匹配" + (labels[opNow] || opNow) + " · " + famNow + " · " + wantFam + extraTxt, heightAligned ? "warn" : "ok");
+        return true;
+      }
+      if ($("service")) $("service").value = "";
+      if (shot) {
+        shot.serviceId = "";
+        shot.backend = liveHouse;
+        if (!shot.composer) shot.composer = {};
+        shot.composer.service = "";
+        shot.composer.backend = liveHouse;
+      }
+      setMsg("这家没有可匹配的" + (labels[opNow] || opNow) + "模型（" + famNow + "），请换模型或换家", "warn");
+      return true;
+    }
     setMsg("已导入参数" + (nLora ? (" · " + nLora + " 个 LoRA") : " · 未识别 LoRA") + extraTxt + "，自己点生成。", heightAligned ? "warn" : "ok");
     return true;
   }

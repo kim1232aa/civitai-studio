@@ -58,16 +58,14 @@
 
   function familyFromImport(j) {
     j = j || {};
+    let fam = familyFromAir(j.diffusionModel);
+    if (fam) return fam;
+    fam = inferModelFamily(j.ecosystem);
+    if (fam) return fam;
+    fam = inferModelFamily(j.checkpointName || j.model || j.serviceName || "");
+    if (fam) return fam;
     const parts = [j.serviceId, j.serviceName, j.model, j.checkpointName, j.ecosystem, j.diffusionModel];
-    let fam = inferModelFamily(parts.filter(Boolean).join(" "));
-    if (!fam && j.diffusionModel) fam = familyFromAir(j.diffusionModel);
-    if (!fam && Array.isArray(j.loras)) {
-      for (let i = 0; i < j.loras.length; i++) {
-        fam = familyFromAir((j.loras[i] && (j.loras[i].air || j.loras[i].name)) || "");
-        if (fam) break;
-      }
-    }
-    return fam;
+    return inferModelFamily(parts.filter(Boolean).join(" "));
   }
 
   function itemFamily(it) {
