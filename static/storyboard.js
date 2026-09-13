@@ -2076,11 +2076,14 @@
     const recipe = shot && shot.composer;
     const wantKey = recipe ? (recipe.backend + ":" + (state.mode === "video" || state.mode === "text" || state.mode === "audio" ? state.mode : (recipe.mode || "image"))) : "";
     if (_composerShotId === id) {
-      if (id && recipe && $("backend") && $("backend").value !== recipe.backend) {
-        $("backend").value = recipe.backend;
+      if (id && $("backend") && $("backend").value) {
+        const liveBe = $("backend").value;
+        shot.backend = liveBe;
+        if (!recipe) shot.composer = snapshotComposer();
+        else recipe.backend = liveBe;
       }
       if (id && wantKey && (state._catalogKey !== wantKey)) {
-        state._pendingService = recipe.service || shot.serviceId || "";
+        state._pendingService = (recipe && recipe.service) || shot.serviceId || "";
         loadCatalog();
       }
       return;
@@ -6771,10 +6774,12 @@
     }
     if (gen !== smartMatchService._gen) return false;
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
-    const shotBe = shot && shot.kind === "shot"
-      ? String(shot.backend || (shot.composer && shot.composer.backend) || "").trim()
-      : "";
-    if (shotBe && $("backend") && $("backend").value !== shotBe) $("backend").value = shotBe;
+    const liveBe = ($("backend") && $("backend").value) || "";
+    if (shot && shot.kind === "shot" && liveBe) {
+      shot.backend = liveBe;
+      if (!shot.composer) shot.composer = {};
+      shot.composer.backend = liveBe;
+    }
     const op = currentGraphOp();
     const cur = catalogItemForService();
     const be = (typeof currentBackend === "function" ? currentBackend() : "") || ($("backend") && $("backend").value) || "";
@@ -11257,6 +11262,18 @@
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
     const be = ($("backend") && $("backend").value) || "";
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    if (shot && shot.kind === "shot") {
+      shot.backend = be;
+      if (!shot.composer) shot.composer = snapshotComposer();
+      shot.composer.backend = be;
+      const sid = String((shot.composer && shot.composer.service) || shot.serviceId || "").trim();
+      if (sid && typeof serviceBelongsToBackend === "function" && !serviceBelongsToBackend(sid, be)) {
+        shot.serviceId = "";
+        shot.composer.service = "";
+        if ($("service")) $("service").value = "";
+      }
+    }
     // v0821o26: drop foreign #service when 换家 so catalog keep= does not re-select civitai/HF id on Fal.
     if ($("service")) {
       const cur = String($("service").value || "").trim();
