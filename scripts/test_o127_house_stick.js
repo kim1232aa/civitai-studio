@@ -18,8 +18,12 @@ await page.waitForTimeout(400);
 
 const result = {};
 for (const be of houses) {
-  await page.selectOption("#backend", be);
-  await page.waitForTimeout(1800);
+  await page.evaluate((be) => {
+    const sel = document.getElementById("backend");
+    sel.value = be;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }, be);
+  await page.waitForTimeout(2200);
   const live = await page.evaluate(() => ({
     ui: (document.getElementById("backend") || {}).value,
     shot: (() => {

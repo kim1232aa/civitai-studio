@@ -2051,6 +2051,23 @@
     return true;
   }
 
+  let _houseLock = { be: "", shotId: "", until: 0 };
+  function lockHouse(be) {
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    _houseLock = { be: String(be || ""), shotId: (shot && shot.id) || "", until: Date.now() + 8000 };
+  }
+  function honorHouseLock() {
+    if (!_houseLock.be || Date.now() > _houseLock.until) return false;
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    if (_houseLock.shotId && shot && shot.id && shot.id !== _houseLock.shotId) return false;
+    if (shot && shot.kind === "shot") {
+      shot.backend = _houseLock.be;
+      if (!shot.composer) shot.composer = {};
+      shot.composer.backend = _houseLock.be;
+    }
+    return true;
+  }
+
   function snapshotComposer() {
     const fields = {};
     SHOT_COMPOSER_FIELDS.forEach((id) => { if ($(id)) fields[id] = $(id).value; });
@@ -2072,6 +2089,7 @@
   }
 
   function activateShotComposer(shot) {
+    honorHouseLock();
     const id = shot && shot.kind === "shot" ? shot.id : null;
     const recipe = shot && shot.composer;
     const wantKey = recipe ? (recipe.backend + ":" + (state.mode === "video" || state.mode === "text" || state.mode === "audio" ? state.mode : (recipe.mode || "image"))) : "";
@@ -2095,7 +2113,9 @@
       const recipe = shot.composer;
       const key = recipe.backend + ":" + recipe.mode;
       state.mode = recipe.mode;
-      $("backend").value = recipe.backend;
+      if (!(honorHouseLock() && _houseLock.be)) {
+        $("backend").value = recipe.backend;
+      }
       state.loras = JSON.parse(JSON.stringify(recipe.loras || []));
       Object.keys(recipe.fields || {}).forEach((field) => {
         const el = $(field);
@@ -6774,6 +6794,7 @@
     }
     if (gen !== smartMatchService._gen) return false;
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    honorHouseLock();
     const liveBe = ($("backend") && $("backend").value) || "";
     if (shot && shot.kind === "shot" && liveBe) {
       shot.backend = liveBe;
@@ -11262,6 +11283,7 @@
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
     const be = ($("backend") && $("backend").value) || "";
+    lockHouse(be);
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
     if (shot && shot.kind === "shot") {
       shot.backend = be;
@@ -11374,7 +11396,8 @@
       sel.appendChild(o);
     });
     if (keep && seen[keep]) sel.value = keep;
-    else if (!sel.value && rows[0]) sel.value = rows[0].id;
+    honorHouseLock();
+    if (!sel.value && rows[0]) sel.value = rows[0].id;
   }
   async function loadProviderCaps() {
     try {
