@@ -7968,6 +7968,20 @@
       if (be === "modelscope-ai" || be === "modelscope-cn" || be === "fal" || be === "huggingface") {
         genParams.width = w;
         genParams.height = h;
+        // stage3 fix: user-filled steps/cfg/sampler/scheduler must reach the
+        // request when the field is usable for this backend (provider does
+        // schema-checked forwarding / honest reject). Silent UI omission = 摆设.
+        const _usable = function (id) {
+          const el = $(id);
+          if (!el || el.disabled) return false;
+          const wrap = el.closest(".param-field");
+          if (wrap && (wrap.classList.contains("param-unsupported") || wrap.classList.contains("hidden"))) return false;
+          return true;
+        };
+        if (_usable("steps") && comfy.steps != null) genParams.steps = comfy.steps;
+        if (_usable("cfg") && comfy.cfgScale != null) { genParams.cfgScale = comfy.cfgScale; genParams.cfg = comfy.cfg; }
+        if (_usable("sampler") && comfy.sampler) genParams.sampler = comfy.sampler;
+        if (_usable("scheduler") && comfy.scheduler) genParams.scheduler = comfy.scheduler;
       } else {
         genParams.resolution = res;
       }
@@ -8599,10 +8613,10 @@
     if (prefix) setMsg(prefix + (stage ? (stage.op + "…") : "请求中…"));
     else setAckMsg(stage ? ("逐步跑 · " + stage.op + "…") : "正在请求云 API…");
     const outSid = String((payload && payload.serviceId) || ($("service") && $("service").value) || "");
+    // stage3 fix: do NOT silently strip steps/cfg for Fal — providers/fal.py
+    // already forwards schema-supported fields and honestly rejects the rest.
     if (/\/fal\//.test(outSid) || /^fal[-.]ai\//i.test(outSid)) {
-      delete payload.steps;
-      delete payload.cfg;
-      delete payload.cfgScale;
+      // sampler/scheduler have no Fal schema home; keep the historical strip.
       delete payload.sampler;
       delete payload.scheduler;
     }
@@ -11539,6 +11553,14 @@
   }
   if ($("service")) {
     $("service").addEventListener("change", function () {
+      // stage3 fix: deliberate user model change must pin the selected shot,
+      // otherwise resolveCivitaiOutboundServiceId() silently overrides the
+      // pick with the shot's previously pinned serviceId (model never changes).
+      const n = nodeById(state.selected);
+      if (n && n.kind === "shot") {
+        n.serviceId = String($("service").value || "");
+        try { persist(); } catch (_) {}
+      }
       applyServiceConstraints();
     });
   }

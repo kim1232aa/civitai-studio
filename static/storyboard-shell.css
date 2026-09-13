@@ -421,9 +421,21 @@ svg.wires path.edge {
   padding: 8px 10px;
   resize: none;
 }
-.dock.show #negative,
-.dock.show #paramWarn,
 .dock.show #send { display: none !important; }
+.dock.show .dock-prompt { flex-wrap: wrap !important; }
+.dock.show #negative {
+  display: block !important;
+  min-height: 36px !important;
+  max-height: 52px !important;
+  height: 36px !important;
+  flex: 1 1 34%;
+  min-width: 160px;
+  padding: 6px 10px;
+  resize: none;
+}
+.dock.show #prompt { flex: 1 1 60%; }
+.dock.show #paramWarn { display: block !important; flex: 1 0 100%; }
+.dock.show #paramWarn:empty { display: none !important; }
 .dock.show .dock-foot {
   display: flex !important;
   flex-direction: column;
