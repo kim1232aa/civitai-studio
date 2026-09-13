@@ -17,6 +17,9 @@
     return "";
   }
   function readChips() {
+    if (typeof window.applyHouseLoraRemap === "function") {
+      try { window.applyHouseLoraRemap(); } catch (_) {}
+    }
     if (window.state && Array.isArray(window.state.loras) && window.state.loras.length) {
       return window.state.loras.slice();
     }
@@ -31,6 +34,7 @@
       return (r.name || r.air || r.path || "LoRA") + " · " + (r.chipReason || "");
     });
     hint.textContent = bits.join(" ； ") || hint.textContent;
+    if (bits.length) hint.classList.add("show");
   }
   function applyRemap() {
     const house = currentHouse();
@@ -39,9 +43,9 @@
     window.__remappedLoras = rows;
     paintHint(rows);
     const msg = document.getElementById("msg");
-    const blocked = rows.filter(function (r) { return !r.outbound; });
+    const blocked = rows.filter(function (r) { return !r.outbound && !r.canOutbound; });
     if (msg && blocked.length) {
-      msg.textContent = blocked[0].chipReason;
+      msg.textContent = blocked[0].chipReason || "这家不能用当前 LoRA 形态";
       msg.className = "msg warn";
     }
     try {
@@ -77,11 +81,11 @@
     if (!t || !t.closest) return;
     if (t.closest("#send") || t.closest("#sendCap")) {
       const rows = window.__remappedLoras || [];
-      const blocked = rows.filter(function (r) { return !r.outbound; });
+      const blocked = rows.filter(function (r) { return !r.outbound && !r.canOutbound; });
       if (blocked.length) {
         const msg = document.getElementById("msg");
         if (msg) {
-          msg.textContent = blocked[0].chipReason + " · 先换 LoRA 或换家再点 ↑";
+          msg.textContent = (blocked[0].chipReason || "LoRA 不能出站") + " · 先换 LoRA 或换家再点 ↑";
           msg.className = "msg warn";
         }
       }

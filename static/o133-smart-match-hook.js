@@ -2,6 +2,33 @@
  * Does not call /api/generate. Does not change house. */
 (function () {
   if (typeof window === "undefined") return;
+
+  function loadSibling(src, after) {
+    if (document.querySelector('script[src^="' + src.split("?")[0] + '"]')) {
+      if (after) after();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = after || function () {};
+    document.head.appendChild(s);
+  }
+  function loadCss(href) {
+    if (document.querySelector('link[href^="' + href.split("?")[0] + '"]')) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.href = href;
+    document.head.appendChild(l);
+  }
+  loadCss("/static/o134-name-wrap.css?v=o134name");
+  if (!window.LoraHouseRemap) {
+    loadSibling("/static/lora-house-remap.js?v=o134lora", function () {
+      loadSibling("/static/o134-lora-remap-hook.js?v=o134");
+    });
+  } else {
+    loadSibling("/static/o134-lora-remap-hook.js?v=o134");
+  }
+
   const Fam = window.SmartFamilyMatch;
   if (!Fam) return;
 
@@ -31,46 +58,49 @@
       foreign: false,
       fits: function () { return true; }
     });
-    if (keep) return;
-    const want = Fam.pickByFamily({
-      backend: house,
-      op: op,
-      family: fam,
-      pool: curId ? [{ id: curId, name: curId }] : [],
-      fits: function () { return true; },
-      belongs: function (id, be) { return be === house; }
-    }) || Fam.preferredId(house, fam, op);
-    const msg = document.getElementById("msg");
-    if (!want) {
-      if (sel) sel.value = "";
-      if (msg && fam) {
-        msg.textContent = "这家没有可匹配的" + (OP_LABEL[op] || op) + "模型（" + fam + "），请换模型或换家";
-        msg.className = "msg warn";
+    if (!keep) {
+      const want = Fam.pickByFamily({
+        backend: house,
+        op: op,
+        family: fam,
+        pool: curId ? [{ id: curId, name: curId }] : [],
+        fits: function () { return true; },
+        belongs: function (id, be) { return be === house; }
+      }) || Fam.preferredId(house, fam, op);
+      const msg = document.getElementById("msg");
+      if (!want) {
+        if (sel) sel.value = "";
+        if (msg && fam) {
+          msg.textContent = "这家没有可匹配的" + (OP_LABEL[op] || op) + "模型（" + fam + "），请换模型或换家";
+          msg.className = "msg warn";
+        }
+      } else if (sel) {
+        let hit = false;
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === want) { hit = true; break; }
+        }
+        if (!hit) {
+          const opt = document.createElement("option");
+          opt.value = want;
+          opt.textContent = want;
+          sel.appendChild(opt);
+        }
+        sel.value = want;
+        try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+        if (msg && fam) {
+          msg.textContent = "已智能匹配" + (OP_LABEL[op] || op) + " · " + fam + " · " + want;
+          msg.className = "msg ok";
+        }
       }
-      return;
     }
-    if (sel) {
-      let hit = false;
-      for (let i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].value === want) { hit = true; break; }
-      }
-      if (!hit) {
-        const opt = document.createElement("option");
-        opt.value = want;
-        opt.textContent = want;
-        sel.appendChild(opt);
-      }
-      sel.value = want;
-      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
-    }
-    if (msg && fam) {
-      msg.textContent = "已智能匹配" + (OP_LABEL[op] || op) + " · " + fam + " · " + want;
-      msg.className = "msg ok";
-    }
+    try {
+      if (typeof window.applyHouseLoraRemap === "function") window.applyHouseLoraRemap();
+    } catch (_) {}
   }
 
   const rawFetch = window.fetch;
-  if (typeof rawFetch === "function") {
+  if (typeof rawFetch === "function" && !window.__o133FetchWrapped) {
+    window.__o133FetchWrapped = true;
     window.fetch = function (url, opts) {
       const req = String(url || "");
       return rawFetch.apply(this, arguments).then(function (res) {

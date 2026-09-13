@@ -1,7 +1,7 @@
 /* lora-house-remap.js
  * Import / switch-house: rewrite LoRA chips to the current house API shape.
  * Civitai = AIR. Fal/Nano = http path. ModelScope = Hub owner/repo.
- * HF = path if any, mark unverified. Never invent strength. Never silent-drop.
+ * HF = path if any, mark unverified. Never invent strength. Never silent-drop chips.
  */
 (function (root) {
   "use strict";
@@ -64,6 +64,7 @@
       strength: strength,
       scale: strength,
       outbound: false,
+      canOutbound: false,
       chipReason: "",
       shape: ""
     };
@@ -80,6 +81,8 @@
       } else {
         out.chipReason = "缺 AIR，Civitai 出不了这张 LoRA";
       }
+      out.canOutbound = !!out.outbound;
+      out.status = out.chipReason || "";
       return out;
     }
 
@@ -101,6 +104,8 @@
           ? "这家 LoRA 要直链 URL，当前是 Civitai AIR"
           : "没有可下载的 LoRA 地址";
       }
+      out.canOutbound = !!out.outbound;
+      out.status = out.chipReason || "";
       return out;
     }
 
@@ -117,6 +122,8 @@
         out.outbound = false;
         out.chipReason = "HF 官方多数端点没有 LoRA 键，请换模型或换家";
       }
+      out.canOutbound = !!out.outbound;
+      out.status = out.chipReason || "";
       return out;
     }
 
@@ -134,29 +141,42 @@
         out.outbound = false;
         out.chipReason = "魔搭只要 Hub owner/repo，请搜本家 LoRA，不能用 Civitai 下载链";
       }
+      out.canOutbound = !!out.outbound;
+      out.status = out.chipReason || "";
       return out;
     }
 
     out.chipReason = "未知供应商";
+    out.canOutbound = false;
+    out.status = out.chipReason;
     return out;
   }
 
   function remapLorasForHouse(backend, loras, family) {
     const list = Array.isArray(loras) ? loras : [];
-    return list.map(function (row) { return remapRow(backend, row, family); });
+    return list.map(function (row) {
+      const mapped = remapRow(backend, row, family);
+      return Object.assign({}, row, mapped);
+    });
   }
 
+  // Test/inspect helper only. Generate path must not use this to drop chips.
   function packOutbound(backend, loras, family) {
     return remapLorasForHouse(backend, loras, family).filter(function (r) { return r.outbound; });
   }
 
   const api = {
     isAir: isAir,
+    looksAir: isAir,
     isHttp: isHttp,
+    isHttpUrl: isHttp,
     isHubRepo: isHubRepo,
     versionIdOf: versionIdOf,
+    versionId: versionIdOf,
+    modelId: modelIdOf,
     downloadUrl: downloadUrl,
     remapRow: remapRow,
+    remapOne: remapRow,
     remapLorasForHouse: remapLorasForHouse,
     packOutbound: packOutbound
   };
