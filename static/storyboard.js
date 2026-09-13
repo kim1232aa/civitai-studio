@@ -147,7 +147,8 @@
   let _catalogFlight = null;
   let _importToken = 0;
   let _composerShotId = null;
-  const SHOT_COMPOSER_FIELDS = ["prompt", "negative", "duration", "aspect", "res", "nanoRes"].concat(COMFY_PARAM_IDS);
+  // v0821o136-seko: quantity (数量 1-4) persists per shot like other composer fields.
+  const SHOT_COMPOSER_FIELDS = ["prompt", "negative", "duration", "aspect", "res", "nanoRes", "quantity"].concat(COMFY_PARAM_IDS);
   const SNAP_PX = 36;
   const vp = $("viewport");
   const world = $("world");
@@ -2700,7 +2701,9 @@
     dock.style.setProperty("max-height", "none", "important");
     dock.style.setProperty("overflow", "visible", "important");
     const naturalH = Math.max(180, dock.offsetHeight || 220);
-    const spaceBelow = sr.height - (cy + ch + gap) - 8;
+    // v0821o136-seko: 底部居中的缩放底栏约占 56px，Composer 不压上去
+    const bottomReserve = 56;
+    const spaceBelow = sr.height - (cy + ch + gap) - bottomReserve;
     const spaceAbove = cy - gap - 44;
     let top;
     let attach = "below";
@@ -2715,7 +2718,7 @@
       top = cy + ch + gap;
     }
     if (top < 44) top = 44; // fallback bottom desk unused: box follows the shot
-    if (top + naturalH > sr.height - 8) top = Math.max(44, sr.height - 8 - naturalH);
+    if (top + naturalH > sr.height - bottomReserve) top = Math.max(44, sr.height - bottomReserve - naturalH);
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
     dock.style.setProperty("top", Math.round(top) + "px", "important");
@@ -3113,6 +3116,8 @@
     syncComposerChip(); syncCanvasTip();
     renderRail();
     renderChatRail();
+    if (typeof syncSvcCaps === "function") syncSvcCaps();
+    if (typeof scheduleCostRefresh === "function") scheduleCostRefresh();
     requestAnimationFrame(() => {
       positionDock();
       if (expanded) keepComposerPromptVisible();
@@ -4195,6 +4200,13 @@
       vp.setPointerCapture(e.pointerId);
       return;
     }
+    // empty canvas: 框选 mode starts a marquee instead of panning.
+    if (state.canvasTool === "select") {
+      state.marquee = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
+      vp.setPointerCapture(e.pointerId);
+      drawMarquee();
+      return;
+    }
     // empty canvas: clear multi + start pan; collapse Composer only on true click (not drag)
     if (!e.shiftKey) {
       setMulti(state.selected ? [state.selected] : []);
@@ -4212,6 +4224,12 @@
     vp.setPointerCapture(e.pointerId);
   });
   vp.addEventListener("pointermove", (e) => {
+    if (state.marquee) {
+      state.marquee.x1 = e.clientX;
+      state.marquee.y1 = e.clientY;
+      drawMarquee();
+      return;
+    }
     if (state.link) {
       if (e.pointerId !== state.link.pointerId) return;
       const w = clientToWorld(e.clientX, e.clientY);
@@ -4243,6 +4261,30 @@
     }
   });
   vp.addEventListener("pointerup", (e) => {
+    if (state.marquee) {
+      const m = state.marquee;
+      state.marquee = null;
+      drawMarquee();
+      const x0 = Math.min(m.x0, m.x1), x1 = Math.max(m.x0, m.x1);
+      const y0 = Math.min(m.y0, m.y1), y1 = Math.max(m.y0, m.y1);
+      if (x1 - x0 > 4 && y1 - y0 > 4) {
+        const ids = [];
+        world.querySelectorAll(".card").forEach(function (el) {
+          const r = el.getBoundingClientRect();
+          if (r.left < x1 && r.right > x0 && r.top < y1 && r.bottom > y0) ids.push(el.dataset.id);
+        });
+        if (ids.length) {
+          state.selected = ids[0];
+          setMulti(ids);
+          renderCards();
+          syncSelBar();
+          syncGroupRunBtn();
+          renderDock();
+          setMsg("已框选 " + ids.length + " 个节点", "ok");
+        }
+      }
+      return;
+    }
     if (state.link) {
       if (e.pointerId !== state.link.pointerId) return;
       const link = state.link;
@@ -4287,10 +4329,30 @@
   function cancelCanvasGesture(e) {
     if (state.link && e && e.pointerId != null && e.pointerId !== state.link.pointerId) return;
     const pointerId = state.link && state.link.pointerId;
-    state.link = null; state.snapTarget = null; state.drag = null; state.pan = null;
+    state.link = null; state.snapTarget = null; state.drag = null; state.pan = null; state.marquee = null;
     vp.classList.remove("grabbing");
+    drawMarquee();
     if (pointerId != null && vp.hasPointerCapture(pointerId)) vp.releasePointerCapture(pointerId);
     drawWires();
+  }
+  function drawMarquee() {
+    let el = vp.querySelector(".marquee");
+    const m = state.marquee;
+    if (!m) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "marquee";
+      vp.appendChild(el);
+    }
+    const r = vp.getBoundingClientRect();
+    const x0 = Math.min(m.x0, m.x1) - r.left, y0 = Math.min(m.y0, m.y1) - r.top;
+    el.style.left = Math.round(x0) + "px";
+    el.style.top = Math.round(y0) + "px";
+    el.style.width = Math.round(Math.abs(m.x1 - m.x0)) + "px";
+    el.style.height = Math.round(Math.abs(m.y1 - m.y0)) + "px";
   }
   vp.addEventListener("pointercancel", cancelCanvasGesture);
   vp.addEventListener("lostpointercapture", (e) => { if (state.link) cancelCanvasGesture(e); });
@@ -4311,6 +4373,48 @@
     state.cam.y = e.clientY - r.top - w0.y * next;
     applyCam(); persist();
   }, { passive: false });
+
+  // v0821o136-seko: double-click blank canvas → create 空白节点 there + open Composer bound to it.
+  function createBlankShotAt(wx, wy) {
+    const n = shots().length;
+    const id = uid("shot");
+    state.mode = "image";
+    const shot = {
+      id: id, kind: "shot", title: "分镜" + (n + 1),
+      x: wx, y: wy,
+      url: "", firstFrameId: "",
+      prompt: "",
+      mode: "image",
+      composer: { backend: ($("backend") && $("backend").value) || "civitai", service: "", mode: "image", fields: {}, loras: [] },
+    };
+    state.nodes.push(shot);
+    const b = box(shot);
+    shot.x = Math.round(wx - b.w / 2);
+    shot.y = Math.round(wy - b.h / 2);
+    renderCards();
+    drawWires();
+    selectNode(id, { preserveLayout: true });
+    state.dockMode = "expanded";
+    renderDock();
+    persist();
+    setMsg("已创建 " + shot.title + " · 在 Composer 写提示词后点 ↑", "ok");
+    const p = $("prompt");
+    if (p) { try { p.focus(); } catch (_) {} }
+    return shot;
+  }
+  vp.addEventListener("dblclick", (e) => {
+    if (e.button != null && e.button !== 0) return;
+    // pointer capture retargets dblclick to #viewport after a card pointerdown —
+    // hit-test with elementFromPoint instead of trusting e.target.
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const t = (hit && hit.closest) ? hit : e.target;
+    if (t && t.closest && t.closest(".dock,.tools,.zoom,.picker,.rail,.atbox,.skillbox,header,.ghost,.minimap,.import-backdrop,.selbar,.shot-bar,.card,.group-bound,path.edge,.composer-chip,.canvas-tip,.marquee")) return;
+    const w = clientToWorld(e.clientX, e.clientY);
+    if (!Number.isFinite(w.x) || !Number.isFinite(w.y)) return;
+    if (hitNode(w.x, w.y)) return;
+    e.preventDefault();
+    createBlankShotAt(w.x, w.y);
+  });
 
   world.addEventListener("input", (e) => {
     const ta = e.target.closest("textarea[data-text]");
@@ -8118,6 +8222,18 @@
         }
       }
     }
+    // v0821o136-seko: 数量 1-4 — 只在家/模型官方支持数量参数时才随请求发出。
+    const qtyN = $("quantity") ? parseInt($("quantity").value, 10) : 1;
+    if (Number.isFinite(qtyN) && qtyN > 1) {
+      const itQ = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+      const spQ = (itQ && itQ.supported_parameters) || {};
+      const qtyOk = be === "civitai" || spQ.num_images != null || spQ.quantity != null || spQ.n != null;
+      if (qtyOk) {
+        genParams.quantity = qtyN;
+      } else {
+        setMsg("当前模型目录未标注数量支持 · 已按 1 张发送", "warn");
+      }
+    }
     nodes.push({
       id: shot.id, op: op,
       params: genParams,
@@ -9291,6 +9407,141 @@
     if (e.target.closest("#addPop,#btnAdd")) return;
     pop.hidden = true;
   });
+  // v0821o136-seko: Seko 式竖排图标 rail — + / 生成历史 / 技能 / 资产。
+  function syncRailToolState() {
+    const rail = $("assetRail");
+    const histOn = !!(rail && !rail.hidden && state.railTab === "history");
+    const assetOn = !!(rail && !rail.hidden && state.railTab !== "history");
+    if ($("btnRailHistory")) $("btnRailHistory").classList.toggle("on", histOn);
+    if ($("btnHistoryTop")) $("btnHistoryTop").classList.toggle("on", histOn);
+    if ($("btnRailAssets")) $("btnRailAssets").classList.toggle("on", assetOn);
+    const tools = document.querySelector(".tools");
+    const fly = $("toolsFly");
+    const skillsOn = !!(fly && !fly.hidden);
+    if (tools) tools.classList.toggle("skills-open", skillsOn);
+    if ($("btnRailSkills")) {
+      $("btnRailSkills").classList.toggle("on", skillsOn);
+      $("btnRailSkills").setAttribute("aria-expanded", skillsOn ? "true" : "false");
+    }
+  }
+  function toggleAssetRail(tab) {
+    const rail = $("assetRail");
+    if (!rail) return;
+    if (!rail.hidden && state.railTab === tab) {
+      rail.hidden = true;
+    } else {
+      state.railTab = tab;
+      rail.hidden = false;
+      renderRail();
+      positionDock();
+    }
+    syncRailToolState();
+  }
+  if ($("btnRailHistory")) $("btnRailHistory").onclick = () => toggleAssetRail("history");
+  if ($("btnHistoryTop")) $("btnHistoryTop").onclick = () => toggleAssetRail("history");
+  if ($("btnRailAssets")) $("btnRailAssets").onclick = () => toggleAssetRail("assets");
+  if ($("btnRailSkills")) $("btnRailSkills").onclick = () => {
+    const fly = $("toolsFly");
+    if (!fly) return;
+    fly.hidden = !fly.hidden;
+    syncRailToolState();
+  };
+  syncRailToolState();
+
+  // v0821o136-seko: Composer 底行 — 能力徽标 / @引用 / 数量 / 费用预估 / 高级参数折叠。
+  function syncSvcCaps() {
+    const el = $("svcCaps");
+    if (!el) return;
+    const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+    if (!it) { el.innerHTML = ""; return; }
+    const badges = [];
+    const caps = (it.capabilities && typeof it.capabilities === "object") ? it.capabilities : {};
+    const sp = (it.supported_parameters && typeof it.supported_parameters === "object") ? it.supported_parameters : {};
+    let resTok = "";
+    if (Array.isArray(caps.resolutionTokens) && caps.resolutionTokens.length) resTok = String(caps.resolutionTokens[caps.resolutionTokens.length - 1]);
+    else if (Array.isArray(sp.resolutions) && sp.resolutions.length) resTok = String(sp.resolutions[sp.resolutions.length - 1]);
+    else if (typeof sp.resolution === "string") resTok = sp.resolution;
+    if (resTok) badges.push('<span class="badge">' + esc(resTok) + "</span>");
+    const maxRefs = (typeof maxRefCount === "function") ? maxRefCount(it) : null;
+    if (Number.isFinite(maxRefs) && maxRefs > 0) badges.push('<span class="badge">支持 ' + maxRefs + ' 个参考</span>');
+    if (caps.supportsLora === true) badges.push('<span class="badge">LoRA</span>');
+    el.innerHTML = badges.join("");
+  }
+  let _costTimer = 0;
+  let _costKey = "";
+  function scheduleCostRefresh() {
+    const el = $("costHint");
+    if (!el) return;
+    const shot = nodeById(state.selected);
+    if (!shot || shot.kind !== "shot" || state.dockMode !== "expanded") { el.textContent = "✦—"; _costKey = ""; return; }
+    const sid = ($("service") && $("service").value) || "";
+    if (!sid) { el.textContent = "✦—"; _costKey = ""; return; }
+    const key = [($("backend") && $("backend").value) || "", sid, state.mode,
+      ($("width") && $("width").value) || "", ($("height") && $("height").value) || "",
+      ($("quantity") && $("quantity").value) || ""].join("|");
+    if (key === _costKey) return;
+    _costKey = key;
+    clearTimeout(_costTimer);
+    el.textContent = "✦…";
+    _costTimer = setTimeout(refreshCostHint, 650);
+  }
+  async function refreshCostHint() {
+    const el = $("costHint");
+    if (!el) return;
+    const key = _costKey;
+    try {
+      const shot = nodeById(state.selected);
+      if (!shot || shot.kind !== "shot") throw new Error("no shot");
+      const rc = await fetch("/api/graph/compile", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildGraph(shot)),
+      });
+      const compiled = await rc.json();
+      if (!compiled || compiled.ok === false || !compiled.payload) throw new Error("compile");
+      const rw = await fetch("/api/whatif", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(compiled.payload),
+      });
+      const data = await rw.json();
+      if (key !== _costKey) return; // stale response
+      let n = null;
+      const cost = data && data.cost;
+      if (typeof cost === "number" && Number.isFinite(cost)) n = cost;
+      else if (cost && typeof cost === "object") {
+        ["total", "amount", "buzz", "points", "value"].forEach(function (k) {
+          if (n == null && Number.isFinite(Number(cost[k]))) n = Number(cost[k]);
+        });
+      }
+      if (n == null && data && Number.isFinite(Number(data.buzzCost))) n = Number(data.buzzCost);
+      el.textContent = n != null ? ("✦" + n) : "✦—";
+      el.title = n != null ? "费用预估" : "费用预估 · 该家暂无价格数据";
+    } catch (_) {
+      if (key === _costKey) el.textContent = "✦—";
+    }
+  }
+  if ($("btnAt")) $("btnAt").onclick = () => {
+    const p = $("prompt");
+    if (p) { try { p.focus(); } catch (_) {} }
+    showAtbox("");
+  };
+  if ($("advToggle")) $("advToggle").onclick = () => {
+    const p = $("advParams");
+    if (!p) return;
+    p.hidden = !p.hidden;
+    $("advToggle").setAttribute("aria-expanded", p.hidden ? "false" : "true");
+    $("advToggle").textContent = p.hidden ? "高级参数 ▾" : "高级参数 ▴";
+    requestAnimationFrame(positionDock);
+  };
+  const sekoRow = $("sekoRow");
+  if (sekoRow) {
+    sekoRow.addEventListener("change", (e) => {
+      const id = e.target && e.target.id;
+      if (id === "quantity" || id === "aspect" || id === "res" || id === "service" || id === "backend") {
+        syncSvcCaps();
+        scheduleCostRefresh();
+      }
+    });
+  }
   function addBlankShot() {
     const n = shots().length;
     const id = uid("shot");
@@ -10372,6 +10623,16 @@
   $("btnFit").onclick = () => { fitShotsInView(); };
   $("zIn").onclick = () => { setZoomScale(state.cam.s * 1.12); };
   $("zOut").onclick = () => { setZoomScale(state.cam.s * 0.9); };
+  // v0821o136-seko: 抓手/框选 tool toggle on the centered bottom bar.
+  function setCanvasTool(tool) {
+    state.canvasTool = tool === "select" ? "select" : "pan";
+    if ($("zPan")) $("zPan").classList.toggle("on", state.canvasTool === "pan");
+    if ($("zSelect")) $("zSelect").classList.toggle("on", state.canvasTool === "select");
+    vp.classList.toggle("select-mode", state.canvasTool === "select");
+    setMsg(state.canvasTool === "select" ? "框选模式 · 在空白处拖出选区多选节点" : "抓手模式 · 拖动空白处平移画布", "");
+  }
+  if ($("zPan")) $("zPan").onclick = () => setCanvasTool("pan");
+  if ($("zSelect")) $("zSelect").onclick = () => setCanvasTool("select");
   if ($("zPresets")) {
     $("zPresets").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-z]");

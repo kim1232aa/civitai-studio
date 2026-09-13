@@ -52,9 +52,48 @@ cases = {
 }
 
 fail = 0
+# lead 裁决(对齐 fail-closed 现行语义): 每端点只喂官方 schema 期望的键, 脏超集会被诚实拒绝
+_VALUE_POOL = {
+    "prompt": "test",
+    "firstFrame": "https://x/a.jpg",
+    "lastFrame": "https://x/b.jpg",
+    "aspectRatio": "16:9",
+    "duration": 5,
+    "audioUrl": "https://x/a.mp3",
+    "videoUrl": "https://x/v.mp4",
+    "images": ["https://x/a.jpg", "https://x/c.jpg"],
+}
+# fal 出站键 ↔ 入站 payload 键映射
+_IN_FOR_OUT = {
+    "prompt": "prompt",
+    "image_url": "firstFrame",
+    "start_image_url": "firstFrame",
+    "first_frame_url": "firstFrame",
+    "end_image_url": "lastFrame",
+    "tail_image_url": "lastFrame",
+    "last_frame_url": "lastFrame",
+    "image_urls": "images",
+    "duration": "duration",
+    "aspect_ratio": "aspectRatio",
+    "ratio": "aspectRatio",
+    "audio_url": "audioUrl",
+    "video_url": "videoUrl",
+}
 for eid, expect in cases.items():
-    p = dict(payload, serviceId=eid)
-    inp = fal_api.build_fal_input(p)
+    p = {"serviceId": eid}
+    for out_key in expect:
+        src = _IN_FOR_OUT.get(out_key)
+        if src and src in _VALUE_POOL:
+            p[src] = _VALUE_POOL[src]
+    try:
+        inp = fal_api.build_fal_input(p)
+    except ValueError as exc:
+        if ("超过上限" in str(exc) or "拒绝截断" in str(exc)) and "images" in p:
+            # 端点帽小于 2(如 maxRefs=1): 降到 1 张再验形状
+            p["images"] = p["images"][:1]
+            inp = fal_api.build_fal_input(p)
+        else:
+            raise
     keys = set(inp)
     extra = keys - expect
     missing = expect - keys
@@ -72,38 +111,45 @@ for eid, expect in cases.items():
         print("ok", eid, "=>", sorted(k for k in keys if k != "prompt"))
 
 # ratio vs aspect_ratio on runway
-rw = fal_api.build_fal_input(dict(payload, serviceId="fal-ai/runway-gen3/turbo/image-to-video"))
+# lead 裁决(fail-closed): 脏超集 payload 会被诚实拒绝, 用干净 payload 验字段映射
+rw = fal_api.build_fal_input({"serviceId": "fal-ai/runway-gen3/turbo/image-to-video", "prompt": "test", "firstFrame": "https://x/a.jpg", "aspectRatio": "16:9"})
 assert "ratio" in rw and "aspect_ratio" not in rw, rw
 
 # hailuo 2.3 must not send end_image_url
-h = fal_api.build_fal_input(dict(payload, serviceId="fal-ai/minimax/hailuo-2.3/standard/image-to-video"))
+h = fal_api.build_fal_input({"serviceId": "fal-ai/minimax/hailuo-2.3/standard/image-to-video", "prompt": "test", "firstFrame": "https://x/a.jpg", "lastFrame": "https://x/b.jpg"})
 assert "end_image_url" not in h, h
 
 # LoRA: /lora endpoints get loras[{path,scale}], AIR is dropped, scale clipped 0-2
-lora_pl = dict(payload, serviceId="fal-ai/z-image/turbo/lora", loras=[
+# lead 裁决(fail-closed): 干净 payload, 不混脏参考图
+lora_pl = {"serviceId": "fal-ai/z-image/turbo/lora", "prompt": "test", "loras": [
     {"path": "https://civitai.com/api/download/models/3184845", "strength": 0.8, "name": "Kroma"},
     {"air": "urn:air:krea2:lora:civitai:2823254@3184845", "strength": 0.8, "name": "AIR only"},
     {"path": "XLabs-AI/flux-lora-collection", "scale": 5},
-])
+]}
 lz = fal_api.build_fal_input(lora_pl)
 assert "loras" in lz, lz
+# lead 裁决(对齐 lora_air_resolve 现行正确行为): AIR 解析为下载直链不丢; scale 原样透传不发明 0-2 截断
 assert lz["loras"] == [
     {"path": "https://civitai.com/api/download/models/3184845", "scale": 0.8},
-    {"path": "XLabs-AI/flux-lora-collection", "scale": 2.0},
+    {"path": "https://civitai.com/api/download/models/3184845", "scale": 0.8},
+    {"path": "XLabs-AI/flux-lora-collection", "scale": 5.0},
 ], lz["loras"]
 # flux-lora uses optional loras
 lf = fal_api.build_fal_input(dict(lora_pl, serviceId="fal-ai/flux-lora"))
 assert lf.get("loras") == lz["loras"], lf
-# schnell must not grow a loras field from leftover payload
-ls = fal_api.build_fal_input(dict(lora_pl, serviceId="fal-ai/flux/schnell"))
-assert "loras" not in ls, ls
-# AIR-only must not become path
+# lead 裁决(fail-closed): schnell 不吃 LoRA 时必须硬拒, 不静默丢
+try:
+    fal_api.build_fal_input(dict(lora_pl, serviceId="fal-ai/flux/schnell"))
+    raise SystemExit("schnell with loras must raise, not silently drop")
+except ValueError as exc:
+    assert "不接受 LoRA" in str(exc), exc
+# lead 裁决: AIR-only 现在解析为下载直链(不丢不发明)
 air_only = fal_api.build_fal_input({
     "serviceId": "fal-ai/z-image/turbo/lora",
     "prompt": "x",
     "loras": [{"air": "urn:air:sdxl:lora:civitai:1@2", "strength": 1}],
 })
-assert "loras" not in air_only, air_only
+assert air_only.get("loras") and air_only["loras"][0]["path"].endswith("/models/2"), air_only
 
 from providers.fal import overlay_image_fields, infer_image_fields
 ov = overlay_image_fields({"id": "fal-ai/kling-video/v3/pro/image-to-video", "category": "video", "falCategory": "image-to-video"})

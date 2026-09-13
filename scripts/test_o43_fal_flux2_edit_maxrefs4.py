@@ -61,11 +61,25 @@ def main() -> int:
         check(ov["maxRefs"] == 9, f"{eid} must stay 9 (no invent lower): {ov.get('maxRefs')}")
 
     urls = [f"https://ex/{i}.png" for i in range(9)]
+    # lead 裁决(对齐 fail-closed 现行语义): 4 帽端点塞 9 张必须诚实拒绝, 不静默截断到 4
+    raised = False
+    try:
+        build_fal_input(
+            {
+                "serviceId": "fal-ai/flux-2/edit",
+                "prompt": "edit",
+                "image_urls": urls,
+            }
+        )
+    except ValueError as exc:
+        raised = "超过上限" in str(exc) or "拒绝截断" in str(exc)
+    check(raised, "flux-2/edit 9 refs must fail-closed, not slice to 4")
+    # 4 张以内正常通过
     fin = build_fal_input(
         {
             "serviceId": "fal-ai/flux-2/edit",
             "prompt": "edit",
-            "image_urls": urls,
+            "image_urls": urls[:4],
         }
     )
     check(len(fin.get("image_urls") or []) == 4, fin)

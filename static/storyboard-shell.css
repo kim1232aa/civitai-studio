@@ -1002,10 +1002,10 @@ svg.wires path.edge {
 .dock.show #service,
 .dock.show.collapsed #service,
 .dock.show.expanded #service {
-  min-width: 240px !important;
+  min-width: 200px !important;
   max-width: min(480px, 52vw) !important;
   width: auto !important;
-  flex: 1 1 280px !important;
+  flex: 1 1 220px !important;
 }
 .dock.show .lora-block,
 .dock.show.collapsed .lora-block,
@@ -1054,3 +1054,180 @@ svg.wires path.edge {
   white-space: normal !important;
   line-height: 1.2 !important;
 }
+
+/* ===== v0821o136-seko — Seko 对齐：图标 rail / 居中缩放底栏 / 底行 / 卡片 ===== */
+
+/* 左 rail 只留 4 图标；其余工具收进「技能」浮层（不删不藏，可展开） */
+.tools-fly { display: none; }
+.tools .tools-fly:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  left: 56px;
+  top: 0;
+  width: 60px;
+  padding: 6px;
+  gap: 4px;
+  background: #16161af5;
+  border: 1px solid #2e2e36;
+  border-radius: 12px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 30;
+  box-shadow: 0 12px 32px #000a;
+}
+.tools .tool.on,
+.tool-mini.on { border-color: rgba(94,224,197,.45) !important; color: #dffcf5 !important; }
+
+/* 资产/历史面板由 rail 图标唤起 */
+.rail[hidden] { display: none !important; }
+
+/* 底栏缩放控件居中 + 抓手/框选切换 */
+.zoom {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  bottom: 16px !important;
+  padding: 4px 6px;
+  border-radius: 12px;
+  background: #16161ad9;
+  border: 1px solid #2e2e36;
+}
+.zoom .zoom-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: #3a3a44;
+  flex: 0 0 1px;
+}
+.zoom button.on {
+  border-color: rgba(94,224,197,.45);
+  color: #dffcf5;
+}
+.zoom #zPct {
+  min-width: 40px;
+  text-align: center;
+  font-size: 11px;
+  color: #c8c8d0;
+  font-variant-numeric: tabular-nums;
+}
+.viewport.select-mode { cursor: crosshair !important; }
+.marquee {
+  position: absolute;
+  border: 1px dashed #5ee0c5;
+  background: rgba(94,224,197,.12);
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* 顶栏历史入口 */
+.mode-mini button.tool-mini {
+  background: #1c1c1f;
+  border: 1px solid #303034;
+  color: #e8e8ec;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mode-mini button.tool-mini:hover { border-color: rgba(94,224,197,.45); }
+
+/* Composer 底行（Seko 式一行） */
+.seko-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.seko-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.seko-model-cell {
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.svc-caps { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.svc-caps .badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #2a2d30;
+  color: #c8c8d0;
+  white-space: nowrap;
+}
+.seko-size-cell {
+  padding: 2px 8px;
+  border: 1px solid #2e2e36;
+  border-radius: 8px;
+  background: #141418;
+  gap: 6px;
+}
+.seko-size-cell .param-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.seko-size-cell .param-field > span { font-size: 11px; }
+.seko-size-cell select { height: 24px; min-width: 52px; width: auto; }
+button.seko-cell {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #2e2e36;
+  border-radius: 8px;
+  background: #1a1a1f;
+  color: #c8c8d0;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button.seko-cell:hover { border-color: rgba(94,224,197,.45); color: #dffcf5; }
+.seko-qty { font-size: 11px; color: #a0a0a8; gap: 4px; }
+.seko-qty select { height: 24px; min-width: 44px; }
+.seko-cost {
+  font-size: 12px;
+  color: #ffd97a;
+  white-space: nowrap;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.adv-toggle {
+  align-self: flex-start;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid #2e2e36;
+  border-radius: 8px;
+  background: transparent;
+  color: #9a9aa3;
+  font-size: 11px;
+  cursor: pointer;
+}
+.adv-toggle:hover { color: #ececef; border-color: rgba(94,224,197,.45); }
+.adv-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed #2a2a32;
+}
+.adv-params[hidden] { display: none; }
+
+/* 节点卡片对齐 Seko：圆角暗卡 + hover 出连接点 */
+.card {
+  background: #1a1c1e;
+  border: 1px solid #2a2d30;
+  border-radius: 12px;
+}
+.card.shot { border-radius: 12px; background: #1a1c1e; }
+.shot .face { border-radius: 11px; }
+.shot .face img, .shot .face video { border-radius: 11px; }
+.card .port { opacity: 0; transition: opacity .12s ease; }
+.card:hover .port,
+.card.sel .port,
+.card .port.snap-hot { opacity: 1; }
