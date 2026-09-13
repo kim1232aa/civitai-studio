@@ -158,11 +158,8 @@ def main() -> int:
     assert pick_resolution(spec, 1024, 1024, preferred="2k") == "2k"
     ls = _loras({"loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 0.8}]})
     assert ls and ls[0]["path"].startswith("https://")
-    try:
-        nano_seed(475720515768790)
-        raise AssertionError("NanoGPT oversize seed must reject, not modulo-clamp")
-    except ValueError as exc:
-        assert "种子" in str(exc)
+    # lead 裁决(对齐 0163679 最新意图): 官方无文档化 seed 上限, 不发明阈值, 超大 seed 原样透传
+    assert nano_seed(475720515768790) == 475720515768790
     body = _image_body({"serviceId": "wavespeed-ai/krea-v2/turbo-lora", "prompt": "x", "width": 1024, "height": 1024, "resolution": "1k", "quantity": 1, "loras": [{"path": "https://civitai.com/api/download/models/1", "scale": 1}]}, spec)
     assert body["model"] == "wavespeed-ai/krea-v2/turbo-lora"
     assert body["loras"][0]["path"].startswith("https://")
@@ -756,16 +753,9 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "seedHint" in html
     assert 'title="v0776"' in html
     from providers.nanogpt import _response_seed, _clamp_seed as _ns, _seed_clamp_meta
-    try:
-        _ns(891104780613135)
-        raise AssertionError("NanoGPT oversize seed must reject, not modulo-clamp")
-    except ValueError as exc:
-        assert "种子" in str(exc)
-    try:
-        _seed_clamp_meta(891104780613135)
-        raise AssertionError("_seed_clamp_meta must reject oversize seed too, not report seedClamped=True")
-    except ValueError as exc:
-        assert "种子" in str(exc)
+    # lead 裁决: 官方无上限, 超大 seed 透传且不报 clamped
+    assert _ns(891104780613135) == 891104780613135
+    assert _seed_clamp_meta(891104780613135) == {}
     assert _seed_clamp_meta(42) == {}
     assert _response_seed({"seed": 42}) == 42
     assert _response_seed({"data": [{"seed": 99, "url": "x"}]}) == 99
@@ -804,7 +794,7 @@ console.log('PASS isMusePublicQwenImageCousin');
                         "seed": 222,
                     })
                     assert code2 == 200 and body2.get("seed") == 222, body2
-                    # v0794: oversized seed → hard 400 reject, never modulo-clamp into a wrong seed
+                    # lead 裁决(对齐 0163679): 官方无 seed 上限, 超大 seed 原样提交不发明拒绝
                     jc.return_value = (200, {"data": [{"url": "https://example.com/c.png"}]})
                     code3, body3 = prov.generate({
                         "serviceId": "z-image-turbo",
@@ -813,8 +803,8 @@ console.log('PASS isMusePublicQwenImageCousin');
                         "height": 1024,
                         "seed": 891104780613135,
                     })
-                    assert code3 == 400, (code3, body3)
-                    assert "种子" in (body3.get("error") or ""), body3
+                    assert code3 == 200, (code3, body3)
+                    assert body3.get("seed") == 891104780613135, body3
 
 
 
@@ -1006,10 +996,11 @@ console.log('PASS isMusePublicQwenImageCousin');
     # --- i2v: image→video main path ---
     assert pub["civitai"]["capabilities"]["i2v"] == "sourceImage"
     assert pub["fal"]["capabilities"]["i2v"] == "fal_endpoint"
-    assert pub["huggingface"]["capabilities"]["i2v"] == "none"
+    # lead 裁决: HF i2v 经 fal 映射端点已接线(image_url), 更新过期断言; "none 不可抬升"用语义等价的未知家验证
+    assert pub["huggingface"]["capabilities"]["i2v"] == "image_url"
     assert pub["nano-gpt"]["capabilities"]["i2v"] == "image_url"
     # cannot raise i2v from none
-    bad_i2v = merge_catalog_override(get_provider_capabilities("huggingface"), {"i2v": "image_url"})
+    bad_i2v = merge_catalog_override(get_provider_capabilities("no-such-provider"), {"i2v": "image_url"})
     assert bad_i2v["i2v"] == "none", bad_i2v
 
     i2v_ok = compile_graph({
@@ -1041,9 +1032,9 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert not i2v_steal.get("ok") and i2v_steal.get("blocked")
     assert "未连线" in i2v_steal.get("error", "")
 
-    # HF i2v=none → blocked
+    # 魔搭 i2v=none(官方无视频 API)→ blocked; HF i2v 已接线(image_url)
     i2v_hf = compile_graph({
-        "backend": "huggingface",
+        "backend": "modelscope-ai",
         "nodes": [
             {"id": "img", "op": "image", "params": {"url": "https://ex/a.png"}},
             {"id": "v", "op": "i2v", "params": {"serviceId": "x"}},
@@ -1194,7 +1185,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert i2v_fal["payload"].get("firstFrame") == "https://ex/f.png"
     assert "image_url" in (i2v_fal.get("wiring") or {}).get("out", {})
 
-    # Modelscope i2v → image_url
+    # Modelscope i2v: 官方无视频 API → 编译期诚实拦截(lead 裁决, 取代旧假实现映射断言)
     i2v_ms = compile_graph({
         "backend": "modelscope-ai",
         "nodes": [
@@ -1203,13 +1194,12 @@ console.log('PASS isMusePublicQwenImageCousin');
         ],
         "edges": [{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
     })
-    assert i2v_ms.get("ok"), i2v_ms
-    assert i2v_ms["payload"].get("image_url") == "https://ex/m.png"
-    assert i2v_ms.get("wiring", {}).get("out", {}).get("image_url") == "https://ex/m.png"
+    assert not i2v_ms.get("ok") and i2v_ms.get("blocked"), i2v_ms
+    assert "不支持图生视频" in i2v_ms.get("error", "")
 
     # Civitai keeps sourceImage (no Nano mode, no fal invent)
     assert i2v_ok["payload"].get("sourceImage") and "mode" not in i2v_ok["payload"]
-    assert pub["modelscope-cn"]["capabilities"]["i2v"] == "image_url"
+    assert pub["modelscope-cn"]["capabilities"]["i2v"] == "none"  # 官方无视频 API
     assert "videoDuration" in pub["nano-gpt"]["capabilities"]
     assert pub["nano-gpt"]["capabilities"]["videoDuration"] == "string_seconds"
     assert pub["huggingface"]["capabilities"]["videoAspect"] is False
@@ -1218,17 +1208,15 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "sourceImage" not in (i2v_steal.get("payload") or {})
     assert "imageUrl" not in (i2v_steal.get("payload") or {})
 
-    # UI demo markers: single-step image→i2v + multi-step ?demo=chain
+    # UI demo markers(对齐当前 cloud-nodes 结构: cloud/i2v 节点 + loadDemo): 单步图→视频 + 链式 demo
     cn_html = (Path(__file__).resolve().parent.parent / "static" / "cloud-nodes.html").read_text()
-    assert "op:'i2v'" in cn_html
-    assert "btnBreakImage" in cn_html
-    assert "image→i2v" in cn_html
-    assert "toPort:'image'" in cn_html
-    assert "btnDemoChain" in cn_html and "demo=chain" in cn_html
-    assert "DEMO_CHAIN" in cn_html and "applyDemo" in cn_html
-    # Cold-start: serviceId must match default backend family (not fal SID on nano-gpt)
-    assert "DEFAULT_SID" in cn_html
-    assert 'value="vidu-q2-pro"' in cn_html
+    assert "cloud/i2v" in cn_html
+    assert 'loadDemo("i2v")' in cn_html
+    assert "btnDemo" in cn_html
+    assert "btnChain" in cn_html and 'loadDemo("chain")' in cn_html
+    # Cold-start: 默认家 fal 与默认 i2v serviceId 同家族(不别家 SID 顶默认)
+    assert cn_html.index('<option value="fal">') < cn_html.index('<option value="civitai">')
+    assert 'serviceId:"fal-ai/' in cn_html
     assert "i2v" in OP_SPEC, "server must register i2v or UI shows 未知 op: i2v"
     # Default demo graph (image→i2v + prompt/seed) must compile green on nano-gpt
     demo = compile_graph({

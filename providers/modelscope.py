@@ -1005,6 +1005,18 @@ class ModelScopeProvider(Provider):
         mid = model_id(sid)
         if not mid:
             return 400, {"error": f"缺少{self.label} 模型 id"}
+        # P0 honesty gate: 魔搭官方没有公开的视频生成 API。唯一的 async 端点是
+        # /images/generations（image_generation 任务类型）。把视频 payload 塞进
+        # 图片端点（i2v 塞 image_url）是冒充，绝不发送；诚实硬拒。
+        if _wants_video(payload, mid):
+            return 400, {
+                "error": (
+                    f"{self.label} 官方没有视频生成 API，"
+                    "拒绝拿 /images/generations 图片端点冒充图生视频/文生视频。"
+                    "请改用 Civitai / Fal / NanoGPT 的视频服务。"
+                ),
+                "backend": self.id,
+            }
         # v0764: refuse client model field that disagrees with serviceId (no MusePublic/2512 remap).
         raw_model = (payload or {}).get("model")
         if isinstance(raw_model, str) and "/" in raw_model.strip():

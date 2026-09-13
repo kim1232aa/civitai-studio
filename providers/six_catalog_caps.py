@@ -5,6 +5,7 @@ Fal/Nano here. Do not invent duration 5/12/16 or promptMax=1200.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -45,6 +46,15 @@ def _duration_enum(row: dict, params: dict) -> list[str] | None:
     return None
 
 
+def _sid_has_lora_token(sid: str) -> bool:
+    """Token-level 'lora' in endpoint id (fal-ai/flux-lora, krea-2/turbo/lora).
+
+    Substring match would false-positive on ids like 'floral'; official Fal
+    LoRA endpoints carry a real lora path segment or -lora suffix.
+    """
+    return "lora" in re.split(r"[^a-z0-9]+", sid.lower())
+
+
 def overlay_fal_catalog_item(row: dict | None) -> dict:
     """Stamp one Fal row from OpenAPI / catalog overlay fields. Never invent 5/12/16."""
     row = dict(row or {})
@@ -60,7 +70,7 @@ def overlay_fal_catalog_item(row: dict | None) -> dict:
     elif "supportsLora" in caps:
         row["supportsLora"] = bool(caps["supportsLora"])
         caps.setdefault("loraSource", "fal-catalog-overlay")
-    elif isinstance(params.get("loras"), (dict, list)) or "/lora" in sid.lower():
+    elif isinstance(params.get("loras"), (dict, list)) or _sid_has_lora_token(sid):
         caps["supportsLora"] = True
         caps["loraSource"] = "openapi-loras-or-sibling"
         row["supportsLora"] = True

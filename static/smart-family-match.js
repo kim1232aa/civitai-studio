@@ -182,7 +182,8 @@
     const fits = typeof opts.fits === "function" ? opts.fits : function () { return true; };
     if (it && !fits(it, op)) return false;
     const fam = String(opts.family || "").trim();
-    if (!fam) return !!(it && fits(it, op));
+    // 认不出底模家族 = 不可信：不许因"当前模型恰好 fits"就当成已匹配保留。
+    if (!fam) return false;
     const got = (it && itemFamily(it)) || inferModelFamily(curId);
     return familyCompatible(fam, got);
   }

@@ -22,7 +22,8 @@ from providers.capabilities import get_provider_capabilities as gc
 
 def main():
     assert max_refs("nano-gpt", gc("nano-gpt")) == 5
-    assert max_refs("modelscope-ai", gc("modelscope-ai")) == 1
+    # lead 裁决(对齐 6a313ce 官方依据: Qwen-Image-Edit-2509 收 1-3 张): provider ceiling=3
+    assert max_refs("modelscope-ai", gc("modelscope-ai")) == 3
     assert max_refs("fal", gc("fal")) == 9
     raw = collect_ref_images(
         {

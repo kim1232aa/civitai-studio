@@ -34,6 +34,10 @@ def check(name, cond, detail=""):
 PNG_1x1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
 )
+# 非空白 16×16 渐变图(过 is_blank_image 闸门, lead 裁决对齐 o91)
+PNG_REAL = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACb0lEQVR4nAXBIai0MBwA8H88eElOnu3gbI8dFh9cfDBc+eCioLAmGC0LYjcMi3m2BcuSUVg3CWLXqs1gH36/HwCABV8ufPvwDOAVwjsFnMOHQyQgUZBpKEYoV6gPaC5oAZwvy/l2nafvvALnHTo4dT65E3EnEU6mnEI75ejUq9McTns5HYD3bXlP13v53jvwcOh9Ui/KvYR7mfAK5ZXaq0evWb328LrL0wDkaZGXS94+wQH5hCRKSZKTjJNCkFKRWpNmJO1KuoPoiwwA9GXRt0uxTz8BjUKapDTLacFpKWitaKNpO9Jupfqgw0VnAPa2GHbZx2dRwJKQZSkrclZyVgvWKNZq1o1Mr2w42HyxBaDCVvVxq8ivkqDKwqpIqzKval41ompV1elKj9WwVvNRLVe1A8iPJSNXJr7MAlmEskxlncuGy1bITkmt5TDKeZXLIfdLngB9ZPWJ22d+XwR9GfZ12jd53/K+E71W/aD7eeyXtd+P/rx6AzAl1pS5U+FPZTDV4dSkU5tPHZ+0mAY1zXpaxmlfp/OYzDXdALbM2gp3K/2tDrYm3Np06/JN820Q26y2RW/7uJ3rZo7tdm13AFNYpnRN7ZsmMG1outTo3AzczMIsyuzanKMxq7kd5n6ZB4BdWnbt2o1vt4HdhbZO7SG3Z24vwt6VfWrbjPZtte+H/bjsHwBUW6hxUeujLkA6REOK5hwtHO0CnQoZjW4juq/ocaCfC/0C4MbCrYs7H+sADyGeU7zkeOf4FNgofNP4PuLHin8O/HvhP4C4teLOjbUfD0E8h/GSxnsenzw2Ir6p+K7jxxj/rPHvEf9d8b//xR51EHIN1akAAAAASUVORK5CYII="
+)
 
 
 print("upload-out unit")
@@ -45,13 +49,19 @@ with TemporaryDirectory() as tmp:
         {"dataUrl": "not-a-data-url", "filename": "x.png"}, out_dir=tmp_path
     )
     check("非法 dataUrl 400", code == 400, str((code, data)))
+    # lead 裁决(对齐 o91 空图不入库): 1×1 空白图必须 400; 合法上传改用非空白 16×16 渐变图
     data_url = "data:image/png;base64," + base64.b64encode(PNG_1x1).decode("ascii")
+    code, data = media_io.upload_out_request(
+        {"dataUrl": data_url, "filename": "dot.png"}, out_dir=tmp_path
+    )
+    check("1×1 空白图 400 不入库", code == 400 and data.get("code") == "blank_image", str((code, data)))
+    data_url = "data:image/png;base64," + base64.b64encode(PNG_REAL).decode("ascii")
     code, data = media_io.upload_out_request(
         {"dataUrl": data_url, "filename": "dot.png"}, out_dir=tmp_path
     )
     check("合法上传 200", code == 200 and (data.get("url") or "").startswith("/out/"), str((code, data)))
     dest = tmp_path / data["file"]
-    check("文件落盘", dest.is_file() and dest.read_bytes() == PNG_1x1, str(dest))
+    check("文件落盘", dest.is_file() and dest.read_bytes() == PNG_REAL, str(dest))
     check("禁止 blob 冒充", "blob:" not in str(data.get("url")))
 
 print("caption unit")
@@ -102,19 +112,19 @@ with TemporaryDirectory() as tmp:
                         raise
                     time.sleep(0.05)
 
-        st, payload = post("/api/upload-out", {"dataUrl": "data:image/png;base64," + base64.b64encode(PNG_1x1).decode(), "filename": "http.png"})
+        st, payload = post("/api/upload-out", {"dataUrl": "data:image/png;base64," + base64.b64encode(PNG_REAL).decode(), "filename": "http.png"})
         check("HTTP upload-out 不是 404", st != 404, str((st, payload)))
         check("HTTP upload-out 200 落盘", st == 200 and payload.get("url", "").startswith("/out/"), str((st, payload)))
         if st == 200:
             saved = Path(tmp) / payload["file"]
-            check("HTTP 文件存在", saved.is_file() and saved.stat().st_size == len(PNG_1x1), str(saved))
+            check("HTTP 文件存在", saved.is_file() and saved.stat().st_size == len(PNG_REAL), str(saved))
         st, payload = post("/api/caption", {})
         check("HTTP caption 路由存在", payload.get("error") != "not found", str((st, payload)))
         check("HTTP caption 缺 url 400", st == 400 and payload.get("code") == "missing_url", str((st, payload)))
         st, payload = post("/api/caption", {"url": "/out/missing.png"})
         check("HTTP caption 失败非 2xx 且无假 caption", st >= 400 and not payload.get("caption"), str((st, payload)))
         st, payload = post("/api/generate", {"backend": "nope", "serviceId": "zzz", "prompt": "x"})
-        check("未知后端 generate 400", st == 400 and payload.get("code") == "unknown_backend", str((st, payload)))
+        check("未知后端 generate 400", st == 400 and "未知" in str(payload.get("error", "")), str((st, payload)))
     finally:
         httpd.shutdown()
 

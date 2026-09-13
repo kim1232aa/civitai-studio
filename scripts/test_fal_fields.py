@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-sys.path.insert(0, "/workspace/civitai-studio")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]))
 import fal_api
 
 payload = {

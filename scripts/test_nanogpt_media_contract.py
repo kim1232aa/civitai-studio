@@ -226,10 +226,11 @@ def main():
         for extra in (
             {"steps": "many"}, {"steps": True}, {"steps": 1.5}, {"steps": []},
             {"cfgScale": "high"}, {"cfgScale": True}, {"cfgScale": float("nan")},
-            {"seed": 891104780613135}, {"seed": -2}, {"seed": "abc"}, {"seed": True},
+            {"seed": -2}, {"seed": "abc"}, {"seed": True},
         ):
             rejects(nano._image_body, {"quantity": 1, "resolution": "1k", **extra}, image)
-        rejects(nano._video_body, {**BASE, "mode": "text-to-video", "seed": 891104780613135}, VIDEO)
+        # lead 裁决(对齐 0163679): 官方无 seed 上限, 超大 seed 透传
+        nano._video_body({**BASE, "mode": "text-to-video", "seed": 891104780613135}, VIDEO)
 
         provider = nano.NanoGptProvider()
         code, data = provider._generate_video({**BASE, "mode": "text-to-video"}, VIDEO, VIDEO["id"])
@@ -246,11 +247,13 @@ def main():
         code, _ = provider._generate_image({"quantity": 8, "resolution": "1k"}, image, image["id"])
         check(code == 422 and all(call["body"]["nImages"] == 8 for call in calls))
         n_calls = len(calls)
+        # lead 裁决(对齐 0163679): 超大 seed 透传到传输层(离线哨兵 422), 不发明 400
         code, data = provider._generate_image(
             {"quantity": 1, "resolution": "1k", "seed": 891104780613135}, image, image["id"]
         )
-        check(code == 400 and "种子" in data["error"] and "seedClamped" not in data)
-        check(len(calls) == n_calls)
+        check(code == 422 and calls[-1]["body"]["seed"] == 891104780613135)
+        check(len(calls) > n_calls)
+        n_calls = len(calls)
         code, data = provider._generate_image(
             {"quantity": 1, "resolution": "1k", "steps": "many"}, image, image["id"]
         )

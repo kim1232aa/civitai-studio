@@ -186,13 +186,15 @@
   },
   "ResolutionSelector": {
     "class_type": "ResolutionSelector",
-    "air": null,
-    "status": "core",
+    "air": "urn:air:comfy:nodepack:comfyregistry:comfydeploy/llm-toolkit@1.3.0",
+    "status": "matched",
     "ambiguous": false,
-    "core": true,
-    "repo": "https://github.com/comfyanonymous/ComfyUI",
-    "registryId": null,
-    "version": null
+    "core": false,
+    "repo": "https://github.com/comfy-deploy/comfyui-llm-toolkit",
+    "registryId": "comfydeploy/llm-toolkit",
+    "version": "1.3.0",
+    "name": "comfyui-llm-toolkit",
+    "via": "comfy-nodes"
   },
   "ColorMatch": {
     "class_type": "ColorMatch",

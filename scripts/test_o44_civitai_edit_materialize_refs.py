@@ -32,7 +32,8 @@ def _out_urls(n: int) -> list[str]:
 
 def test_build_workflow_editimage_materializes_out_paths():
     civ.load_catalog_disk()
-    urls = _out_urls(9)
+    # lead 裁决: docs/capabilities.json 官方 constraints.images.maxItems=2, 以此为准
+    urls = _out_urls(2)
     for u in urls:
         check((ROOT / "out" / Path(u).name).is_file(), f"fixture missing {u}")
     wf = civ.build_workflow(
@@ -44,7 +45,7 @@ def test_build_workflow_editimage_materializes_out_paths():
     )
     inp = wf["steps"][0]["input"]
     imgs = inp.get("images") or []
-    check(len(imgs) == 9, f"keep official maxRefs=9, got {len(imgs)}")
+    check(len(imgs) == 2, f"keep official maxRefs=2, got {len(imgs)}")
     for i, u in enumerate(imgs):
         check(isinstance(u, str) and u.startswith("data:"), f"img[{i}] not data: {u[:60]!r}")
         check("/out/" not in u[:80], f"img[{i}] still /out")
@@ -68,7 +69,7 @@ def test_fail_closed_missing_local():
 
 def test_http_refs_untouched_and_clamp_not_invented_lower():
     civ.load_catalog_disk()
-    urls = [f"https://example.invalid/r{i}.jpg" for i in range(9)]
+    urls = [f"https://example.invalid/r{i}.jpg" for i in range(2)]
     wf = civ.build_workflow(
         {
             "serviceId": "image/sdcpp/flux1/editImage",
@@ -77,7 +78,7 @@ def test_http_refs_untouched_and_clamp_not_invented_lower():
         }
     )
     imgs = wf["steps"][0]["input"].get("images") or []
-    check(len(imgs) == 9, f"do not invent lower than official 9: {len(imgs)}")
+    check(len(imgs) == 2, f"do not invent higher than official 2: {len(imgs)}")
     check(imgs == urls, imgs)
 
 
@@ -92,7 +93,8 @@ def test_source_image_materialize():
 
 def test_generate_audit_nrefs_data_lengths_only():
     civ.load_catalog_disk()
-    urls = _out_urls(3)
+    # lead 裁决: 官方 maxItems=2, 超帽硬拒; 用 2 张走通审计字段
+    urls = _out_urls(2)
     captured = {}
 
     def fake_submit(body, whatif=False):
@@ -110,15 +112,15 @@ def test_generate_audit_nrefs_data_lengths_only():
             }
         )
     check(code == 200, code)
-    check(data.get("nRefs") == 3, data.get("nRefs"))
-    check(int(data.get("nDataUrls") or 0) == 3, data.get("nDataUrls"))
+    check(data.get("nRefs") == 2, data.get("nRefs"))
+    check(int(data.get("nDataUrls") or 0) == 2, data.get("nDataUrls"))
     check(int(data.get("nOutPaths") or 0) == 0, data.get("nOutPaths"))
     lenses = data.get("imageUrlLens")
-    check(isinstance(lenses, list) and len(lenses) == 3, lenses)
+    check(isinstance(lenses, list) and len(lenses) == 2, lenses)
     check(all(isinstance(n, int) and n > 100 for n in lenses), lenses)
     # submitted images must be data URLs (not /out)
     sub = (data.get("submittedInput") or {}).get("images") or []
-    check(len(sub) == 3 and all(str(u).startswith("data:") for u in sub), [str(u)[:40] for u in sub])
+    check(len(sub) == 2 and all(str(u).startswith("data:") for u in sub), [str(u)[:40] for u in sub])
     check(all(str(u).startswith("data:") for u in (captured.get("inp") or {}).get("images") or []))
 
 

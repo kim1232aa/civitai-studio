@@ -2657,7 +2657,7 @@
       attach = "below";
       top = cy + ch + gap;
     }
-    if (top < 44) top = 44;
+    if (top < 44) top = 44; // fallback bottom desk unused: box follows the shot
     if (top + naturalH > sr.height - 8) top = Math.max(44, sr.height - 8 - naturalH);
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
@@ -5409,6 +5409,17 @@
     }
 
     const be = currentBackend();
+    // v0821o135: Civitai 有底模概念——LoRA 底模家族与当前 checkpoint 家族不符时硬拒，不静默加。
+    // Fal/Nano 走 http 直链、无 baseModel 概念，保持现有"无直链/重映射"逻辑，不在此发明校验。
+    if (be === "civitai" && typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.familyFromAir) {
+      const loraFam = SmartFamilyMatch.familyFromAir(row.air)
+        || SmartFamilyMatch.inferModelFamily([(v && v.baseModel), row.baseModel, row.name].filter(Boolean).join(" ")) || "";
+      const ckptFam = currentCheckpointFamily();
+      if (loraFam && ckptFam && !SmartFamilyMatch.familyCompatible(ckptFam, loraFam)) {
+        setLoraNote("该 LoRA 底模是 " + loraFam + "，当前模型是 " + ckptFam + "，不匹配", true);
+        return false;
+      }
+    }
     if ((be === "fal" || isNanogptBe()) && !loraHasDirectPath(row)) row.status = "无直链";
     if (v && v.source && !row.source) row.source = v.source;
     if (v && v.backend && !row.backend) row.backend = v.backend;
@@ -6033,6 +6044,17 @@
     if (s === "nano-gpt" || s === "nanogpt" || s === "nano") return "Nano";
     return src || "";
   }
+  // v0821o135: 当前选中模型(checkpoint)的底模家族。供 LoRA 搜索按底模过滤/标灰。
+  function currentCheckpointFamily() {
+    if (typeof SmartFamilyMatch === "undefined" || !SmartFamilyMatch.inferModelFamily) return "";
+    const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
+    let fam = "";
+    try { fam = (shot && SmartFamilyMatch.familyFromShot) ? (SmartFamilyMatch.familyFromShot(shot, "") || "") : ""; } catch (_) { fam = ""; }
+    if (fam) return fam;
+    const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+    const sid = ($("service") && $("service").value) || "";
+    return SmartFamilyMatch.inferModelFamily([it && it.baseModel, it && it.ecosystem, it && it.name, sid].filter(Boolean).join(" ")) || "";
+  }
   async function searchLoras() {
     const qEl = $("loraQ");
     const hits = $("loraHits");
@@ -6074,21 +6096,39 @@
       return;
     }
     try {
-      const r = await fetch("/api/search?type=LORA&q=" + encodeURIComponent(q) + "&backend=" + encodeURIComponent(be) + "&cross=1");
+      // v0821o135: 默认只在当前家搜(cross=0)；用户显式勾选"跨家搜"才混入别家结果。
+      const crossOn = !!($("loraCross") && $("loraCross").checked);
+      // v0821o135: 当前家有底模概念时(Civitai baseModel)，带上当前选中模型的底模家族，结果按家族优先/标灰。
+      const curFam = currentCheckpointFamily();
+      const r = await fetch("/api/search?type=LORA&q=" + encodeURIComponent(q) + "&backend=" + encodeURIComponent(be) + (crossOn ? "&cross=1" : "&cross=0") + (curFam ? "&baseFamily=" + encodeURIComponent(curFam) : ""));
       const j = await r.json();
       const rows = j.items || [];
       if (!rows.length) { hits.textContent = (j.note || "没有结果"); return; }
-      hits.innerHTML = rows.map(function (it) {
+      const decorated = rows.map(function (it) {
         const v = (it.versions || [])[0] || {};
+        const loraFam = (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.inferModelFamily)
+          ? (SmartFamilyMatch.inferModelFamily([v.baseModel, it.baseModel, it.ecosystem].filter(Boolean).join(" ")) || "")
+          : "";
+        const mismatch = !!(curFam && loraFam && typeof SmartFamilyMatch !== "undefined" && !SmartFamilyMatch.familyCompatible(curFam, loraFam));
+        return { it: it, v: v, fam: loraFam, mismatch: mismatch };
+      });
+      // 底模匹配的排前，不符的标灰沉底（不藏，只注明）
+      decorated.sort(function (a, b) { return (a.mismatch ? 1 : 0) - (b.mismatch ? 1 : 0); });
+      hits.innerHTML = decorated.map(function (d) {
+        const it = d.it;
+        const v = d.v;
         const path = it.path || "";
         const extra = v.baseModel || v.name || path || "";
         const src = it.source || it.backend || be;
         const badge = loraHouseLabel(src);
-        return '<div class="lora-hit" data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") +
+        return '<div class="lora-hit' + (d.mismatch ? " lora-baseMismatch" : "") + '"' +
+          (d.mismatch ? ' style="opacity:.45" title="该 LoRA 底模是 ' + esc(d.fam) + '，当前模型是 ' + esc(curFam) + '，不匹配"' : "") +
+          ' data-path="' + esc(path) + '" data-vid="' + esc(v.id || "") +
           '" data-mid="' + esc(it.id || "") + '" data-type="' + esc(it.type || "") +
           '" data-name="' + esc(it.name || "") + '" data-src="' + esc(src) + '"><b>' +
           esc(it.name) + '</b>' +
           (badge ? ('<span class="lora-src">' + esc(badge) + '</span>') : "") +
+          (d.mismatch ? '<span class="lora-src lora-mismatch">底模不符</span>' : "") +
           (extra ? (" · " + esc(extra)) : "") + "</div>";
       }).join("");
       Array.prototype.forEach.call(hits.children, function (el) {
@@ -6569,7 +6609,11 @@
   function currentGraphOp() {
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
     if (state.mode === "video") {
-      if (!shot || !frameAsset(shot) || (shot.wantT2v && !frameAsset(shot))) return "t2v";
+      // frameAsset lives outside the smart-match seam; guard it so a seam-less VM (o79) treats video as i2v (never invent a frame).
+      if (typeof frameAsset === "function") {
+        if (!shot || !frameAsset(shot) || (shot.wantT2v && !frameAsset(shot))) return "t2v";
+        return "i2v";
+      }
       return "i2v";
     }
     if (shot && shot.wantUpscale) return "upscale";
@@ -6812,7 +6856,7 @@
     }
     if (gen !== smartMatchService._gen) return false;
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
-    honorHouseLock();
+    if (typeof honorHouseLock === "function") honorHouseLock();
     const liveBe = ($("backend") && $("backend").value) || "";
     if (shot && shot.kind === "shot" && liveBe) {
       shot.backend = liveBe;
@@ -6892,7 +6936,7 @@
         const want = String(row.id || row.name || "");
         const rowBe = String(row.backend || row.source || be);
         if (!want) return false;
-        if (rowBe && $("backend") && $("backend").value !== rowBe && !state._importFamily) $("backend").value = rowBe;
+        // v0821o135: 匹配只发生在用户当前选中的家内部——任何时候导入/匹配都不许改用户选的 backend。
         injectCatalogRow(row);
         if (typeof ensureSelectOpt === "function") ensureSelectOpt(sel, want);
         sel.value = want;
@@ -10767,12 +10811,13 @@
       if ($("backend")) $("backend").value = "fal";
       syncParamSurface();
       let sid = String(j.serviceId || "").trim();
-      if (!sid && !state._importFamily) sid = FAL_LORA_PREF_SERVICE;
+      // v0821o135: 认不出帖子底模家族时不许套 krea-2 写死默认；清空模型框，警告在导入收尾统一报。
+      const falFamilyUnknown = !sid && !state._importFamily;
       // Pin fal-ai/z-image/turbo(/lora) — never drift to Civitai image/comfy/…
       if (looksCivitaiServiceId(sid)) {
         hardErr = "Fal 导入拒绝 Civitai serviceId " + sid;
         sid = "";
-      } else if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
+      } else if (falFamilyUnknown || state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
         sid = "";
         state._pinFalLoraService = "";
         state._pendingService = "";
@@ -10827,7 +10872,7 @@
       if ($("backend")) $("backend").value = "huggingface";
       syncParamSurface();
       let sid = String(j.serviceId || "").trim();
-      if (!sid && !state._importFamily) sid = HF_LORA_PREF_SERVICE;
+      // v0821o135: 认不出帖子底模家族时不许套 Krea-2 写死默认；sid 留空，收尾统一清空模型框+警告。
       if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") sid = "";
       // v0821o31: allow official Fal LoRA endpoints (flux-lora / krea-2/turbo/lora) when import carries loras[].
       // Still reject Civitai image/… and bare no-LoRA fal-ai/*/turbo (Router must not silent-swap sibling).
@@ -10874,7 +10919,7 @@
       if ($("backend")) $("backend").value = msHouse;
       syncParamSurface();
       let sid = String(j.serviceId || "").trim();
-      if (!sid && !state._importFamily) sid = MS_LORA_PREF_SERVICE;
+      // v0821o135: 认不出帖子底模家族时不许套 Krea-2 写死默认；sid 留空，收尾统一清空模型框+警告。
       if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") sid = "";
       if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
         hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
@@ -11057,8 +11102,33 @@
     const famNow = famInfo.family || state._importFamily || "";
     const opNow = famInfo.op || "t2i";
     let matched = ($("service") && $("service").value) || "";
-    if (typeof SmartFamilyMatch !== "undefined" && liveHouse && famNow) {
-      const wantFam = SmartFamilyMatch.preferredId(liveHouse, famNow, opNow) || "";
+    if (typeof SmartFamilyMatch !== "undefined" && liveHouse) {
+      if (!famNow) {
+        // v0821o135: 认不出帖子底模家族。没挂上模型就清空模型框+明说，绝不播"已智能匹配"。
+        if (!matched) {
+          if ($("service")) $("service").value = "";
+          if (shot) {
+            shot.serviceId = "";
+            shot.backend = liveHouse;
+            if (!shot.composer) shot.composer = {};
+            shot.composer.service = "";
+            shot.composer.backend = liveHouse;
+          }
+          setMsg("认不出帖子底模家族，请手动选模型", "warn");
+          return true;
+        }
+        // 已显式挂上模型但没认出家族：留着模型，只报导入，不冒充智能匹配。
+        setMsg("已导入参数" + (nLora ? (" · " + nLora + " 个 LoRA") : " · 未识别 LoRA") + extraTxt + "，自己点生成。", heightAligned ? "warn" : "ok");
+        return true;
+      }
+      // v0821o135: 智能匹配用活目录——已加载目录池里按家族+op 搜（pickByFamily），写死表 HOUSE_FAMILY_PREF 仅兜底。
+      const poolObj = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+      const poolArr = Array.isArray(poolObj) ? poolObj : Object.keys(poolObj).map(function (k) { return poolObj[k]; });
+      let wantFam = (typeof SmartFamilyMatch.pickByFamily === "function") ? (SmartFamilyMatch.pickByFamily({
+        backend: liveHouse, op: opNow, family: famNow, pool: poolArr,
+        fits: serviceFitsOp, belongs: serviceBelongsToBackend
+      }) || "") : "";
+      if (!wantFam) wantFam = SmartFamilyMatch.preferredId(liveHouse, famNow, opNow) || "";
       if (wantFam) {
         ensureSelectOpt($("service"), wantFam);
         if ($("service")) $("service").value = wantFam;
@@ -11443,6 +11513,8 @@
     }
     syncParamSurface();
     const p = loadCatalog();
+    // B1: 目录异步就绪后再跑一次 applyServiceConstraints(syncParamChrome)，不要求用户再点节点。
+    loadCatalog().then(function () { applyServiceConstraints(); });
     Promise.resolve(p).then(async function () {
       if (be === "fal") ensureFalLoraServiceSelected();
       else if (be === "huggingface") ensureHfLoraServiceSelected();

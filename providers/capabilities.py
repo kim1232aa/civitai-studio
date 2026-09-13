@@ -107,7 +107,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": False,
         "i2i": "source",
         "video": True,
-        "i2v": "image_url",
+        "i2v": "none",  # 官方 API-Inference 无视频生成(实测 /v1/models 无视频任务); 目录仅展示, 生成/编译硬拒
         "videoDuration": False,
         "videoAspect": True,
         "maxRefs": 3,
@@ -128,7 +128,7 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "sampler": False,
         "i2i": "source",
         "video": True,
-        "i2v": "image_url",
+        "i2v": "none",  # 同 modelscope-ai: 官方无视频 API
         "videoDuration": False,
         "videoAspect": True,
         "maxRefs": 3,

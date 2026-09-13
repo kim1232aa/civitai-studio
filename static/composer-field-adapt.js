@@ -9,7 +9,7 @@
 (function (root) {
   "use strict";
 
-  const STAMP = "v0821o61-group-hide";
+  const STAMP = "v0821o57-item-match";
   const BOARD_SRC = "docs/api-usage/composer-field-board.md";
 
   const COMPOSER_FIELD_BOARD = {
