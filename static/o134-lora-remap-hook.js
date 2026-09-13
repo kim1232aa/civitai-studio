@@ -1,5 +1,6 @@
 /* o134: after import / house change, remap LoRA chips to this house.
- * Does not call /api/generate. Does not hide chips. */
+ * Does not call /api/generate. Does not hide chips. Does not strip LoRAs on send.
+ */
 (function () {
   if (typeof window === "undefined") return;
   const Remap = window.LoraHouseRemap;
@@ -16,7 +17,7 @@
     return "";
   }
   function readChips() {
-    if (Array.isArray(window.state && window.state.loras) && window.state.loras.length) {
+    if (window.state && Array.isArray(window.state.loras) && window.state.loras.length) {
       return window.state.loras.slice();
     }
     const j = window.__lastImportRecipe || {};
@@ -53,18 +54,6 @@
     window.__o134FetchWrapped = true;
     window.fetch = function (url, opts) {
       const req = String(url || "");
-      const method = String((opts && opts.method) || "GET").toUpperCase();
-      if (req.indexOf("/api/generate") >= 0 && method === "POST" && opts && typeof opts.body === "string") {
-        try {
-          const body = JSON.parse(opts.body);
-          const house = body.backend || currentHouse();
-          if (Array.isArray(body.loras) && body.loras.length) {
-            body.loras = Remap.packOutbound(house, body.loras, currentFamily());
-            opts = Object.assign({}, opts, { body: JSON.stringify(body) });
-            arguments[1] = opts;
-          }
-        } catch (_) {}
-      }
       return rawFetch.apply(this, arguments).then(function (res) {
         if (req.indexOf("/api/import") >= 0 && res && res.ok) {
           res.clone().json().then(function (j) {
@@ -83,5 +72,20 @@
     if (!t) return;
     if (t.id === "backend" || t.id === "service") applyRemap();
   });
+  document.addEventListener("click", function (ev) {
+    const t = ev && ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest("#send") || t.closest("#sendCap")) {
+      const rows = window.__remappedLoras || [];
+      const blocked = rows.filter(function (r) { return !r.outbound; });
+      if (blocked.length) {
+        const msg = document.getElementById("msg");
+        if (msg) {
+          msg.textContent = blocked[0].chipReason + " · 先换 LoRA 或换家再点 ↑";
+          msg.className = "msg warn";
+        }
+      }
+    }
+  }, true);
   setTimeout(applyRemap, 800);
 })();
