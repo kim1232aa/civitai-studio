@@ -61,8 +61,14 @@
 
       var strip = ctx.$("paramSupportStrip");
       if (strip) {
-        strip.hidden = true;
-        hide(strip);
+        var text = String(strip.textContent || "").trim();
+        if (text) {
+          strip.hidden = false;
+          show(strip);
+        } else {
+          strip.hidden = true;
+          hide(strip);
+        }
       }
     };
     api._o68 = true;

@@ -1,9 +1,5 @@
-/* v0821o109-room — 主体库和写字台不再挤。fallback bottom: 12px */
-.chat-rail,
-.canvas-tip,
-.composer-chip,
-.stamp,
-#paramSupportStrip { display: none !important; }
+/* v0821o131 — 有功能就不藏。测试戳除外。 */
+.stamp { display: none !important; }
 
 .tools {
   left: 12px !important;
@@ -15,13 +11,12 @@
   overflow: visible !important;
   z-index: 20 !important;
 }
-.tools .tools-sep,
-.tools .tools-hint,
+.tools .tools-sep { display: none; }
+.tools .tools-hint { display: none; }
 .tools .node-only,
-.tools .group-only,
-.tools.has-shot .node-only,
-.tools.has-group .group-only,
-.tools.has-multi .group-only { display: none !important; }
+.tools .group-only { display: none; }
+.tools.has-shot .node-only { display: flex !important; }
+.tools.has-multi .group-only { display: flex !important; }
 
 .rail {
   display: flex !important;
@@ -101,7 +96,16 @@
   font-size: 12px;
 }
 
-.node-acts { display: none !important; }
+.node-acts {
+  display: flex !important;
+  min-height: 28px !important;
+  z-index: 12 !important;
+  overflow: visible !important;
+}
+.node-acts button {
+  height: 24px !important;
+  min-width: 40px;
+}
 .card.shot { touch-action: none; user-select: none; }
 .card img, .card video { -webkit-user-drag: none; user-select: none; pointer-events: none; }
 .port {
@@ -198,7 +202,7 @@ svg.wires path.edge {
   color: #c8c8d0;
   font-size: 11px;
 }
-#shotBar [data-shot-act="more"] { display: none !important; }
+#shotBar [data-shot-act="more"] { display: inline-flex !important; }
 
 /* JS pins left/top to the selected shot. One box, content fully visible. */
 .dock.show,
@@ -461,7 +465,9 @@ svg.wires path.edge {
 }
 .dock.show .lora-hint,
 .dock.show #loraHint {
-  display: none !important;
+  display: block !important;
+  font-size: 11px;
+  color: #9a9aa3;
 }
 .dock.show .lora-row {
   display: flex;
@@ -928,3 +934,45 @@ svg.wires path.edge {
   align-items: center;
   gap: 6px;
 }
+
+/* 有功能就不藏：左侧节点工具、路径、提示、参数条、折叠 Composer 里的模型搜/参数 */
+.chat-rail {
+  display: flex !important;
+  flex-direction: column;
+}
+.canvas-tip,
+.canvas-tip.show,
+#canvasTip {
+  display: inline-block !important;
+  position: absolute !important;
+  left: 360px;
+  bottom: 18px;
+  z-index: 22;
+  width: auto !important;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #1b1b1eee;
+  color: #9a9aa3;
+  font-size: 12px;
+  pointer-events: none;
+}
+.composer-chip:not([hidden]) { display: flex !important; }
+#paramSupportStrip:not([hidden]) { display: flex !important; }
+
+.dock.show.collapsed .modes,
+.dock.show.collapsed .refs,
+.dock.show.collapsed .composer-acts,
+.dock.show.collapsed .lora-block,
+.dock.show.collapsed .param-group:not(.hidden) {
+  display: flex !important;
+}
+.dock.show.collapsed .bar > #serviceFilter,
+.dock.show.collapsed .bar > #serviceFilterLbl,
+.dock.show.collapsed .bar > #catalogStatus,
+.dock.show.collapsed .bar > .param-group:not(.hidden) {
+  display: flex !important;
+}
+.dock.show.collapsed .bar > #serviceFilter { display: inline-block !important; }
+.dock.show.collapsed .bar > #serviceFilterLbl { display: inline !important; }
+.canvas-manager .cm-tabs { display: flex !important; }

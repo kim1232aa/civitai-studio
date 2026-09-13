@@ -9138,6 +9138,7 @@
     const multi = !!(state.multi && state.multi.length >= 2);
     tools.classList.toggle("has-shot", hasShot);
     tools.classList.toggle("has-multi", multi);
+    tools.classList.toggle("has-group", multi);
     const needUrl = !!(hasShot && shot.url);
     ["btnDownload", "btnCrop", "btnNine", "btnPano", "btnLight", "btnCamera", "btnUpscale", "btnErase"].forEach(function (id) {
       const el = $(id);
