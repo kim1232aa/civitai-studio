@@ -56,8 +56,8 @@ def install_modelscope_seed() -> None:
     if not callable(orig):
         return
 
-    def _image_body(payload, mid, backend):
-        body = orig(payload, mid, backend)
+    def _image_body(payload, mid, backend, *args, **kwargs):
+        body = orig(payload, mid, backend, *args, **kwargs)
         return strip_unofficial_seed(body)
 
     ms._image_body = _image_body

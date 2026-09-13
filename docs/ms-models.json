@@ -7,13 +7,11 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": true,
+      "tags": [
+        "t2i"
+      ],
       "capabilities": {
         "image_to_image": false,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
-        "loraConfidence": "official",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -28,16 +26,17 @@
       "status": "available",
       "task": "image-to-image",
       "needsSource": true,
-      "tags": ["i2i"],
-      "supportsLora": true,
+      "tags": [
+        "i2i"
+      ],
       "capabilities": {
         "image_to_image": true,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
-        "imageFields": ["image_url"]
+        "imageFields": [
+          "image_url"
+        ]
       },
       "supported_parameters": {
         "max_input_images": 1
@@ -51,16 +50,17 @@
       "status": "available",
       "task": "image-to-image",
       "needsSource": true,
-      "tags": ["i2i"],
-      "supportsLora": true,
+      "tags": [
+        "i2i"
+      ],
       "capabilities": {
         "image_to_image": true,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
-        "imageFields": ["image_url"]
+        "imageFields": [
+          "image_url"
+        ]
       },
       "supported_parameters": {
         "max_input_images": 1
@@ -73,13 +73,11 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": true,
+      "tags": [
+        "t2i"
+      ],
       "capabilities": {
         "image_to_image": false,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
-        "loraConfidence": "official",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -93,12 +91,12 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i", "krea2"],
-      "supportsLora": true,
+      "tags": [
+        "t2i",
+        "krea2"
+      ],
       "capabilities": {
         "image_to_image": false,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -112,12 +110,12 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i", "krea2"],
-      "supportsLora": true,
+      "tags": [
+        "t2i",
+        "krea2"
+      ],
       "capabilities": {
         "image_to_image": false,
-        "supportsLora": true,
-        "loraShape": "hub_repo",
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
@@ -131,15 +129,41 @@
       "backend": "modelscope",
       "status": "available",
       "task": "text-to-video",
-      "tags": ["t2v", "krea"],
-      "supportsLora": false,
+      "tags": [
+        "t2v",
+        "krea"
+      ],
       "capabilities": {
         "image_to_image": false,
-        "supportsLora": false,
         "maxRefs": 1,
         "maxImages": 1,
         "refImagesField": "image_url",
         "imageFields": []
+      }
+    },
+    {
+      "id": "Wan-AI/Wan2.1-I2V-14B-720P",
+      "name": "Wan2.1 I2V 14B",
+      "category": "video",
+      "backend": "modelscope",
+      "status": "available",
+      "task": "image-to-video",
+      "needsFirstFrame": true,
+      "tags": [
+        "i2v"
+      ],
+      "capabilities": {
+        "image_to_image": true,
+        "supportsI2v": true,
+        "maxRefs": 1,
+        "maxImages": 1,
+        "refImagesField": "image_url",
+        "imageFields": [
+          "image_url"
+        ]
+      },
+      "supported_parameters": {
+        "max_input_images": 1
       }
     }
   ]

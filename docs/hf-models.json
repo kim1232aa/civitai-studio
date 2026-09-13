@@ -7,13 +7,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false,
-        "loraConfidence": "none"
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "black-forest-labs/FLUX.1-dev",
@@ -22,13 +18,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false,
-        "loraConfidence": "unverified"
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "black-forest-labs/FLUX.1-Krea-dev",
@@ -37,13 +29,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false,
-        "loraConfidence": "unverified"
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "Qwen/Qwen-Image",
@@ -52,12 +40,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "Tongyi-MAI/Z-Image-Turbo",
@@ -66,12 +51,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "stabilityai/stable-diffusion-xl-base-1.0",
@@ -80,12 +62,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-image",
-      "tags": ["t2i"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false
-      }
+      "tags": [
+        "t2i"
+      ]
     },
     {
       "id": "tencent/HunyuanVideo",
@@ -94,13 +73,9 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-video",
-      "tags": ["t2v"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false,
-        "videoDuration": false
-      }
+      "tags": [
+        "t2v"
+      ]
     },
     {
       "id": "Lightricks/LTX-Video-0.9.8-13B-distilled",
@@ -109,13 +84,23 @@
       "backend": "huggingface",
       "status": "available",
       "task": "text-to-video",
-      "tags": ["t2v"],
-      "supportsLora": false,
-      "capabilities": {
-        "supportsLora": false,
-        "image_to_image": false,
-        "videoDuration": false
-      }
+      "tags": [
+        "t2v"
+      ]
+    },
+    {
+      "id": "Wan-AI/Wan2.2-TI2V-5B",
+      "name": "Wan2.2 TI2V 5B",
+      "category": "video",
+      "backend": "huggingface",
+      "status": "available",
+      "task": "image-to-video",
+      "needsSource": true,
+      "needsFirstFrame": true,
+      "tags": [
+        "i2v",
+        "ti2v"
+      ]
     }
   ]
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -165,6 +166,39 @@ class CatalogHub(unittest.TestCase):
         self.assertFalse(body["hubTotals"]["complete"])
         self.assertIn("pin", body["hubTotals"]["error"])
         self.assertIs(body["items"][0]["capabilities"]["image_to_image"], False)
+
+    def test_catalog_promotes_disk_pins_to_front(self):
+        hub_rows = [
+            {"id": "org/other", "name": "Other", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+            {"id": "krea/Krea-2-Turbo", "name": "Buried Turbo", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+        ]
+        with patch.object(ms, "fetch_hub", return_value=(hub_rows, {"complete": True})):
+            with patch.object(ms, "load_disk", return_value=[
+                {"id": "krea/Krea-2-Turbo", "name": "Krea 2 Turbo", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+                {"id": "MusePublic/Qwen-Image-Edit", "name": "Qwen Edit", "category": "image", "task": "image-to-image", "tags": ["i2i"], "needsSource": True},
+                {"id": "Wan-AI/Wan2.1-I2V-14B-720P", "name": "Wan I2V", "category": "video", "task": "image-to-video", "tags": ["i2v"], "needsFirstFrame": True},
+            ]):
+                body = ms.ModelScopeProvider("cn").catalog("", "image", "", page=1, pageSize=50)
+                video = ms.ModelScopeProvider("cn").catalog("", "video", "", page=1, pageSize=50)
+        ids = [x["id"] for x in body["items"]]
+        self.assertEqual(ids[0], "krea/Krea-2-Turbo")
+        self.assertIn("MusePublic/Qwen-Image-Edit", ids[:2])
+        self.assertEqual(video["items"][0]["id"], "Wan-AI/Wan2.1-I2V-14B-720P")
+        self.assertTrue(video["items"][0].get("needsFirstFrame"))
+        self.assertTrue(video["items"][0].get("supportsI2v"))
+
+    def test_catalog_search_uses_warm_cache_not_hub(self):
+        ms._HUB_CACHE.update({
+            "at": time.time(),
+            "items": [
+                {"id": "krea/Krea-2-Turbo", "name": "Krea", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+                {"id": "org/other", "name": "Other", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+            ],
+            "totals": {"complete": True},
+        })
+        with patch.object(ms, "fetch_hub", side_effect=AssertionError("must not search hub when cache is warm")):
+            body = ms.ModelScopeProvider("cn").catalog("krea/Krea-2-Turbo", "image", "")
+        self.assertEqual(body["items"][0]["id"], "krea/Krea-2-Turbo")
 
 
 if __name__ == "__main__":

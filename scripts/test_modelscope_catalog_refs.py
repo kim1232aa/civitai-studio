@@ -71,6 +71,19 @@ def main():
     check(by_id["krea/Krea-2-Raw"]["capabilities"]["image_to_image"] is False, "pin overlay")
     check(by_id["Qwen/Qwen-Image-Edit"]["capabilities"]["image_to_image"] is True, "edit pin overlay")
     check("Qwen/Qwen-Image-Edit-2509" in MODELSCOPE_REF_POLICY, "2509 policy recorded")
+    check(by_id["Wan-AI/Wan2.1-I2V-14B-720P"]["needsFirstFrame"] is True, "wan pin first frame")
+    check(by_id["Wan-AI/Wan2.1-I2V-14B-720P"]["supportsI2v"] is True, "wan pin i2v")
+
+    wan = overlay_modelscope_catalog_item({
+        "id": "Wan-AI/Wan2.1-I2V-14B-720P",
+        "task": "image-to-video",
+        "tags": ["i2v"],
+        "category": "video",
+    })
+    check(wan.get("needsFirstFrame") is True, wan)
+    check(wan.get("supportsI2v") is True, wan)
+    check(modelscope_t2i_refs_error("Wan-AI/Wan2.1-I2V-14B-720P", 1, wan) is None,
+          "i2v first frame is not a t2i unused-ref block")
 
     print("PASS modelscope_catalog_refs")
     return 0

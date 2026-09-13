@@ -254,17 +254,20 @@ def apply_job_media_to_graph(
 ) -> dict[str, Any]:
     """Write media onto the originating node. No node id → incomplete, not Pass."""
     rec = pending if isinstance(pending, dict) else get_pending(job_id)
+    if not rec:
+        return {"updated": False, "skipped": "no_pending", "incomplete": True}
+    nid = node_id_of(rec)
+    if not nid:
+        return {"updated": False, "skipped": "no_node", "incomplete": True}
     url = (media_url or "").strip()
     if not url:
         return {"updated": False, "skipped": "no_media", "incomplete": True}
     nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
-    nid = node_id_of(rec) if rec else ""
     hit = None
-    if nid:
-        for node in nodes:
-            if isinstance(node, dict) and str(node.get("id") or "") == nid:
-                hit = node
-                break
+    for node in nodes:
+        if isinstance(node, dict) and str(node.get("id") or "") == nid:
+            hit = node
+            break
     if hit is None:
         jid = (job_id or "").strip()
         for node in nodes:
@@ -273,26 +276,18 @@ def apply_job_media_to_graph(
                 nid = str(node.get("id") or "")
                 break
     if hit is None:
-        return {
-            "updated": False,
-            "skipped": "no_pending" if not rec else "node_missing",
-            "incomplete": True,
-            "nodeId": nid,
-        }
+        return {"updated": False, "skipped": "node_missing", "incomplete": True, "nodeId": nid}
     hit["url"] = url
     hit["mediaUrl"] = url
     hit["_jobId"] = (job_id or "").strip()
     now_ms = int(time.time() * 1000)
     hit["_urlUpdatedAt"] = now_ms
     hit["urlUpdatedAt"] = now_ms
-    submitted = rec.get("submittedInput") if rec else None
+    submitted = rec.get("submittedInput")
     if submitted is not None:
         hit["submittedInput"] = submitted
-    backend = ""
-    service = ""
-    if rec:
-        backend = str(rec.get("backend") or "").strip()
-        service = str(rec.get("serviceId") or rec.get("service") or rec.get("endpoint") or "").strip()
+    backend = str(rec.get("backend") or "").strip()
+    service = str(rec.get("serviceId") or rec.get("service") or rec.get("endpoint") or "").strip()
     if not backend:
         raw_jid = str(job_id or "")
         backend = raw_jid.split("|", 1)[0].strip() if "|" in raw_jid else ""
@@ -320,10 +315,13 @@ def apply_job_media_to_graph(
 def complete_pending_job(job_id: str, media_url: str) -> dict[str, Any]:
     """Apply media to the persisted storyboard graph and drop the pending row on success."""
     rec = get_pending(job_id)
+    if not rec:
+        return {"updated": False, "skipped": "no_pending", "incomplete": True}
+    if not node_id_of(rec):
+        return {"updated": False, "skipped": "no_node", "incomplete": True}
     graph = read_storyboard_graph()
     result = apply_job_media_to_graph(graph, job_id, media_url, pending=rec)
     if result.get("updated"):
         write_storyboard_graph(graph)
-        if rec:
-            clear_pending(job_id)
+        clear_pending(job_id)
     return result

@@ -69,6 +69,31 @@ def load_disk():
         return []
 
 
+def _promote_pins(items, pins):
+    """Keep disk pins at the front even when Hub already listed them later."""
+    pin_ids = []
+    pin_map = {}
+    for pin in pins or []:
+        if not isinstance(pin, dict):
+            continue
+        pid = str(pin.get("id") or "").strip()
+        if not pid or pid in pin_map:
+            continue
+        pin_ids.append(pid)
+        pin_map[pid] = pin
+    have = {}
+    rest = []
+    for row in items or []:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("id") or "").strip()
+        if rid and rid in pin_map:
+            have[rid] = row
+        else:
+            rest.append(row)
+    return [have.get(pid) or pin_map[pid] for pid in pin_ids] + rest
+
+
 def model_id(service_id: str) -> str:
     s = (service_id or "").strip().lstrip("/")
     for pfx in ("modelscope-ai/", "modelscope-cn/", "ms/", "modelscope/", "魔搭/"):
@@ -180,7 +205,22 @@ def _modelscope_loras(payload: dict):
     return out
 
 
-def _image_body(payload, mid, backend):
+def _wants_video(payload, mid=""):
+    blob = " ".join([
+        str((payload or {}).get("kind") or ""),
+        str((payload or {}).get("recipe") or ""),
+        str((payload or {}).get("task") or ""),
+        str((payload or {}).get("op") or ""),
+        str(mid or ""),
+        str((payload or {}).get("serviceId") or ""),
+    ]).lower()
+    return any(tok in blob for tok in (
+        "video", "i2v", "t2v", "ti2v", "flf2v", "imagetovideo",
+        "image-to-video", "text-to-video",
+    ))
+
+
+def _image_body(payload, mid, backend, *, video=False):
     if payload.get("prompt") is not None and not isinstance(payload["prompt"], str):
         raise ValueError("prompt 必须是文本")
     body = {"model": mid, "prompt": payload.get("prompt") or ""}
@@ -216,10 +256,18 @@ def _image_body(payload, mid, backend):
         if "size" in body and body["size"] != f"{w}x{h}":
             raise ValueError("resolution/size 与 width/height 冲突")
         body["size"] = f"{w}x{h}"
-    for field in ("sampler", "scheduler", "duration", "aspectRatio", "aspect_ratio",
-                  "denoise", "strength", "lastFrame", "end_image_url"):
+    for field in ("sampler", "scheduler", "denoise", "strength", "lastFrame", "end_image_url"):
         if payload.get(field) not in (None, ""):
             raise ValueError(f"{backend} 当前图片适配器未接入 {field}；拒绝丢参生成，不能据此认定 API 不支持")
+    if payload.get("duration") not in (None, ""):
+        raise ValueError(f"{backend} 官方 AIGC 表无 duration；请清空时长后再生成")
+    if not video:
+        for field in ("aspectRatio", "aspect_ratio"):
+            if payload.get(field) not in (None, ""):
+                raise ValueError(f"{backend} 当前图片适配器未接入 {field}；拒绝丢参生成，不能据此认定 API 不支持")
+    elif payload.get("aspectRatio") not in (None, "") or payload.get("aspect_ratio") not in (None, ""):
+        if "size" not in body:
+            raise ValueError(f"{backend} 官方键是 size（宽x高），没有 aspect_ratio；请填宽高")
     quantity = _value(payload, "quantity", "qty", "n", "num_images")
     if quantity is not None and _number(quantity, "quantity", integer=True, minimum=1) != 1:
         raise ValueError(f"{backend} 当前适配器未接入 quantity 多图；不会只生成一张")
@@ -241,7 +289,10 @@ def _image_body(payload, mid, backend):
         raise ValueError("参考图必须是有效 URL、data URL 或可读取的 /out 文件，拒绝跳过")
     refs = list(dict.fromkeys(refs))
     from .capabilities import modelscope_t2i_refs_error, overlay_modelscope_catalog_item
-    item = overlay_modelscope_catalog_item({"id": mid})
+    item = overlay_modelscope_catalog_item(
+        {"id": mid, "task": "image-to-video", "tags": ["i2v"], "category": "video"} if video
+        else {"id": mid}
+    )
     t2i_err = modelscope_t2i_refs_error(mid, len(refs), item)
     if t2i_err:
         raise ValueError(t2i_err)
@@ -252,6 +303,8 @@ def _image_body(payload, mid, backend):
         raise ValueError(f"{backend} 当前参考图接线最多 {limit} 张，收到 {len(refs)} 张；拒绝截断")
     if refs:
         body["image_url"] = refs[0] if len(refs) == 1 else refs
+    elif video:
+        raise ValueError(f"{backend} 图生视频需要首帧，请连一张参考图")
     return body
 
 
@@ -831,29 +884,29 @@ class ModelScopeProvider(Provider):
         qn = (q or "").strip()
         now = time.time()
         totals = {}
-        cache_key = self.id
-        if (not qn) and _HUB_CACHE["items"] is not None and (now - _HUB_CACHE["at"]) < _HUB_TTL:
-            items = list(_HUB_CACHE["items"])
+        cached = _HUB_CACHE["items"] is not None and (now - (_HUB_CACHE.get("at") or 0)) < _HUB_TTL
+        pins = load_disk()
+        if cached:
+            items = _promote_pins(list(_HUB_CACHE["items"]), pins)
             totals = dict(_HUB_CACHE.get("totals") or {})
         else:
-            hub, totals = fetch_hub(search=qn)
-            pins = load_disk()
-            seen = {x.get("id") for x in hub}
-            items = list(hub)
-            for pin in reversed(pins):
-                pid = pin.get("id")
-                if pid and pid not in seen:
-                    items.insert(0, pin)
-                    seen.add(pid)
+            # Rematch search must not wait on a Hub crawl. Pref ids live on the pin list.
+            if qn:
+                hub, totals = [], {"pinSearch": True, "complete": False}
+            else:
+                hub, totals = fetch_hub(search="")
+            items = _promote_pins(hub, pins)
             if not hub:
-                items = list(pins)
                 totals = dict(totals or {})
-                totals["pinFallback"] = True
                 totals["complete"] = False
-                totals.setdefault(
-                    "error",
-                    "AIGC Checkpoint 目录拉取失败，已回退 pin 短名单；不是官网只有这些",
-                )
+                if qn:
+                    totals["pinSearch"] = True
+                else:
+                    totals["pinFallback"] = True
+                    totals.setdefault(
+                        "error",
+                        "AIGC Checkpoint 目录拉取失败，已回退 pin 短名单；不是官网只有这些",
+                    )
             if not qn:
                 _HUB_CACHE["items"] = list(items)
                 _HUB_CACHE["at"] = now
@@ -962,7 +1015,7 @@ class ModelScopeProvider(Provider):
                     "backend": self.id,
                 }
         try:
-            body = _image_body(payload, mid, self.id)
+            body = _image_body(payload, mid, self.id, video=_wants_video(payload, mid))
         except ValueError as exc:
             return 400, {"error": str(exc), "backend": self.id}
         headers = self._auth({"X-ModelScope-Async-Mode": "true"})
@@ -1031,11 +1084,13 @@ class ModelScopeProvider(Provider):
         if data["status"] == "succeeded":
             nested = data.get("data") if isinstance(data.get("data"), dict) else {}
             urls = collect_urls(data) + collect_urls(data.get("output") or {}) + collect_urls(data.get("outputs") or {}) + collect_urls(nested)
-            for u in data.get("output_images") or []:
-                if isinstance(u, str) and u.startswith("http"):
-                    urls.append(u)
-                elif isinstance(u, dict) and u.get("url"):
-                    urls.append(u["url"])
+            for bag in (data.get("output_images") or [], data.get("output_videos") or [], data.get("output_video") or []):
+                items = bag if isinstance(bag, list) else [bag]
+                for u in items:
+                    if isinstance(u, str) and u.startswith("http"):
+                        urls.append(u)
+                    elif isinstance(u, dict) and u.get("url"):
+                        urls.append(u["url"])
             seen = []
             for u in urls:
                 if u not in seen:

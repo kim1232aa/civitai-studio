@@ -84,9 +84,9 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "cancel": False,
         "estimate": "none",
         "sampler": False,
-        "i2i": "none",
+        "i2i": "source",
         "video": True,
-        "i2v": "none",
+        "i2v": "image_url",
         "videoDuration": False,
         "videoAspect": False,
         "maxRefs": 9,
@@ -378,6 +378,8 @@ MODELSCOPE_REF_POLICY: dict[str, dict[str, Any]] = {
     "krea/Krea-2-Raw": {"task": "text-to-image", "image_to_image": False, "maxRefs": 1},
     "krea/krea-realtime-video": {"task": "text-to-video", "image_to_image": False, "maxRefs": 1},
     "Qwen/Qwen-Image-Edit-2509": {"task": "image-to-image", "image_to_image": True, "maxRefs": 3},
+    "Wan-AI/Wan2.1-I2V-14B-720P": {"task": "image-to-video", "image_to_image": True, "maxRefs": 1},
+    "Wan-AI/Wan2.1-FLF2V-14B-720P": {"task": "image-to-video", "image_to_image": True, "maxRefs": 1},
 }
 
 
@@ -457,6 +459,16 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
     if "supportsLora" in caps and row.get("supportsLora") is None:
         row["supportsLora"] = caps["supportsLora"]
 
+    if task == "image-to-video" or "i2v" in tags:
+        row.setdefault("needsFirstFrame", True)
+        row["supportsI2v"] = True
+        caps.setdefault("supportsI2v", True)
+        caps.setdefault("maxRefs", max_r if max_r else 1)
+        caps.setdefault("maxImages", caps.get("maxRefs") or 1)
+        caps.setdefault("refImagesField", "image_url")
+        if not caps.get("imageFields"):
+            caps["imageFields"] = ["image_url"]
+
     if caps:
         row["capabilities"] = caps
     if mid and not row.get("id"):
@@ -485,6 +497,11 @@ def modelscope_t2i_refs_error(service_id: str | None, n_refs: int, item: dict | 
         row["id"] = _modelscope_mid(service_id)
         row = overlay_modelscope_catalog_item(row)
     caps = row.get("capabilities") if isinstance(row.get("capabilities"), dict) else {}
+    task = str(row.get("task") or "").strip().lower()
+    tags = [str(t).lower() for t in (row.get("tags") or []) if t]
+    cat = str(row.get("category") or "").strip().lower()
+    if cat == "video" or task in ("image-to-video", "text-to-video") or "i2v" in tags or "t2v" in tags:
+        return None
     if caps.get("image_to_image") is False:
         name = row.get("name") or row.get("id") or service_id or "当前模型"
         return (

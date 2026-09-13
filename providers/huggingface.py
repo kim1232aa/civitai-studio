@@ -112,6 +112,18 @@ _I2I_PIN = {
     "pipelineTag": "image-to-image",
 }
 
+_I2V_PIN = {
+    "id": "Wan-AI/Wan2.2-TI2V-5B",
+    "name": "Wan2.2 TI2V 5B",
+    "category": "video",
+    "backend": "huggingface",
+    "status": "available",
+    "task": "image-to-video",
+    "tags": ["i2v", "ti2v"],
+    "needsFirstFrame": True,
+    "pipelineTag": "image-to-video",
+}
+
 
 def load_items():
     fp = DOCS / "hf-models.json"
@@ -129,6 +141,8 @@ def load_items():
         extra.append(dict(_KREA_PIN))
     if "Qwen/Qwen-Image-Edit" not in ids:
         extra.append(dict(_I2I_PIN))
+    if "Wan-AI/Wan2.2-TI2V-5B" not in ids:
+        extra.append(dict(_I2V_PIN))
     return extra + items
 
 
@@ -857,6 +871,17 @@ def _hf_row(mid, name, pipe, *, raw=None, mapping=None):
         }
         if eats:
             row["supported_parameters"] = {"max_input_images": 1}
+    elif cat == "video" and needs_ff:
+        row["supportsI2v"] = True
+        row["capabilities"] = {
+            "image_to_image": False,
+            "supportsI2v": True,
+            "maxRefs": 1,
+            "maxImages": 1,
+            "refImagesField": "image_url",
+            "imageFields": ["image_url"],
+        }
+        row["supported_parameters"] = {"max_input_images": 1}
     return _apply_upscale_category(row)
 
 
@@ -934,7 +959,7 @@ def _normalize_page(page, page_size):
 def _pipeline_for_category(category):
     cat = (category or "").strip().lower()
     if cat == "video":
-        return "text-to-video"
+        return "image-to-video"
     if cat in HF_PIPES:
         return cat
     return "text-to-image"
@@ -944,13 +969,13 @@ def _pipelines_for_category(category, q=""):
     """Official Hub filters for one Studio catalog request.
 
     Search keeps a single untagged Hub page. Image browse is t2i + i2i,
-    one page each (limit≤50), not a Hub crawl.
+    video browse is i2v + t2v, one page each (limit≤50), not a Hub crawl.
     """
     if (q or "").strip():
         return [None]
     cat = (category or "").strip().lower()
     if cat == "video":
-        return ["text-to-video"]
+        return ["image-to-video", "text-to-video"]
     if cat in HF_PIPES:
         return [cat]
     return ["text-to-image", "image-to-image"]

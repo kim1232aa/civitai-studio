@@ -27,6 +27,20 @@ I2I_ROW = {
         {"provider": "fal-ai", "status": "live", "providerId": "fal-ai/x/edit", "task": "image-to-image"},
     ],
 }
+I2V_ROW = {
+    "id": "org/hub-i2v",
+    "pipeline_tag": "image-to-video",
+    "inferenceProviderMapping": [
+        {"provider": "fal-ai", "status": "live", "providerId": "fal-ai/x/i2v", "task": "image-to-video"},
+    ],
+}
+T2V_ROW = {
+    "id": "org/hub-t2v",
+    "pipeline_tag": "text-to-video",
+    "inferenceProviderMapping": [
+        {"provider": "fal-ai", "status": "live", "providerId": "fal-ai/x/t2v", "task": "text-to-video"},
+    ],
+}
 
 
 def _reset_cache():
@@ -50,6 +64,10 @@ class HFCatalogTests(unittest.TestCase):
             tags = query.get("pipeline_tag") or []
             if tags == ["image-to-image"]:
                 return 200, [dict(I2I_ROW)], None
+            if tags == ["image-to-video"]:
+                return 200, [dict(I2V_ROW)], None
+            if tags == ["text-to-video"]:
+                return 200, [dict(T2V_ROW)], None
             return 200, [dict(HUB_ROW)], NEXT
 
         self.list_page = self.enterContext(patch.object(hf, "_hf_list_page", side_effect=one_page))
@@ -94,12 +112,28 @@ class HFCatalogTests(unittest.TestCase):
         hf.HuggingFaceProvider().catalog("", "image", "")
         self.assertEqual(len(self.calls), 2)
 
-    def test_video_category_requests_official_t2v_filter(self):
-        hf.HuggingFaceProvider().catalog("", "video", "")
-        self.assertEqual(len(self.calls), 1)
-        query = parse_qs(urlsplit(self.calls[0]).query)
-        self.assertEqual(query.get("pipeline_tag"), ["text-to-video"])
-        self.assertEqual(query.get("inference_provider"), ["all"])
+    def test_video_category_requests_official_i2v_and_t2v_filters(self):
+        body = hf.HuggingFaceProvider().catalog("", "video", "")
+        self.assertEqual(len(self.calls), 2)
+        pipes = []
+        for url in self.calls:
+            query = parse_qs(urlsplit(url).query)
+            self.assertEqual(query.get("inference_provider"), ["all"])
+            pipes.extend(query.get("pipeline_tag") or [])
+        self.assertEqual(sorted(pipes), ["image-to-video", "text-to-video"])
+        ids = [x["id"] for x in body["items"]]
+        self.assertIn("Wan-AI/Wan2.2-TI2V-5B", ids)
+        self.assertIn("org/hub-i2v", ids)
+        self.assertIn("org/hub-t2v", ids)
+        by_id = {x["id"]: x for x in body["items"]}
+        self.assertEqual(by_id["org/hub-i2v"]["task"], "image-to-video")
+        self.assertTrue(by_id["org/hub-i2v"].get("needsFirstFrame"))
+        self.assertEqual(by_id["Wan-AI/Wan2.2-TI2V-5B"]["task"], "image-to-video")
+        self.assertTrue(by_id["Wan-AI/Wan2.2-TI2V-5B"].get("needsFirstFrame"))
+        self.assertEqual(by_id["Wan-AI/Wan2.2-TI2V-5B"]["capabilities"]["maxRefs"], 1)
+        self.assertTrue(by_id["Wan-AI/Wan2.2-TI2V-5B"].get("supportsI2v"))
+        self.assertEqual(by_id["org/hub-i2v"]["capabilities"]["maxRefs"], 1)
+        self.assertTrue(by_id["org/hub-i2v"].get("supportsI2v"))
 
     def test_search_is_one_page_plus_pins(self):
         body = hf.HuggingFaceProvider().catalog("krea", "image", "")

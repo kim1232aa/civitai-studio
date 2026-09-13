@@ -130,6 +130,32 @@ def overlay_nano_catalog_item(row: dict | None) -> dict:
     if dur:
         caps["durationEnum"] = dur
 
+    task = str(row.get("task") or "").strip().lower()
+    tags_l = tags
+    sid_l = sid
+    if (
+        row.get("needsFirstFrame")
+        or task == "image-to-video"
+        or "i2v" in tags_l
+        or "image-to-video" in sid_l
+        or "imagetovideo" in sid_l.replace("-", "")
+    ):
+        row.setdefault("needsFirstFrame", True)
+        row["supportsI2v"] = True
+        caps.setdefault("supportsI2v", True)
+        caps.setdefault("maxRefs", 1)
+        caps.setdefault("maxImages", 1)
+        caps.setdefault("refImagesField", "image_url")
+        if not caps.get("imageFields"):
+            caps["imageFields"] = ["image_url"]
+    elif row.get("needsSource") or task == "image-to-image" or "i2i" in tags_l or "/edit" in sid_l or sid_l.endswith("-edit"):
+        caps.setdefault("image_to_image", True)
+        caps.setdefault("maxRefs", 1)
+        caps.setdefault("maxImages", 1)
+    elif task in ("text-to-image", "text-to-video") or "t2i" in tags_l or "t2v" in tags_l:
+        caps.setdefault("image_to_image", False)
+        caps.setdefault("maxRefs", 1)
+
     row["capabilities"] = caps
     if "supportsLora" in caps:
         row["supportsLora"] = caps["supportsLora"]

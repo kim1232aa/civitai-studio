@@ -30,10 +30,12 @@ test("catalogItemSupportsI2i exists", () => {
 });
 
 function loadPinApi() {
-  const sandbox = { console };
+  const sandbox = { console, state: { loras: [] } };
   vm.createContext(sandbox);
   const code = [
     "function isHfRepo(s) { return /^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$/.test(String(s || '').trim()); }",
+    "const FAL_FLUX_LORA_SERVICE = 'fal-ai/flux-lora';",
+    "const FAL_LORA_PREF_SERVICE = 'fal-ai/krea-2/turbo/lora';",
     section("  const HF_LORA_PREF_SERVICE =", "  const COMFY_PARAM_IDS ="),
     section("  function looksCivitaiServiceId(", "  function ensureHfLoraServiceSelected("),
     "globalThis.api = { HF_LORA_PREF_SERVICE, pinHfLoraServiceId };",

@@ -243,20 +243,8 @@ svg.wires path.edge {
   pointer-events: none;
   overflow: visible !important;
 }
-.dock.show #dockExpand,
-.dock.show #dockCollapse,
 .dock.show #dockHint,
-.dock.show .expand-only,
-.dock.show .collapse-only,
-.dock.show .dock-hd > .grow,
-.dock.show #dockTitle,
-.dock.show .dock-title,
-.dock.show #dockClose,
-.dock.show.collapsed #dockExpand,
-.dock.show.collapsed #dockCollapse,
 .dock.show.collapsed #dockHint,
-.dock.show.collapsed .expand-only,
-.dock.show.collapsed .collapse-only,
 .dock.show.collapsed #paramWarn { display: none !important; }
 .dock.show #sendCap {
   display: grid !important;
