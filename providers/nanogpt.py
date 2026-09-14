@@ -996,8 +996,13 @@ def _core_image_body(full: dict) -> dict:
     body = {k: full[k] for k in keep if k in full}
     refs = full.get("input_references")
     if isinstance(refs, list) and refs:
-        body["imageDataUrls"] = list(refs)
-        body["imageDataUrl"] = refs[0]
+        # v0821o136seko-nanodup: 上游把 imageDataUrl 与 imageDataUrls 加总计数——
+        # cap=1 模型（如 boogu-image/edit）同发两字段会被判 2 张 → 400 IMAGE_INPUT_TOO_MANY。
+        # 实测探针（2026-09-14）: 单发 imageDataUrl → 200；双发 → 400。故 1 张只发单数字段，多张只发复数字段。
+        if len(refs) == 1:
+            body["imageDataUrl"] = refs[0]
+        else:
+            body["imageDataUrls"] = list(refs)
     else:
         # Pass through explicit OAI fields only when no input_references bag.
         for k in ("imageDataUrls", "imageDataUrl", "imageUrl", "image"):

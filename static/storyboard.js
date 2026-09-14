@@ -8023,7 +8023,10 @@
         }
       });
       // Fal i2v common aliases when catalog row lacks imageFields
-      if (!stamped && state.mode === "video") {
+      // v0821o136seko-civfalfield: 只对 fal 后端补 Fal 别名——civitai 配方吃官方 sourceImage/firstFrame，
+      // 混入 image_url 会被服务端诚实硬门拒（「Civitai 不接受 Fal 字段 image_url」），不许静默改名。
+      const _beForAlias = (typeof currentBackend === "function") ? currentBackend() : "";
+      if (!stamped && state.mode === "video" && _beForAlias === "fal") {
         if (!payload.start_image_url && !payload.image_url && !payload.first_frame_url) {
           payload.start_image_url = firstUrl;
           payload.image_url = firstUrl;
@@ -8193,6 +8196,12 @@
       });
       if (genParams.width == null) genParams.width = w;
       if (genParams.height == null) genParams.height = h;
+    } else if (be === "civitai") {
+      // v0821o136seko-civrestoken: Civitai /fal/ videoGen 配方（wan 家族）的 resolution
+      // 是档位枚举（480p/580p/720p），不是像素 WxH——发像素会撞「不在允许列表」诚实硬门。
+      // 发 #res 原始档位 token（720P），由 io_meta fold 到官方枚举；1080P 不在枚举时硬门照常拒绝。
+      genParams.resolution = ($("res") && $("res").value) || "720P";
+      genParams.aspectRatio = aspect;
     } else if (be === "nano-gpt") {
       const token = ($("nanoRes") && $("nanoRes").value) || "";
       if (token) genParams.resolution = token;

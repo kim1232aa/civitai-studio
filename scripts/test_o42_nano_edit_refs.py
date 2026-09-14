@@ -56,8 +56,11 @@ def test_oai_body_maps_refs_to_imageDataUrls_no_mix():
     }
     oai = nano._core_image_body(full)
     check("input_references" not in oai, "OAI body must not keep input_references")
+    # 裁决(2026-09-14, v0821o136seko-nanodup): 上游把 imageDataUrl+imageDataUrls 加总计数，
+    # cap=1 模型双发被判 2 张 → 400 IMAGE_INPUT_TOO_MANY（live 探针实测）。
+    # 新语义: ≥2 张只发复数 imageDataUrls；1 张只发单数 imageDataUrl；两字段永不共存。
     check(oai.get("imageDataUrls") == refs, "imageDataUrls must mirror refs")
-    check(oai.get("imageDataUrl") == refs[0], "imageDataUrl = first ref")
+    check("imageDataUrl" not in oai, "multi-ref must NOT also send singular imageDataUrl")
     check("image" not in oai or oai.get("image") is None or True)
     # normalized path still uses input_references only
     check(full.get("input_references") == refs)
@@ -78,7 +81,24 @@ def test_edit_image_body_same_shape():
     edit = nano._edit_image_body(full)
     check("input_references" not in edit)
     check(edit.get("imageDataUrls") == refs)
-    check(edit.get("imageDataUrl") == refs[0])
+    check("imageDataUrl" not in edit, "multi-ref edit must not send singular field")
+
+
+def test_single_ref_sends_only_singular_field():
+    # cap=1 模型（boogu-image/edit）回归：恰好 1 张参考 → 只发 imageDataUrl，不带 imageDataUrls
+    refs = ["data:image/png;base64,ONLY"]
+    full = {
+        "model": "boogu-image/edit",
+        "prompt": "make it night",
+        "n": 1,
+        "resolution": "1024x1024",
+        "input_references": refs,
+        "response_format": "url",
+    }
+    for body in (nano._core_image_body(full), nano._edit_image_body(full)):
+        check(body.get("imageDataUrl") == refs[0], "single ref → imageDataUrl only")
+        check("imageDataUrls" not in body, "single ref must not send plural field")
+        check("input_references" not in body)
 
 
 def test_endpoint_candidates_edit_prefers_edit_routes():
@@ -198,6 +218,7 @@ def test_stamp_and_cache_bust():
 def main():
     test_oai_body_maps_refs_to_imageDataUrls_no_mix()
     test_edit_image_body_same_shape()
+    test_single_ref_sends_only_singular_field()
     test_endpoint_candidates_edit_prefers_edit_routes()
     test_endpoint_candidates_t2i_no_edit_first()
     test_empty_image_error_detector()
