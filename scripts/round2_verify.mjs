@@ -98,16 +98,19 @@ async function send(p) {
   await p.waitForTimeout(500);
 }
 
-async function waitDone(p, timeoutMs, beforeAssets, beforeShotSrc) {
+async function waitDone(p, timeoutMs, beforeAssets, beforeShotSrc, beforeCardErr) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     const st = await p.evaluate(() => {
       const msg = (document.querySelector("#msg") || {}).textContent || "";
       const toast = [...document.querySelectorAll(".toast, .send-toast, [class*=toast]")].map((e) => e.textContent).join(" ");
+      // 裁决(2026-09-14): 失败经 paintShotFail/shot._error 渲染进卡片 .result-error，
+      // #msg 可能被后续目录加载等异步文案覆盖（hf-t2i 实测：msg 被刷掉、卡片红字仍在）→ 失败判定必须读卡面。
+      const cardErr = [...document.querySelectorAll(".card.shot .result-error")].map((e) => e.textContent).join(" ");
       const assets = document.querySelectorAll(".card.asset img, .card.character img, .card.asset video, .card.character video").length;
       const shotImg = (document.querySelector(".card.shot .face img, .card.shot .face video") || {}).src || "";
       const busy = msg.includes("生成中") || msg.includes("排队") || msg.includes("运行") || /处理中|等待/.test(msg);
-      return { msg, toast, assets, shotImg, busy };
+      return { msg, toast, cardErr, assets, shotImg, busy };
     });
     // 写回语义: 结果写进分镜卡 face（“此镜完成，已写入卡片”）或新增资产卡
     // 裁决(2026-09-14): video 模式下 renderDock 会把 ok 级「此镜完成」重置回「首帧已就绪·可生成」(v0821j 只保 bad/warn)，
@@ -115,7 +118,9 @@ async function waitDone(p, timeoutMs, beforeAssets, beforeShotSrc) {
     const wroteShot = /此镜完成|已写入卡片|出图完成|视频完成/.test(st.msg + st.toast);
     const shotChanged = !!(st.shotImg && st.shotImg !== (beforeShotSrc || ""));
     if ((wroteShot || shotChanged || st.assets > beforeAssets) && !st.busy) return { ok: true, ...st, ms: Date.now() - t0 };
-    if (/失败|错误|拒绝|不支持|缺首帧|未接|没有.*Key|等待超时|没有可预览地址/i.test(st.msg + st.toast)) return { ok: false, ...st, ms: Date.now() - t0 };
+    // 只认本次发送后新出现的卡面错误——重发时上一次的红字可能还没被重渲染清掉（hf-t2i 实测 ms:2 误判）。
+    const cardErrNew = (st.cardErr && st.cardErr !== (beforeCardErr || "")) ? st.cardErr : "";
+    if (/失败|错误|拒绝|不支持|缺首帧|未接|没有.*Key|等待超时|没有可预览地址/i.test(st.msg + st.toast + cardErrNew)) return { ok: false, ...st, ms: Date.now() - t0 };
     await p.waitForTimeout(3000);
   }
   return { ok: false, timeout: true, ms: timeoutMs };
@@ -246,7 +251,20 @@ try {
     const before = await countAssets(p);
     const beforeShot = await shotSrc(p);
     await send(p);
-    const res = await waitDone(p, 300000, before, beforeShot);
+    let res = await waitDone(p, 300000, before, beforeShot);
+    // 裁决(2026-09-14): HF Inference Providers 路由到 fal-ai 子端点，FLUX.1-schnell 官方 schema
+    // 没有 negative_prompt → 服务端诚实硬拒「拒绝丢参生成」。这正是铁律要的闸门；记录这次硬拒后，
+    // 按真实用户行为清空负面词重发一次（不换模型不换家），验证同模型可出图。
+    if (!res.ok && /端点字段表未声明[^「」]*negative_prompt|未声明：negative_prompt/.test((res.cardErr || "") + (res.msg || ""))) {
+      out.honestReject = { msg: (res.cardErr || res.msg || "").slice(0, 160), ms: res.ms };
+      await p.evaluate(() => {
+        const neg = document.querySelector("#negative");
+        if (neg) { neg.value = ""; neg.dispatchEvent(new Event("input", { bubbles: true })); }
+      });
+      await p.waitForTimeout(500);
+      await send(p);
+      res = await waitDone(p, 300000, before, beforeShot, res.cardErr || "");
+    }
     Object.assign(out, res);
     await p.screenshot({ path: `${SHOTS}/hf-t2i-3-done.png` });
     if (res.ok) out.reload = await reloadCheck(p, before + 1, "hf-t2i");
