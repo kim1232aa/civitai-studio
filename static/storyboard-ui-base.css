@@ -44,7 +44,11 @@ svg.wires path.edge:hover{stroke:#fff;opacity:1;stroke-width:3.2}
 .zoom{position:absolute;left:188px;bottom:18px;z-index:22}
 .chat-rail,.canvas-tip,.tools-hint,.dev-fixture,#paramSupportStrip{display:none!important}
 .param-unsupported,.lora-block.hidden,.lora-block.param-lora-off,.lora-block.param-unsupported,.bar .param-group.hidden{display:none!important}
-.send{width:48px;height:48px;border:0;border-radius:50%;background:#fff;color:#111;font-size:20px;flex-shrink:0}
+.send{position:relative;z-index:5;width:48px;height:48px;border:0;border-radius:50%;background:#fff;color:#111;font-size:20px;flex-shrink:0;cursor:pointer;touch-action:manipulation}
+/* v0821o136seko-sendafford: 补回 o63 外迁时丢失的 send 可用性样式（JS 仍在驱动 is-blocked/aria-disabled） */
+.send:disabled,.send.is-blocked,.send[aria-disabled="true"]{background:#3a3a44;color:#8a8a95;cursor:not-allowed}
+.send::before{content:"";position:absolute;inset:-12px;border-radius:50%}
+.dock-foot{position:relative;z-index:3}
 .prompt{width:100%;min-height:120px;background:#121214;border:1px solid #2a2a30;border-radius:12px;padding:10px 12px;color:#e8e8ec}
 .bar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .lora-block{margin:10px 0 0;padding:10px;border:1px solid #2a2a30;border-radius:12px;background:#121216}

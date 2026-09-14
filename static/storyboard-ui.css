@@ -692,6 +692,14 @@ header .title:hover { color: #fff; }
   border: 1px solid #2a2a30;
   color: #ececec;
 }
+/* v0821o136seko: shot label matches Seko canvas node title (small, scales with canvas) */
+.card.shot .label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #c8c8d0;
+  line-height: 1.4;
+}
 .card.text .label {
   flex: 0 0 auto;
   font-size: 12px;
@@ -793,3 +801,19 @@ header .title:hover { color: #fff; }
 
 
 
+
+/* v0821o39: empty reference slot — dashed placeholder, click to upload (Seko-style) */
+.chip.ref-slot-empty {
+  border: 1px dashed #4a4a55 !important;
+  background: transparent !important;
+  color: #8a8a95;
+  position: relative;
+  cursor: pointer;
+}
+.chip.ref-slot-empty::before {
+  content: "+";
+  font-size: 18px;
+  line-height: 1;
+  color: #6a6a75;
+}
+.chip.ref-slot-empty:hover { border-color: var(--teal) !important; }

@@ -5,10 +5,13 @@ const out = "/workspace/civitai-studio/docs/review-shots";
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto("http://127.0.0.1:8080/storyboard?t=" + Date.now(), { waitUntil: "domcontentloaded" });
+await page.goto("http://127.0.0.1:18901/storyboard?t=" + Date.now(), { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(2500);
 await page.locator(".card.shot").first().click({ position: { x: 40, y: 30 } });
 await page.waitForTimeout(600);
+// o136seko: node tools live in the Seko-style 技能 flyout — open it before asserting visibility
+await page.locator("#btnRailSkills").click();
+await page.waitForTimeout(300);
 const vis = await page.evaluate(() => {
   const r = (sel) => {
     const el = document.querySelector(sel);

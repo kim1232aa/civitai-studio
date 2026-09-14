@@ -13,7 +13,8 @@ const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
 assert.ok(html.includes("v0821o49b-hydrate-fresh-empty-url"), "html stamp o16");
 assert.ok(html.includes("storyboard.js?v=20260911-o49bhydratefreshemptyurl"), "cache bust o16");
-assert.ok(source.includes('const STORE = "nl-storyboard-v0821o16"'), "STORE o16");
+assert.ok(/const STORE = "nl-storyboard-v0821o\d+/.test(source), "STORE versioned key");
+assert.ok(source.includes('"nl-storyboard-v0821o16"'), "STORE_OLDS migrates o16");
 assert.ok(source.includes('"nl-storyboard-v0821o15"'), "STORE_OLDS keeps o15");
 assert.ok(source.includes("skip PUT"), "persistServer skips empty nodes");
 assert.ok(source.includes("服务端保存失败 HTTP"), "persistServer surfaces HTTP fail");
@@ -80,11 +81,21 @@ function harness(opts) {
   const puts = [];
   const sandbox = {
     console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
     localStorage,
     sessionStorage,
+    window: {
+      canvasManager: null,
+      prompt: () => "",
+      confirm: () => true,
+    },
     document: {
       getElementById: (id) => elements[id] || null,
       createElement: (tag) => new Element(tag),
+      addEventListener: () => {},
     },
     fetch: async (url, init) => {
       const u = String(url || "");
@@ -130,6 +141,7 @@ function harness(opts) {
     "  };",
     "  function uid(p) { return (p || 'id') + '-x'; }",
     "  function nodeById(id) { return state.nodes.find((n) => n.id === id); }",
+    "  function shots() { return state.nodes.filter((n) => n && n.kind === 'shot'); }",
     "  function saveDisplayedComposer() {}",
     "  function syncAspectFromSize() {}",
     "  function ensureSelectOpt(el, value) { if (el) el.value = value; }",
@@ -220,7 +232,8 @@ function test_mergePreferUrl_unit() {
 
 async function test_writeback_puts_server_and_clean_profile_hydrate() {
   const api = harness();
-  const shot = { id: "shot-op", kind: "shot", title: "分镜1", url: "", x: 10, y: 20 };
+  // main-house graph marker: /api/storyboard-graph PUT only fires for the main house (o110+ multi-canvas)
+  const shot = { id: "shot-civitai", kind: "shot", title: "分镜1", url: "", x: 10, y: 20 };
   api.state.nodes = [shot];
   api.writebackResult(shot, "/out/12100372-20260910081835126_0.jpg");
   // allow microtask for fetch PUT
@@ -237,7 +250,7 @@ async function test_writeback_puts_server_and_clean_profile_hydrate() {
   api.state.edges = [];
   const changed = await api.hydrateFromServer();
   assert.equal(changed, true, "hydrate adopts server graph when no local media");
-  assert.equal(api.state.nodes[0].id, "shot-op", "server shot id adopted");
+  assert.equal(api.state.nodes[0].id, "shot-civitai", "server shot id adopted");
   assert.equal(api.state.nodes[0].url, "/out/12100372-20260910081835126_0.jpg", "card url survives clean-profile hydrate");
   assert.ok(api.localStorage.getItem(api.STORE), "hydrate mirrors into localStorage");
 }
@@ -255,7 +268,7 @@ async function test_persistServer_skips_empty_nodes() {
 
 async function test_persistServer_puts_nonempty_nodes() {
   const api = harness();
-  api.state.nodes = [{ id: "shot-1", kind: "shot", title: "分镜1", url: "/out/a.png", x: 0, y: 0 }];
+  api.state.nodes = [{ id: "shot-civitai", kind: "shot", title: "分镜1", url: "/out/a.png", x: 0, y: 0 }];
   api.persistServer();
   await Promise.resolve();
   await new Promise((r) => setTimeout(r, 0));
@@ -266,7 +279,7 @@ async function test_persistServer_puts_nonempty_nodes() {
 
 async function test_persistServer_surfaces_http_fail() {
   const api = harness({ putFail: true, putFailStatus: 400, putFailText: "storyboard graph.nodes 必须是非空数组" });
-  api.state.nodes = [{ id: "shot-1", kind: "shot", title: "分镜1", url: "/out/a.png" }];
+  api.state.nodes = [{ id: "shot-civitai", kind: "shot", title: "分镜1", url: "/out/a.png" }];
   api.persistServer();
   await Promise.resolve();
   await new Promise((r) => setTimeout(r, 0));
@@ -302,12 +315,12 @@ async function test_hydrate_fills_blank_url_by_id_when_other_media_exists() {
 async function test_writeback_reattaches_orphan_shot() {
   const api = harness();
   api.state.nodes = [];
-  const orphan = { id: "shot-orphan", kind: "shot", title: "孤儿", url: "", x: 1, y: 2 };
+  const orphan = { id: "shot-civitai", kind: "shot", title: "孤儿", url: "", x: 1, y: 2 };
   api.writebackResult(orphan, "/out/orphan-o16.png");
   await Promise.resolve();
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(api.state.nodes.length, 1, "orphan shot pushed into state.nodes");
-  assert.equal(api.state.nodes[0].id, "shot-orphan");
+  assert.equal(api.state.nodes[0].id, "shot-civitai");
   assert.equal(api.state.nodes[0].url, "/out/orphan-o16.png");
   assert.ok(api.__puts.length >= 1, "orphan writeback still PUTs after re-attach");
   assert.equal(api.__puts[api.__puts.length - 1].nodes[0].url, "/out/orphan-o16.png");

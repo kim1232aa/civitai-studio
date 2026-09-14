@@ -106,6 +106,14 @@ test("restore repairs legacy storage and writes the repaired payload to STORE", 
   const sandbox = {
     console,
     TextDecoder,
+    setTimeout,
+    clearTimeout,
+    window: {},
+    document: {
+      getElementById: () => null,
+      createElement: () => ({ value: "", textContent: "", style: {} }),
+      addEventListener: () => {},
+    },
     localStorage,
     sessionStorage: new FakeStorage(),
     state: {
@@ -132,8 +140,9 @@ test("restore repairs legacy storage and writes the repaired payload to STORE", 
     'const STORE = "nl-storyboard-v0821o7";',
     'const STORE_OLDS = ["nl-storyboard-v0821o6b"];',
     section("  const CP1252_BYTES =", "  /** Seko-aligned empty canvas"),
+    section("  function parseStoreRaw(raw) {", "  function persist()"),
     'function persist() { persistCount += 1; localStorage.setItem(STORE, JSON.stringify({ nodes: state.nodes, groups: state.groups, script: state.script })); }',
-    section("  function restore()", "  function applyCam()"),
+    section("  function applyGraph(p) {", "  function applyCam()"),
     "globalThis.api = { state, restore, localStorage };",
   ].join("\n");
   vm.runInContext(code, sandbox, { filename: "storyboard-restore.vm.js" });

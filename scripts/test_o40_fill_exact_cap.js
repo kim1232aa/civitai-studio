@@ -52,7 +52,7 @@ class FakeEl {
 function harness(backend) {
   const els = { backend: new FakeEl("backend"), service: new FakeEl("service"), msg: new FakeEl("msg") };
   els.backend.value = backend || "nano-gpt";
-  const state = { mode: "image", nodes: [], edges: [], selected: "shot-1", catalogById: {}, dockMode: "expanded", loras: [] };
+  const state = { mode: "image", nodes: [], edges: [], selected: "shot-1", catalogById: {}, dockMode: "expanded", loras: [], _providerCaps: {} };
   const box = {
     state,
     $: (id) => els[id] || null,
@@ -61,6 +61,7 @@ function harness(backend) {
     },
     connectedNodes(id) { return box.connectedAssets(id); },
     frameAsset() { return null; },
+    lastFrameAsset() { return null; },
     isVideoUrl(u) { return /\\.(mp4|webm|mov)(\\?|$)/i.test(String(u || "")); },
     catalogItemForService() {
       const sid = els.service.value;
@@ -88,6 +89,7 @@ function harness(backend) {
     const connectedAssets = this.connectedAssets.bind(this);
     const connectedNodes = this.connectedNodes.bind(this);
     const frameAsset = this.frameAsset;
+    const lastFrameAsset = this.lastFrameAsset;
     const isVideoUrl = this.isVideoUrl;
     const catalogItemForService = this.catalogItemForService.bind(this);
     const currentBackend = this.currentBackend.bind(this);
@@ -101,6 +103,12 @@ function harness(backend) {
     const setMsg = this.setMsg;
     const Event = this.Event;
     const document = this.document;
+    const providerCaps = () => {
+      const be = currentBackend();
+      const fromProv = state._providerCaps && state._providerCaps[be];
+      if (fromProv && typeof fromProv === "object") return fromProv;
+      return (typeof PROVIDER_REF_CAPS !== "undefined" && PROVIDER_REF_CAPS[be]) || {};
+    };
     ${extractHelpers()}
     return { resolveRefCaps, maxRefCount, countRefUrls, displayRefUrls, fillRefSlotsToCap, attachExtraImages, catalogEatsRefs };
   })`);

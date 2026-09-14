@@ -7,6 +7,7 @@ Offline. Executes the real pack/gate helpers in node.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -45,7 +46,7 @@ def source_contracts():
     ok("function loraModelId" in JS, "loraModelId parses air")
     ok('payload.pop("loras", None)' not in COMPILE, "compile does not silent-pop loras")
     ok("已选 LoRA 不能静默丢掉" in COMPILE, "compile refuses residual LoRA")
-    ok("storyboard.js?v=20260910-astra-0163679" in HTML, "cache stamp")
+    ok(re.search(r'storyboard\.js\?v=[\w-]+', HTML) is not None, "cache stamp (versioned bust present)")
     ok("revalidateLorasForService()" in JS, "syncParamChrome revalidates")
 
 
@@ -94,6 +95,7 @@ function $(id) { return null; }
 function persist() {}
 function renderLoras() {}
 function setLoraNote() {}
+function falLoraUnsupportedMsg() { return ""; }
 """ + chunk + r"""
 function run(be, rows, item, supportsOverride) {
   BE = be;

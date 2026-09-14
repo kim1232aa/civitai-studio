@@ -933,6 +933,9 @@
     if (!shot.firstFrameId) return null;
     const hit = linked.find((a) => a.id === shot.firstFrameId);
     if (hit) return hit;
+    // v0821o136seko-healframe: 孤儿 firstFrameId（资产已删）愈合成当前连入的首张图——
+    // 连线即引用；只有完全没连图时才清空并交给缺首帧硬门（fail-closed 不变）。
+    if (linked.length) { shot.firstFrameId = linked[0].id; return linked[0]; }
     shot.firstFrameId = "";
     return null;
   }
@@ -2719,6 +2722,19 @@
     }
     if (top < 44) top = 44; // fallback bottom desk unused: box follows the shot
     if (top + naturalH > sr.height - bottomReserve) top = Math.max(44, sr.height - bottomReserve - naturalH);
+
+    // v0821o136seko-ui: Composer 不许压左下角 minimap；垂直区间相交时向右让位
+    const mmEl = document.querySelector(".minimap");
+    if (mmEl) {
+      const mr = mmEl.getBoundingClientRect();
+      if (mr.width > 0) {
+        const mmT = mr.top - sr.top, mmB = mr.bottom - sr.top, mmR = mr.right - sr.left;
+        const dB = top + naturalH;
+        if (dB > mmT + 4 && top < mmB - 4 && left < mmR + 8) {
+          left = Math.min(Math.max(left, mmR + 8), Math.max(railRight, sr.width - dw - 12));
+        }
+      }
+    }
 
     dock.style.setProperty("left", Math.round(left) + "px", "important");
     dock.style.setProperty("top", Math.round(top) + "px", "important");
@@ -10841,7 +10857,8 @@
   function hfLoraFixtureImport() {
     return {
       backend: "huggingface",
-      serviceId: FAL_LORA_PREF_SERVICE,
+      // v0821o136seko-hffix: 修正历史笔误——HF fixture 必须钉 HF 自家 pref，不是 Fal id
+      serviceId: HF_LORA_PREF_SERVICE,
       serviceName: "Krea 2 Turbo LoRA",
       kind: "image",
       prompt: "portrait, soft light, detailed face, cinematic",
@@ -10859,7 +10876,7 @@
   }
   async function mountHfLoraFixture() {
     closeImportModal();
-    state._pinHfLoraService = FAL_LORA_PREF_SERVICE;
+    state._pinHfLoraService = HF_LORA_PREF_SERVICE;
     const ok = await applyImport(hfLoraFixtureImport());
     ensureHfLoraServiceSelected();
     return ok;

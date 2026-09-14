@@ -27,8 +27,8 @@ assert.ok(css.includes("ref-slot-empty"), "css empty slot");
 
 const attachStart = source.indexOf("function attachExtraImages");
 const attachBody = source.slice(attachStart, source.indexOf("function setShotBusy", attachStart));
-assert.ok(attachBody.includes("urls.slice(0, cap)"), "slice to cap");
-assert.ok(attachBody.includes("payload.images = sliced"), "images bag");
+assert.ok(attachBody.includes("payload.images = urls"), "images bag (full, no silent slice)");
+assert.ok(!attachBody.includes("urls.slice(0, cap)"), "never silent-slice refs (fail-closed contract)");
 
 function extractHelpers() {
   const start = source.indexOf("const PROVIDER_REF_CAPS = {");
@@ -64,6 +64,7 @@ function harness(backend) {
     catalogById: {},
     dockMode: "expanded",
     loras: [],
+    _providerCaps: {},
   };
   const box = {
     state,
@@ -76,6 +77,7 @@ function harness(backend) {
     },
     connectedNodes(id) { return box.connectedAssets(id); },
     frameAsset() { return null; },
+    lastFrameAsset() { return null; },
     isVideoUrl() { return false; },
     catalogItemForService() {
       const sid = els.service.value;
@@ -110,6 +112,7 @@ function harness(backend) {
     const connectedAssets = this.connectedAssets.bind(this);
     const connectedNodes = this.connectedNodes.bind(this);
     const frameAsset = this.frameAsset;
+    const lastFrameAsset = this.lastFrameAsset;
     const isVideoUrl = this.isVideoUrl;
     const catalogItemForService = this.catalogItemForService.bind(this);
     const currentBackend = this.currentBackend.bind(this);
@@ -123,6 +126,14 @@ function harness(backend) {
     const setMsg = this.setMsg;
     const Event = this.Event;
     const document = this.document;
+    // providerCaps lives outside the extracted seam in storyboard.js; bind an equivalent
+    // that reads harness state first, then the block-local PROVIDER_REF_CAPS table.
+    const providerCaps = () => {
+      const be = currentBackend();
+      const fromProv = state._providerCaps && state._providerCaps[be];
+      if (fromProv && typeof fromProv === "object") return fromProv;
+      return (typeof PROVIDER_REF_CAPS !== "undefined" && PROVIDER_REF_CAPS[be]) || {};
+    };
     ${extractHelpers()}
     return {
       resolveRefCaps, maxRefCount, catalogEatsRefs, editSiblingId, applyEditSibling,
@@ -157,7 +168,7 @@ function harness(backend) {
   assert.equal(payload.input_references.length, 5, "nano input_references == 5");
 }
 
-// Magao maxRefs=1 → bag/singular length 1 (never claim 5)
+// Magao maxRefs=1 → singular mirrors first url; bag stays FULL (over-cap is a hard gate upstream, never silent-slice)
 {
   const { api, state, els } = harness("modelscope-cn");
   els.service.value = "Qwen/Qwen-Image-Edit";
@@ -177,8 +188,8 @@ function harness(backend) {
     state.edges.push({ from: a.id, to: shot.id });
   }
   const payload = api.attachExtraImages({}, shot);
-  assert.equal(payload.images.length, 1, "magao bag len 1");
-  assert.equal(payload.image_url, payload.images[0], "magao singular image_url");
+  assert.equal(payload.images.length, 3, "magao bag keeps all refs (no silent slice)");
+  assert.equal(payload.image_url, payload.images[0], "magao singular image_url = first ref");
 }
 
 // t2i + refs → hard block + one-click Edit sibling

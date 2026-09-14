@@ -33,6 +33,9 @@ function makeApi(serverGraph, nodes) {
     shotsHaveMedia() {
       return (state.nodes || []).some((n) => n && n.kind === "shot" && n.url);
     },
+    shots() {
+      return (state.nodes || []).filter((n) => n && n.kind === "shot");
+    },
     fetch: async () => ({
       ok: true,
       json: async () => ({ graph: serverGraph }),

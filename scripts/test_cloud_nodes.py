@@ -72,7 +72,9 @@ def test_chain_is_staged():
     assert_true(isinstance(img, dict) and img.get("__stageOut__") == "g", img)
 
 
-def test_hf_i2v_blocked():
+def test_hf_i2v_wired_image_url():
+    # Ruling (0163679+): HF officially takes image_url for i2v (wired via fal mapping) —
+    # compile must wire sourceImage/firstFrame into image_url, not block.
     r = g(
         backend="huggingface",
         nodes=[
@@ -81,8 +83,11 @@ def test_hf_i2v_blocked():
         ],
         edges=[{"from": "img", "fromPort": "image", "to": "v", "toPort": "image"}],
     )
-    assert_true(r.get("ok") is False, r)
-    assert_true(r.get("blocked") is True, r)
+    assert_true(r.get("ok") is True, r)
+    wiring = r.get("wiring") or {}
+    assert_true(wiring.get("i2v") == "image_url", r)
+    out = wiring.get("out") or {}
+    assert_true(out.get("image_url") == "/out/x.jpg", r)
 
 
 def test_seed_bypass_blocked():
@@ -198,7 +203,7 @@ def main():
         test_missing_image_blocked,
         test_single_i2v_payload,
         test_chain_is_staged,
-        test_hf_i2v_blocked,
+        test_hf_i2v_wired_image_url,
         test_seed_bypass_blocked,
         test_unknown_op,
         test_i2v_empty_prompt_allowed,

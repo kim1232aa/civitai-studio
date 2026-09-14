@@ -17,3 +17,4 @@ docs/hf-modelscope-listing.proposed.patch
 patch_*.py
 data/
 .test-tmp/
+node_modules
