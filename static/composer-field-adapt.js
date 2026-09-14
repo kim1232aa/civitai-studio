@@ -128,9 +128,24 @@
       loraConfidence: caps.loraConfidence || item.loraConfidence || "",
       loraChannel: caps.loraChannel || item.loraChannel || "",
       durationEnum: caps.durationEnum || item.durationEnum || null,
-      resolutionTokens: caps.resolutionTokens || sp.resolutions || item.resolutionTokens || null
+      resolutionTokens: caps.resolutionTokens || sp.resolutions || item.resolutionTokens || null,
+      officialFields: Array.isArray(sp.official_fields) ? sp.official_fields : null
     };
   }
+
+  // v0821o136seko-falschema: studio 字段 → 官方 schema 字段名候选（用于 official_fields 收紧）
+  const OFFICIAL_FIELD_MAP = {
+    negative: ["negative_prompt"],
+    seed: ["seed"],
+    steps: ["num_inference_steps", "steps"],
+    cfg: ["cfg_scale", "guidance_scale"],
+    sampler: ["sampler"],
+    scheduler: ["scheduler"],
+    duration: ["duration"],
+    aspect: ["aspect_ratio", "aspect"],
+    res: ["resolution", "size", "image_size"],
+    quantity: ["num_images", "n"]
+  };
 
   function tighten(support, next) {
     const rank = { unsupported: 0, unknown: 1, catalog: 2, supported: 3 };
@@ -176,7 +191,28 @@
     if (field === "cancel" && (caps.cancel === false || board.cancel === "unsupported")) {
       support = "unsupported";
     }
+    // v0821o136seko-falschema: 端点带官方 schema 字段表时按表收紧——
+    // 表里没有的参数标「不支持」（kling i2v 无 num_inference_steps：默认 steps 不许上船），
+    // 表里有的升级为 supported（官方背书，强于 unknown）。
+    if (Array.isArray(ic.officialFields) && ic.officialFields.length) {
+      const names = OFFICIAL_FIELD_MAP[field];
+      if (names) {
+        support = names.some(function (n) { return ic.officialFields.indexOf(n) >= 0; })
+          ? "supported" : "unsupported";
+      }
+    }
     return support;
+  }
+
+  function officialFieldAllowed(item, field) {
+    // v0821o136seko-falschema: 发送边界用的同步判定——不依赖 CSS 标记时序。
+    // 返回 true=允许发 / false=官方 schema 没有该字段 / null=无表可判（不拦）。
+    const sp = (item && typeof item.supported_parameters === "object") ? item.supported_parameters : null;
+    const of_ = sp && Array.isArray(sp.official_fields) ? sp.official_fields : null;
+    if (!of_ || !of_.length) return null;
+    const names = OFFICIAL_FIELD_MAP[field];
+    if (!names) return null;
+    return names.some(function (n) { return of_.indexOf(n) >= 0; });
   }
 
   function wrapFor(el) {
@@ -448,7 +484,9 @@
     }
     const refs = $("refs");
     if (refs && refs.querySelector) {
-      if (refs.querySelector("img, video, .chip.on, .frame-slot:not(.missing)")) return true;
+      // v0821o136seko-t2vgate: 「文生视频·不需要首帧」的 frame-slot 不是参考输入——
+      // 旧选择器 .frame-slot:not(.missing) 把它误判成 i2v 输入，魔搭 t2v 被整体误拦（实测 round2）。
+      if (refs.querySelector("img, video, .chip.on, .frame-slot:not(.missing):not(.t2v-no-frame)")) return true;
     }
     return false;
   }
@@ -547,6 +585,7 @@
     fillDurationOptions: fillDurationOptions,
     applyLoraUi: applyLoraUi,
     resolveFieldSupport: resolveFieldSupport,
+    officialFieldAllowed: officialFieldAllowed,
     applyFieldSupport: applyFieldSupport,
     applyToSurface: applyToSurface,
     filledUnsupportedMessages: filledUnsupportedMessages,

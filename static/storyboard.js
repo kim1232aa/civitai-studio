@@ -3058,7 +3058,7 @@
             '<button class="chip-btn" type="button" data-act="upload-last">上传</button>' +
             '<button class="chip-btn" type="button" data-act="pick-last">选择</button></div>';
       } else if (opNow === "t2v") {
-        frameHtml = '<div class="frame-slot">文生视频 · 不需要首帧</div>';
+        frameHtml = '<div class="frame-slot t2v-no-frame">文生视频 · 不需要首帧</div>';
       } else {
         frameHtml = '<div class="frame-slot missing">缺首帧' +
           '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
@@ -8138,7 +8138,9 @@
     const edges = [{ from: "p-" + shot.id, fromPort: "prompt", to: shot.id, toPort: "prompt" }];
     linked.forEach((a) => nodes.push({ id: a.id, op: "image", params: { url: a.url } }));
     let op = "t2i";
-    if (state.mode === "video") op = "i2v";
+    // v0821o136seko-t2vop: 与 currentGraphOp() 对齐——视频模式无首帧 = 文生视频(t2v)，
+    // 不许硬编码 i2v 让图编译层报「未连线输入口 image」这种错层错误。
+    if (state.mode === "video") op = frame ? "i2v" : "t2v";
     else if (linked[0]) op = "i2i";
     const aspect = ($("aspect") && $("aspect").value) || "16:9";
     const size = sizeFromAspectRes(aspect, ($("res") && $("res").value) || "720P");
@@ -8172,10 +8174,14 @@
     } else if (!serviceId && be === "nano-gpt") {
       serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op)) || "";
     } else if (!serviceId && be === "fal") {
-      if (op !== "i2v" && falHasLoras()) {
+      // v0821o136seko-t2vop: t2v 不许走 LoRA 图像端点解析，也不许塞 t2i 默认（flux/schnell
+      // 收视频 payload 是错层冒充）——只认目录里真 text-to-video 端点，找不到就空着硬门拦。
+      if (op !== "i2v" && op !== "t2v" && falHasLoras()) {
         const resolved = resolveFalLoraEndpointFromChips();
         serviceId = resolved.endpoint || "";
-      } else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT : FAL_T2I_DEFAULT);
+      } else serviceId = (op === "i2v" ? FAL_I2V_DEFAULT
+        : op === "t2v" ? ((typeof pickSmartServiceId === "function" && pickSmartServiceId("t2v")) || "")
+        : FAL_T2I_DEFAULT);
     }
     if (be === "huggingface") {
       serviceId = pinHfLoraServiceId(serviceId, op);
@@ -8210,6 +8216,15 @@
         genParams.aspectRatio = aspect;
       }
     } else {
+      // v0821o136seko-falschema: 发送边界同步判定——CSS 标记有异步时序，
+      // 官方 schema 字段表（official_fields）在 payload 边界再拦一次，杜绝竞赛漏发 steps/aspect。
+      const _ofItem = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+      const _ofAllow = function (f) {
+        const A = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+        if (!A || typeof A.officialFieldAllowed !== "function") return true;
+        const r = A.officialFieldAllowed(_ofItem, f);
+        return r !== false; // null=无表不拦; false=官方没有该字段
+      };
       // Image APIs take width/height. Do not pack canvas duration/aspect/resolution
       // into Fal/HF/MS t2i — those keys 400 when the endpoint schema has no such field.
       if (be === "modelscope-ai" || be === "modelscope-cn" || be === "fal" || be === "huggingface") {
@@ -8225,24 +8240,25 @@
           if (wrap && (wrap.classList.contains("param-unsupported") || wrap.classList.contains("hidden"))) return false;
           return true;
         };
-        if (_usable("steps") && comfy.steps != null) genParams.steps = comfy.steps;
-        if (_usable("cfg") && comfy.cfgScale != null) { genParams.cfgScale = comfy.cfgScale; genParams.cfg = comfy.cfg; }
-        if (_usable("sampler") && comfy.sampler) genParams.sampler = comfy.sampler;
-        if (_usable("scheduler") && comfy.scheduler) genParams.scheduler = comfy.scheduler;
+        if (_usable("steps") && _ofAllow("steps") && comfy.steps != null) genParams.steps = comfy.steps;
+        if (_usable("cfg") && _ofAllow("cfg") && comfy.cfgScale != null) { genParams.cfgScale = comfy.cfgScale; genParams.cfg = comfy.cfg; }
+        if (_usable("sampler") && _ofAllow("sampler") && comfy.sampler) genParams.sampler = comfy.sampler;
+        if (_usable("scheduler") && _ofAllow("scheduler") && comfy.scheduler) genParams.scheduler = comfy.scheduler;
       } else {
         genParams.resolution = res;
       }
       if (op === "i2v" || state.mode === "video") {
         const pc = (typeof catalogCaps === "function") ? catalogCaps() : {};
         const durEl = $("duration");
-        if (pc.videoDuration && durEl && !durEl.classList.contains("hidden") && !durationGateMessage()) {
+        if (pc.videoDuration && durEl && !durEl.classList.contains("hidden") && !durationGateMessage() && _ofAllow("duration")) {
           const durN = parseDurationSeconds(durEl.value);
           if (Number.isFinite(durN)) genParams.duration = durN;
         }
         const aspectEl = $("aspect");
         // Magao official AIGC key is size (width×height already packed). Do not also send aspect_ratio.
+        // v0821o136seko-falschema: 官方 schema 无 aspect_ratio 的端点（kling i2v）不发，服务端诚实硬门实测 400。
         if (pc.videoAspect && aspectEl && !aspectEl.classList.contains("hidden")
-            && be !== "modelscope-ai" && be !== "modelscope-cn") {
+            && be !== "modelscope-ai" && be !== "modelscope-cn" && _ofAllow("aspect")) {
           genParams.aspectRatio = aspect;
         }
       }
@@ -8263,7 +8279,8 @@
       id: shot.id, op: op,
       params: genParams,
     });
-    const ref = (op === "i2v") ? frame : linked[0];
+    // v0821o136seko-t2vop: t2v 无 image 输入口——连线资产不得偷接成 image 边（编译层会硬拒）。
+    const ref = (op === "i2v") ? frame : (op === "t2v" ? null : linked[0]);
     if (ref) edges.push({ from: ref.id, fromPort: "image", to: shot.id, toPort: "image" });
     return { backend: $("backend").value, nodes: nodes, edges: edges };
   }

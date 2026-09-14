@@ -110,10 +110,12 @@ async function waitDone(p, timeoutMs, beforeAssets, beforeShotSrc) {
       return { msg, toast, assets, shotImg, busy };
     });
     // 写回语义: 结果写进分镜卡 face（“此镜完成，已写入卡片”）或新增资产卡
+    // 裁决(2026-09-14): video 模式下 renderDock 会把 ok 级「此镜完成」重置回「首帧已就绪·可生成」(v0821j 只保 bad/warn)，
+    // 且全新 profile 下 beforeShotSrc 为空 → 改成「face 出现/变化」也算写回，不以 msg 为唯一依据。
     const wroteShot = /此镜完成|已写入卡片|出图完成|视频完成/.test(st.msg + st.toast);
-    const shotChanged = beforeShotSrc && st.shotImg && st.shotImg !== beforeShotSrc;
+    const shotChanged = !!(st.shotImg && st.shotImg !== (beforeShotSrc || ""));
     if ((wroteShot || shotChanged || st.assets > beforeAssets) && !st.busy) return { ok: true, ...st, ms: Date.now() - t0 };
-    if (/失败|错误|拒绝|不支持|缺首帧|未接|没有.*Key/i.test(st.msg + st.toast)) return { ok: false, ...st, ms: Date.now() - t0 };
+    if (/失败|错误|拒绝|不支持|缺首帧|未接|没有.*Key|等待超时|没有可预览地址/i.test(st.msg + st.toast)) return { ok: false, ...st, ms: Date.now() - t0 };
     await p.waitForTimeout(3000);
   }
   return { ok: false, timeout: true, ms: timeoutMs };

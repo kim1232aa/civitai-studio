@@ -1346,6 +1346,20 @@ class FalProvider(Provider):
     def catalog(self, q, category, status) -> dict:
         qn = (q or "").strip()
         items = [overlay_image_fields(x) for x in load_catalog()]
+        # v0821o136seko-falschema: 静态注册表带官方 required/optional schema 的端点，
+        # 把字段表并进 supported_parameters.official_fields，让 Composer 能把
+        # 「官方不收的参数」（如 kling i2v 无 num_inference_steps）标成不支持——
+        # 否则默认值随表单静默上船，被服务端诚实硬门 400 挡下（实测 round2 fal-i2v）。
+        for x in items:
+            # 行内自带 required/optional（catalog json 即注册表）——O(n) 直读，
+            # 不许逐项 find_model（每项都重读 1492 行目录文件，实测 /api/catalog 18s）。
+            req0 = x.get("required")
+            opt0 = x.get("optional")
+            if req0 or opt0:
+                sp0 = dict(x.get("supported_parameters") or {})
+                if "official_fields" not in sp0:
+                    sp0["official_fields"] = list(req0 or []) + list(opt0 or [])
+                    x["supported_parameters"] = sp0
         unfiltered = len(items)
         # Keep the full local catalog. Live search only ADDS extra ids.
         # UI filters leftover text client-side; sending q must not collapse ~1492 to 1.
