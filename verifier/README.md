@@ -10,8 +10,13 @@
 | --- | --- |
 | 766fefe | 四缺口修复 + 魔搭视频诚实化 + 测试裁决 + verifier 体系（39→61 绿零回归） |
 | 1bec2fb | Stage3 真机验收的 4 个页面 bug 修复 + 验收记录 |
+| 1c64934 | round2 三连修：NanoGPT 双字段超cap / Civitai 档位token / Fal别名越权 |
+| 4e4739b | t2v 端到端补全（graph_compile t2v op + 前端 op 对齐）+ Fal official_fields 收紧 |
+| ccc2c77 | round2 驱动：卡面 .result-error 检测 + 硬拒重发语义 |
 
 ## runs 目录
 每次验证运行追加一条记录: 时间、命令、exit code、产出文件、结论(pass/fail + 证据路径)。
 | 本轮运行记录 | 2026-09-14 04:00 | 离线单测全量回归(81 测试): 39→61 绿, 零回归; 四缺口修复 + 后端诚实化 | 见 runs/2026-09-14T0400-offline-regression.md · 766fefe |
 | 本轮运行记录 | 2026-09-14 Stage3 | 真机验收 4 个页面 bug + 六家点选 A5/6 D F | 见 runs/2026-09-14-stage3-live.md · 1bec2fb |
+| 本轮运行记录 | 2026-09-14 round2 | 九用例收官：civ/fal/nano i2i+i2v 实片、ms 诚实硬拒、hf-t2i 硬拒→重发出图、nano 视频目录、LoRA 不匹配硬拒 | 见 runs/2026-09-14-round2-live.md · 4e4739b/ccc2c77 |
+| 本轮运行记录 | 2026-09-14 t2v 回归 | graph 75/75 · UI 32/32 · o42 38 · nano 契约 106 · fal 契约 OK | 见 runs/2026-09-14-t2v-regression.md |
