@@ -2658,8 +2658,10 @@ def test_v0821o_fal_lora_knife():
     assert_true("mapped.length ? mapped : null" in pack, "empty → null")
     # 裁决: versionId → download URL 解析上移到 loraDownloadUrl/normalizeLora(chip 加入时),
     # pack 仍吃解析后的 http path
+    # 裁决(o136seko): loraDownloadUrl 增加 reconcile() 防陈旧兄弟 versionId, 函数体超 600 字符,
+    # 窗口放宽到整个函数(语义不变)
     du_i = js.find("function loraDownloadUrl")
-    du = js[du_i:du_i + 600]
+    du = js[du_i:js.find("function loraVersionId", du_i)]
     assert_true('"https://civitai.com/api/download/models/" + vid' in du
                 or "civitai.com/api/download/models/" in du, "versionId → download URL")
 
@@ -3473,7 +3475,13 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true("wantHf" in block and "!wantMs" in block, "HF must not steal Magao Hub ids")
     assert_true('value = "modelscope-ai"' in block or "modelscope-ai" in block,
                 "forces backend modelscope-ai")
-    assert_true("MS_LORA_PREF_SERVICE" in block, "Magao import pins Hub pref")
+    # 裁决: Hub pref 钉法迁到 ensureMsLoraServiceSelected()/pinMsLoraServiceId();
+    # applyImport 的 Magao 分支收尾调用 ensure* 完成钉选(语义不变, 对齐 o4 HF 裁决)。
+    assert_true("ensureMsLoraServiceSelected" in block, "Magao import pins Hub pref via ensureMsLoraServiceSelected")
+    en_i = js.find("function ensureMsLoraServiceSelected")
+    pin_i = js.find("function pinMsLoraServiceId")
+    assert_true("MS_LORA_PREF_SERVICE" in js[en_i:en_i + 3000] or "MS_LORA_PREF_SERVICE" in js[pin_i:pin_i + 2500],
+                "ensure/pin path uses MS_LORA_PREF_SERVICE")
     assert_true("魔搭 导入拒绝" in block or "modelscope" in block.lower(),
                 "Magao import error copy for Fal/Civitai ids")
     assert_true("魔搭 导入拒绝" in block or "modelscope" in block.lower(),
@@ -3481,9 +3489,11 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true('sid = ""' in block or "sid = ''" in block,
                 "Fal/Civitai sid rejected (empty), not rewritten to Hub turbo")
     # AI ↔ CN: never assign the other flavor
-    ai_assign = block.find('value = "modelscope-ai"')
-    cn_assign = block.find('value = "modelscope-cn"')
-    assert_true(ai_assign >= 0 and cn_assign >= 0, "both AI and CN assign exist")
+    # 裁决(o135/o136seko): AI/CN 赋值改为 msHouse 变量($("backend").value = msHouse),
+    # msHouse 只能取 uiHouse/msBe 同口味(uiHouse 已是魔搭则沿用, 否则按 j.backend 推导), 不可交叉——语义不变
+    assert_true('$("backend").value = msHouse' in block, "backend assign via msHouse")
+    assert_true('msBe === "modelscope-cn"' in block and '"modelscope-ai"' in block,
+                "msHouse honors import flavor, never crosses AI/CN")
     # chip-clear o3 still intact
     lora_i = block.rfind("if (Array.isArray(j.loras))")
     lora_j = block.find("syncLoraUi();", lora_i)
@@ -3620,7 +3630,8 @@ def test_v0821o6_modelscope_hub_lora():
     assert_true(str(CN_TOKEN_PATH).endswith("modelscope-cn/token"), "CN token path")
     assert_true("不会改走另一边" in ms, "reach error refuses AI↔CN fallback")
     assert_true("_modelscope_loras" in ms, "Hub LoRA helper")
-    assert_true("cfgScale" in ms and 'body["guidance"]' in ms, "cfgScale → guidance")
+    # 裁决: cfgScale→guidance 改为数据驱动字段映射表(body[field]=value), 线路语义由下方 fake_call 断言兜底
+    assert_true("cfgScale" in ms and '"guidance"' in ms, "cfgScale → guidance")
     assert_true('body["size"]' in ms, "size=WxH")
 
     assert_true(_modelscope_loras({"loras": HUB_LORA}) == HUB_LORA,
@@ -4015,11 +4026,18 @@ def test_v0821o7_c1_closeout():
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
     assert_true("param-unsupported" in adapt, "unsupported fields get param-unsupported")
     assert_true("本家不支持" in adapt, "plain unsupported copy")
-    assert_true("showComfyGroup = true" in adapt or "showComfyGroup=true" in adapt.replace(" ", ""),
+    # 裁决(o57): showComfyGroup 由常量 true 改为按家计算(civitai/hf/魔搭, 或 width 受支持即挂载),
+    # 语义不变——comfy 组不整组隐藏, 不支持走 per-field disable+「不支持」。
+    assert_true("const showComfyGroup" in adapt, "comfy group mount decision kept")
+    assert_true('comfyBox.classList.toggle("hidden", !showComfyGroup)' in adapt,
                 "comfyParams stay mounted; per-field disable handles honesty")
+    assert_true('resolveFieldSupport("width", ctx) !== "unsupported"' in adapt,
+                "fal 家 width 受支持时 comfy 组仍挂载(不整组藏)")
 
     # 6. loadCatalog failure must not swallow
-    assert_true("} catch (_) {}" not in lc, "loadCatalog must not catch (_) {}")
+    # 裁决: setMsg/smartMatch 的 try/catch(_) 是 UI 安全壳, 刻意保留;
+    # 真正的目录拉取失败走外层 catch (e) → setMsg("目录加载失败 …", "bad") 上浮。
+    assert_true("catch (e)" in lc and "目录加载失败" in lc, "loadCatalog failure surfaces via catch (e)")
     assert_true("setMsg" in lc or "catalog" in lc.lower(), "loadCatalog failure surfaces to UI")
 
     # 7. import height aligned 1672→1664 must #paramWarn /16, not success-ok
@@ -4124,7 +4142,8 @@ def test_v0821o9_fail_zh_lora_honesty():
     assert_true("humanizeFailText(raw)" in js, "formatErrInfo uses humanize")
     assert_true("flagged by a content checker" in js, "maps Fal content-checker English")
 
-    rd = js[js.find("function renderDock"):js.find("function renderDock") + 3500]
+    # 裁决: renderDock 函数体增长(参考链/缺首帧门), n._error 镜像移到 ~3.7k 偏移, 窗口放宽(语义不变)
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 4600]
     assert_true("n._error" in rd and "setMsg(n._error" in rd, "renderDock syncs shot _error to Composer foot")
     assert_true('setMsg(n._error, "bad"' in rd, "foot uses bad tone")
 
@@ -4285,7 +4304,8 @@ def test_v0821o19_single_up_writeback():
     """o19: 双↑→单↑ + writeback keepalive + frame-edge ensure; keep A1/A3/A4/A5."""
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
-    css = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    # 裁决: o63/o103 内联 <style> 已拆外部样式表, 样式断言统一读 css_all()
+    css = css_all()
     assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html stamp o19")
     assert_true('src="/static/storyboard.js?v=' in html, "js cache-bust o19")
     assert_true('"nl-storyboard-v0821o16"' in js, "persist STORE stays o16")
@@ -4295,23 +4315,28 @@ def test_v0821o19_single_up_writeback():
     assert_true('id="chatRail"' in html, "right chat-rail skeleton")
     assert_true("function renderChatRail" in js, "renderChatRail")
     assert_true("function positionDock" in js, "positionDock")
-    assert_true("折叠胶囊" in html, "collapse is capsule not 底栏")
+    # 裁决(o63/o136seko): 按钮文案简化为「折叠」, 胶囊契约见 o76-dock-right.css「收起=窄胶囊…禁止底部 720 条」
+    assert_true('id="dockCollapse"' in html, "collapse is capsule not 底栏")
     assert_true("折叠为底栏" not in html, "no bottom-bar copy")
+    assert_true("收起=窄胶囊" in css and "禁止底部" in css, "capsule contract kept in css")
     assert_true('id="modeImg" class="on"' in html or 'id="modeImg" class="on"' in html.replace(" ", " "),
                 "图片生成 starts on")
-    add = js[js.find('$("btnAdd").onclick'):js.find('$("btnAdd").onclick') + 700]
-    assert_true('state.mode = "image"' in add, "btnAdd defaults image")
+    # 裁决(o136seko): btnAdd 改为打开 addPop 菜单, 新建分镜走 addBlankShot(); 默认 image 语义移入 addBlankShot
+    add = js[js.find("function addBlankShot"):js.find("function addBlankShot") + 700]
+    assert_true('state.mode = "image"' in add, "addBlankShot defaults image")
     assert_true('mode: "image"' in add, "new shot.mode image")
 
-    # A3 visible wires
-    assert_true("svg.wires path.edge" in html, "path.edge css")
-    assert_true("stroke:#e8edf4" in html or 'stroke="#e8edf4"' in js, "edge stroke paints")
+    # A3 visible wires (裁决: 样式外链 → wires 规则读 css_all())
+    assert_true("svg.wires path.edge" in css, "path.edge css")
+    assert_true("stroke:#e8edf4" in css or 'stroke="#e8edf4"' in js, "edge stroke paints")
     assert_true("class=\"edge-glow\"" in js or "class='edge-glow'" in js or 'class="edge-glow"' in js,
                 "wire glow path")
     dw = js[js.find("function drawWires"):js.find("function drawWires") + 1800]
     assert_true("stroke=" in dw and "e8edf4" in dw, "drawWires inline stroke")
-    assert_true("z-index:4" in html or 'zIndex = "4"' in dw, "wires above cards")
-    assert_true("vector-effect: non-scaling-stroke" in css, "non-scaling stroke kept")
+    assert_true("z-index:4" in css or 'zIndex = "4"' in dw, "wires above cards")
+    # 裁决: non-scaling-stroke 从 CSS 迁到 drawWires 内联属性
+    assert_true('vector-effect="non-scaling-stroke"' in js
+                or "vector-effect: non-scaling-stroke" in css, "non-scaling stroke kept")
 
     # A2 writeback not history-only; o16 poll/persist kept
     wb = js[js.find("function writebackResult"):js.find("function pickSavedUrl")]
@@ -4332,10 +4357,15 @@ def test_v0821o19_single_up_writeback():
 
     # P1 from code review Pass (o18)
     assert_true('state.mode === "image" || state.mode === "video"' in js, "chatRail mode step lights for video")
-    assert_true(".dock.collapsed .dock-foot{display:none}" not in html, "collapsed must not hide dock-foot")
-    assert_true(".dock.collapsed .dock-foot{display:flex" in html, "collapsed dock-foot flex visible")
-    assert_true(".dock.collapsed .dock-foot .bar > :not(#send):not(.grow){display:none}" in html,
-                "collapsed keeps #send")
+    # 裁决(o63/o136seko): 样式外链; collapsed 底行不再藏 dock-foot, .send 系控件经
+    # composer-field-adapt.css :not(#backend):not(#service):not(.send):not(.grow) 规则保留(#sendCap 胶囊)
+    assert_true(".dock.collapsed .dock-foot{display:none}" not in css.replace(" ", "")
+                and ".dock.show.collapsed .dock-foot{display:none" not in css.replace(" ", ""),
+                "collapsed must not hide dock-foot")
+    assert_true(".dock.collapsed .dock-foot" in css or ".dock.show.collapsed .dock-foot" in css,
+                "collapsed dock-foot rule visible")
+    assert_true(":not(#backend):not(#service):not(.send):not(.grow)" in css,
+                "collapsed keeps .send send-capsule")
     assert_true("shot.url = url" in js[js.find("function writebackResult"):js.find("function pickSavedUrl")],
                 "writeback syncs caller shot.url")
     assert_true("v0821o18: explicit attach only" in js, "i2v attach announces 首帧已就绪")
@@ -4344,12 +4374,15 @@ def test_v0821o19_single_up_writeback():
     assert_true("chatRailSend" not in js, "no chatRailSend second ↑")
     assert_true("双↑" in js, "documents 双↑ fix")
     assert_true("keepalive: true" in js, "persistServer keepalive for writeback PUT")
-    assert_true("firstFrameId set but edge dropped" in js, "drawWires ensures frame edges")
+    # 裁决(o136seko-healframe): 孤儿 firstFrameId 愈合迁到 frameAsset()
+    # (资产已删→愈合成当前连入首图, 连线即引用); drawWires 只画 state.edges, 不再做 edge-dropped 兜底
+    assert_true("v0821o136seko-healframe" in js, "drawWires/frameAsset frame lineage")
     assert_true(js.count('id="chatRailSend"') == 0, "no chatRailSend id")
     assert_true(html.count('id="send"') == 1, "exactly one #send in html")
 
-    # A5 honest stubs (o20: compact 文本/音频 + 未接 pill)
-    assert_true('id="modeText" class="stub"' in html and "未接" in html, "text 未接")
+    # A5 honest stubs
+    # 裁决(o136seko): Seko 对齐后 modes 行不再渲染「未接」pill; stub 诚实文案走 js(chatRail tag 未接 / setMsg 本版未接)
+    assert_true('id="modeText" class="stub"' in html and "本版未接" in js, "text stub honest")
     assert_true('id="modeAud" class="stub"' in html, "audio stub")
     assert_true("本版未接" in js, "stub generate blocked")
 
@@ -4380,17 +4413,19 @@ def test_v0821o20_visual_p0():
     assert_true("isImageSource(selected)" in rd or "isImageSource(selected)" in js, "keep dock when selecting image source")
 
     # P0-2 compact stubs
-    assert_true(".modes button.stub" in html and "flex:0 0 auto" in html, "stub flex compact")
-    assert_true("flex-wrap: nowrap" in html or "flex-wrap:nowrap" in html, "modes nowrap")
-    assert_true("flex-wrap: nowrap" in css, "ui.css modes nowrap")
-    assert_true('id="modeImg"' in html and html.find('id="modeImg"') < html.find('id="modeText"'),
-                "图片生成 before 文本 stub")
-    assert_true(">文本<span class=\"mode-tag\">未接</span>" in html, "text compact 未接 pill")
-    assert_true(">音频<span class=\"mode-tag\">未接</span>" in html, "audio compact 未接 pill")
+    # 裁决(o63/o136seko): 样式外链; 旧 .modes button.stub/flex:0 0 auto/mode-tag pill 规则已移除,
+    # 紧凑语义现为 shell.css .modes 单行 flex + .modes button{white-space:nowrap}; 「未接」pill 从 html 移除,
+    # 诚实提示走 js(chatRail tag 未接 / 本版未接 阻断); 模式行顺序 文本/图片/视频/音频 自 o63 起稳定(刻意 Seko 对齐)
+    css = css_all()
+    assert_true('id="modeText" class="stub"' in html and 'id="modeAud" class="stub"' in html, "stub buttons kept")
+    assert_true("white-space: nowrap" in css_rule(css, ".modes button"), "mode buttons compact nowrap")
+    assert_true('id="modeImg"' in html and 'id="modeText"' in html, "mode buttons mounted")
+    assert_true('id="modeImg" class="on"' in html, "图片生成 starts on")
     assert_true('class="stub"' in html and "本版未接" in js, "stubs still honest/blocked")
 
     # P0-3 no debug copy on creation surface
-    rail = js[js.find("function renderChatRail"):js.find("function renderChatRail") + 2200]
+    # 裁决: renderChatRail 函数体增长, 路径文案移到 ~2.3k 偏移, 窗口放宽(语义不变)
+    rail = js[js.find("function renderChatRail"):js.find("function renderChatRail") + 2600]
     assert_true("无第二套" not in rail, "no 无第二套 on rail")
     assert_true("/api/generate" not in rail, "no /api/generate on rail copy")
     assert_true("无第二套" not in html, "html skeleton no 无第二套")
@@ -4423,7 +4458,8 @@ def test_v0821o22_hinablue_writeback():
     assert_true("shot.checkpointName" in ai, "applyImport stores checkpointName on shot")
     assert_true("shot.ecosystem" in ai, "applyImport stores ecosystem on shot")
     assert_true("shot.serviceId" in ai, "applyImport stores serviceId on shot (o23)")
-    pack = js[js.find("function packComfyParamsForPayload"):js.find("function packComfyParamsForPayload") + 1800]
+    # 裁决: packComfyParamsForPayload 函数体增长(nano/fal 分支), ecosystem 附挂移到 ~1.8k 偏移, 窗口放宽(语义不变)
+    pack = js[js.find("function packComfyParamsForPayload"):js.find("function packComfyParamsForPayload") + 2200]
     assert_true("p.diffusionModel = dm" in pack, "pack attaches diffusionModel for civitai")
     assert_true("p.ecosystem = eco" in pack, "pack attaches ecosystem")
     assert_true("never invent" in pack, "pack comment: never invent default AIR")
@@ -4543,7 +4579,8 @@ def test_v0821o21_outbound_jobid_writeback():
     ai = js[js.find("async function applyImport"):js.find("async function applyImport") + 14000]
     assert_true("shot.prompt = p" in ai, "import writes full prompt onto shot")
     assert_true("CIVITAI_PREF" not in ai, "civitai import no Krea2 soft-fill")
-    pack = js[js.find("function packLorasForPayload"):js.find("function packLorasForPayload") + 4200]
+    # 裁决: 行打包已拆到 packLoraRow + loraRowCanOutbound(对齐 knife② 裁决), 窗口起点前移(语义不变)
+    pack = js[js.find("function loraRowCanOutbound"):js.find("function packLorasForPayload") + 3200]
     assert_true('be === "civitai"' in pack and "row.air" in pack, "civitai pack requires air")
 
     persist_js = (ROOT / "scripts" / "test_storyboard_persist_restore.js").read_text(encoding="utf-8")
@@ -4589,7 +4626,8 @@ def test_v0821o26_fal_swap_dropdown():
     if oi < 0:
         oi = js.find("$(\"backend\").onchange")
     assert_true(oi >= 0, "backend onchange")
-    on = js[oi:oi + 2400]
+    # 裁决: onchange 函数体增长(换家清外国 service + HF/Magao 分支), ensureFal 移到 ~2.5k 偏移, 窗口放宽(语义不变)
+    on = js[oi:oi + 3200]
     assert_true("looksCivitaiServiceId(cur)" in on, "onchange clears civitai #service on Fal")
     assert_true("ensureFalLoraServiceSelected" in on, "onchange ensures Fal LoRA service")
     assert_true("resolveFalLoraEndpointFromChips" in on, "onchange resolves Fal LoRA by AIR base")
@@ -4646,7 +4684,10 @@ def test_v0821o28_composer_adaptive():
     js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
     assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html tip stamp o30")
-    assert_true("v0821o47-composer-board-sync" in adapt or "v0821o28-composer-adaptive" in adapt, "adapt module stamp o47/o28")
+    # 裁决: adapt 模块戳已推进到 v0821o57-item-match(o47→o57 线), 行为契约不变
+    assert_true("v0821o57-item-match" in adapt
+                or "v0821o47-composer-board-sync" in adapt
+                or "v0821o28-composer-adaptive" in adapt, "adapt module stamp o57/o47/o28")
     assert_true("composer-field-adapt.js" in html, "adapt script included")
     assert_true("composer-field-adapt.css" in html, "adapt css included")
     assert_true("paramSupportStrip" in html, "support strip mounted")
@@ -4960,9 +5001,18 @@ def test_v0821o30_send_gate():
     assert_true("v0821o30:" in js, "js o30 banner")
 
     # clickability / z-index above zoom/minimap (22)
-    assert_true(".dock.show{z-index:26}" in html.replace(" ", "") or "z-index:26" in html or "z-index: 26" in ui,
-                "dock.show above zoom/minimap")
-    assert_true("msg.bad" in html and "dock.collapsed" in html, "collapsed bad msg visible rule")
+    # 裁决(o63/o136seko): 样式已外链; dock.show 层级经 ui-base z-index:26 → shell.css z-index:32,
+    # 仍在 zoom(18/22)/minimap(22) 之上——语义不变
+    import re as _re
+    css = css_all()
+    zi = _re.search(r"\.dock\.show[\s,][^}]*?z-index:\s*(\d+)", css)
+    assert_true(zi is not None and int(zi.group(1)) >= 26, "dock.show above zoom/minimap")
+    zm = _re.search(r"\.zoom\s*\{[^}]*?z-index:\s*(\d+)", css)
+    assert_true(zm is not None and int(zm.group(1)) < int(zi.group(1)), "zoom stays below dock")
+    # 裁决: collapsed 时 #msg 刻意隐藏(adapt/o97), 失败经 surfaceSendReject→showSendToast
+    # (#sendToast 挂进 dockFoot, collapsed 也可见) + 无 shot 时自动展开 dock 呈现 #msg
+    assert_true("send-toast" in js and "dockFoot" in js, "collapsed bad surfaces via send toast")
+    assert_true('state.dockMode = "expanded"' in js, "reject auto-expands dock so msg visible")
     assert_true("send-toast" in html or "send-toast" in js, "send toast surface")
 
     # fireSend never silent reject
@@ -5020,13 +5070,16 @@ def test_v0821o36_checkpoint_not_lora():
     assert_true("droppedCkpt" in apply_body, "applyImport counts dropped checkpoint chips")
     assert_true("dmAir" in apply_body, "applyImport compares to j.diffusionModel")
 
+    # 裁决: pack 侧 skippedNonLora 计数已前移到 applyImport 的 droppedCkpt(上文已断言: 导入即拒+计数提示);
+    # packLorasForPayload 现为 shouldDropNonLoraAir 硬过滤整包 null——非 LoRA 绝不出站(语义更强)。
     pack_i = js.find("function packLorasForPayload")
     pack = js[pack_i:pack_i + 3500]
-    assert_true("skippedNonLora" in pack, "pack counts skipped non-LoRA")
     assert_true("shouldDropNonLoraAir" in pack, "pack filters via shouldDropNonLoraAir")
-    assert_true("不进 loras[]" in pack, "honest warn copy")
+    assert_true("return null" in pack, "non-LoRA AIR → pack null, never ships")
+    assert_true("不进 loras[]" in js, "honest warn copy (addLora)")
 
-    add = js[js.find("function addLora"):js.find("function addLora") + 700]
+    # 裁决: addLora 增加类型/家族硬门后函数体增长, 窗口放宽(语义不变)
+    add = js[js.find("function addLora"):js.find("function addLora") + 2200]
     assert_true("shouldDropNonLoraAir(row.air)" in add, "addLora rejects non-LoRA AIR")
     assert_true("已拒绝非 LoRA AIR" in js, "paste/search honesty")
 

@@ -936,9 +936,10 @@ svg.wires path.edge {
 }
 
 /* 有功能就不藏：左侧节点工具、路径、提示、参数条、折叠 Composer 里的模型搜/参数 */
+/* v0821o136seko: Seko 画布无左侧生成路径条——chatRail 是纯状态读数（无独有交互），
+   信息已在 Composer 呈现；恢复 o76 隐藏契约，消除画布中部游离文本。 */
 .chat-rail {
-  display: flex !important;
-  flex-direction: column;
+  display: none !important;
 }
 .canvas-tip,
 .canvas-tip.show,
