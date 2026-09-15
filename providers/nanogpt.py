@@ -1508,7 +1508,11 @@ class NanoGptProvider(Provider):
         code, data = json_call(url, headers=_auth(), timeout=30)
         if not isinstance(data, dict):
             return 502, {"error": "NanoGPT 状态无效", "id": job_id, "backend": self.id, "status": "failed"}
-        st = (data.get("status") or data.get("state") or "").lower()
+        # 实测(2026-09-15)：视频状态嵌套在内层 data.status（大写 "COMPLETED"），
+        # 成片 URL 在 data.output.video.url / data.output.videoUrls[]；
+        # 顶层没有 status 字段——旧版只读顶层导致永远 pending（真 bug，fal/seedance 两单实证）。
+        inner = data.get("data") if isinstance(data.get("data"), dict) else {}
+        st = (inner.get("status") or data.get("status") or data.get("state") or "").lower()
         mapped = {
             "pending": "pending",
             "queued": "pending",
@@ -1529,11 +1533,11 @@ class NanoGptProvider(Provider):
             "backend": self.id,
             "status": mapped,
             "wait": {
-                "progress": data.get("progress"),
+                "progress": inner.get("progress") if inner.get("progress") is not None else data.get("progress"),
                 "precedingJobs": None,
-                "etaSeconds": data.get("etaSeconds") or data.get("eta"),
+                "etaSeconds": data.get("etaSeconds") or data.get("eta") or inner.get("eta"),
                 "completeAt": None,
-                "log": (data.get("message") or data.get("error") or "")[:120] or None,
+                "log": (inner.get("error") or data.get("message") or data.get("error") or "")[:120] or None,
             },
         }
         if mapped == "succeeded":

@@ -6898,7 +6898,9 @@
       t2i: ["wavespeed-ai/krea-v2/turbo-lora", "z-image-turbo", "nvidia/cosmos-3-super/text-to-image", "openai/gpt-image-2.5/flare/text-to-image"],
       i2i: ["z-image-turbo-image-to-image", "openai/gpt-image-2.5/flare/edit", "bernini-r/edit-image", "pruna-ai/p-image/edit-lora"],
       i2v: ["minimax/h3-max/multi-angle/image-to-video", "infinitetalk", "bytedance/seedance-2.5-spicy"],
-      t2v: ["minimax/h3-max/text-to-video", "bytedance/seedance-2.5/text-to-video"],
+      // 裁决(2026-09-15): nano 目录 t2v 真实 id 无 /text-to-video 后缀（task 字段标注）——
+      // 旧 pref「minimax/h3-max/text-to-video」不在目录，pickSmartServiceId 永远落空。
+      t2v: ["minimax/h3-max", "bytedance/seedance-2.5"],
       upscale: [],
       inpaint: []
     },
@@ -7109,12 +7111,23 @@
     const fam = (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.familyFromShot)
       ? SmartFamilyMatch.familyFromShot(shot, (shot && (shot.checkpointName || shot.diffusionModel)) || "")
       : "";
-    const keepNow = (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.keepCurrent)
-      ? SmartFamilyMatch.keepCurrent({
-          currentId: sel.value, item: cur, op: op, family: fam, foreign: foreign,
-          fits: serviceFitsOp
-        })
-      : (!foreign && serviceFitsOp(cur, op));
+    // v0821o136seko-uservspick: 无底模家族信息时（普通手选/新建分镜，非帖子导入），
+    // 显式已选且适配当前 op 的模型必须保留——否则任何手选都会被重匹配偷换
+    // （实测：fal-t2v 手选 minimax/video-01 被换成 flux-3，违反「不许偷偷换模型」）。
+    // 家族严格判定只用于 fam 非空（帖子导入 D3：SDXL 帖不许留 Krea2）；
+    // 有导入底模标记但家族识别失败（fam==""）→ 维持 766fefe 的不可信方向：照常重匹配。
+    const hasImportModel = !!(shot && (shot.diffusionModel || shot.checkpointName));
+    const curForFit = cur || (sel.value ? { id: sel.value, name: sel.value } : null);
+    const keepNow = fam
+      ? ((typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.keepCurrent)
+          ? SmartFamilyMatch.keepCurrent({
+              currentId: sel.value, item: cur, op: op, family: fam, foreign: foreign,
+              fits: serviceFitsOp
+            })
+          : (!foreign && serviceFitsOp(cur, op)))
+      : (!hasImportModel && !foreign && !!sel.value && serviceFitsOp(curForFit, op));
+    // 异步搜索起跑时的选择快照——应用重匹配结果前据此再判一次用户是否已改选。
+    const sidAtStart = String(sel.value || "").trim();
     if (keepNow) {
       writeSmartMatchToShot(shot, sel.value);
       if (typeof syncOpChip === "function") syncOpChip();
@@ -7162,6 +7175,13 @@
           }
         }
         if (!row) {
+          // v0821o136seko-uservspick: 搜索无果且用户在异步期间已改选到适配模型 → 保留，不得清空。
+          const nowId0 = String(sel.value || "").trim();
+          if (nowId0 && nowId0 !== sidAtStart && serviceBelongsToBackend(nowId0, be)
+              && serviceFitsOp(catalogItemForService() || { id: nowId0, name: nowId0 }, op)) {
+            writeSmartMatchToShot(shot, nowId0);
+            return false;
+          }
           sel.value = "";
           writeSmartMatchToShot(shot, "");
           if (typeof syncOpChip === "function") syncOpChip();
@@ -7174,6 +7194,16 @@
         const want = String(row.id || row.name || "");
         const rowBe = String(row.backend || row.source || be);
         if (!want) return false;
+        // v0821o136seko-uservspick: 异步搜索期间用户可能已显式改选——应用前再判一次：
+        // 当前值较起跑时有变化、适配 op、不跨家 → 保留用户选择，放弃本次重匹配（不许偷换）。
+        const nowId = String(sel.value || "").trim();
+        if (nowId && nowId !== sidAtStart && nowId !== want && serviceBelongsToBackend(nowId, be)
+            && serviceFitsOp(catalogItemForService() || { id: nowId, name: nowId }, op)) {
+          writeSmartMatchToShot(shot, nowId);
+          try { if (typeof syncOpChip === "function") syncOpChip(); } catch (_) {}
+          try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
+          return false;
+        }
         // v0821o135: 匹配只发生在用户当前选中的家内部——任何时候导入/匹配都不许改用户选的 backend。
         injectCatalogRow(row);
         if (typeof ensureSelectOpt === "function") ensureSelectOpt(sel, want);

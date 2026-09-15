@@ -1,6 +1,6 @@
 // Stage3 round2 driver — real page clicks only. Usage:
 //   PW_VERSION_OVERRIDE=1.56.1 node round2.mjs <case> [args]
-// cases: civ-i2i | fal-i2i | nano-i2i | civ-i2v | fal-i2v | ms-video-honest | hf-t2i | nano-video-list | reload-check
+// cases: civ-i2i | fal-i2i | nano-i2i | civ-i2v | fal-i2v | civ-t2v | fal-t2v | nano-t2v | ms-video-honest | hf-t2i | nano-video-list | lora-mismatch | reload-check
 import { chromium } from "playwright";
 import { writeFileSync, existsSync } from "fs";
 
@@ -96,6 +96,26 @@ async function uploadRef(p, path) {
 async function send(p) {
   await p.click("#sendCap");
   await p.waitForTimeout(500);
+}
+
+// 裁决(2026-09-15): 端点官方 schema 无 negative_prompt 时（HF 路由子端点 / fal minimax 实测），
+// 服务端诚实硬拒「不能静默丢弃 negativePrompt」——这是铁律要的闸门。记录硬拒后按真实用户行为
+// 清空负面词重发一次（不换模型不换家），验证同模型可出片。返回最终 res。
+async function sendWithNegativeRetry(p, timeoutMs, before, beforeShot, out) {
+  await send(p);
+  let res = await waitDone(p, timeoutMs, before, beforeShot);
+  const errText = (res.cardErr || "") + (res.msg || "");
+  if (!res.ok && /未声明：negative_prompt|没有 negative_prompt|丢弃 negativePrompt/.test(errText)) {
+    out.honestReject = { msg: (res.cardErr || res.msg || "").slice(0, 160), ms: res.ms };
+    await p.evaluate(() => {
+      const neg = document.querySelector("#negative");
+      if (neg) { neg.value = ""; neg.dispatchEvent(new Event("input", { bubbles: true })); }
+    });
+    await p.waitForTimeout(500);
+    await send(p);
+    res = await waitDone(p, timeoutMs, before, beforeShot, res.cardErr || "");
+  }
+  return res;
 }
 
 async function waitDone(p, timeoutMs, beforeAssets, beforeShotSrc, beforeCardErr) {
@@ -228,6 +248,55 @@ try {
     Object.assign(out, res, { backend: be, serviceId: sid });
     await p.screenshot({ path: `${SHOTS}/${mode}-3-done.png` });
     if (res.ok) out.reload = await reloadCheck(p, before + 1, mode);
+  } else if (mode === "civ-t2v" || mode === "fal-t2v" || mode === "nano-t2v") {
+    // 文生视频实发：无首帧、无连线参考，走 t2v 图 op（v0821o136seko-t2vop 补全的链路）。
+    const be = { "civ-t2v": "civitai", "fal-t2v": "fal", "nano-t2v": "nano-gpt" }[mode];
+    const sid = {
+      "civ-t2v": "video/wan/v2.2/fal/text-to-video",
+      "fal-t2v": "fal-ai/minimax/video-01",
+      // 裁决(2026-09-15): nano 目录 t2v 真实 id 无 /text-to-video 后缀（task 字段标注）。
+      // h3-max 上游排队实测 >15min 未终态；可用 NANO_T2V_SID 环境变量换快模型（如 bytedance/seedance-2.5）。
+      "nano-t2v": process.env.NANO_T2V_SID || "minimax/h3-max",
+    }[mode];
+    await selectShot(p);
+    await setMode(p, "video");
+    // t2v 不许有首帧/残留连线参考——先点掉历史 run 累积的 chip
+    for (let i = 0; i < 12; i++) {
+      const on = await p.$("#refs .chip.on[data-asset]");
+      if (!on) break;
+      await on.click();
+      await p.waitForTimeout(300);
+    }
+    await setBackend(p, be);
+    await setService(p, sid);
+    // nano 视频模型 resolution 也是目录 token——同 i2i 分支的 nanoRes 舞曲（无该字段时自动空转）
+    if (be === "nano-gpt") {
+      await p.click("#advToggle");
+      await p.waitForTimeout(400);
+      let tok = null;
+      for (let i = 0; i < 12 && !tok; i++) {
+        tok = await p.evaluate(() => {
+          const sel = document.querySelector("#nanoRes");
+          if (!sel) return null;
+          const opt = [...sel.options].find((o) => o.value);
+          if (!opt) return null;
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+          return sel.value;
+        });
+        if (!tok) await p.waitForTimeout(1500);
+      }
+      out.nanoResToken = tok;
+    }
+    out.params = await fillSupportedParams(p);
+    await fillPrompt(p, `round2-${mode}-${STAMP}: 一只橘猫在日落沙滩上奔跑, 海浪碎金反光, 镜头随行跟拍, 电影感`);
+    await p.screenshot({ path: `${SHOTS}/${mode}-2-ready.png` });
+    const before = await countAssets(p);
+    const beforeShot = await shotSrc(p);
+    const res = await sendWithNegativeRetry(p, 600000, before, beforeShot, out);
+    Object.assign(out, res, { backend: be, serviceId: sid });
+    await p.screenshot({ path: `${SHOTS}/${mode}-3-done.png` });
+    if (res.ok) out.reload = await reloadCheck(p, before + 1, mode);
   } else if (mode === "ms-video-honest") {
     await selectShot(p);
     await setMode(p, "video");
@@ -250,21 +319,10 @@ try {
     await p.screenshot({ path: `${SHOTS}/hf-t2i-2-ready.png` });
     const before = await countAssets(p);
     const beforeShot = await shotSrc(p);
-    await send(p);
-    let res = await waitDone(p, 300000, before, beforeShot);
-    // 裁决(2026-09-14): HF Inference Providers 路由到 fal-ai 子端点，FLUX.1-schnell 官方 schema
-    // 没有 negative_prompt → 服务端诚实硬拒「拒绝丢参生成」。这正是铁律要的闸门；记录这次硬拒后，
-    // 按真实用户行为清空负面词重发一次（不换模型不换家），验证同模型可出图。
-    if (!res.ok && /端点字段表未声明[^「」]*negative_prompt|未声明：negative_prompt/.test((res.cardErr || "") + (res.msg || ""))) {
-      out.honestReject = { msg: (res.cardErr || res.msg || "").slice(0, 160), ms: res.ms };
-      await p.evaluate(() => {
-        const neg = document.querySelector("#negative");
-        if (neg) { neg.value = ""; neg.dispatchEvent(new Event("input", { bubbles: true })); }
-      });
-      await p.waitForTimeout(500);
-      await send(p);
-      res = await waitDone(p, 300000, before, beforeShot, res.cardErr || "");
-    }
+    // 裁决(2026-09-14/15): HF 路由子端点 / fal 官方 schema 无 negative_prompt → 服务端诚实硬拒
+    // 「拒绝丢参生成」。这正是铁律要的闸门；sendWithNegativeRetry 记录硬拒后按真实用户行为
+    // 清空负面词重发一次（不换模型不换家），验证同模型可出图。
+    const res = await sendWithNegativeRetry(p, 300000, before, beforeShot, out);
     Object.assign(out, res);
     await p.screenshot({ path: `${SHOTS}/hf-t2i-3-done.png` });
     if (res.ok) out.reload = await reloadCheck(p, before + 1, "hf-t2i");
