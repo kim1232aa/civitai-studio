@@ -463,6 +463,26 @@ svg.wires path.edge {
   font-size: 12px;
   color: #9a9aa3;
 }
+/* v0915seko-align-lorafold: LoRA 面板默认收起（Seko 紧凑 Composer 对齐）；
+   .lora-mini 收起本体（提示/搜索行/命中/芯片），标题行与开关常显；
+   有芯片或不匹配告警时 JS 自动展开，不藏任何状态。 */
+.lora-fold {
+  border: 0;
+  background: transparent;
+  color: #9a9aa3;
+  font-size: 11px;
+  padding: 0 4px 0 0;
+  cursor: pointer;
+  line-height: 1;
+}
+.lora-fold:hover { color: #dffcf5; }
+.dock.show .lora-block.lora-mini .lora-hint,
+.dock.show .lora-block.lora-mini #loraHint,
+.dock.show .lora-block.lora-mini .lora-row,
+.dock.show .lora-block.lora-mini .lora-hits,
+.dock.show .lora-block.lora-mini #loras {
+  display: none !important;
+}
 .dock.show .lora-hint,
 .dock.show #loraHint {
   display: block !important;
@@ -1152,6 +1172,18 @@ svg.wires path.edge {
   min-width: 0;
   flex: 1 1 auto;
 }
+/* v0915seko-align-modelcell: 模型单元紧凑化对齐 Seko 单 pill 形态——
+   「模型」文字标签视觉隐藏（保留 a11y），搜索框收窄，控件单行排布 */
+.seko-model-cell #serviceFilterLbl {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.seko-model-cell #backend { width: auto; min-width: 0; flex: 0 0 auto; }
+.seko-model-cell #serviceFilter { width: 92px; min-width: 0; flex: 0 1 auto; }
+.seko-model-cell #service { min-width: 120px; flex: 1 1 auto; }
 .svc-caps { display: inline-flex; gap: 4px; flex: 0 0 auto; }
 .svc-caps .badge {
   font-size: 10px;

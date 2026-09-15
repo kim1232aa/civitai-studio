@@ -5521,6 +5521,18 @@
         '</div></div>';
     }).join("");
   }
+  // v0915seko-align-lorafold: LoRA 面板默认收起对齐 Seko 的紧凑 Composer；
+  // 有芯片或不匹配告警时自动展开（不藏状态）；手动开关优先级最高（会话级）。
+  let loraFoldOpen = null;
+  function applyLoraFold(block, chips) {
+    const open = (loraFoldOpen !== null) ? loraFoldOpen : !!chips;
+    block.classList.toggle("lora-mini", !open);
+    const fold = $("loraFold");
+    if (fold) {
+      fold.textContent = open ? "▾" : "▸";
+      fold.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+  }
   function syncLoraUi() {
     const block = $("loraBlock");
     if (!block) return;
@@ -5529,6 +5541,7 @@
     const chips = Array.isArray(state.loras) && state.loras.length > 0;
     const support = catalogItemSupportsLora();
     block.classList.toggle("lora-unsupported", !!(chips && !support));
+    applyLoraFold(block, chips);
     const row = block.querySelector(".lora-row");
     if (row) {
       // Keep search usable so 跨家检索 → 加芯片 → 一键匹配 can run on a non-LoRA model.
@@ -6412,6 +6425,12 @@
     }
   }
   function bindLoraUi() {
+    if ($("loraFold")) $("loraFold").onclick = function () {
+      const block = $("loraBlock");
+      const nowOpen = !(block && block.classList.contains("lora-mini"));
+      loraFoldOpen = !nowOpen;
+      syncLoraUi();
+    };
     if ($("searchLora")) $("searchLora").onclick = function () { searchLoras(); };
     if ($("loraQ")) {
       $("loraQ").addEventListener("keydown", function (e) {

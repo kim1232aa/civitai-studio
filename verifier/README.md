@@ -14,6 +14,7 @@
 | 4e4739b | t2v 端到端补全（graph_compile t2v op + 前端 op 对齐）+ Fal official_fields 收紧 |
 | ccc2c77 | round2 驱动：卡面 .result-error 检测 + 硬拒重发语义 |
 | 10a3dd9 | NanoGPT 视频状态嵌套解析修复 + 智能匹配覆盖手选模型(uservspick)修复 + t2v 三家实发验证 |
+| 9c991b8 | Seko 对齐第一轮：LoRA 面板默认收起 + 模型单元紧凑化 + P0 对照差距清单入库 |
 
 ## runs 目录
 每次验证运行追加一条记录: 时间、命令、exit code、产出文件、结论(pass/fail + 证据路径)。
@@ -22,3 +23,4 @@
 | 本轮运行记录 | 2026-09-14 round2 | 九用例收官：civ/fal/nano i2i+i2v 实片、ms 诚实硬拒、hf-t2i 硬拒→重发出图、nano 视频目录、LoRA 不匹配硬拒 | 见 runs/2026-09-14-round2-live.md · 4e4739b/ccc2c77 |
 | 本轮运行记录 | 2026-09-14 t2v 回归 | graph 75/75 · UI 32/32 · o42 38 · nano 契约 106 · fal 契约 OK | 见 runs/2026-09-14-t2v-regression.md |
 | 本轮运行记录 | 2026-09-15 nano-t2v | 状态嵌套修复后两单历史任务回收落盘 + nano-t2v 页面点击全链路 ok（400s 出片硬刷保持）；回归全绿 | 见 runs/2026-09-15-nano-t2v-status-fix.md · 10a3dd9 |
+| 本轮运行记录 | 2026-09-15 Seko 对齐 r1 | LoRA 折叠 + 模型单元紧凑化；UI 32/32 · graph 75/75 · o133/o58/o59 全绿；对照截图建清单 | 见 runs/2026-09-15-seko-align-round1.md · 9c991b8 |

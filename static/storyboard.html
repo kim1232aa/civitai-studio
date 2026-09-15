@@ -185,12 +185,13 @@
       <div class="param-support-strip" id="paramSupportStrip" hidden aria-live="polite"></div>
       </div>
       <div class="dock-foot" id="dockFoot">
-      <div class="lora-block" id="loraBlock" data-sb-lora="1">
+      <div class="lora-block lora-mini" id="loraBlock" data-sb-lora="1">
         <div class="lora-hd">
+          <button type="button" class="lora-fold" id="loraFold" aria-expanded="false" aria-controls="loraRow" title="展开/收起 LoRA 面板">▸</button>
           <span class="lbl" id="loraQLbl">LoRA</span>
         </div>
         <div class="lora-hint" id="loraHint"></div>
-        <div class="lora-row">
+        <div class="lora-row" id="loraRow">
           <input id="loraQ" placeholder="名字 / URL / version id / AIR" autocomplete="off" />
           <button type="button" id="searchLora">搜索</button>
           <label class="lora-cross" id="loraCrossLbl" title="默认只在当前家搜；勾选才把别家 LoRA 混进结果"><input type="checkbox" id="loraCross" />跨家搜</label>
