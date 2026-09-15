@@ -3004,6 +3004,11 @@
       const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
       if (el) el.classList.toggle("on", state.mode === m);
     });
+    // v0916-stub-hide-model-row: 文本/音频为本版未接的 stub 模式，目录本来返回空——
+    // 把整个模型行（后端/搜索/模型下拉）与 LoRA 行视觉隐藏，只留下方状态文案
+    // 「文本生成 · 本版未接」，避免空「选择模型」下拉被误读成模型被砍。
+    const dockEl = $("dock");
+    if (dockEl) dockEl.classList.toggle("stub-mode", isStubMode());
     const list = assets();
     const linked = connectedAssets(n.id);
     const frame = frameAsset(n);
@@ -10733,6 +10738,8 @@
     });
   }
   if ($("btnImport")) $("btnImport").onclick = () => openImportModal();
+  // v0916-import-entry: Composer 动作区直接给「导入」入口（原只在左侧工具栏 ⇪，用户找不到以为被砍）
+  if ($("btnImportPost")) $("btnImportPost").onclick = () => openImportModal();
 
 
   // v0821o23: keep imported civitai serviceId honest on page↑ (live job 12100372 sent krea2 with sdxl dm).

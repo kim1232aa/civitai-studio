@@ -1087,6 +1087,7 @@
   <div class="grid" id="grid"></div>
 </main>
 
+<script src="/static/smart-family-match.js?v=20260916-familymatch"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 window.__studioGo = function (ev) {
@@ -3060,11 +3061,37 @@ function applyImport(j) {
       if (keep) {
         selectService(keep, { user: true });
       } else {
-        selected = null;
-        copyPicked(null);
-        userPickedId = null;
-        setDock('导入未精确匹配目录模型（请点选确切 id，禁止模糊/自动代点）', 'warn');
-        showPickedChip();
+        // v0916-familymatch: 精确 Hub id 落空后，与画布 smartMatchService 同源，
+        // 在当前选中家目录内按底模家族智能匹配（需求：帖子导入→家内智能匹配）。
+        // 只在当前家内匹配，绝不跨家；匹配到明示家族与目标（非精确 id），匹配不到诚实明说。
+        let famPick = null;
+        let fam = '';
+        try {
+          if (window.SmartFamilyMatch) {
+            fam = SmartFamilyMatch.familyFromImport(j) || '';
+            if (fam) {
+              const op = (recipe === 'video') ? 'i2v' : 't2i';
+              const pool = catalog.filter(it => matchRecipe(it, recipe));
+              const pid = SmartFamilyMatch.pickByFamily({
+                backend: backend, op: op, family: fam, pool: pool,
+                // §3.2 曾见跨家条目混入目录：fits 里卡 it.backend 必须等于当前家
+                fits: (it) => (!it || !it.backend || it.backend === backend) && matchRecipe(it, recipe),
+                belongs: () => true, // catalog 已是当前选中家，天然不跨家
+              });
+              if (pid) famPick = findCatalogItem(pid) || { id: pid, name: pid };
+            }
+          }
+        } catch (eFam) { famPick = null; }
+        if (famPick) {
+          selectService(famPick, { user: true });
+          setDock('导入按底模家族「' + fam + '」匹配到 ' + (famPick.name || famPick.id) + '（家内家族匹配，非精确 id；参数已铺开，自己点生成）', 'ok');
+        } else {
+          selected = null;
+          copyPicked(null);
+          userPickedId = null;
+          setDock('导入未匹配到当前家模型' + (fam ? '（底模家族「' + fam + '」在本家目录无可用项）' : '') + '（请点选确切 id，禁止模糊/自动代点）', 'warn');
+          showPickedChip();
+        }
       }
     } else {
       const keep = findCatalogItem(userPickedId);
