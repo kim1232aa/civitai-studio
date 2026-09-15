@@ -1273,3 +1273,214 @@ button.seko-cell:hover { border-color: rgba(94,224,197,.45); color: #dffcf5; }
 .card:hover .port,
 .card.sel .port,
 .card .port.snap-hot { opacity: 1; }
+
+/* ═══ v0916-seko-round2：P0 对齐第二轮 + 导入弹层补样式 ═══
+   1) P0-1/P0-2 模型 pill + 上弹选择层（控件原 id 不变，逻辑零改动）
+   2) P0-3   节点选中：白描边 + 白色 ⊕ 手柄（对齐 Seko）
+   3) P0-4   缩放条并入左下小地图组合条
+   4) 导入弹层素材卡首次完整样式（此前 .import-card/.import-grid 无样式=灰盒空壳）
+*/
+
+/* ── 1) 模型 pill + popover ─────────────────────────────── */
+.seko-model-cell { position: relative; }
+.svc-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  max-width: 300px;
+  border-radius: 16px;
+  border: 1px solid #34343e;
+  background: rgba(255,255,255,.06);
+  color: #e8e8ec; font-size: 12px; line-height: 1;
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.svc-pill:hover { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.09); }
+.svc-pill[aria-expanded="true"] { border-color: rgba(94,224,197,.55); }
+.svc-pop {
+  position: absolute; left: 0; bottom: calc(100% + 8px);
+  width: 352px; max-width: min(86vw, 352px);
+  z-index: 60;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px;
+  background: #17181d; border: 1px solid #2e3038; border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.6);
+}
+.svc-pop[hidden] { display: none !important; }
+.svc-pop-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.svc-pop #backend { flex: 0 0 128px; width: auto !important; min-width: 0; height: 30px; }
+.svc-pop #serviceFilterLbl {
+  position: static !important; width: auto !important; height: auto !important;
+  clip-path: none !important; overflow: visible !important; white-space: nowrap;
+  font-size: 11px; color: #a0a0a8;
+}
+.svc-pop #serviceFilter { flex: 1 1 auto !important; width: auto !important; min-width: 0; height: 30px; }
+.svc-pop #service {
+  width: 100% !important; min-width: 0 !important; flex: 1 1 auto !important;
+  background: #101014; border: 1px solid #2a2a30; border-radius: 10px;
+  color: #e8e8ec; font-size: 12px; padding: 4px;
+}
+.svc-pop .svc-caps { display: flex; flex-wrap: wrap; gap: 4px; min-height: 4px; }
+.svc-pop .catalog-status { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #b8a07a; }
+.svc-pop .catalog-status[hidden] { display: none !important; }
+.svc-pop .catalog-hint { flex: 1 1 auto; }
+.svc-pop .catalog-status button {
+  height: 24px; padding: 0 8px; font-size: 11px;
+  border-radius: 6px; border: 1px solid #34343e; background: #1c1c22; color: #c8c8d0; cursor: pointer;
+}
+
+/* ── 2) 节点选中态：白描边 + 白色 ⊕ 手柄 ────────────────── */
+.card.sel {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.55);
+}
+.card.sel .port {
+  width: 18px !important; height: 18px !important; margin-top: -9px !important;
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.55);
+}
+.card.sel .port.in { left: -9px; }
+.card.sel .port.out { right: -9px; }
+.card.sel .port::after {
+  content: "+";
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #17181d; font-size: 13px; font-weight: 700; line-height: 1;
+  pointer-events: none;
+}
+
+/* ── 3) 缩放条并入左下小地图组合条 ──────────────────────── */
+.zoom {
+  left: 14px !important;
+  right: auto !important;
+  transform: none !important;
+  bottom: 126px !important;
+  max-width: 248px;
+  padding: 5px 6px;
+  border-radius: 10px;
+  border: 1px solid #303034;
+  background: rgba(18,18,22,.92);
+  backdrop-filter: blur(8px);
+}
+.zoom > button, .zoom #zOut, .zoom #zIn {
+  border-color: transparent;
+  background: transparent;
+}
+.zoom > button:hover, .zoom #zOut:hover, .zoom #zIn:hover { background: #2a2a32; }
+.zoom > button.on { background: #2e3330; color: #5ee0c5; }
+
+/* ── 4) 导入弹层素材卡：首次完整样式（修「灰盒空壳」）──── */
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+.import-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 2px solid #2a2a30;
+  background: #1b1b20;
+  cursor: pointer;
+  text-align: left;
+}
+.import-card:hover { border-color: #4a4a55; }
+.import-card.on { border-color: #5ee0c5; box-shadow: 0 0 0 1px #5ee0c5; }
+.import-card img, .import-card video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.import-card .ph {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #8b93a7; background: #17181d;
+}
+.import-card .ibadge {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(10,10,14,.78);
+  color: #dffcf5; font-size: 10px; line-height: 16px;
+  pointer-events: none;
+}
+.import-card .icheck {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,.75);
+  background: rgba(10,10,14,.4);
+  pointer-events: none;
+}
+.import-card.on .icheck { background: #5ee0c5; border-color: #5ee0c5; }
+.import-card.on .icheck::after {
+  content: "✓";
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #0b0b0d; font-size: 11px; font-weight: 700;
+}
+/* 底部名称条：常驻，破图时也能分辨素材 */
+.import-card .icap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 10px 6px 4px;
+  font-size: 10px; color: #e8e8ec;
+  background: linear-gradient(transparent, rgba(0,0,0,.78));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* 破图降级占位：默认隐藏，no-thumb 时顶替被移除的 img/video */
+.import-card .iph { display: none; }
+.import-card.no-thumb .iph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px 8px 22px;
+  font-size: 11px; color: #a0a0a8; text-align: center;
+  background:
+    repeating-linear-gradient(45deg, #1b1b20 0 10px, #1e1e24 10px 20px);
+  pointer-events: none;
+}
+.import-card.no-thumb .icap { background: rgba(0,0,0,.55); }
+.import-empty { padding: 28px 12px; text-align: center; color: #a0a0a8; font-size: 13px; line-height: 1.9; }
+
+/* ── 4b) 导入弹层：页签 / 筛选胶囊 / 本地上传按钮（补齐缺失样式）── */
+.import-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.import-tabs button {
+  height: 30px; padding: 0 14px;
+  border-radius: 15px;
+  border: 1px solid #34343e;
+  background: transparent; color: #c8c8d0; font-size: 12px;
+  cursor: pointer;
+}
+.import-tabs button:hover { border-color: #4a4a55; color: #fff; }
+.import-tabs button.on { background: #ececef; border-color: #ececef; color: #171719; font-weight: 600; }
+.import-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.import-filters .pill {
+  height: 24px; padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid #34343e;
+  background: transparent; color: #a0a0a8; font-size: 11px;
+  cursor: pointer;
+}
+.import-filters .pill:hover { color: #fff; border-color: #4a4a55; }
+.import-filters .pill.on { background: rgba(94,224,197,.14); border-color: rgba(94,224,197,.5); color: #dffcf5; }
+.import-filters .spacer { flex: 1 1 auto; }
+.import-filters .local-up {
+  height: 26px; padding: 0 10px;
+  border-radius: 8px; border: 1px dashed #4a4a55;
+  background: transparent; color: #c8c8d0; font-size: 11px; cursor: pointer;
+}
+.import-filters .local-up:hover { border-color: #5ee0c5; color: #dffcf5; }
+.import-ft .ghost {
+  height: 32px; padding: 0 12px;
+  border-radius: 8px; border: 1px solid #34343e;
+  background: transparent; color: #c8c8d0; font-size: 12px; cursor: pointer;
+}
+.import-ft label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #a0a0a8; }
+.import-ft .grow { flex: 1 1 auto; }
+.import-ft .primary:disabled { opacity: .45; cursor: not-allowed; }
+.import-body { min-height: 120px; }

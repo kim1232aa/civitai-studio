@@ -3806,14 +3806,20 @@
       body.innerHTML = '<div class="import-grid">' + list.map((it) => {
         const on = !!state.importSelected[it.key];
         const badge = kindBadgeLabel(it.kind);
+        // v0916import-tiles: 懒加载 + 加载失败显式降级为「标题卡」（不再灰盒误导）；
+        // 卡片底部常驻名称条，破图时也能分辨素材。
+        const broken = ' onerror="this.onerror=null;var c=this.closest(\'.import-card\');if(c)c.classList.add(\'no-thumb\');this.remove();"';
         const media = it.kind === "video"
-          ? '<video src="' + esc(it.url) + '" muted></video>'
+          ? '<video src="' + esc(it.url) + '" muted preload="metadata"' + broken + "></video>"
           : (it.kind === "audio"
             ? '<div class="ph">♪</div>'
-            : '<img src="' + esc(it.url) + '" alt="">');
+            : '<img src="' + esc(it.url) + '" alt="" loading="lazy" decoding="async"' + broken + ">");
         return '<button type="button" class="import-card' + (on ? " on" : "") + '" data-ikey="' + esc(it.key) + '" title="' + esc(it.title) + '">' +
           '<span class="ibadge">' + esc(badge) + "</span>" +
-          '<span class="icheck"></span>' + media + "</button>";
+          '<span class="icheck"></span>' + media +
+          '<span class="icap">' + esc(it.title || it.key || "") + "</span>" +
+          '<span class="iph">' + esc(badge) + " · " + esc(it.title || "") + "</span>" +
+          "</button>";
       }).join("") + "</div>";
     }
     const visibleKeys = list.map((it) => it.key);
@@ -5529,6 +5535,19 @@
   // v0915seko-align-lorafold: LoRA 面板默认收起对齐 Seko 的紧凑 Composer；
   // 有芯片或不匹配告警时自动展开（不藏状态）；手动开关优先级最高（会话级）。
   let loraFoldOpen = null;
+  // v0916seko-pill: Composer 模型 pill 文案同步（backend · 模型名，截掉能力后缀）。
+  function syncSvcPill() {
+    const btn = $("svcPill");
+    if (!btn) return;
+    const bSel = $("backend");
+    const bTxt = (bSel && bSel.options[bSel.selectedIndex]) ? bSel.options[bSel.selectedIndex].textContent.trim() : "";
+    const se = $("service");
+    const opt = se && se.options[se.selectedIndex];
+    btn.textContent = (opt && opt.value)
+      ? ((bTxt ? bTxt + " · " : "") + String(opt.textContent || "").split(" · ")[0])
+      : "选择模型 ▾";
+    btn.title = btn.textContent;
+  }
   function applyLoraFold(block, chips) {
     const open = (loraFoldOpen !== null) ? loraFoldOpen : !!chips;
     block.classList.toggle("lora-mini", !open);
@@ -6741,9 +6760,11 @@
         _svcChunkHandle = requestAnimationFrame(function () { pump(end); });
       } else {
         _svcChunkHandle = 0;
+        try { syncSvcPill(); } catch (_) {}
       }
     }
     pump(0);
+    try { syncSvcPill(); } catch (_) {}
   }
 
   function catalogItemForService() {
@@ -9635,8 +9656,36 @@
       if (id === "quantity" || id === "aspect" || id === "res" || id === "service" || id === "backend") {
         syncSvcCaps();
         scheduleCostRefresh();
+        try { syncSvcPill(); } catch (_) {}
       }
+      if (id === "service") closeSvcPop();
     });
+  }
+  // v0916seko-pill: 模型 pill 弹层 —— 点击开关 / 点外关闭 / Esc 关闭。控件 id 不变，逻辑零改动。
+  const svcPillBtn = $("svcPill");
+  const svcPopEl = $("svcPop");
+  function closeSvcPop() {
+    if (!svcPopEl || svcPopEl.hidden) return;
+    svcPopEl.hidden = true;
+    if (svcPillBtn) svcPillBtn.setAttribute("aria-expanded", "false");
+  }
+  if (svcPillBtn && svcPopEl && !svcPillBtn._bound) {
+    svcPillBtn._bound = true;
+    svcPillBtn.addEventListener("click", () => {
+      const opening = svcPopEl.hidden;
+      svcPopEl.hidden = !opening;
+      svcPillBtn.setAttribute("aria-expanded", opening ? "true" : "false");
+      if (opening) setTimeout(() => { try { $("serviceFilter") && $("serviceFilter").focus(); } catch (_) {} }, 0);
+    });
+    document.addEventListener("click", (e) => {
+      if (svcPopEl.hidden) return;
+      if (svcPopEl.contains(e.target) || svcPillBtn.contains(e.target)) return;
+      closeSvcPop();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !svcPopEl.hidden) { closeSvcPop(); try { svcPillBtn.focus(); } catch (_) {} }
+    });
+    syncSvcPill();
   }
   function addBlankShot() {
     const n = shots().length;
@@ -11660,11 +11709,15 @@
       : { backend: "civitai", q: raw };
     const btn = $("importUrlBtn");
     if (btn) { btn.disabled = true; btn.textContent = "导入中"; }
+    // v0916import-timeout: 45s 超时兜底，避免 Civitai 慢响应时按钮永远卡「导入中」。
+    const ctrl = (typeof AbortController === "function") ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, 45000) : 0;
     try {
       const r = await fetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: ctrl ? ctrl.signal : undefined,
       });
       let j = null;
       try { j = await r.json(); } catch (_) { j = null; }
@@ -11675,8 +11728,13 @@
       closeImportModal();
       await applyImport(j);
     } catch (e) {
-      setMsg("导入失败 " + (e && e.message ? e.message : String(e)), "bad");
+      if (e && e.name === "AbortError") {
+        setMsg("导入超时（45s）：请检查网络/代理后重试", "bad");
+      } else {
+        setMsg("导入失败 " + (e && e.message ? e.message : String(e)), "bad");
+      }
     } finally {
+      if (timer) clearTimeout(timer);
       if (btn) { btn.disabled = false; btn.textContent = "导入参数"; }
     }
   }

@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/static/composer-field-adapt.css?v=o132" />
 <link rel="stylesheet" href="/static/o76-dock-right.css?v=o132" />
 <link rel="stylesheet" href="/static/o97-dock-pin.css?v=o132" />
-<link rel="stylesheet" href="/static/storyboard-shell.css?v=o136seko" />
+<link rel="stylesheet" href="/static/storyboard-shell.css?v=o137seko2" />
 </head>
 <body>
 <div class="app">
@@ -203,23 +203,31 @@
 
       <div class="bar">
         <div class="seko-row" id="sekoRow">
+          <!-- v0916-seko-pill: 模型单元收成 Seko 单 pill；原控件原id移入弹层，逻辑零改动 -->
           <span class="seko-cell seko-model-cell">
-            <select id="backend" title="服务家">
-              <option value="fal">fal</option>
-              <option value="nano-gpt">nano-gpt</option>
-              <option value="civitai">civitai</option>
-              <option value="modelscope-ai">modelscope-ai</option>
-              <option value="modelscope-cn">modelscope-cn</option>
-              <option value="huggingface">huggingface</option>
-            </select>
-            <label class="lbl" for="serviceFilter" id="serviceFilterLbl">模型</label>
-            <input id="serviceFilter" type="search" placeholder="搜索当前家的模型" autocomplete="off" />
-            <select id="service" aria-describedby="catalogHint"></select>
-            <span class="svc-caps" id="svcCaps" title="模型能力"></span>
-            <div class="catalog-status" id="catalogStatus" hidden>
-              <span class="catalog-hint" id="catalogHint" role="status" aria-live="polite"></span>
-              <button type="button" id="catalogMore" hidden>加载更多</button>
-              <button type="button" id="catalogRetry" hidden>重试本页</button>
+            <button type="button" class="svc-pill" id="svcPill" aria-haspopup="dialog" aria-expanded="false" aria-controls="svcPop" title="选择服务家与模型">选择模型 ▾</button>
+            <div class="svc-pop" id="svcPop" hidden role="dialog" aria-label="选择模型">
+              <div class="svc-pop-row">
+                <select id="backend" title="服务家">
+                  <option value="fal">fal</option>
+                  <option value="nano-gpt">nano-gpt</option>
+                  <option value="civitai">civitai</option>
+                  <option value="modelscope-ai">modelscope-ai</option>
+                  <option value="modelscope-cn">modelscope-cn</option>
+                  <option value="huggingface">huggingface</option>
+                </select>
+                <label class="lbl" for="serviceFilter" id="serviceFilterLbl">模型</label>
+                <input id="serviceFilter" type="search" placeholder="搜索当前家的模型" autocomplete="off" />
+              </div>
+              <div class="svc-pop-row">
+                <select id="service" aria-describedby="catalogHint" size="8"></select>
+              </div>
+              <span class="svc-caps" id="svcCaps" title="模型能力"></span>
+              <div class="catalog-status" id="catalogStatus" hidden>
+                <span class="catalog-hint" id="catalogHint" role="status" aria-live="polite"></span>
+                <button type="button" id="catalogMore" hidden>加载更多</button>
+                <button type="button" id="catalogRetry" hidden>重试本页</button>
+              </div>
             </div>
           </span>
           <span class="seko-cell seko-size-cell" title="比例·分辨率联动 · 也可在高级参数手动改宽高">
@@ -290,7 +298,7 @@
     </div>
     <div class="import-url-row" id="importUrlRow">
       <input id="importUrl" type="text" placeholder="Civitai 图 id / 链接，如 https://civitai.red/images/134923572" autocomplete="off" />
-      <button type="button" class="primary" id="importUrlBtn">导入参数</button>
+      <button type="button" class="primary" id="importUrlBtn" title="只取配方参数（提示词/模型/采样等）填入 Composer，不会把图片挂成附件">导入参数</button>
       <button type="button" id="btnFalLoraFix" class="dev-fixture" hidden title="开发夹具">Fal LoRA夹具</button>
       <button type="button" id="btnHfLoraFix" class="dev-fixture" hidden title="开发夹具">HF LoRA夹具</button>
       <button type="button" id="btnMsLoraFix" class="dev-fixture" hidden title="开发夹具">魔搭模型（不预置 LoRA）</button>
@@ -314,7 +322,7 @@
 <script src="/static/o61-group-hide.js?v=o75seko"></script>
 <script src="/static/smart-family-match.js?v=o133fam"></script>
 <script src="/static/prompt-bible.js?v=o136prompt"></script>
-<script src="/static/storyboard.js?v=o136seko"></script>
+<script src="/static/storyboard.js?v=o137seko2"></script>
 <script src="/static/o133-smart-match-hook.js?v=o133"></script>
 <script src="/static/o68-capability-hide.js?v=o132"></script>
 <script src="/static/o75-catalog-busy.js?v=o98busy"></script>
