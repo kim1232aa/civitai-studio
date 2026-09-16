@@ -1,6 +1,6 @@
-/* v0821o68-capability-hide — load AFTER composer-field-adapt.js + storyboard.js
+/* v0821o141-o68-lora-unknown — load AFTER composer-field-adapt.js + storyboard.js
  * If this model supports LoRA/seed/sampler/wh/duration, show the input.
- * If not, the input must not appear.
+ * Unsupported → hide. Unknown supportsLora → show as「未知」, do not bury.
  */
 (function () {
   function hide(el) {
@@ -50,13 +50,29 @@
       var svcEl = ctx.$("service");
       var svcVal = (ctx.serviceId || (svcEl && svcEl.value) || (item && item.id) || "").trim();
       var hasModel = !!(item.id || svcVal);
-      var showLora = (be === "civitai" && hasModel) || (hasModel && supportsLora === true);
+      // o141: unknown/missing supportsLora must NOT hide — show as「未知」(align o61/hints).
+      // Only bury when explicitly supportsLora===false (non-civitai).
+      var unknownLora = (supportsLora !== true && supportsLora !== false);
+      var showLora = (be === "civitai" && hasModel)
+        || (hasModel && supportsLora === true)
+        || (hasModel && be !== "civitai" && unknownLora);
       if (showLora) {
         show(loraBlock);
-        if (loraBlock && loraBlock.classList) loraBlock.classList.remove("param-lora-off");
+        if (loraBlock && loraBlock.classList) {
+          loraBlock.classList.remove("param-lora-off");
+          if (unknownLora && be !== "civitai") loraBlock.classList.add("param-unknown");
+          else loraBlock.classList.remove("param-unknown");
+        }
+        if (unknownLora && be !== "civitai") {
+          var hint = ctx.$("loraHint") || ctx.$("loraShapeHint") || document.getElementById("loraHint");
+          if (hint) hint.textContent = "未知";
+        }
       } else {
         hide(loraBlock);
-        if (loraBlock && loraBlock.classList) loraBlock.classList.add("param-lora-off");
+        if (loraBlock && loraBlock.classList) {
+          loraBlock.classList.add("param-lora-off");
+          loraBlock.classList.remove("param-unknown");
+        }
       }
 
       var strip = ctx.$("paramSupportStrip");
@@ -72,7 +88,7 @@
       }
     };
     api._o68 = true;
-    api.STAMP = "v0821o68-capability-hide";
+    api.STAMP = "v0821o141-o68-lora-unknown";
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
   else install();
