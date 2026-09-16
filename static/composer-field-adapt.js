@@ -43,7 +43,8 @@
       nanoRes: "unsupported",
       resolutionMode: "free_wh", lora: "path",
       loraConfidence: "unverified",
-      i2v: "unsupported", progress: "unsupported", cancel: "unsupported"
+      // 2026-09-16: board was stale vs official InferenceClient image_to_video + caps.i2v=image_url
+      i2v: "supported", progress: "unsupported", cancel: "unsupported"
     },
     "modelscope-ai": {
       negative: "supported", seed: "supported",
@@ -182,8 +183,12 @@
         (caps.resolution === "catalog_token" || board.resolutionMode === "catalog_token")) {
       support = "supported";
     }
-    if (field === "i2v" && (caps.i2v === "none" || board.i2v === "unsupported")) {
-      support = "unsupported";
+    if (field === "i2v") {
+      // Live provider caps win: image_url/source/… = supported; none = unsupported.
+      // Do not let a stale field-board "unsupported" override official HF i2v.
+      if (caps.i2v === "none") support = "unsupported";
+      else if (caps.i2v && caps.i2v !== "none") support = "supported";
+      else if (board.i2v === "unsupported") support = "unsupported";
     }
     if (field === "progress" && (caps.progress === "none" || board.progress === "unsupported")) {
       support = "unsupported";

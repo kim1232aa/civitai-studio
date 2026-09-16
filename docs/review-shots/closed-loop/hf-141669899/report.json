@@ -1,0 +1,92 @@
+{
+  "imageId": "141669899",
+  "backend": "huggingface",
+  "serviceId": "Wan-AI/Wan2.2-I2V-A14B",
+  "op": "i2v",
+  "promptLen": 978,
+  "jobId": null,
+  "generateStatus": 402,
+  "generateBody": {
+    "error": "You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage."
+  },
+  "submittedInput": null,
+  "posts": [
+    {
+      "sid": "Wan-AI/Wan2.2-I2V-A14B",
+      "be": "huggingface",
+      "kind": "video",
+      "task": null,
+      "promptLen": 978,
+      "promptHead": "grok film style, analog film photography, lighting and shadow, color cast, wide angel, dim backgroun",
+      "seed": 79679881871603,
+      "w": 992,
+      "h": 1760,
+      "duration": null,
+      "nLoras": 0,
+      "firstFrame": "/out/hf-i2v-141669899-still_20260916070036_91581536.jpg",
+      "images": [
+        "/out/hf-i2v-141669899-still_20260916070036_91581536.jpg"
+      ],
+      "keys": [
+        "backend",
+        "cfg",
+        "cfgScale",
+        "diffusionModel",
+        "firstFrame",
+        "height",
+        "image_url",
+        "images",
+        "kind",
+        "negativePrompt",
+        "prompt",
+        "recipe",
+        "seed",
+        "serviceId",
+        "sourceImage",
+        "steps",
+        "width"
+      ]
+    }
+  ],
+  "error": "{\"error\": \"You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage.\"}",
+  "msg": "额度不足或账单错误\n详情",
+  "writeback": false,
+  "mediaLanded": false,
+  "clearedLoras": true,
+  "note": "Cleared LoRA + excess refs (Wan i2v maxRefs=1). Original prompt from import; still as first frame.",
+  "afterImport": {
+    "promptLen": 978,
+    "promptHead": "grok film style, analog film photography, lighting and shadow, color cast, wide angel, dim backgroun",
+    "backend": "civitai",
+    "service": "image/sdcpp/zImage/turbo/createImage",
+    "seed": "79679881871603",
+    "msg": "正在加载模型目录，目录就绪后才会完成参数导入…"
+  },
+  "pinned": {
+    "svc": "Wan-AI/Wan2.2-I2V-A14B",
+    "be": "huggingface",
+    "promptLen": 978,
+    "msg": "已智能匹配图生视频 · zimage · Wan-AI/Wan2.2-I2V-A14B · 确认后点 ↑",
+    "refs": "首帧\nhf-i2v-141669899-still\n尾帧（可选）\n上传\n选择\n上传\n选择\n入库"
+  },
+  "ready": {
+    "msg": "已智能匹配图生视频 · zimage · Wan-AI/Wan2.2-I2V-A14B · 确认后点 ↑",
+    "svc": "Wan-AI/Wan2.2-I2V-A14B",
+    "be": "huggingface",
+    "promptLen": 978,
+    "nOn": 1,
+    "hasFrame": true
+  },
+  "lastSrc": "http://127.0.0.1:8765/out/modelscope-ai_2ad94576-35b7-47c4-8765-f19f6cf1fbe2_0.png",
+  "outMatches": [
+    "hf-i2v-141669899-still_20260916070036_91581536.jpg",
+    "hf-i2v-141669899-still_20260916065937_2a13c9c1.jpg",
+    "hf-i2v-141669899-still_20260916065752_baad8ace.jpg",
+    "hf-i2v-141669899-still_20260916065602_416ffb92.jpg",
+    "hf-i2v-141669899-still_20260916065336_0e776ab4.jpg",
+    "hf-i2v-141669899-still_20260916065129_fe11902e.jpg",
+    "hf-i2v-141669899-still.jpg",
+    "hf_queue_d09e134e40bc_0.json",
+    "hf_queue_d09e134e40bc_0.jpg"
+  ]
+}

@@ -650,29 +650,56 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         body["model_name"] = payload["model_name"]
     params = _prompt_body(payload)
     if params.get("negative_prompt"):
-        body["negative_prompt"] = params["negative_prompt"]
+        if not fields or "negative_prompt" in fields:
+            body["negative_prompt"] = params["negative_prompt"]
+        else:
+            raise ValueError(f"HF {pid} 端点字段表未声明 negative_prompt，拒绝丢参生成")
     if params.get("seed") is not None:
-        body["seed"] = params["seed"]
+        if not fields or "seed" in fields:
+            body["seed"] = params["seed"]
+        else:
+            raise ValueError(f"HF {pid} 端点字段表未声明 seed，拒绝丢参生成")
     if params.get("num_inference_steps"):
-        body["num_inference_steps"] = params["num_inference_steps"]
+        if not fields or "num_inference_steps" in fields:
+            body["num_inference_steps"] = params["num_inference_steps"]
+        else:
+            raise ValueError(f"HF {pid} 端点字段表未声明 num_inference_steps，拒绝丢参生成")
     if params.get("guidance_scale") is not None:
-        body["guidance_scale"] = params["guidance_scale"]
-    if params.get("width") and params.get("height"):
-        body["image_size"] = {"width": params["width"], "height": params["height"]}
-    if params.get("scheduler"):
-        body["scheduler"] = params["scheduler"]
+        if not fields or "guidance_scale" in fields:
+            body["guidance_scale"] = params["guidance_scale"]
+        else:
+            raise ValueError(f"HF {pid} 端点字段表未声明 guidance_scale，拒绝丢参生成")
     if ("width" in params) != ("height" in params):
         raise ValueError("width/height 必须一起填写")
+    # Align with fal.build_fal_input: only emit image_size when the mapped endpoint
+    # declares it. Video fal schemas (Wan i2v etc.) use resolution/aspect_ratio enums —
+    # never invent those tokens from free WxH, and never self-reject via undeclared image_size.
+    if params.get("width") and params.get("height"):
+        if not fields or "image_size" in fields:
+            body["image_size"] = {"width": params["width"], "height": params["height"]}
+    if params.get("scheduler"):
+        if not fields or "scheduler" in fields:
+            body["scheduler"] = params["scheduler"]
+        else:
+            raise ValueError(f"HF {pid} 端点字段表未声明 scheduler，拒绝丢参生成")
     for names, integer in ((("num_images", "quantity", "qty", "n"), True),
                            (("duration",), False), (("strength", "denoise"), False)):
         value = _value(payload, *names)
         if value is not None:
+            if fields and names[0] not in fields:
+                raise ValueError(
+                    f"HF {pid} 端点字段表未声明 {names[0]}，拒绝丢参生成"
+                )
             body[names[0]] = _number(value, names[0], integer=integer, minimum=1 if integer else None)
     for names in (("aspect_ratio", "aspectRatio"), ("resolution",), ("sampler",)):
         value = _value(payload, *names)
         if value is not None:
             if names[0] == "resolution" and isinstance(value, str) and re.fullmatch(r"\d+\s*[x×*]\s*\d+", value.strip()):
-                continue  # Exact numeric resolution is already encoded as image_size.
+                continue  # Exact numeric resolution is already encoded as image_size when declared.
+            if fields and names[0] not in fields:
+                raise ValueError(
+                    f"HF {pid} 端点字段表未声明 {names[0]}，拒绝丢参生成"
+                )
             body[names[0]] = value
     # A client/inferred task does not add reference support to the mapped endpoint.
     blob = pid.lower()
@@ -700,8 +727,12 @@ def _call_fal(provider: str, provider_id: str, payload: dict, key: str, timeout:
         # (including mapped fal-ai/krea-2/turbo). Never invent /lora sibling.
         fal_mod.apply_fal_loras(body, payload or {}, spec, pid)
     # Pass endpoint-specific input fields through; never silently discard a supplied field.
+    # image_url(s) already set from _references (materialized); payload may still hold /out paths.
+    skip_passthrough = {"loras", "prompt"}
+    if refs:
+        skip_passthrough |= {"image_url", "image_urls", "image", "images"}
     for field in fields.intersection(payload):
-        if payload[field] not in (None, "") and field not in ("loras", "prompt"):
+        if payload[field] not in (None, "") and field not in skip_passthrough:
             if field in body and body[field] != payload[field]:
                 raise ValueError(f"{field} 与统一参数冲突，拒绝覆盖")
             body[field] = payload[field]
