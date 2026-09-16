@@ -5942,19 +5942,37 @@
     return null;
   }
   // o151: when steps > OpenAPI max, update #steps AND show visible hint — never silent outbound-only clamp.
+  // Sticky: after clamp, keep returning the same hint so paramGateMessage (which re-calls after steps==max)
+  // does not wipe it with lower-priority adaptWarn (e.g. 本家不支持 sampler).
   function honestFalSchnellStepsClamp() {
-    if ((typeof currentBackend === "function" ? currentBackend() : "") !== "fal") return "";
+    const st = (typeof state !== "undefined") ? state : null;
+    if ((typeof currentBackend === "function" ? currentBackend() : "") !== "fal") {
+      try { if (st) st._o151FalStepsHint = ""; } catch (_) {}
+      return "";
+    }
     const mx = falStepsMax();
-    if (mx == null) return "";
+    if (mx == null) {
+      try { if (st) st._o151FalStepsHint = ""; } catch (_) {}
+      return "";
+    }
     const el = $("steps");
-    if (!el || el.value === "") return "";
+    if (!el || el.value === "") return (st && st._o151FalStepsHint) || "";
     const n = parseInt(el.value, 10);
-    if (!Number.isFinite(n) || n <= mx) return "";
+    if (!Number.isFinite(n)) return (st && st._o151FalStepsHint) || "";
+    if (n <= mx) {
+      // Already at/under max — return sticky hint from this session's prior clamp (same service).
+      const sticky = (st && st._o151FalStepsHint) || "";
+      if (sticky && n === mx) {
+        try { setParamWarn(sticky, true); } catch (_) {}
+      }
+      return sticky;
+    }
     const orig = n;
     el.value = String(mx);
     const sid = String(($("service") && $("service").value) || "");
     const label = /schnell/i.test(sid) ? "schnell" : "Fal";
     const hint = label + " 上限 " + mx + "，已从原帖 " + orig + "→" + mx;
+    try { if (st) st._o151FalStepsHint = hint; } catch (_) {}
     try { setParamWarn(hint, true); } catch (_) {}
     return hint;
   }
