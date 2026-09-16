@@ -45,8 +45,12 @@ assert.ok(/NEVER importSourceUrl/.test(js), "cardHTML comment forbids importSour
 const renderStart = js.indexOf("function renderCards()");
 const renderEnd = js.indexOf("\n  function worldBounds()", renderStart);
 const renderBody = js.slice(renderStart, renderEnd);
-assert.ok(/indexOf\(["']\/out\//.test(renderBody), "renderCards checks /out/");
+assert.ok(/isStudioOutUrl\(u\)/.test(renderBody) || /indexOf\(["']\/out\//.test(renderBody), "renderCards checks /out via isStudioOutUrl");
 assert.ok(/patchShotCardMediaDom\(n\.id/.test(renderBody), "renderCards post-pass calls patch for /out");
+assert.ok(js.includes("function isStudioOutUrl"), "isStudioOutUrl helper");
+assert.ok(js.includes("function studioOutPath"), "studioOutPath helper");
+assert.ok(/decoding["']?\s*,\s*["']sync["']/.test(js) || /setAttribute\(\s*["']decoding["']\s*,\s*["']sync["']/.test(js), "img decoding=sync");
+assert.ok(/_demotedAfterGen/.test(js), "demote 导入原图 asset after /out writeback");
 
 // --- writebackResult schedules re-patch ---
 const wbStart = js.indexOf("function writebackResult(shot, url)");

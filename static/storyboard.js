@@ -2100,8 +2100,8 @@
         }
         if (localUrl === serverUrl) continue;
         // o153: generated /out on the shot must not lose to import CDN / 导入原图 on hydrate
-        const localOut = localUrl.indexOf("/out/") === 0;
-        const serverOut = serverUrl.indexOf("/out/") === 0;
+        const localOut = (typeof isStudioOutUrl === "function") ? isStudioOutUrl(localUrl) : localUrl.indexOf("/out/") === 0;
+        const serverOut = (typeof isStudioOutUrl === "function") ? isStudioOutUrl(serverUrl) : serverUrl.indexOf("/out/") === 0;
         if (localOut && !serverOut) continue;
         // Keep local: pending PUT in flight
         if (n._pendingPut || n.pendingPut) continue;
@@ -2567,8 +2567,8 @@
       state.nodes.forEach((n) => {
         if (!n || n.kind !== "shot") return;
         const u = n.url != null ? String(n.url).trim() : "";
-        if (u.indexOf("/out/") !== 0) return;
-        patchShotCardMediaDom(n.id, u, n._urlUpdatedAt || n.urlUpdatedAt || n._facePaintTs || Date.now());
+        if (!isStudioOutUrl(u)) return;
+        patchShotCardMediaDom(n.id, studioOutPath(u) || u, n._urlUpdatedAt || n.urlUpdatedAt || n._facePaintTs || Date.now());
       });
     } catch (_) {}
   }
@@ -8942,19 +8942,23 @@
     // v0821o18: keep live.url even if a later hydrate races; always refresh dock/chat after card write.
     // v0821o153: generated /out must win over import still; patch card DOM immediately; persist clean path.
     if (!shot || !url) return;
-    const cleanUrl = String(url).trim();
+    let cleanUrl = String(url).trim();
     if (!cleanUrl) return;
     let live = nodeById(shot.id);
     if (!live) {
       if (shot.kind === "shot") state.nodes.push(shot);
       live = shot;
     }
+    // o153b: normalize absolute http://host/out/x → /out/x so guards + cache-bust always hit.
+    if (isStudioOutUrl(cleanUrl)) {
+      cleanUrl = studioOutPath(cleanUrl) || cleanUrl;
+    }
     // Import CDN / 导入原图 stays on importSourceUrl + asset — never re-take the face after gen.
-    if (live.importSourceUrl && live.importSourceUrl === cleanUrl && cleanUrl.indexOf("/out/") !== 0) {
+    if (live.importSourceUrl && live.importSourceUrl === cleanUrl && !isStudioOutUrl(cleanUrl)) {
       return;
     }
     const prev = live.url != null ? String(live.url).trim() : "";
-    if (prev.indexOf("/out/") === 0 && cleanUrl.indexOf("/out/") !== 0) {
+    if (isStudioOutUrl(prev) && !isStudioOutUrl(cleanUrl)) {
       return; // generated /out already on card — import/CDN must not win
     }
     live.url = cleanUrl;
@@ -8972,6 +8976,20 @@
       state.edges.push({ from: frame.id, to: live.id });
     }
     pushHistoryItem(cleanUrl, (live.title || "分镜") + (isVideoUrl(cleanUrl) ? "视频" : "成片"));
+    // o153b: after /out lands, demote 导入原图 asset so it cannot sit on / look like the shot face.
+    if (isStudioOutUrl(cleanUrl)) {
+      try {
+        (state.nodes || []).forEach(function (a) {
+          if (!a || a.kind === "shot" || a.kind === "text") return;
+          if (a.source !== "import" && a.title !== "导入原图") return;
+          const sameUrl = live.importSourceUrl && a.url === live.importSourceUrl;
+          if (!sameUrl && a.title !== "导入原图") return;
+          a._demotedAfterGen = true;
+          a.y = (live.y || 0) + (box(live).h || 280) + 48;
+          a.x = (live.x || 0) - 40;
+        });
+      } catch (_) {}
+    }
     renderRail();
     if (typeof renderChatRail === "function") renderChatRail();
     live._facePaintTs = nowTs;
@@ -9002,13 +9020,35 @@
     else if (shot && shot._jobId) clearPendingJob(shot._jobId);
   }
 
+  /** o153b: true for relative /out/x or absolute …/out/x (browser resolves img.src to absolute). */
+  function isStudioOutUrl(url) {
+    const u = String(url || "").trim();
+    if (!u) return false;
+    if (u.indexOf("/out/") === 0) return true;
+    try {
+      const path = u.charAt(0) === "/" ? u : (new URL(u, "http://local.invalid")).pathname;
+      return path.indexOf("/out/") === 0;
+    } catch (_) {
+      return /\/out\/[^/?#]+/.test(u);
+    }
+  }
+
+  /** o153b: persist/compare as clean relative /out/<file> (strip origin + query). */
+  function studioOutPath(url) {
+    const u = String(url || "").trim();
+    if (!u) return "";
+    const m = u.match(/\/out\/[^/?#]+/);
+    return m ? m[0] : u;
+  }
+
   /** o153: display src for card img — cache-bust /out so stale import bytes cannot stick. Persist keeps cleanUrl. */
   function displayMediaSrc(url, bustTs) {
     const u = String(url || "").trim();
     if (!u) return "";
-    if (u.indexOf("/out/") !== 0) return u;
+    if (!isStudioOutUrl(u)) return u;
+    const path = studioOutPath(u) || u;
     const ts = bustTs || Date.now();
-    return u + (u.indexOf("?") >= 0 ? "&" : "?") + "_wb=" + ts;
+    return path + (path.indexOf("?") >= 0 ? "&" : "?") + "_wb=" + ts;
   }
 
   /** o153b: hard-reset .card.shot .face media so visible pixels are /out, not a reused import bitmap. */
@@ -9039,10 +9079,23 @@
     } else {
       media = document.createElement("img");
       media.alt = "";
+      try { media.setAttribute("decoding", "sync"); } catch (_) {}
+      try { media.setAttribute("loading", "eager"); } catch (_) {}
       face.appendChild(media);
       // Force network/decode reload even if browser thinks src is unchanged.
       try { media.removeAttribute("src"); } catch (_) {}
       media.src = shown;
+      try {
+        const expect = studioOutPath(clean) || clean;
+        media.onload = function () {
+          try {
+            const now = String(media.getAttribute("src") || media.src || "");
+            if (expect && now.indexOf(expect) < 0) {
+              media.src = displayMediaSrc(expect, Date.now());
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
       try {
         if (typeof media.decode === "function") {
           media.decode().catch(function () {});
@@ -12962,6 +13015,8 @@
       // o153 harness: afterSrc must come from real card DOM
       cardMediaSrcFromDom: cardMediaSrcFromDom,
       patchShotCardMediaDom: patchShotCardMediaDom,
+      isStudioOutUrl: isStudioOutUrl,
+      studioOutPath: studioOutPath,
       writebackResult: writebackResult,
     };
   }
