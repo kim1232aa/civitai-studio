@@ -17,11 +17,11 @@ const capsPy = fs.readFileSync(path.join(root, "providers/six_catalog_caps.py"),
 assert.ok(source.includes("v0821o151-fal-schnell-steps-honest"), "js stamp o151");
 assert.ok(
   html.includes("v0821o151-fal-schnell-steps-honest")
-    || html.includes("v0821o152-nano-aspect-matches-size")
+    || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card")
     || html.includes("o152nano"),
   "html stamp o151 or successor"
 );
-assert.ok(/storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano/.test(html), "cache bust o151+");
+assert.ok(/storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html), "cache bust o151+");
 
 // --- FE contracts ---
 assert.ok(source.includes("function falStepsMax("), "falStepsMax helper");

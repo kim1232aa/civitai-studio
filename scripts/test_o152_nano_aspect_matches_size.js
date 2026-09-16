@@ -13,8 +13,8 @@ const nanoPy = fs.readFileSync(path.join(root, "providers/nanogpt.py"), "utf8");
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o152-nano-aspect-matches-size"), "js stamp o152");
-assert.ok(html.includes("v0821o152-nano-aspect-matches-size"), "html stamp o152");
-assert.ok(/storyboard\.js\?v=o152nano/.test(html), "cache bust o152nano");
+assert.ok(html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card"), "html stamp o152");
+assert.ok(/storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html), "cache bust o152nano");
 
 // --- FE: pack aspect with nano resolution token ---
 assert.ok(source.includes("o152: keep size token"), "nano buildGraph o152 comment");

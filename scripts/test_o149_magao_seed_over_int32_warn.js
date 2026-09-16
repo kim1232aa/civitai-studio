@@ -15,8 +15,8 @@ const msPy = fs.readFileSync(path.join(root, "providers/modelscope.py"), "utf8")
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o149b-magao-seed-warn-not-block"), "js stamp");
-assert.ok(html.includes("v0821o149b-magao-seed-warn-not-block") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("o152nano"), "html stamp o149 or successor");
-assert.ok(/storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano|storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano/.test(html), "cache bust o149 or successor");
+assert.ok(html.includes("v0821o149b-magao-seed-warn-not-block") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o151b-fal-steps-hint-sticky") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("o152nano"), "html stamp o149 or successor");
+assert.ok(/storyboard\.js\?v=o149bseed|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o150nano|storyboard\.js\?v=o151bsticky|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html), "cache bust o149 or successor");
 
 // --- UI must explicitly show 超魔搭区间; never silent -1 rewrite ---
 assert.ok(source.includes("超魔搭区间"), "UI note 超魔搭区间");

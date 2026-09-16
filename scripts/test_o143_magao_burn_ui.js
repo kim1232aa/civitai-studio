@@ -16,11 +16,11 @@ const css = fs.readFileSync(path.join(root, "static/storyboard-ui.css"), "utf8")
 assert.ok(js.includes("v0821o143-magao-burn-ui"), "js stamp");
 // html stamp/cache may advance (o144+); o143 contracts live in js/o68/css
 assert.ok(
-  html.includes("v0821o143-magao-burn-ui") || html.includes("v0821o144-adv-default-open") || html.includes("v0821o145-smart-match") || html.includes("v0821o146-canvas-hydrate-scope") || html.includes("v0821o147-house-first-after-import") || html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("v0821o149b-magao-seed-warn-not-block") || html.includes("v0821o150-nano-prompt-limit-warn"),
+  html.includes("v0821o143-magao-burn-ui") || html.includes("v0821o144-adv-default-open") || html.includes("v0821o145-smart-match") || html.includes("v0821o146-canvas-hydrate-scope") || html.includes("v0821o147-house-first-after-import") || html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("v0821o149b-magao-seed-warn-not-block") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o151b-fal-steps-hint-sticky") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card"),
   "html stamp o143 or successor"
 );
 assert.ok(
-  /storyboard\.js\?v=o143burn|storyboard\.js\?v=o144adv|storyboard\.js\?v=o145match|storyboard\.js\?v=o146canvas|storyboard\.js\?v=o147house|storyboard\.js\?v=o148magao|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano/.test(html),
+  /storyboard\.js\?v=o143burn|storyboard\.js\?v=o144adv|storyboard\.js\?v=o145match|storyboard\.js\?v=o146canvas|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o147house|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o148magao|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o150nano|storyboard\.js\?v=o151bsticky|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html),
   "cache bust o143 or successor"
 );
 assert.ok(

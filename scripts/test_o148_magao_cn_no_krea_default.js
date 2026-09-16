@@ -15,8 +15,8 @@ const Fam = require(path.join(root, "static/smart-family-match.js"));
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o148-magao-cn-catalog-tongyi"), "js stamp");
-assert.ok(html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("o150nano"), "html stamp o148 or successor");
-assert.ok(/storyboard\.js\?v=o148magao|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano/.test(html), "cache bust o148 or successor");
+assert.ok(html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o151b-fal-steps-hint-sticky") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("o150nano"), "html stamp o148 or successor");
+assert.ok(/storyboard\.js\?v=o148magao|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o150nano|storyboard\.js\?v=o151bsticky|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html), "cache bust o148 or successor");
 
 // --- no Krea invent as Magao SMART_PREF / pin default ---
 assert.ok(source.includes('const MS_T2I_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo"'), "Tongyi pref const");

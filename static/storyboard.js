@@ -43,6 +43,7 @@
   // v0821o150-nano-prompt-limit-warn o150nano 20260916-o150: Nano live counter 上限/剩余/超N字; over blocks ↑; never silent truncate; measured 400
   // v0821o151-fal-schnell-steps-honest o151fal 20260916-o151: Fal schnell steps max 12 — update #steps + hint「schnell 上限 12，已从原帖 20→12」; never silent clamp
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
+  // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -2097,6 +2098,10 @@
           continue;
         }
         if (localUrl === serverUrl) continue;
+        // o153: generated /out on the shot must not lose to import CDN / 导入原图 on hydrate
+        const localOut = localUrl.indexOf("/out/") === 0;
+        const serverOut = serverUrl.indexOf("/out/") === 0;
+        if (localOut && !serverOut) continue;
         // Keep local: pending PUT in flight
         if (n._pendingPut || n.pendingPut) continue;
         const localTs = shotUrlMtime(n);
@@ -2105,6 +2110,10 @@
         if (localTs > serverTs) continue;
         if (localTs > 0 && serverTs === 0) continue;
         // Adopt server when fresher, or both missing mtime (stale LS → server wins when fresher/unknown)
+        // o153: never adopt import CDN onto a shot that already has (or is about to keep) generated media intent
+        if (!serverOut && n.importSourceUrl && serverUrl === n.importSourceUrl) {
+          continue;
+        }
         n.url = serverUrl;
         if (serverTs) {
           n._urlUpdatedAt = o._urlUpdatedAt != null ? o._urlUpdatedAt : o.urlUpdatedAt;
@@ -2423,10 +2432,14 @@
     }
     if (n.kind === "shot") {
       const emptyShell = !n.url && !n._error && !n._busy;
+      // o153: paint generated /out with stable cache-bust from urlUpdatedAt so import bytes cannot stick
+      const faceSrc = (typeof displayMediaSrc === "function")
+        ? displayMediaSrc(n.url, n._urlUpdatedAt || n.urlUpdatedAt)
+        : n.url;
       const media = n.url
         ? (isVideoUrl(n.url)
-            ? '<video src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
-            : '<img src="' + esc(n.url) + '" alt="">')
+            ? '<video src="' + esc(faceSrc) + '" muted playsinline preload="metadata"></video>'
+            : '<img src="' + esc(faceSrc) + '" alt="">')
         : n._error
           ? '<div class="result-error"><strong>生成失败</strong><span>' + esc(n._error) + '</span>'
             + (n._errorDetail
@@ -8910,14 +8923,27 @@
     // canvas clones still require 入库 / 拖到画布 / explicit pin — never auto-promote.
     // v0821o16: re-attach orphan shot into state.nodes before persist/PUT (avoid empty nodes 400).
     // v0821o18: keep live.url even if a later hydrate races; always refresh dock/chat after card write.
+    // v0821o153: generated /out must win over import still; patch card DOM immediately; persist clean path.
     if (!shot || !url) return;
+    const cleanUrl = String(url).trim();
+    if (!cleanUrl) return;
     let live = nodeById(shot.id);
     if (!live) {
       if (shot.kind === "shot") state.nodes.push(shot);
       live = shot;
     }
-    live.url = url;
-    shot.url = url; // keep caller reference in sync (poll path may hold stale shot obj)
+    // Import CDN / 导入原图 stays on importSourceUrl + asset — never re-take the face after gen.
+    if (live.importSourceUrl && live.importSourceUrl === cleanUrl && cleanUrl.indexOf("/out/") !== 0) {
+      return;
+    }
+    const prev = live.url != null ? String(live.url).trim() : "";
+    if (prev.indexOf("/out/") === 0 && cleanUrl.indexOf("/out/") !== 0) {
+      return; // generated /out already on card — import/CDN must not win
+    }
+    live.url = cleanUrl;
+    shot.url = cleanUrl; // keep caller reference in sync (poll path may hold stale shot obj)
+    live._resultUrl = cleanUrl;
+    shot._resultUrl = cleanUrl;
     const nowTs = Date.now();
     live._urlUpdatedAt = nowTs;
     live.urlUpdatedAt = nowTs;
@@ -8928,15 +8954,74 @@
     if (frame && frame.id && !(state.edges || []).some((e) => e.from === frame.id && e.to === live.id)) {
       state.edges.push({ from: frame.id, to: live.id });
     }
-    pushHistoryItem(url, (live.title || "分镜") + (isVideoUrl(url) ? "视频" : "成片"));
+    pushHistoryItem(cleanUrl, (live.title || "分镜") + (isVideoUrl(cleanUrl) ? "视频" : "成片"));
     renderRail();
     if (typeof renderChatRail === "function") renderChatRail();
     try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+    // o153: force the painted card face to the new /out immediately (cache-bust display only).
+    try { patchShotCardMediaDom(live.id, cleanUrl, nowTs); } catch (_) {}
     persist();
     persistServer();
     if (typeof persistActiveCanvas === "function") persistActiveCanvas();
     if (live && live._jobId) clearPendingJob(live._jobId);
     else if (shot && shot._jobId) clearPendingJob(shot._jobId);
+  }
+
+  /** o153: display src for card img — cache-bust /out so stale import bytes cannot stick. Persist keeps cleanUrl. */
+  function displayMediaSrc(url, bustTs) {
+    const u = String(url || "").trim();
+    if (!u) return "";
+    if (u.indexOf("/out/") !== 0) return u;
+    const ts = bustTs || Date.now();
+    return u + (u.indexOf("?") >= 0 ? "&" : "?") + "_wb=" + ts;
+  }
+
+  /** o153: patch .card.shot .face media from real DOM (harness afterSrc reads this). */
+  function patchShotCardMediaDom(shotId, url, bustTs) {
+    const sid = String(shotId || "").trim();
+    const clean = String(url || "").trim();
+    if (!sid || !clean || !world) return false;
+    const card = world.querySelector('.card.shot[data-id="' + sid + '"]');
+    if (!card) return false;
+    const face = card.querySelector(".face");
+    if (!face) return false;
+    const shown = displayMediaSrc(clean, bustTs);
+    let media = face.querySelector("img, video");
+    if (isVideoUrl(clean)) {
+      if (!media || media.tagName !== "VIDEO") {
+        face.innerHTML = "";
+        media = document.createElement("video");
+        media.setAttribute("muted", "");
+        media.setAttribute("playsinline", "");
+        media.setAttribute("preload", "metadata");
+        face.appendChild(media);
+      }
+      media.src = shown;
+    } else {
+      if (!media || media.tagName !== "IMG") {
+        face.innerHTML = "";
+        media = document.createElement("img");
+        media.alt = "";
+        face.appendChild(media);
+      }
+      media.src = shown;
+    }
+    card.classList.remove("shot-empty-shell");
+    card.setAttribute("data-empty-shell", "0");
+    return true;
+  }
+
+  /** o153: read afterSrc from real card DOM only — never from constructed JSON / shot.url alone. */
+  function cardMediaSrcFromDom(shotId) {
+    const sid = String(shotId || "").trim();
+    if (!sid || !world) return "";
+    const card = world.querySelector('.card.shot[data-id="' + sid + '"]');
+    if (!card) return "";
+    const media = card.querySelector(".face img, .face video");
+    if (!media) return "";
+    const raw = String(media.currentSrc || media.getAttribute("src") || media.src || "").trim();
+    // Strip display cache-bust so callers compare clean /out/<job>_0.jpg
+    return raw.replace(/([?&])_wb=\d+/, "").replace(/\?$/, "").replace(/&$/, "");
   }
 
   function pickSavedUrl(data) {
@@ -11648,6 +11733,17 @@
     });
     if (!url) return null;
     if (!/^https?:\/\//i.test(url) && url.indexOf("/out/") !== 0 && url.indexOf("data:") !== 0) return null;
+    // o153: import still = source/reference metadata only. Never paint it as shot.url
+    // (generated /out must own the card face after poll/save).
+    shot.importSourceUrl = url;
+    // If this shot already has generated /out media, keep it — import must not win.
+    const existing = shot.url != null ? String(shot.url).trim() : "";
+    if (existing && existing.indexOf("/out/") === 0) {
+      // still mount the asset nearby as reference, but do not touch shot.url
+    } else if (existing && existing === url) {
+      // stale preview equal to import — clear so empty shell waits for generation
+      shot.url = "";
+    }
     let asset = state.nodes.find(function (n) {
       return n && n.kind !== "shot" && n.kind !== "text" && n.url === url;
     });
@@ -12812,6 +12908,10 @@
       importStillUrl: importStillUrl,
       mountImportStillOnShot: mountImportStillOnShot,
       catalogEatsRefs: catalogEatsRefs,
+      // o153 harness: afterSrc must come from real card DOM
+      cardMediaSrcFromDom: cardMediaSrcFromDom,
+      patchShotCardMediaDom: patchShotCardMediaDom,
+      writebackResult: writebackResult,
     };
   }
   window.__sekoDeleteNode = deleteNode;

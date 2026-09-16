@@ -15,8 +15,8 @@ const capsPy = fs.readFileSync(path.join(root, "providers/six_catalog_caps.py"),
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o150-nano-prompt-limit-warn"), "js stamp");
-assert.ok(html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("o152nano"), "html stamp o150 or successor");
-assert.ok(/storyboard\.js\?v=o150nano|storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano/.test(html), "cache bust o150 or successor");
+assert.ok(html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o151b-fal-steps-hint-sticky") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o153-result-writeback-original-card") || html.includes("v0821o151-fal-schnell-steps-honest") || html.includes("v0821o152-nano-aspect-matches-size") || html.includes("v0821o153-result-writeback-original-card") || html.includes("o152nano"), "html stamp o150 or successor");
+assert.ok(/storyboard\.js\?v=o150nano|storyboard\.js\?v=o151bsticky|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback|storyboard\.js\?v=o151fal|storyboard\.js\?v=o152nano|storyboard\.js\?v=o153writeback/.test(html), "cache bust o150 or successor");
 assert.ok(html.includes('id="nanoPromptCount"'), "live counter element");
 
 // --- UI: live remaining / over-by-N; block ↑; never truncate ---
