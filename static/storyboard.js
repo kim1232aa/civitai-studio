@@ -39,6 +39,7 @@
   // v0821o146-canvas-hydrate-scope o146canvas 20260916-o146: canvas-scoped boards never applyGraph(house) — stops Magao dirty revive on blank/burn canvases
   // v0821o147-house-first-after-import o147house 20260916-o147: 先认家 — lock selected house on import; civitai post never flashes fal/schnell; match only in-house
   // v0821o148-magao-cn-catalog-tongyi o148magao 20260916-o148: Magao CN pin-first catalog + never invent Krea-2-Turbo; house-first afterImport mounts Tongyi for zimage
+  // v0821o149-magao-seed-over-int32-warn o149seed 20260916-o149: Magao over-int32 seed keeps real value +「超魔搭区间」; outbound omit (no silent -1 / no wrap)
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -1535,7 +1536,8 @@
     if (p.sampler && $("sampler")) ensureSelectOpt($("sampler"), p.sampler);
     if (p.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), p.scheduler);
     if (p.seed != null && $("seed")) {
-      $("seed").value = p.seed;
+      // o149: preserve full seed digits on restore — Magao over-int32 must not become silent -1
+      $("seed").value = String(p.seed);
       $("seed").title = String(p.seed);
     }
     if (p.nanoRes && $("nanoRes")) ensureSelectOpt($("nanoRes"), p.nanoRes);
@@ -6011,16 +6013,38 @@
     const seedEl = $("seed");
     const seedRaw = seedEl ? String(seedEl.value || "").trim() : "";
     const seedSpec = caps.seed || {};
-    if (seedRaw && seedRaw !== "random" && seedSpec && (seedSpec.min != null || seedSpec.max != null)) {
+    // o149: Magao over-int32 → keep real seed visible +「超魔搭区间」(never silent rewrite to -1)
+    const magaoSeed = (typeof isModelscopeBe === "function" && isModelscopeBe())
+      || (function () {
+        const b = (typeof currentBackend === "function") ? currentBackend() : "";
+        return b === "modelscope-ai" || b === "modelscope-cn";
+      })();
+    const MAGAO_SEED_MAX = 2147483647;
+    if (seedRaw && seedRaw !== "random") {
       const n = Number(seedRaw);
       if (Number.isFinite(n)) {
-        const lo = seedSpec.min;
-        const hi = seedSpec.max;
-        const over = (lo != null && n < lo) || (hi != null && n > hi);
-        markOver(seedEl, over);
-        if (over) {
-          msgs.push("种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）");
+        let over = false;
+        let note = "";
+        if (magaoSeed) {
+          // Official Magao send range [0, int32]; -1/random = omit. Over-int32 must warn explicitly.
+          if (n !== -1 && (n < -1 || n > MAGAO_SEED_MAX)) {
+            over = true;
+            note = "超魔搭区间";
+          }
+        } else if (seedSpec && (seedSpec.min != null || seedSpec.max != null)) {
+          const lo = seedSpec.min;
+          const hi = seedSpec.max;
+          over = (lo != null && n < lo) || (hi != null && n > hi);
+          if (over) {
+            note = "种子 " + n + " 超出范围 " + (lo == null ? "-∞" : lo) + "…" + (hi == null ? "∞" : hi) + "，请改值后再生成（不静默取模）";
+          }
         }
+        markOver(seedEl, over);
+        if (over && note) msgs.push(note);
+        // Never rewrite the input to -1 when over Magao int32 — keep original digits.
+        if (seedEl && seedEl.value !== seedRaw) seedEl.value = seedRaw;
+      } else {
+        markOver(seedEl, false);
       }
     } else {
       markOver(seedEl, false);
@@ -6193,7 +6217,8 @@
     if (src.sampler && $("sampler")) ensureSelectOpt($("sampler"), src.sampler);
     if (src.scheduler && $("scheduler")) ensureSelectOpt($("scheduler"), src.scheduler);
     if (src.seed != null && $("seed")) {
-      $("seed").value = src.seed;
+      // o149: keep full numeric string (Civitai/import may exceed Magao int32); never silent -1
+      $("seed").value = String(src.seed);
       $("seed").title = String(src.seed);
     }
   }
@@ -9160,6 +9185,13 @@
     if (payload && payload.seed != null) {
       const seedNum = Number(payload.seed);
       if (!Number.isFinite(seedNum) || seedNum < 0) delete payload.seed;
+      // o149: Magao official omit when over int32 — never wrap, never invent
+      else {
+        const beOut = (typeof currentBackend === "function") ? currentBackend() : "";
+        const magaoOut = beOut === "modelscope-ai" || beOut === "modelscope-cn"
+          || (typeof isModelscopeBe === "function" && isModelscopeBe());
+        if (magaoOut && seedNum > 2147483647) delete payload.seed;
+      }
     }
     setShotBusy(shot, true);
     shot._error = "";

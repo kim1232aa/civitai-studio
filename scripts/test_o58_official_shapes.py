@@ -69,11 +69,16 @@ class ModelScopeSeed(unittest.TestCase):
         self.assertEqual(official_seed_outbound(42), 42)
         self.assertNotIn("seed", strip_unofficial_seed({"prompt": "a", "seed": -1}))
 
-    def test_reject_wrap(self):
-        from providers.modelscope_seed import official_seed_outbound
+    def test_omit_over_int32_no_wrap(self):
+        # o149: over-int32 omits (official Magao), never wraps / never invents
+        from providers.modelscope_seed import official_seed_outbound, strip_unofficial_seed
 
+        self.assertIsNone(official_seed_outbound(2147483648))
+        self.assertIsNone(official_seed_outbound(4294967295))
+        self.assertEqual(official_seed_outbound(2147483647), 2147483647)
+        self.assertNotIn("seed", strip_unofficial_seed({"prompt": "a", "seed": 2147483648}))
         with self.assertRaises(ValueError):
-            official_seed_outbound(2147483648)
+            official_seed_outbound(-2)
 
 
 class FalNanoCatalogNoInventedGates(unittest.TestCase):

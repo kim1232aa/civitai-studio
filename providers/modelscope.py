@@ -120,7 +120,11 @@ def _number(raw, field, *, integer=False, minimum=None, maximum=None):
 
 
 def _clamp_seed(raw):
-    """Historical name retained for callers; now rejects, never wraps int32."""
+    """Historical name retained for callers; rejects out-of-band, never wraps int32.
+
+    o149: generate path uses official_seed_outbound (omit over-int32 / -1).
+    Direct callers that need reject-not-omit still use this helper.
+    """
     return _number(raw, "seed", integer=True, minimum=-1, maximum=2147483647)
 
 
@@ -257,7 +261,11 @@ def _image_body(payload, mid, backend, *, video=False):
         body["negative_prompt"] = negative
     seed = _value(payload, "seed")
     if seed is not None and seed != "random":
-        body["seed"] = _clamp_seed(seed)
+        # o149: official Magao omit for -1 / over-int32 — never wrap, never silent UI -1
+        from .modelscope_seed import official_seed_outbound
+        out_seed = official_seed_outbound(seed)
+        if out_seed is not None:
+            body["seed"] = out_seed
     for names, field, integer in (
         (("steps", "num_inference_steps"), "steps", True),
         (("cfgScale", "guidance", "guidance_scale", "cfg"), "guidance", False),

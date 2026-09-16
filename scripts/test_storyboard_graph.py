@@ -3663,12 +3663,15 @@ def test_v0821o6_modelscope_hub_lora():
     except ValueError as exc:
         mixed_raised = "owner/repo" in str(exc)
     assert_true(mixed_raised, "mixed http+Hub refused rather than dropping http")
+    # o149: direct _clamp_seed still rejects (no wrap). Generate path omits via official_seed_outbound.
     seed_raised = False
     try:
         _clamp_seed(475720515768790)
     except ValueError as exc:
         seed_raised = "seed" in str(exc)
-    assert_true(seed_raised, "oversize seed rejected, not modulo")
+    assert_true(seed_raised, "oversize seed rejected by _clamp_seed, not modulo")
+    from providers.modelscope_seed import official_seed_outbound
+    assert_true(official_seed_outbound(475720515768790) is None, "o149 over-int32 omit (not wrap)")
 
     captured = []
 

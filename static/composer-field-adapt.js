@@ -4,6 +4,7 @@
  * duration options copy item.capabilities.durationEnum only — never invent 5/12/16.
  * LoRA box follows LoraCapabilityHints.loraBoxState when present.
  * o56 kept: seed int32 hint only 魔搭; Nano/HF have no official max.
+ * o149: Magao over-int32 →「超魔搭区间」+ outbound omit (no silent -1 / no wrap).
  * Video i2v-unsupported does not block text-to-video; only blocks when refs are attached.
  */
 (function (root) {
@@ -554,7 +555,7 @@
       title = title.replace(/\s*·\s*本家 seed[一-鿿A-Za-z0-9 \[\]\/,-]+限?/g, "");
       title = title.replace(/\s*·\s*魔搭 seed[一-鿿A-Za-z0-9 \[\]\/,-]+/g, "");
       if (be2 === "modelscope-ai" || be2 === "modelscope-cn") {
-        const hint = "魔搭 seed 官方 [0,2147483647]；-1/random 省略不发（原 reject[-1,2147483647] 不 wrap）";
+        const hint = "魔搭 seed 官方 [0,2147483647]；超区间显示「超魔搭区间」并省略出站；-1/random 省略不发（reject[-1,2147483647] 不 wrap）";
         seedEl.title = title ? (title + " · " + hint) : hint;
       } else if (be2 === "huggingface" || be2 === "nano-gpt") {
         const hint = "本家 seed 无官方 max，禁止 mod int32 / 发明上限";
