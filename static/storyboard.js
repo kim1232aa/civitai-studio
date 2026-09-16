@@ -36,6 +36,7 @@
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o144: advanced params default expanded (not folded); stamp v0821o144-adv-default-open
+  // v0821o146-canvas-hydrate-scope o146canvas 20260916-o146: canvas-scoped boards never applyGraph(house) — stops Magao dirty revive on blank/burn canvases
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -1685,6 +1686,9 @@
   function persistActiveCanvas() {
     const cm = window.canvasManager;
     if (!cm || !cm.activeProject || !cm.activeCanvasId) return Promise.resolve();
+    // o146: capture target canvas id — do not PATCH a different canvas if user switched mid-flight
+    const projectId = cm.activeProject.id;
+    const canvasId = cm.activeCanvasId;
     let parsed = { nodes: state.nodes || [], edges: state.edges || [] };
     try { parsed = JSON.parse(graphPayload()); } catch (_) {}
     const body = {
@@ -1692,14 +1696,16 @@
       edges: parsed.edges || state.edges || [],
       viewport: { x: state.cam.x, y: state.cam.y, zoom: state.cam.s },
     };
-    return fetch("/api/canvas-projects/" + encodeURIComponent(cm.activeProject.id) + "/canvases/" + encodeURIComponent(cm.activeCanvasId), {
+    return fetch("/api/canvas-projects/" + encodeURIComponent(projectId) + "/canvases/" + encodeURIComponent(canvasId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       keepalive: true,
     }).then(function (r) {
       if (!r || !r.ok) return;
-      const canvas = (cm.activeProject.canvases || []).find(function (c) { return c.id === cm.activeCanvasId; });
+      // only mirror into the same canvas we PATCHed
+      if (cm.activeCanvasId !== canvasId) return;
+      const canvas = (cm.activeProject.canvases || []).find(function (c) { return c.id === canvasId; });
       if (canvas) {
         canvas.nodes = body.nodes;
         canvas.edges = body.edges;
@@ -2033,13 +2039,26 @@
       const j = await r.json();
       const p = j && (j.graph || j);
       if (!p || !Array.isArray(p.nodes) || !p.nodes.length) return false;
+      // o146: once a project canvas is adopted and it is NOT the shared house
+      // graph (no shot-1 / shot-civitai), never replace the whole board with
+      // storyboard_graph.json. That full applyGraph resurrected Magao 29-node
+      // dirt into fresh blank / burn canvases, then persistActiveCanvas wrote
+      // the dirt into canvas_projects — hard refresh showed Magao, not the burn.
+      // Still allow by-id URL merge below (same shot id only).
+      // typeof-guard: isolated tests may not bind _canvasAdopted (ReferenceError → silent fail)
+      const canvasScoped = (typeof _canvasAdopted !== "undefined" && !!_canvasAdopted)
+        && (typeof isMainHouseGraph !== "function" || !isMainHouseGraph());
       if (!shotsHaveMedia()) {
-        if (!applyGraph(p)) return false;
-        persist();
-        return true;
+        if (canvasScoped) {
+          // blank burn/new canvas: keep local nodes; fall through to by-id merge only
+        } else {
+          if (!applyGraph(p)) return false;
+          persist();
+          return true;
+        }
       }
       const serverShotN = p.nodes.filter(function (n) { return n && n.kind === "shot"; }).length;
-      if (serverShotN > shots().length) {
+      if (!canvasScoped && serverShotN > shots().length) {
         if (!applyGraph(p)) return false;
         persist();
         return true;
