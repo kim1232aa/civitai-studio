@@ -35,6 +35,7 @@
   // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
+  // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
   // v0821o50: nano LoRA omit null scale (never invent 1.0); tip with o49b
@@ -2360,6 +2361,20 @@
     if (port) port.classList.add("snap-hot");
   }
 
+  // o143: Seko-like — empty shell only when intentional (active compose / sole shot / has prompt|busy|error|url).
+  function isOrphanEmptyShotShell(n) {
+    if (!n || n.kind !== "shot") return false;
+    if (n.url || n._busy || n._error) return false;
+    if (String(n.prompt || "").trim()) return false;
+    if (String(n.firstFrameId || "").trim()) return false;
+    const composeId = state.lastComposerShot || null;
+    if (n.id === composeId || n.id === state.selected) return false;
+    if (state.editor && state.editor.activeShotId === n.id) return false;
+    const shotList = shots();
+    if (shotList.length <= 1) return false;
+    return true;
+  }
+
   function cardHTML(n) {
     const sel = state.selected === n.id ? " sel" : "";
     const multi = isMulti(n.id) ? " multi" : "";
@@ -2377,6 +2392,7 @@
         '<button class="port out" data-side="out" type="button" aria-label="输出"></button></div>';
     }
     if (n.kind === "shot") {
+      const emptyShell = !n.url && !n._error && !n._busy;
       const media = n.url
         ? (isVideoUrl(n.url)
             ? '<video src="' + esc(n.url) + '" muted playsinline preload="metadata"></video>'
@@ -2387,7 +2403,7 @@
               ? '<details class="result-error-more"><summary>详情</summary><pre>' + esc(n._errorDetail) + '</pre></details>'
               : '')
             + '</div>'
-        : '<div class="face"><div style="font-size:28px;opacity:.55">+</div><div class="hint">点击查看或编辑提示词</div></div>';
+        : '<div class="face shot-empty-intentional"><div style="font-size:28px;opacity:.55">+</div><div class="hint">空分镜 · 点此写画面</div></div>';
       const dur = shotDurationLabel(n);
       const busy = n._busy ? " busy" : "";
       const crop = (state._cropShotId === n.id) ? " cropping" : "";
@@ -2403,7 +2419,8 @@
           '<button type="button" data-node-act="more" data-id="' + esc(n.id) + '">更多</button>' +
           '</div>'
         : "";
-      return '<div class="card shot' + sel + multi + busy + crop + erase + '" data-id="' + esc(n.id) + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
+      const emptyCls = emptyShell ? " shot-empty-shell" : "";
+      return '<div class="card shot' + sel + multi + busy + crop + erase + emptyCls + '" data-id="' + esc(n.id) + '" data-empty-shell="' + (emptyShell ? "1" : "0") + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -2460,7 +2477,11 @@
       : null;
     world.querySelectorAll(".card,.group-bound").forEach((el) => el.remove());
     renderGroupBounds();
-    state.nodes.forEach((n) => world.insertAdjacentHTML("beforeend", cardHTML(n)));
+    state.nodes.forEach((n) => {
+      // o143: do not leave orphan empty shot shells mid-row (broken chain).
+      if (n.kind === "shot" && isOrphanEmptyShotShell(n)) return;
+      world.insertAdjacentHTML("beforeend", cardHTML(n));
+    });
     world.querySelectorAll(".card.shot img,.card.shot video").forEach((el) => {
       const card = el.closest(".card");
       const shot = card && nodeById(card.dataset.id);
@@ -3131,14 +3152,19 @@
     // Unlinked thumbnails are selectable suggestions, not sent references.
     // Keep them out of this row so the visible count cannot claim 0/n beside
     // a thumbnail that will not be sent.
-    const chipNodes = linked;
+    // o143: t2i (!eats) must not present linked refs as if they drive the gen.
+    // Driving chips only when model eats refs; unused links stay demoted (可点断开).
+    const drivingChips = eats ? linked : [];
+    const unusedLinked = (!eats && linked.length) ? linked : [];
     const ownUrl = shotResultImageUrl(n);
+    // 成片 chip = painted result on this shot (not a send-path ref). Keep for t2i.
     const ownChip = ownUrl
       ? '<button class="chip on" type="button" data-self-ref="1" title="成片">' +
           '<img src="' + esc(ownUrl) + '" alt=""></button>'
       : "";
     const refsEl = $("refs");
     const emptySlots = [];
+    // Empty capacity slots only when intentional i2i/i2v (eats) — never fake t2i ref chain.
     if (eats && remain > 0 && expanded) {
       for (let si = 0; si < remain; si++) {
         emptySlots.push(
@@ -3160,7 +3186,7 @@
       : "";
     // 灌满测试: only when current model eats refs and still has remain capacity
     const fillBtn = ""; // 灌满测试 hidden; data-act="fill-refs-cap" not shown
-    const hasChips = !!(ownChip || chipNodes.length || frameHtml || emptySlots.length || smartBtn || rematchBtn || fillBtn);
+    const hasChips = !!(ownChip || drivingChips.length || unusedLinked.length || frameHtml || emptySlots.length || smartBtn || rematchBtn || fillBtn);
     // v0821o24: collapsed + no chips/frame → hide refs (no orphan empty slots).
     // v0821o39: empty capacity slots count as chips so cap is always visible when dock open.
     // Expanded always keeps 上传/选择; collapsed keeps them when pinned or video needs frame.
@@ -3173,9 +3199,14 @@
         '<button class="chip-btn" type="button" data-act="upload">上传</button>' +
         '<button class="chip-btn" type="button" data-act="pick">选择</button>' +
         promoteBtn + smartBtn + rematchBtn + fillBtn + refHint + ownChip +
-        chipNodes.map((a) => {
+        drivingChips.map((a) => {
           const on = linked.some((x) => x.id === a.id) ? " on" : "";
           return '<button class="chip' + on + '" type="button" data-asset="' + esc(a.id) + '" title="' + esc(sourceTitle(a)) + '">' +
+            (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
+        }).join("") +
+        unusedLinked.map((a) => {
+          return '<button class="chip ref-unused" type="button" data-asset="' + esc(a.id) +
+            '" title="文生图不发送 · 点断开 · ' + esc(sourceTitle(a)) + '" aria-label="未使用参考">' +
             (a.url ? '<img src="' + esc(a.url) + '" alt="">' : esc(sourceTitle(a).slice(0, 2))) + "</button>";
         }).join("") + emptySlots.join("");
     }
@@ -11354,6 +11385,49 @@
     ensureFalLoraServiceSelected();
     return ok;
   }
+  // o143: import original still URL (Civitai mediaUrl / common aliases).
+  function importStillUrl(j) {
+    j = j || {};
+    return String(j.mediaUrl || j.url || j.imageUrl || j.previewUrl || j.sourceUrl || "").trim();
+  }
+  /** Mount import still on the SAME shot as the prompt. t2i: place near shot, do not link as driving ref.
+   *  i2i/i2v: link as ref/firstFrame. Always unlink unrelated leftovers on this shot. */
+  function mountImportStillOnShot(j, shot, op) {
+    if (!shot || shot.kind !== "shot") return null;
+    const url = importStillUrl(j);
+    const keepUrl = url || "";
+    connectedAssets(shot.id).slice().forEach(function (a) {
+      if (keepUrl && a && a.url === keepUrl) return;
+      try { unlinkAssetFromShot(a, shot); } catch (_) {}
+    });
+    if (!url) return null;
+    if (!/^https?:\/\//i.test(url) && url.indexOf("/out/") !== 0 && url.indexOf("data:") !== 0) return null;
+    let asset = state.nodes.find(function (n) {
+      return n && n.kind !== "shot" && n.kind !== "text" && n.url === url;
+    });
+    if (!asset) {
+      const pos = { x: (shot.x || 0) - 160, y: shot.y || 0 };
+      asset = {
+        id: uid("import-still"),
+        kind: "asset",
+        title: "导入原图",
+        x: pos.x,
+        y: pos.y,
+        url: url,
+        source: "import",
+      };
+      state.nodes.push(asset);
+    }
+    const wantsRef = (op === "i2i" || op === "i2v" || j.kind === "video" || state.mode === "video");
+    if (wantsRef) {
+      try { linkAssetToShot(asset, shot); } catch (_) {}
+      if (j.kind === "video" || state.mode === "video" || op === "i2v") {
+        shot.firstFrameId = asset.id;
+      }
+    }
+    return asset;
+  }
+
   function ensureActiveShotForImport() {
     let shot = nodeById(state.selected);
     if (shot && shot.kind === "shot") return shot;
@@ -11731,6 +11805,12 @@
 
     if (j.kind === "video") state.mode = "video";
     else if (j.kind === "image") state.mode = "image";
+
+    // o143: mount original still with prompt on SAME shot; t2i clears leftover unrelated refs.
+    try {
+      const opMount = (famInfo && famInfo.op) || (j.kind === "video" ? "i2v" : "t2i");
+      mountImportStillOnShot(j, shot, opMount);
+    } catch (_) {}
 
     setDockMode("expanded");
     renderCards();
@@ -12440,6 +12520,11 @@
         return shot && shot.url ? String(shot.url) : "";
       },
       isMainHouse: function () { return isMainHouseGraph(); },
+      // o143 harness
+      isOrphanEmptyShotShell: isOrphanEmptyShotShell,
+      importStillUrl: importStillUrl,
+      mountImportStillOnShot: mountImportStillOnShot,
+      catalogEatsRefs: catalogEatsRefs,
     };
   }
   window.__sekoDeleteNode = deleteNode;

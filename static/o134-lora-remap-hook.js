@@ -1,4 +1,4 @@
-/* o134: after import / house change, remap LoRA chips to this house.
+/* o134 + o143: after import / house change, remap LoRA chips to this house.
  * Does not call /api/generate. Does not hide chips. Does not strip LoRAs on send.
  */
 (function () {
@@ -27,14 +27,23 @@
     if (Array.isArray(j.loras)) return j.loras.slice();
     return [];
   }
+  // o143: Magao Hub-only / house-shape warnings stay in #loraHint — not canvas #msg error sticker.
   function paintHint(rows) {
     const hint = document.getElementById("loraHint");
     if (!hint) return;
+    const blocked = (rows || []).filter(function (r) { return !r.outbound && !r.canOutbound; });
     const bits = (rows || []).map(function (r) {
       return (r.name || r.air || r.path || "LoRA") + " · " + (r.chipReason || "");
     });
-    hint.textContent = bits.join(" ； ") || hint.textContent;
-    if (bits.length) hint.classList.add("show");
+    if (blocked.length) {
+      // Keep capability honest (Hub owner/repo) but scoped to LoRA block.
+      hint.textContent = blocked[0].chipReason || bits.join(" ； ") || "这家不能用当前 LoRA 形态";
+      hint.classList.add("show", "bad");
+    } else {
+      hint.textContent = bits.join(" ； ") || hint.textContent;
+      hint.classList.remove("bad");
+      if (bits.length) hint.classList.add("show");
+    }
   }
   function applyRemap() {
     const house = currentHouse();
@@ -42,12 +51,7 @@
     const rows = Remap.remapLorasForHouse(house, readChips(), currentFamily());
     window.__remappedLoras = rows;
     paintHint(rows);
-    const msg = document.getElementById("msg");
-    const blocked = rows.filter(function (r) { return !r.outbound && !r.canOutbound; });
-    if (msg && blocked.length) {
-      msg.textContent = blocked[0].chipReason || "这家不能用当前 LoRA 形态";
-      msg.className = "msg warn";
-    }
+    // Do not stamp #msg — canvas sticker looked like a gen error (o143).
     try {
       window.dispatchEvent(new CustomEvent("lora-house-remap", { detail: { house: house, rows: rows } }));
     } catch (_) {}
@@ -83,10 +87,10 @@
       const rows = window.__remappedLoras || [];
       const blocked = rows.filter(function (r) { return !r.outbound && !r.canOutbound; });
       if (blocked.length) {
-        const msg = document.getElementById("msg");
-        if (msg) {
-          msg.textContent = (blocked[0].chipReason || "LoRA 不能出站") + " · 先换 LoRA 或换家再点 ↑";
-          msg.className = "msg warn";
+        const hint = document.getElementById("loraHint");
+        if (hint) {
+          hint.textContent = (blocked[0].chipReason || "LoRA 不能出站") + " · 先换 LoRA 或换家再点 ↑";
+          hint.classList.add("show", "bad");
         }
       }
     }

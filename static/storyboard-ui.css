@@ -817,3 +817,13 @@ header .title:hover { color: #fff; }
   color: #6a6a75;
 }
 .chip.ref-slot-empty:hover { border-color: var(--teal) !important; }
+
+
+/* v0821o143: t2i unused linked refs — demoted, not driving */
+.chip.ref-unused {
+  opacity: 0.48;
+  border: 1px dashed #5a5a66 !important;
+  filter: grayscale(0.35);
+}
+.chip.ref-unused:hover { opacity: 0.85; border-color: #8a8a95 !important; }
+.card.shot.shot-empty-shell .face.shot-empty-intentional .hint { color: #8a8a95; font-size: 12px; }

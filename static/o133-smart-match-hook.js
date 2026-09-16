@@ -22,11 +22,11 @@
   }
   loadCss("/static/o134-name-wrap.css?v=o134name");
   if (!window.LoraHouseRemap) {
-    loadSibling("/static/lora-house-remap.js?v=o134lora", function () {
-      loadSibling("/static/o134-lora-remap-hook.js?v=o134");
+    loadSibling("/static/lora-house-remap.js?v=o143lora", function () {
+      loadSibling("/static/o134-lora-remap-hook.js?v=o143");
     });
   } else {
-    loadSibling("/static/o134-lora-remap-hook.js?v=o134");
+    loadSibling("/static/o134-lora-remap-hook.js?v=o143");
   }
 
   const Fam = window.SmartFamilyMatch;

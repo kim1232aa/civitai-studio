@@ -8,8 +8,15 @@ const js = fs.readFileSync(path.join(ROOT, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(ROOT, "static/storyboard.html"), "utf8");
 
 assert.ok(js.includes("v0821o142-house-put-adopt-poll"), "js stamp");
-assert.ok(html.includes("v0821o142-house-put-adopt-poll"), "html stamp");
-assert.ok(html.includes("storyboard.js?v=o142house"), "cache bust");
+// html stamp/cache may advance (o143+); o142 contracts live in storyboard.js
+assert.ok(
+  html.includes("v0821o142-house-put-adopt-poll") || html.includes("v0821o143-magao-burn-ui"),
+  "html stamp o142 or successor"
+);
+assert.ok(
+  /storyboard\.js\?v=o142house|storyboard\.js\?v=o143burn/.test(html),
+  "cache bust o142 or successor"
+);
 
 const house = js.slice(js.indexOf("function isMainHouseGraph"), js.indexOf("function persistActiveCanvasSoon"));
 assert.ok(house.includes('shot-1'), "house includes shot-1");

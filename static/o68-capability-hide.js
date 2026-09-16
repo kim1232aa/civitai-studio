@@ -1,6 +1,7 @@
-/* v0821o141-o68-lora-unknown — load AFTER composer-field-adapt.js + storyboard.js
+/* v0821o143-o68-lora-unknown-chips — load AFTER composer-field-adapt.js + storyboard.js
  * If this model supports LoRA/seed/sampler/wh/duration, show the input.
- * Unsupported → hide. Unknown supportsLora → show as「未知」, do not bury.
+ * Unsupported → hide. Unknown supportsLora → show, do not bury.
+ * o143: chips present + unknown →「未知是否加载」(not bare「未知」as if unsupported).
  */
 (function () {
   function hide(el) {
@@ -50,12 +51,23 @@
       var svcEl = ctx.$("service");
       var svcVal = (ctx.serviceId || (svcEl && svcEl.value) || (item && item.id) || "").trim();
       var hasModel = !!(item.id || svcVal);
-      // o141: unknown/missing supportsLora must NOT hide — show as「未知」(align o61/hints).
+      // o141/o143: unknown/missing supportsLora must NOT hide.
       // Only bury when explicitly supportsLora===false (non-civitai).
+      // Chips present + unknown → honest「未知是否加载」, never bare「未知」as if unsupported.
       var unknownLora = (supportsLora !== true && supportsLora !== false);
+      var hasChips = false;
+      try {
+        if (ctx && Array.isArray(ctx.loras) && ctx.loras.length) hasChips = true;
+        else if (typeof window !== "undefined" && window.state && Array.isArray(window.state.loras) && window.state.loras.length) hasChips = true;
+        else {
+          var chipBox = (typeof document !== "undefined") ? document.getElementById("loras") : null;
+          if (chipBox && chipBox.children && chipBox.children.length) hasChips = true;
+        }
+      } catch (_) {}
       var showLora = (be === "civitai" && hasModel)
         || (hasModel && supportsLora === true)
-        || (hasModel && be !== "civitai" && unknownLora);
+        || (hasModel && be !== "civitai" && unknownLora)
+        || hasChips;
       if (showLora) {
         show(loraBlock);
         if (loraBlock && loraBlock.classList) {
@@ -65,7 +77,7 @@
         }
         if (unknownLora && be !== "civitai") {
           var hint = ctx.$("loraHint") || ctx.$("loraShapeHint") || document.getElementById("loraHint");
-          if (hint) hint.textContent = "未知";
+          if (hint) hint.textContent = hasChips ? "未知是否加载" : "未知";
         }
       } else {
         hide(loraBlock);
@@ -88,7 +100,7 @@
       }
     };
     api._o68 = true;
-    api.STAMP = "v0821o141-o68-lora-unknown";
+    api.STAMP = "v0821o143-o68-lora-unknown-chips";
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
   else install();
