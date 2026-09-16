@@ -36,6 +36,7 @@
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o144: advanced params default expanded (not folded); stamp v0821o144-adv-default-open
+  // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
@@ -7322,13 +7323,16 @@
             row = pickFitFromSearch(local, op, be);
           } catch (_) {}
           if (!row) {
-            // No import family: generic rematch may use SMART_PREF — but never when
-            // a known non-krea2 family was requested (belt for stale fam2 empty string).
-            const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
-            if (wantPref) {
-              const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-              const cand = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
-              if (cand && serviceBelongsToBackend(wantPref, be)) row = cand;
+            // o145 / D2: import posts (checkpoint/diffusion on shot) never fall through to
+            // SMART_PREF Krea2 when family was unrecognized — clear miss only.
+            // Generic op rematch (no import model) may still use SMART_PREF.
+            if (!hasImportModel) {
+              const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
+              if (wantPref) {
+                const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
+                const cand = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+                if (cand && serviceBelongsToBackend(wantPref, be)) row = cand;
+              }
             }
           }
         }
@@ -8366,11 +8370,20 @@
         serviceId = resolveCivitaiOutboundServiceId(shot);
       }
     } else if (!serviceId && be === "huggingface") {
-      serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
-        || (op === "i2i" ? HF_I2I_PREF_SERVICE : op === "i2v" ? "Wan-AI/Wan2.2-TI2V-5B" : HF_LORA_PREF_SERVICE);
+      // o145 / D2: SDXL/Pony/SD15 import miss must not invent Krea-2-Turbo on generate.
+      if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
+        serviceId = "";
+      } else {
+        serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
+          || (op === "i2i" ? HF_I2I_PREF_SERVICE : op === "i2v" ? "Wan-AI/Wan2.2-TI2V-5B" : HF_LORA_PREF_SERVICE);
+      }
     } else if (!serviceId && (be === "modelscope-ai" || be === "modelscope-cn")) {
-      serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
-        || (op === "t2i" ? MS_LORA_PREF_SERVICE : "");
+      if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
+        serviceId = "";
+      } else {
+        serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
+          || (op === "t2i" ? MS_LORA_PREF_SERVICE : "");
+      }
     } else if (!serviceId && be === "nano-gpt") {
       serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op)) || "";
     } else if (!serviceId && be === "fal") {
@@ -8947,6 +8960,13 @@
         return fail("请先选择 Civitai 服务（不会默认填入 Krea2）", "blocked");
       }
       syncCivitaiServiceSelect(civSid);
+    }
+    // o145 / D2: after SDXL/Pony/SD15 import honest miss, other houses must not invent Krea2 on ↑.
+    if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") {
+      const liveSid = (($("service") && $("service").value) || (shot && shot.serviceId) || "").trim();
+      if (!liveSid && currentBackend() !== "civitai") {
+        return fail("请先选择模型（这家没有可匹配的" + state._importFamily + "，不会默认填入 Krea2）", "blocked");
+      }
     }
     // v0821n2: LoRA chips in UI but none ship with air → hard red, do not generate/POST
     if (chipsLackAirForOutbound()) {
@@ -11098,6 +11118,8 @@
     return want;
   }
   function ensureHfLoraServiceSelected() {
+    // o145 / D2: never re-pin Krea-2-Turbo after SDXL/Pony/SD15 import honest miss.
+    if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") return;
     const be = ($("backend") && $("backend").value) || "";
     if (be !== "huggingface") return;
     const sel = $("service");
@@ -11192,6 +11214,8 @@
     return t;
   }
   function ensureMsLoraServiceSelected() {
+    // o145 / D2: never re-pin krea/Krea-2-Turbo after SDXL/Pony/SD15 import honest miss.
+    if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") return;
     const be = ($("backend") && $("backend").value) || "";
     if (be !== "modelscope-ai" && be !== "modelscope-cn") return;
     const sel = $("service");

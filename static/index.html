@@ -804,7 +804,7 @@
       <svg class="buzz-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         <path fill="#f0c36a" d="M9.4.5 3 8.7h4.2L5.5 15.5 13.6 6.8H9.2L9.4.5z"/>
       </svg>
-      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0776</span></h1>
+      <h1>Civitai Studio <span style="letter-spacing:0;font-weight:500;color:var(--muted);font-size:10px">v0776o145</span></h1>
     </div>
     <label class="nsfw" title="允许成人内容（Yellow Buzz）">
       <span>成人</span>
@@ -1060,9 +1060,9 @@
     <div class="btns">
       <button class="ghost" id="whatif" type="button">预估</button>
       <label class="qty-dock" title="生成数量">×<input id="qty" type="number" min="1" max="12" value="1"></label>
-      <button class="primary" id="go" type="button" title="v0776" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
+      <button class="primary" id="go" type="button" title="v0776o145" aria-label="生成" onclick="return window.__studioGo(event)">生成</button>
     </div>
-    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。空种子=随机；固定种子会复现。 · v0776</div>
+    <div id="dockStatus">选服务、写提示词，点「生成」。导入不会代点。空种子=随机；固定种子会复现。 · v0776o145</div>
   </div>
 </aside>
 
@@ -2011,6 +2011,8 @@ function renderServiceList(opts) {
   // While generating / shortly after: never auto-pick another row. userPickedId wins.
   let pickDefault = !opts || opts.pickDefault !== false;
   if (locked || userPickedId) pickDefault = false;
+  // o145 / D2: import path owns selection (family match or honest miss) — never Krea auto-pick.
+  if (typeof lastImport !== 'undefined' && lastImport) pickDefault = false;
   const qf = (($('svcFilter') && $('svcFilter').value) || '').toLowerCase();
   const qn = alnum(qf);
   const list = catalog.filter(it => matchRecipe(it, recipe)).filter(it => {
@@ -2046,7 +2048,7 @@ function renderServiceList(opts) {
   bindRows($('serviceList'));
   let pick = wantItem || null;
   if (!pick && pickDefault && !userPickedId && !locked) {
-    const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'nano-gpt':['wavespeed-ai/krea-v2/turbo-lora','wavespeed-ai/krea-v2/turbo','z-image-turbo-lora','z-image-turbo']}[backend] || [];
+    const prefs = {fal:['fal-ai/flux/schnell','fal-ai/flux-1/schnell'], huggingface:['Tongyi-MAI/Z-Image-Turbo','black-forest-labs/FLUX.1-schnell','Qwen/Qwen-Image'], 'modelscope-ai':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'modelscope-cn':['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], modelscope:['Tongyi-MAI/Z-Image-Turbo','Qwen/Qwen-Image'], 'nano-gpt':['z-image-turbo-lora','z-image-turbo','wavespeed-ai/krea-v2/turbo-lora','wavespeed-ai/krea-v2/turbo']}[backend] || [];
     for (let i = 0; i < prefs.length; i++) {
       const hit = list.find(x => x.id === prefs[i] && !isBadAutoPick(x));
       if (hit) { pick = hit; break; }
@@ -2506,7 +2508,8 @@ function pickForBackend() {
     } else if (src) {
       if (krea) want = ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo', 'flux-kontext'];
       else if (zimg) want = ['z-image-turbo-image-to-image', 'z-image-base'];
-      else want = ['wavespeed-ai/krea-v2/turbo-lora', 'flux-kontext', 'pruna-ai/p-image/edit-lora'];
+      // o145: non-krea Nano i2i default is not Krea — use edit endpoints, not krea-v2.
+      else want = ['flux-kontext', 'pruna-ai/p-image/edit-lora', 'z-image-turbo-image-to-image'];
     } else if (zimg) {
       want = hasLoras ? ['z-image-turbo-lora', 'z-image-turbo'] : ['z-image-turbo', 'z-image-turbo-lora'];
     } else if (krea) {
@@ -2514,7 +2517,8 @@ function pickForBackend() {
         ? ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo']
         : ['wavespeed-ai/krea-v2/turbo-lora', 'wavespeed-ai/krea-v2/turbo', 'fal-ai/krea-2/turbo'];
     } else {
-      want = ['wavespeed-ai/krea-v2/turbo-lora', 'z-image-turbo', 'flux-lightning'];
+      // o145 / fix-recipe-krea-pref-lists: non-import Nano t2i default = Z-Image, not Krea2.
+      want = ['z-image-turbo-lora', 'z-image-turbo', 'flux-lightning'];
     }
   } else {
     return false;
@@ -3834,7 +3838,8 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
       return;
     }
     // Catalog must not rewrite hash; only re-select userPickedId when set.
-    renderServiceList({ pickDefault: !userPickedId && !selectionLocked() });
+    // o145 / D2: after import, never auto-pick Krea prefs over honest miss / family match.
+    renderServiceList({ pickDefault: !userPickedId && !selectionLocked() && !lastImport });
     if (backend === 'civitai' && lastImport && lastImport.serviceId && !userPickedId && !selectionLocked()) {
       selectServiceById(lastImport.serviceId);
       if (lastImport.checkpointName || lastImport.diffusionModel) {

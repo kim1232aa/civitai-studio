@@ -23,7 +23,7 @@ const comfyMatch = html.match(/<span[^>]*id="comfyParams"[^>]*>/);
 assert.ok(comfyMatch, "comfyParams element");
 assert.ok(!/class="[^"]*\bhidden\b/.test(comfyMatch[0]), "comfyParams must not start with hidden class");
 
-assert.ok(html.includes("storyboard.js?v=o144adv"), "cache bust storyboard.js");
+assert.ok(/storyboard\.js\?v=o14[45]/.test(html), "cache bust storyboard.js o144+/o145");
 assert.ok(js.includes("v0821o144-adv-default-open"), "js stamp");
 assert.ok(js.includes("syncAdvParamsOpen"), "boot sync helper");
 assert.ok(/p0\.hidden\s*=\s*false/.test(js), "boot forces open");
