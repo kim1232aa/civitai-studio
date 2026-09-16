@@ -37,6 +37,7 @@
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
   // v0821o144: advanced params default expanded (not folded); stamp v0821o144-adv-default-open
   // v0821o146-canvas-hydrate-scope o146canvas 20260916-o146: canvas-scoped boards never applyGraph(house) — stops Magao dirty revive on blank/burn canvases
+  // v0821o147-house-first-after-import o147house 20260916-o147: 先认家 — lock selected house on import; civitai post never flashes fal/schnell; match only in-house
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -11527,6 +11528,20 @@
 
   // v0820b-apply-import: port index.html applyImport onto storyboard Composer.
   // Never silent-fall back to fal/flux/schnell after a civitai import.
+  // o147 / 先认家: resolveImportHouse locks the selected house; civitai post never flashes fal/schnell
+  // on cold-start default fal; match models only inside the locked house.
+  function resolveImportHouse(uiHouse, postFromCivitai, postBackend, userPicked) {
+    const ui = String(uiHouse || "").trim();
+    const post = String(postBackend || "").trim();
+    // Explicit user 换家 always wins (recipe stays on that house).
+    if (ui && userPicked) return ui;
+    // Non-fal selected house (incl. civitai) — keep it.
+    if (ui && ui !== "fal") return ui;
+    // Civitai URL/post: prefer post house over HTML cold-start default fal (no schnell flash).
+    if (postFromCivitai && (post === "civitai" || !post)) return "civitai";
+    if (ui) return ui;
+    return post || "civitai";
+  }
   async function applyImport(j) {
     j = j || {};
     const importToken = ++_importToken;
@@ -11542,26 +11557,39 @@
       || (hfSid && j.backend !== "fal" && j.backend !== "civitai"));
     let wantCivitai = !wantMs && !wantHf && ((j.backend === "civitai") || (civitaiSid && j.backend !== "fal"));
     let wantFal = !wantMs && !wantHf && ((j.backend === "fal") || (falSid && j.backend !== "civitai" && !wantCivitai));
+    // o147: capture #backend BEFORE ensureActiveShotForImport (selectNode→activateShotComposer can clobber).
+    const selectedHouse = String(($("backend") && $("backend").value) || "").trim();
     const shot = ensureActiveShotForImport();
-    const uiHouse = String(($("backend") && $("backend").value) || (shot && (shot.backend || (shot.composer && shot.composer.backend))) || "").trim();
-    const postFromCivitai = !!(wantCivitai || civitaiSid);
+    if (selectedHouse && $("backend") && $("backend").value !== selectedHouse) {
+      $("backend").value = selectedHouse;
+    }
+    const uiHouse = selectedHouse || String((shot && (shot.backend || (shot.composer && shot.composer.backend))) || "").trim();
+    const postFromCivitai = !!(wantCivitai || civitaiSid || j.backend === "civitai");
     let wantNano = j.backend === "nano-gpt";
-    let famInfo = familyMatchImport(uiHouse || "civitai", j);
+    const house = resolveImportHouse(uiHouse, postFromCivitai, j.backend, !!state._userPickedHouse);
+    let famInfo = familyMatchImport(house || "civitai", j);
     state._importFamily = famInfo.family || "";
-    // Stay on the house the user already picked. A Civitai 帖 is a recipe, not a house switch.
-    if (uiHouse && uiHouse !== "civitai" && postFromCivitai) {
-      j = Object.assign({}, j, { backend: uiHouse, serviceId: famInfo.serviceId || "", serviceName: famInfo.serviceId || j.serviceName });
-      lockHouse(uiHouse);
-      wantCivitai = false;
-      wantFal = uiHouse === "fal";
-      wantHf = uiHouse === "huggingface";
-      wantMs = uiHouse === "modelscope-ai" || uiHouse === "modelscope-cn";
-      wantNano = uiHouse === "nano-gpt";
-      if (wantMs) {
-        j.backend = uiHouse;
+    // Lock to resolved house; match only inside it. Never swap to fal/schnell when house is civitai.
+    {
+      lockHouse(house);
+      const curSid = String(j.serviceId || "").trim();
+      const sidKeep = (curSid && typeof serviceBelongsToBackend === "function" && serviceBelongsToBackend(curSid, house))
+        ? curSid : "";
+      // Family match inside house wins over wrong-family import id (e.g. zImage on flux post).
+      let sid = famInfo.serviceId || sidKeep || "";
+      if (house === "civitai" && (looksFalServiceId(sid) || sid === FAL_T2I_DEFAULT || /flux\/schnell/i.test(sid))) {
+        sid = famInfo.serviceId || "";
       }
-    } else if (uiHouse === "civitai" && postFromCivitai && famInfo.serviceId) {
-      j = Object.assign({}, j, { serviceId: famInfo.serviceId });
+      if (house !== "fal" && (looksFalServiceId(sid) || sid === FAL_T2I_DEFAULT)) {
+        sid = famInfo.serviceId && !looksFalServiceId(famInfo.serviceId) ? famInfo.serviceId : "";
+      }
+      j = Object.assign({}, j, { backend: house, serviceId: sid, serviceName: sid || j.serviceName });
+      wantCivitai = house === "civitai";
+      wantFal = house === "fal";
+      wantHf = house === "huggingface";
+      wantMs = house === "modelscope-ai" || house === "modelscope-cn";
+      wantNano = house === "nano-gpt";
+      if ($("backend")) $("backend").value = house;
     }
     let hardErr = "";
     let heightAligned = false;
@@ -11921,6 +11949,10 @@
         fits: serviceFitsOp, belongs: serviceBelongsToBackend
       }) || "") : "";
       if (!wantFam) wantFam = SmartFamilyMatch.preferredId(liveHouse, famNow, opNow) || "";
+      // o147: never mount fal/schnell (or any fal id) when locked house is not fal.
+      if (wantFam && liveHouse !== "fal" && (looksFalServiceId(wantFam) || wantFam === FAL_T2I_DEFAULT || /flux\/schnell/i.test(wantFam))) {
+        wantFam = "";
+      }
       if (wantFam) {
         ensureSelectOpt($("service"), wantFam);
         if ($("service")) $("service").value = wantFam;
@@ -12273,6 +12305,7 @@
     delete state._pendingService;
     if ($("serviceFilter")) $("serviceFilter").value = "";
     const be = ($("backend") && $("backend").value) || "";
+    state._userPickedHouse = true; // o147: explicit 换家 — civitai import may stay on this house
     lockHouse(be);
     const shot = (typeof composerShot === "function" ? composerShot() : null) || nodeById(state.selected);
     if (shot && shot.kind === "shot") {
