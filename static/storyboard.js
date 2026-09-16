@@ -44,6 +44,7 @@
   // v0821o151-fal-schnell-steps-honest o151fal 20260916-o151: Fal schnell steps max 12 — update #steps + hint「schnell 上限 12，已从原帖 20→12」; never silent clamp
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
+  // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -2432,9 +2433,10 @@
     }
     if (n.kind === "shot") {
       const emptyShell = !n.url && !n._error && !n._busy;
-      // o153: paint generated /out with stable cache-bust from urlUpdatedAt so import bytes cannot stick
+      // o153/o153b: face paints ONLY n.url via displayMediaSrc — NEVER importSourceUrl / import CDN.
+      // If n.url is /out/, paint that. Empty url → empty shell (not import CDN).
       const faceSrc = (typeof displayMediaSrc === "function")
-        ? displayMediaSrc(n.url, n._urlUpdatedAt || n.urlUpdatedAt)
+        ? displayMediaSrc(n.url, n._urlUpdatedAt || n.urlUpdatedAt || n._facePaintTs)
         : n.url;
       const media = n.url
         ? (isVideoUrl(n.url)
@@ -2560,6 +2562,15 @@
         ta.scrollTop = keepText.scroll;
       }
     }
+    // o153b: every render that paints /out must hard-reset face pixels (never leave import bitmap).
+    try {
+      state.nodes.forEach((n) => {
+        if (!n || n.kind !== "shot") return;
+        const u = n.url != null ? String(n.url).trim() : "";
+        if (u.indexOf("/out/") !== 0) return;
+        patchShotCardMediaDom(n.id, u, n._urlUpdatedAt || n.urlUpdatedAt || n._facePaintTs || Date.now());
+      });
+    } catch (_) {}
   }
 
   function worldBounds() {
@@ -4781,6 +4792,8 @@
           // Keep History row; do not require a canvas clone for the card face.
           writebackResult(shot, item.url);
           renderCards(); drawWires(); renderDock(); persist();
+          // o153b: extra renderCards drops hard patch — re-force /out face pixels
+          try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
         }
       }
     });
@@ -8862,6 +8875,7 @@
             setShotBusy(shot, false);
             setMsg("上游失败但本地成片已写回原卡", "ok");
             try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+            try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
             return;
           }
           clearPendingJob(jid);
@@ -8876,6 +8890,7 @@
           setShotBusy(shot, false);
           setMsg("已恢复写回原卡（服务端）", "ok");
           try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+            try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
           return;
         }
         const savedUrl = pickSavedUrl(st);
@@ -8885,6 +8900,7 @@
           setShotBusy(shot, false);
           setMsg("已恢复写回原卡", "ok");
           try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+            try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
           return;
         }
         if (!materializing && pickUrl(st)) {
@@ -8893,6 +8909,7 @@
           setShotBusy(shot, false);
           setMsg("已恢复写回原卡", "ok");
           try { renderCards(); drawWires(); renderDock(); } catch (_) {}
+            try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
           return;
         }
         if (i === 0) {
@@ -8957,9 +8974,27 @@
     pushHistoryItem(cleanUrl, (live.title || "分镜") + (isVideoUrl(cleanUrl) ? "视频" : "成片"));
     renderRail();
     if (typeof renderChatRail === "function") renderChatRail();
+    live._facePaintTs = nowTs;
+    shot._facePaintTs = nowTs;
     try { renderCards(); drawWires(); renderDock(); } catch (_) {}
-    // o153: force the painted card face to the new /out immediately (cache-bust display only).
+    // o153b: force painted card face to /out AFTER renderCards; schedule re-patch so late render cannot leave import paint.
     try { patchShotCardMediaDom(live.id, cleanUrl, nowTs); } catch (_) {}
+    try {
+      const sid = live.id;
+      const u = cleanUrl;
+      const ts = nowTs;
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(function () {
+          try { patchShotCardMediaDom(sid, u, ts); } catch (_) {}
+        });
+      }
+      setTimeout(function () {
+        try { patchShotCardMediaDom(sid, u, ts); } catch (_) {}
+      }, 0);
+      setTimeout(function () {
+        try { patchShotCardMediaDom(sid, u, ts); } catch (_) {}
+      }, 50);
+    } catch (_) {}
     persist();
     persistServer();
     if (typeof persistActiveCanvas === "function") persistActiveCanvas();
@@ -8976,7 +9011,7 @@
     return u + (u.indexOf("?") >= 0 ? "&" : "?") + "_wb=" + ts;
   }
 
-  /** o153: patch .card.shot .face media from real DOM (harness afterSrc reads this). */
+  /** o153b: hard-reset .card.shot .face media so visible pixels are /out, not a reused import bitmap. */
   function patchShotCardMediaDom(shotId, url, bustTs) {
     const sid = String(shotId || "").trim();
     const clean = String(url || "").trim();
@@ -8985,27 +9020,39 @@
     if (!card) return false;
     const face = card.querySelector(".face");
     if (!face) return false;
+    // Clear any CSS background-image / background that may still paint the import still.
+    try {
+      face.style.backgroundImage = "";
+      face.style.background = "";
+    } catch (_) {}
+    // Always create a FRESH img/video — never reuse an element that may keep a decoded import bitmap.
+    face.innerHTML = "";
     const shown = displayMediaSrc(clean, bustTs);
-    let media = face.querySelector("img, video");
+    let media;
     if (isVideoUrl(clean)) {
-      if (!media || media.tagName !== "VIDEO") {
-        face.innerHTML = "";
-        media = document.createElement("video");
-        media.setAttribute("muted", "");
-        media.setAttribute("playsinline", "");
-        media.setAttribute("preload", "metadata");
-        face.appendChild(media);
-      }
+      media = document.createElement("video");
+      media.setAttribute("muted", "");
+      media.setAttribute("playsinline", "");
+      media.setAttribute("preload", "metadata");
+      face.appendChild(media);
       media.src = shown;
     } else {
-      if (!media || media.tagName !== "IMG") {
-        face.innerHTML = "";
-        media = document.createElement("img");
-        media.alt = "";
-        face.appendChild(media);
-      }
+      media = document.createElement("img");
+      media.alt = "";
+      face.appendChild(media);
+      // Force network/decode reload even if browser thinks src is unchanged.
+      try { media.removeAttribute("src"); } catch (_) {}
       media.src = shown;
+      try {
+        if (typeof media.decode === "function") {
+          media.decode().catch(function () {});
+        }
+      } catch (_) {}
     }
+    try {
+      if (card.dataset) card.dataset.faceUrl = clean;
+      if (media.dataset) media.dataset.faceUrl = clean;
+    } catch (_) {}
     card.classList.remove("shot-empty-shell");
     card.setAttribute("data-empty-shell", "0");
     return true;
@@ -9520,6 +9567,8 @@
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
+        // o153b: re-force /out face after extra renderCards
+        try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
         if (!durable && materializing) {
           setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
         } else {
@@ -9530,6 +9579,8 @@
         shot.url = url;
         writebackResult(shot, url);
         renderCards(); drawWires(); persist();
+        // o153b: re-force /out face after extra renderCards
+        try { patchShotCardMediaDom(shot.id, shot.url, shot._urlUpdatedAt || Date.now()); } catch (_) {}
         if (!durable && materializing) {
           setMsg(prefix + "此镜完成（CDN 暂存，未落 /out）", "warn");
         } else {

@@ -15,7 +15,7 @@ assert.ok(
   html.includes("v0821o153-result-writeback-original-card") || html.includes("o153writeback"),
   "html stamp"
 );
-assert.ok(/storyboard\.js\?v=o153writeback/.test(html), "cache bust o153writeback");
+assert.ok(/storyboard\.js\?v=o153bcardpixels/.test(html) || /storyboard\.js\?v=o153writeback/.test(html), "cache bust o153bcardpixels or o153writeback");
 assert.ok(js.includes("cardMediaSrcFromDom"), "afterSrc from real card DOM helper");
 assert.ok(js.includes("patchShotCardMediaDom"), "immediate DOM patch");
 assert.ok(js.includes("importSourceUrl"), "import reference field");
@@ -42,45 +42,83 @@ function makeDom() {
     },
     _cards: cards,
   };
+  function makeMedia(tag, src) {
+    const m = {
+      tagName: String(tag || "IMG").toUpperCase(),
+      src: src || "",
+      currentSrc: src || "",
+      alt: "",
+      dataset: {},
+      getAttribute(k) {
+        return k === "src" ? this.src : null;
+      },
+      removeAttribute(k) {
+        if (k === "src") {
+          this.src = "";
+          this.currentSrc = "";
+        }
+      },
+      setAttribute() {},
+      decode() {
+        return Promise.resolve();
+      },
+    };
+    return m;
+  }
   function ensureCard(id, src) {
     let card = cards.get(id);
     if (!card) {
-      const media = {
-        tagName: "IMG",
-        src: src || "",
-        currentSrc: src || "",
-        getAttribute(k) {
-          return k === "src" ? this.src : null;
-        },
-      };
+      let media = makeMedia("IMG", src || "");
       const face = {
+        style: { backgroundImage: "", background: "" },
+        _media: null,
         querySelector(s) {
-          if (/img|video/i.test(s)) return media;
+          if (/img|video/i.test(s)) return this._media;
           return null;
         },
-        innerHTML: "",
+        get innerHTML() {
+          return this._media ? "<media>" : "";
+        },
+        set innerHTML(v) {
+          if (v === "") this._media = null;
+        },
         appendChild(el) {
-          Object.assign(media, el);
-          media.tagName = el.tagName || "IMG";
+          this._media = el;
         },
       };
+      face._media = media;
       card = {
         dataset: { id },
         classList: { remove() {}, add() {} },
         setAttribute() {},
         querySelector(s) {
           if (s === ".face") return face;
-          if (/img|video/i.test(s)) return media;
+          if (/img|video/i.test(s)) return face._media;
           return null;
         },
-        _media: media,
+        get _media() {
+          return face._media;
+        },
+        set _media(v) {
+          face._media = v;
+        },
         _face: face,
       };
+      // sync getter via redefine
+      Object.defineProperty(card, "_media", {
+        get() {
+          return face._media;
+        },
+        set(v) {
+          face._media = v;
+        },
+      });
       cards.set(id, card);
     }
     if (src != null) {
-      card._media.src = src;
-      card._media.currentSrc = src;
+      if (!card._face._media) card._face._media = makeMedia("IMG", src);
+      card._face._media.src = src;
+      card._face._media.currentSrc = src;
     }
     return card;
   }
@@ -118,9 +156,33 @@ const sandbox = {
   world,
   document: {
     createElement(tag) {
-      return { tagName: String(tag).toUpperCase(), setAttribute() {}, src: "", alt: "" };
+      const el = {
+        tagName: String(tag).toUpperCase(),
+        setAttribute() {},
+        src: "",
+        currentSrc: "",
+        alt: "",
+        dataset: {},
+        getAttribute(k) {
+          return k === "src" ? this.src : null;
+        },
+        removeAttribute(k) {
+          if (k === "src") {
+            this.src = "";
+            this.currentSrc = "";
+          }
+        },
+        decode() {
+          return Promise.resolve();
+        },
+      };
+      return el;
     },
   },
+  requestAnimationFrame(cb) {
+    return setTimeout(cb, 0);
+  },
+  setTimeout,
   Date,
   Number,
   String,
