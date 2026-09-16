@@ -205,6 +205,31 @@ def _modelscope_loras(payload: dict):
     return out
 
 
+def _is_video_catalog_row(row) -> bool:
+    """Hub/disk video task rows — not sendable on API-Inference (i2v=none)."""
+    if not isinstance(row, dict):
+        return False
+    cat = str(row.get("category") or "").strip().lower()
+    task = str(row.get("task") or row.get("hubTask") or "").strip().lower()
+    tags = [str(t).lower() for t in (row.get("tags") or []) if t]
+    if cat == "video":
+        return True
+    if task in ("text-to-video", "image-to-video", "text-to-video-synthesis"):
+        return True
+    if "t2v" in tags or "i2v" in tags:
+        return True
+    return False
+
+
+def _filter_unsendable_video(items, provider_id: str):
+    """When provider caps i2v=none, drop video rows so catalog does not advertise sendable i2v/t2v."""
+    from .capabilities import get_provider_capabilities
+    caps = get_provider_capabilities(provider_id) or {}
+    if caps.get("i2v") not in (None, "none"):
+        return list(items or [])
+    return [x for x in (items or []) if not _is_video_catalog_row(x)]
+
+
 def _wants_video(payload, mid=""):
     blob = " ".join([
         str((payload or {}).get("kind") or ""),
@@ -878,6 +903,11 @@ class ModelScopeProvider(Provider):
         return f"{self.label} 地址 {self._base} 连不上。AI 和 CN 是两套接口，不会改走另一边。"
 
     def categories(self) -> list:
+        # API-Inference has no video API; do not expose a video category tab as sendable.
+        from .capabilities import get_provider_capabilities
+        caps = get_provider_capabilities(self.id) or {}
+        if caps.get("i2v") in (None, "none"):
+            return ["image", "upscale", "utility"]
         return ["image", "video", "upscale", "utility"]
 
     def catalog(self, q, category, status, page=1, pageSize=50) -> dict:
@@ -920,6 +950,9 @@ class ModelScopeProvider(Provider):
         if qnl:
             needle = _alnum(qnl)
             items = [x for x in items if needle in _alnum(x.get("name")) or needle in _alnum(x.get("id"))]
+        # Honesty: Hub video task ≠ API-Inference video API. When i2v=none, do not
+        # present video models as sendable (prefer filter over fake selectable rows).
+        items = _filter_unsendable_video(items, self.id)
         tagged = []
         from .capabilities import overlay_modelscope_catalog_item
         for x in items:

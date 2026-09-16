@@ -579,8 +579,8 @@ def compile_graph(graph: dict | None) -> dict:
             continue
 
         if op == "t2v":
-            # caps 没有独立 t2v 键：i2v=="none" 的 provider（魔搭/HF）官方无视频生成
-            # API（目录仅展示），文生视频同样在编译层诚实硬拒，绝不落到发送层冒充。
+            # caps 没有独立 t2v 键：i2v=="none" 时（魔搭 AI/CN API-Inference 无视频 API）
+            # 文生视频在编译层诚实硬拒。勿把 HF 与魔搭绑在一起——HF 另有官方 t2v/i2v。
             if caps.get("i2v") in (None, "none"):
                 return _err(
                     f"后端 {backend} 官方没有视频生成 API，文生视频无法发送（请改用 Civitai / Fal / NanoGPT 的视频服务）",

@@ -183,9 +183,40 @@ class CatalogHub(unittest.TestCase):
         ids = [x["id"] for x in body["items"]]
         self.assertEqual(ids[0], "krea/Krea-2-Turbo")
         self.assertIn("MusePublic/Qwen-Image-Edit", ids[:2])
-        self.assertEqual(video["items"][0]["id"], "Wan-AI/Wan2.1-I2V-14B-720P")
-        self.assertTrue(video["items"][0].get("needsFirstFrame"))
-        self.assertTrue(video["items"][0].get("supportsI2v"))
+        # i2v=none: Hub video pins must not appear as sendable catalog rows
+        self.assertEqual(video["items"], [])
+        self.assertNotIn("Wan-AI/Wan2.1-I2V-14B-720P", ids)
+
+    def test_catalog_filters_video_when_i2v_none(self):
+        """ms-video-honest: Magao catalog must not advertise sendable i2v/t2v."""
+        hub_rows = [
+            {"id": "krea/krea-realtime-video", "name": "Krea RT", "category": "video", "task": "text-to-video", "tags": ["t2v"]},
+            {"id": "Wan-AI/Wan2.1-I2V-14B-720P", "name": "Wan I2V", "category": "video", "task": "image-to-video", "tags": ["i2v"]},
+            {"id": "Tongyi-MAI/Z-Image-Turbo", "name": "Z Turbo", "category": "image", "task": "text-to-image", "tags": ["t2i"]},
+        ]
+        with patch.object(ms, "fetch_hub", return_value=(hub_rows, {"complete": True})):
+            with patch.object(ms, "load_disk", return_value=[]):
+                all_body = ms.ModelScopeProvider("ai").catalog("", "", "", page=1, pageSize=50)
+                vid_body = ms.ModelScopeProvider("ai").catalog("", "video", "", page=1, pageSize=50)
+        ids = [x["id"] for x in all_body["items"]]
+        self.assertIn("Tongyi-MAI/Z-Image-Turbo", ids)
+        self.assertNotIn("krea/krea-realtime-video", ids)
+        self.assertNotIn("Wan-AI/Wan2.1-I2V-14B-720P", ids)
+        self.assertEqual(vid_body["items"], [])
+        self.assertEqual(vid_body["total"], 0)
+        cats = ms.ModelScopeProvider("ai").categories()
+        self.assertNotIn("video", cats)
+        # overlay must not stamp supportsI2v=True (fake sendable)
+        from providers.capabilities import overlay_modelscope_catalog_item
+        stamped = overlay_modelscope_catalog_item({
+            "id": "Wan-AI/Wan2.1-I2V-14B-720P",
+            "task": "image-to-video",
+            "tags": ["i2v"],
+            "category": "video",
+        })
+        self.assertIs(stamped.get("supportsI2v"), False)
+        self.assertTrue(stamped.get("unsendable"))
+        self.assertEqual(stamped.get("unsendableLabel"), "不可发")
 
     def test_catalog_search_uses_warm_cache_not_hub(self):
         ms._HUB_CACHE.update({

@@ -6957,19 +6957,20 @@
       upscale: [],
       inpaint: []
     },
+    // 魔搭 API-Inference 无视频：i2v/t2v pref 留空，勿把 Hub 视频钉当可发送默认
     "modelscope-ai": {
       t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
-      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"],
-      t2v: ["krea/krea-realtime-video"],
+      i2v: [],
+      t2v: [],
       upscale: [],
       inpaint: []
     },
     "modelscope-cn": {
       t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
-      i2v: ["Wan-AI/Wan2.1-I2V-14B-720P"],
-      t2v: ["krea/krea-realtime-video"],
+      i2v: [],
+      t2v: [],
       upscale: [],
       inpaint: []
     }

@@ -1,6 +1,8 @@
 # ModelScope（魔搭 AI / CN）API 用法
 
-适配器：`providers/modelscope.py` — **两家独立** `ModelScopeProvider("ai"|"cn")`。capabilities 相同：`lora=hub_repo`，`loraPath=hub_owner_repo`，`progress=status_only`，`cancel=False`，`seed` clamp=`reject` min=0 max=2147483647（**-1/空/「random」省略不发**，**禁止 mod**），`i2i=source`，`i2v=image_url`，`maxRefs=3`（天花板；目录可收紧），`refImagesField=image_url`，`videoAspect=True`，`videoDuration=False`。
+适配器：`providers/modelscope.py` — **两家独立** `ModelScopeProvider("ai"|"cn")`。capabilities 相同：`lora=hub_repo`，`loraPath=hub_owner_repo`，`progress=status_only`，`cancel=False`，`seed` clamp=`reject` min=0 max=2147483647（**-1/空/「random」省略不发**，**禁止 mod**），`i2i=source`，`i2v=none`，`video=False`，`maxRefs=3`（天花板；目录可收紧），`refImagesField=image_url`，`videoAspect=True`，`videoDuration=False`。
+
+> **视频诚实闸**：官方 **API-Inference**（`api-inference.modelscope.{ai|cn}/v1`）**没有**文档化的视频生成契约；唯一异步出图端点是 `POST …/images/generations`。Hub/catalog 上的 `text-to-video-synthesis` / `image-to-video` （以及钉选如 `krea/krea-realtime-video`）只说明 **Hub 有视频模型 task**，**≠** 托管视频生成 API。Studio 对魔搭 AI/CN：**目录不把视频行当可发送**；`graph_compile` 与 `generate` **硬拒** i2v/t2v（故意，禁止用图片端点冒充）。范围仅 魔搭 API-Inference ai/cn；**不要**接 DashScope / Model Studio 万相。
 
 ## Auth / Base（禁止交叉）
 
@@ -39,7 +41,7 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 | `steps` | `steps` | 否 | 官方表 [1,100] |
 | `cfgScale` | `guidance` | 否 | 字段名 **guidance** 非 guidance_scale；官方表 [1.5,20] |
 | `width`+`height` | `size` `"WxH"` | 否 | |
-| refs / firstFrame | `image_url` | i2i/i2v | 天花板 3；Edit-2509 官方 `images` 1–3 |
+| refs / firstFrame | `image_url` | i2i only | 天花板 3；Edit-2509 官方 `images` 1–3；**无 i2v**（硬拒） |
 | `loras[]` | `loras` | 否 | **仅 Hub owner/repo** |
 
 官方键集合：`model,prompt,negative_prompt,size,seed,steps,guidance,image_url,loras`。多余键 4xx 时会 slim 重试。
@@ -100,7 +102,7 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 Hub（AI/CN **共用**搜目录，**不**共用生成 base）：`GET https://www.modelscope.cn/openapi/v1/models`；slug `text-to-image-synthesis`（不是 `text-to-image`）。
 
-钉选样本：`Tongyi-MAI/Z-Image-Turbo`、`Qwen/Qwen-Image`、`Qwen/Qwen-Image-Edit`、`krea/Krea-2-Turbo`、`krea/Krea-2-Raw`、`krea/krea-realtime-video`。
+钉选样本（可发送图）：`Tongyi-MAI/Z-Image-Turbo`、`Qwen/Qwen-Image`、`Qwen/Qwen-Image-Edit`、`krea/Krea-2-Turbo`、`krea/Krea-2-Raw`。磁盘仍可能含 Hub 视频钉（如 `krea/krea-realtime-video`），但 **catalog 在 `i2v=none` 时过滤，不当可发送**。
 
 ## 静默丢 / drift
 

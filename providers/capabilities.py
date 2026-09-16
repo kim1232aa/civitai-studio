@@ -106,8 +106,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "estimate": "none",
         "sampler": False,
         "i2i": "source",
-        "video": True,
-        "i2v": "none",  # 官方 API-Inference 无视频生成(实测 /v1/models 无视频任务); 目录仅展示, 生成/编译硬拒
+        "video": False,
+        "i2v": "none",  # 官方 API-Inference 无视频生成; Hub video task ≠ Infer; catalog 过滤 + 生成/编译硬拒
         "videoDuration": False,
         "videoAspect": True,
         "maxRefs": 3,
@@ -127,8 +127,8 @@ PROVIDER_CAPS: dict[str, dict[str, Any]] = {
         "estimate": "none",
         "sampler": False,
         "i2i": "source",
-        "video": True,
-        "i2v": "none",  # 同 modelscope-ai: 官方无视频 API
+        "video": False,
+        "i2v": "none",  # 同 modelscope-ai: 官方无视频 API; catalog 不过视频可发送行
         "videoDuration": False,
         "videoAspect": True,
         "maxRefs": 3,
@@ -459,10 +459,19 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
     if "supportsLora" in caps and row.get("supportsLora") is None:
         row["supportsLora"] = caps["supportsLora"]
 
-    if task == "image-to-video" or "i2v" in tags:
-        row.setdefault("needsFirstFrame", True)
-        row["supportsI2v"] = True
-        caps.setdefault("supportsI2v", True)
+    # Magao API-Inference has no video API. Hub i2v/t2v rows are not sendable:
+    # never stamp supportsI2v=True (that would advertise a fake send path).
+    if cat == "video" or task in ("text-to-video", "image-to-video") or "t2v" in tags or "i2v" in tags:
+        if task == "image-to-video" or "i2v" in tags:
+            row.setdefault("needsFirstFrame", True)
+        row["supportsI2v"] = False
+        caps["supportsI2v"] = False
+        row["sendable"] = False
+        row["unsendable"] = True
+        row["unsendableLabel"] = "不可发"
+        row["unsendableReason"] = (
+            "魔搭 API-Inference 无视频生成 API（Hub 视频 task ≠ Infer）；目录应过滤，硬拒故意"
+        )
         caps.setdefault("maxRefs", max_r if max_r else 1)
         caps.setdefault("maxImages", caps.get("maxRefs") or 1)
         caps.setdefault("refImagesField", "image_url")

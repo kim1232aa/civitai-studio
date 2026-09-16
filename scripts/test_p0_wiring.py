@@ -1200,6 +1200,8 @@ console.log('PASS isMusePublicQwenImageCousin');
     # Civitai keeps sourceImage (no Nano mode, no fal invent)
     assert i2v_ok["payload"].get("sourceImage") and "mode" not in i2v_ok["payload"]
     assert pub["modelscope-cn"]["capabilities"]["i2v"] == "none"  # 官方无视频 API
+    assert pub["modelscope-cn"]["capabilities"]["video"] is False  # catalog 不过视频可发送
+    assert pub["modelscope-ai"]["capabilities"]["i2v"] == "none"
     assert "videoDuration" in pub["nano-gpt"]["capabilities"]
     assert pub["nano-gpt"]["capabilities"]["videoDuration"] == "string_seconds"
     assert pub["huggingface"]["capabilities"]["videoAspect"] is False

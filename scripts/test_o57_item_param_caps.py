@@ -34,6 +34,8 @@ def main():
     video = overlay_modelscope_catalog_item({"id": "krea/krea-realtime-video", "task": "text-to-video", "tags": ["t2v"], "category": "video"})
     check(video["supportsLora"] is False, video)
     check(video["capabilities"]["loraShape"] == "hub_repo", video)
+    check(video.get("supportsI2v") is False, "Magao video must not advertise sendable i2v")
+    check(video.get("unsendable") is True, video)
 
     unknown = overlay_modelscope_catalog_item({"id": "someone/cool-edit-model"})
     ucaps = unknown.get("capabilities") if isinstance(unknown.get("capabilities"), dict) else {}
