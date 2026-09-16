@@ -15,7 +15,7 @@ assert.ok(
   html.includes("v0821o153b-card-pixels-show-out") || html.includes("o153bcardpixels"),
   "html stamp o153b"
 );
-assert.ok(/storyboard\.js\?v=o153bcardpixels/.test(html), "cache bust o153bcardpixels");
+assert.ok(/storyboard\.js\?v=o154cardpixels/.test(html) || /storyboard\.js\?v=o153bcardpixels/.test(html), "cache bust o154cardpixels or o153bcardpixels");
 
 // --- patchShotCardMediaDom hard-reset patterns ---
 const patchStart = js.indexOf("function patchShotCardMediaDom(");

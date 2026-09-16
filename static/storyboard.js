@@ -45,6 +45,7 @@
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
+  // v0821o154-card-pixels-match-out o154cardpixels 20260916-o154: paint card face from /out blob ObjectURL + decode so visible pixels match out file
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -2438,10 +2439,11 @@
       const faceSrc = (typeof displayMediaSrc === "function")
         ? displayMediaSrc(n.url, n._urlUpdatedAt || n.urlUpdatedAt || n._facePaintTs)
         : n.url;
+      const faceUrlAttr = n.url ? ' data-face-url="' + esc(n.url) + '"' : "";
       const media = n.url
         ? (isVideoUrl(n.url)
-            ? '<video src="' + esc(faceSrc) + '" muted playsinline preload="metadata"></video>'
-            : '<img src="' + esc(faceSrc) + '" alt="">')
+            ? '<video src="' + esc(faceSrc) + '" muted playsinline preload="metadata"' + faceUrlAttr + '></video>'
+            : '<img src="' + esc(faceSrc) + '" alt=""' + faceUrlAttr + '>')
         : n._error
           ? '<div class="result-error"><strong>生成失败</strong><span>' + esc(n._error) + '</span>'
             + (n._errorDetail
@@ -2465,7 +2467,7 @@
           '</div>'
         : "";
       const emptyCls = emptyShell ? " shot-empty-shell" : "";
-      return '<div class="card shot' + sel + multi + busy + crop + erase + emptyCls + '" data-id="' + esc(n.id) + '" data-empty-shell="' + (emptyShell ? "1" : "0") + '" style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
+      return '<div class="card shot' + sel + multi + busy + crop + erase + emptyCls + '" data-id="' + esc(n.id) + '" data-empty-shell="' + (emptyShell ? "1" : "0") + '"' + faceUrlAttr + ' style="left:' + n.x + 'px;top:' + n.y + 'px;width:' + b.w + 'px;height:' + b.h + 'px">' +
         '<div class="label">▢ ' + esc(n.title) + (dur ? '<span class="dur">' + esc(dur) + '</span>' : '') + '</div>' +
         badge +
         '<div class="face">' + media + '</div>' +
@@ -8995,7 +8997,7 @@
     live._facePaintTs = nowTs;
     shot._facePaintTs = nowTs;
     try { renderCards(); drawWires(); renderDock(); } catch (_) {}
-    // o153b: force painted card face to /out AFTER renderCards; schedule re-patch so late render cannot leave import paint.
+    // o153b/o154: force painted card face to /out AFTER renderCards; blob paint upgrades pixels; schedule re-patch.
     try { patchShotCardMediaDom(live.id, cleanUrl, nowTs); } catch (_) {}
     try {
       const sid = live.id;
@@ -9051,11 +9053,14 @@
     return path + (path.indexOf("?") >= 0 ? "&" : "?") + "_wb=" + ts;
   }
 
-  /** o153b: hard-reset .card.shot .face media so visible pixels are /out, not a reused import bitmap. */
+  /** o154: hard-reset .card.shot .face; for /out images fetch bytes → blob: ObjectURL + decode so pixels match out. */
   function patchShotCardMediaDom(shotId, url, bustTs) {
     const sid = String(shotId || "").trim();
-    const clean = String(url || "").trim();
+    let clean = String(url || "").trim();
     if (!sid || !clean || !world) return false;
+    if (isStudioOutUrl(clean)) {
+      clean = studioOutPath(clean) || clean;
+    }
     const card = world.querySelector('.card.shot[data-id="' + sid + '"]');
     if (!card) return false;
     const face = card.querySelector(".face");
@@ -9064,6 +9069,51 @@
     try {
       face.style.backgroundImage = "";
       face.style.background = "";
+    } catch (_) {}
+    const shot = (typeof nodeById === "function") ? nodeById(sid) : null;
+    function revokePrevFaceBlob() {
+      try {
+        const prev = shot && shot._faceBlobUrl;
+        if (prev && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+          URL.revokeObjectURL(prev);
+        }
+        if (shot) shot._faceBlobUrl = "";
+      } catch (_) {}
+    }
+    function stampFaceUrl(elCard, elMedia, path) {
+      try {
+        if (elCard && elCard.dataset) elCard.dataset.faceUrl = path;
+        if (elMedia && elMedia.dataset) elMedia.dataset.faceUrl = path;
+        if (elCard) {
+          elCard.setAttribute("data-face-url", path);
+        }
+        if (elMedia) {
+          elMedia.setAttribute("data-face-url", path);
+        }
+      } catch (_) {}
+    }
+    // o154: keep a decoded /out blob (or in-flight fetch) — rAF re-patch must not wipe pixels.
+    try {
+      const existing = face.querySelector("img, video");
+      const existSrc = existing ? String(existing.src || (existing.getAttribute && existing.getAttribute("src")) || "") : "";
+      const existFace = (existing && existing.dataset && existing.dataset.faceUrl)
+        || (card.dataset && card.dataset.faceUrl)
+        || "";
+      const existClean = isStudioOutUrl(existFace) ? (studioOutPath(existFace) || existFace) : String(existFace || "").trim();
+      if (isStudioOutUrl(clean) && existClean === clean) {
+        if (existSrc.indexOf("blob:") === 0) {
+          stampFaceUrl(card, existing, clean);
+          card.classList.remove("shot-empty-shell");
+          card.setAttribute("data-empty-shell", "0");
+          return true;
+        }
+        if (shot && shot._faceBlobPending === clean && shot._faceBlobPaintPromise) {
+          stampFaceUrl(card, existing, clean);
+          card.classList.remove("shot-empty-shell");
+          card.setAttribute("data-empty-shell", "0");
+          return shot._faceBlobPaintPromise;
+        }
+      }
     } catch (_) {}
     // Always create a FRESH img/video — never reuse an element that may keep a decoded import bitmap.
     face.innerHTML = "";
@@ -9076,50 +9126,120 @@
       media.setAttribute("preload", "metadata");
       face.appendChild(media);
       media.src = shown;
-    } else {
-      media = document.createElement("img");
-      media.alt = "";
-      try { media.setAttribute("decoding", "sync"); } catch (_) {}
-      try { media.setAttribute("loading", "eager"); } catch (_) {}
-      face.appendChild(media);
-      // Force network/decode reload even if browser thinks src is unchanged.
-      try { media.removeAttribute("src"); } catch (_) {}
-      media.src = shown;
-      try {
-        const expect = studioOutPath(clean) || clean;
-        media.onload = function () {
-          try {
-            const now = String(media.getAttribute("src") || media.src || "");
-            if (expect && now.indexOf(expect) < 0) {
-              media.src = displayMediaSrc(expect, Date.now());
-            }
-          } catch (_) {}
-        };
-      } catch (_) {}
-      try {
-        if (typeof media.decode === "function") {
-          media.decode().catch(function () {});
-        }
-      } catch (_) {}
+      stampFaceUrl(card, media, clean);
+      card.classList.remove("shot-empty-shell");
+      card.setAttribute("data-empty-shell", "0");
+      return true;
     }
-    try {
-      if (card.dataset) card.dataset.faceUrl = clean;
-      if (media.dataset) media.dataset.faceUrl = clean;
-    } catch (_) {}
+    media = document.createElement("img");
+    media.alt = "";
+    try { media.setAttribute("decoding", "sync"); } catch (_) {}
+    try { media.setAttribute("loading", "eager"); } catch (_) {}
+    face.appendChild(media);
+    // Force network/decode reload even if browser thinks src is unchanged.
+    try { media.removeAttribute("src"); } catch (_) {}
+    // Sync fallback: /out?_wb= paints immediately; blob upgrade follows when fetch completes.
+    media.src = shown;
+    stampFaceUrl(card, media, clean);
     card.classList.remove("shot-empty-shell");
     card.setAttribute("data-empty-shell", "0");
+    // o154: studio /out → fetch same-origin bytes → createObjectURL(blob) → decode before success.
+    if (isStudioOutUrl(clean) && typeof fetch === "function") {
+      const fetchPath = studioOutPath(clean) || clean;
+      if (shot) shot._faceBlobPending = clean;
+      const paintPromise = (async function () {
+        try {
+          const resp = await fetch(fetchPath, { cache: "no-store", credentials: "same-origin" });
+          if (!resp || !resp.ok) throw new Error("fetch /out failed");
+          const blob = await resp.blob();
+          if (!blob || !blob.size) throw new Error("empty /out blob");
+          if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+            throw new Error("no createObjectURL");
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          const card2 = world.querySelector('.card.shot[data-id="' + sid + '"]');
+          const face2 = card2 && card2.querySelector(".face");
+          if (!face2) {
+            try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+            return false;
+          }
+          revokePrevFaceBlob();
+          try {
+            face2.style.backgroundImage = "";
+            face2.style.background = "";
+          } catch (_) {}
+          face2.innerHTML = "";
+          const img2 = document.createElement("img");
+          img2.alt = "";
+          try { img2.setAttribute("decoding", "sync"); } catch (_) {}
+          try { img2.setAttribute("loading", "eager"); } catch (_) {}
+          face2.appendChild(img2);
+          try { img2.removeAttribute("src"); } catch (_) {}
+          img2.src = blobUrl;
+          stampFaceUrl(card2, img2, clean);
+          if (shot) shot._faceBlobUrl = blobUrl;
+          card2.classList.remove("shot-empty-shell");
+          card2.setAttribute("data-empty-shell", "0");
+          try {
+            if (typeof img2.decode === "function") {
+              await img2.decode();
+            } else {
+              await new Promise(function (resolve, reject) {
+                img2.onload = function () { resolve(); };
+                img2.onerror = function () { reject(new Error("img load")); };
+                if (img2.complete) resolve();
+              });
+            }
+          } catch (_) {}
+          return true;
+        } catch (_) {
+          // Keep sync fallback src=/out?_wb= already on the face.
+          return false;
+        } finally {
+          try {
+            if (shot && shot._faceBlobPending === clean) shot._faceBlobPending = "";
+          } catch (_) {}
+        }
+      })();
+      try {
+        if (shot) shot._faceBlobPaintPromise = paintPromise;
+        if (paintPromise && typeof paintPromise.catch === "function") {
+          paintPromise.catch(function () {});
+        }
+      } catch (_) {}
+      return paintPromise;
+    }
+    try {
+      if (typeof media.decode === "function") {
+        media.decode().catch(function () {});
+      }
+    } catch (_) {}
     return true;
   }
 
-  /** o153: read afterSrc from real card DOM only — never from constructed JSON / shot.url alone. */
+  /** o153/o154: read afterSrc from real card DOM only — prefer dataset.faceUrl when src is blob:. */
   function cardMediaSrcFromDom(shotId) {
     const sid = String(shotId || "").trim();
     if (!sid || !world) return "";
     const card = world.querySelector('.card.shot[data-id="' + sid + '"]');
     if (!card) return "";
     const media = card.querySelector(".face img, .face video");
+    // Prefer clean /out from data-face-url / dataset.faceUrl (img.src may be blob: after o154 paint).
+    try {
+      const fromDs = (media && media.dataset && media.dataset.faceUrl)
+        || (card.dataset && card.dataset.faceUrl)
+        || (media && media.getAttribute && media.getAttribute("data-face-url"))
+        || (card.getAttribute && card.getAttribute("data-face-url"))
+        || "";
+      const ds = String(fromDs || "").trim();
+      if (ds) {
+        if (isStudioOutUrl(ds)) return studioOutPath(ds) || ds;
+        return ds.replace(/([?&])_wb=\d+/, "").replace(/\?$/, "").replace(/&$/, "");
+      }
+    } catch (_) {}
     if (!media) return "";
     const raw = String(media.currentSrc || media.getAttribute("src") || media.src || "").trim();
+    if (raw.indexOf("blob:") === 0) return "";
     // Strip display cache-bust so callers compare clean /out/<job>_0.jpg
     return raw.replace(/([?&])_wb=\d+/, "").replace(/\?$/, "").replace(/&$/, "");
   }
