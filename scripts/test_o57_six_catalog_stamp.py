@@ -78,6 +78,18 @@ def main():
     check(nano_res.get("supportsLora") is None, "hidream must not invent LoRA")
     check("promptMax" not in (nano_res.get("capabilities") or {}), "no invented 1200")
 
+    nano_meta = overlay_nano_catalog_item({
+        "id": "step-image-edit-2",
+        "description": "Prompts are limited to 512 characters; negative prompts have the same limit.",
+        "supported_parameters": {"resolutions": ["1024x1024"]},
+    })
+    check(nano_meta["capabilities"].get("promptMax") == 512, nano_meta)
+    nano_chars = overlay_nano_catalog_item({
+        "id": "qwen-image-3",
+        "supported_parameters": {"max_chars": 800, "resolutions": ["1024x1024"]},
+    })
+    check(nano_chars["capabilities"].get("promptMax") == 800, nano_chars)
+
     nano_util = overlay_nano_catalog_item({"id": "image-upscale-lora-fix"})
     check(nano_util["supportsLora"] is False, nano_util)
 

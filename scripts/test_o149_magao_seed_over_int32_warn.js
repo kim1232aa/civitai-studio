@@ -15,8 +15,8 @@ const msPy = fs.readFileSync(path.join(root, "providers/modelscope.py"), "utf8")
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o149b-magao-seed-warn-not-block"), "js stamp");
-assert.ok(html.includes("v0821o149b-magao-seed-warn-not-block"), "html stamp");
-assert.ok(/storyboard\.js\?v=o149bseed/.test(html), "cache bust o149bseed");
+assert.ok(html.includes("v0821o149b-magao-seed-warn-not-block") || html.includes("v0821o150-nano-prompt-limit-warn"), "html stamp o149 or successor");
+assert.ok(/storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano/.test(html), "cache bust o149 or successor");
 
 // --- UI must explicitly show 超魔搭区间; never silent -1 rewrite ---
 assert.ok(source.includes("超魔搭区间"), "UI note 超魔搭区间");

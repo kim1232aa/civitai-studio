@@ -827,3 +827,7 @@ header .title:hover { color: #fff; }
 }
 .chip.ref-unused:hover { opacity: 0.85; border-color: #8a8a95 !important; }
 .card.shot.shot-empty-shell .face.shot-empty-intentional .hint { color: #8a8a95; font-size: 12px; }
+
+/* o150: Nano prompt live counter — 上限/剩余/超 N 字 */
+.nano-prompt-count { margin: 4px 0 0; font-size: 12px; color: #a0a0a8; }
+.nano-prompt-count.is-over { color: #e8b4b4; font-weight: 600; }

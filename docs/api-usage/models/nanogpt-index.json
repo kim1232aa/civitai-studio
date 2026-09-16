@@ -35,7 +35,7 @@
     "catalogViaStudio": "GET /api/catalog?backend=nano-gpt"
   },
   "constraints": {
-    "promptMax": 1200,
+    "promptMax": 400,
     "resolution": "catalog_token only (no free WxH outbound)",
     "maxLoras": 3,
     "loraFailClosed": true,

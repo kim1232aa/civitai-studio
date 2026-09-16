@@ -46,6 +46,53 @@ def _duration_enum(row: dict, params: dict) -> list[str] | None:
     return None
 
 
+
+_PROMPT_MAX_KEYS = ("promptMax", "prompt_max", "max_chars", "maxLength", "max_length")
+
+
+def _positive_int(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)) and int(v) > 0:
+        return int(v)
+    if isinstance(v, str) and v.strip().isdigit():
+        n = int(v.strip())
+        return n if n > 0 else None
+    return None
+
+
+def nano_prompt_max_from_row(row: dict | None) -> int | None:
+    """Official catalog metadata only. Never invent 1200 (or any other number).
+
+    Live GET /api/v1/images/models (2026-09-16) has no promptMax/max_chars field.
+    Some descriptions state a limit ("Prompts are limited to 512 characters").
+    Measured fail-closed fallback lives in nanogpt.NANO_PROMPT_MAX (400), not here.
+    """
+    if not isinstance(row, dict):
+        return None
+    caps = row.get("capabilities") if isinstance(row.get("capabilities"), dict) else {}
+    params = _params(row)
+    for blob in (row, caps, params):
+        if not isinstance(blob, dict):
+            continue
+        for k in _PROMPT_MAX_KEYS:
+            got = _positive_int(blob.get(k))
+            if got:
+                return got
+        prompt = blob.get("prompt")
+        if isinstance(prompt, dict):
+            for k in ("max", "maxLength", "max_chars", "max_length"):
+                got = _positive_int(prompt.get(k))
+                if got:
+                    return got
+    desc = str(row.get("description") or caps.get("description") or "")
+    m = re.search(r"limited to\s+([\d,]+)\s+characters", desc, re.I)
+    if m:
+        n = int(m.group(1).replace(",", ""))
+        if n > 0:
+            return n
+    return None
+
 def _sid_has_lora_token(sid: str) -> bool:
     """Token-level 'lora' in endpoint id (fal-ai/flux-lora, krea-2/turbo/lora).
 
@@ -165,6 +212,11 @@ def overlay_nano_catalog_item(row: dict | None) -> dict:
     elif task in ("text-to-image", "text-to-video") or "t2i" in tags_l or "t2v" in tags_l:
         caps.setdefault("image_to_image", False)
         caps.setdefault("maxRefs", 1)
+
+    got_max = nano_prompt_max_from_row(row)
+    if got_max:
+        caps["promptMax"] = got_max
+        caps.setdefault("promptMaxSource", "catalog-metadata")
 
     row["capabilities"] = caps
     if "supportsLora" in caps:

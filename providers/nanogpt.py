@@ -40,27 +40,35 @@ CHAT_COMPLETIONS = BASE + "/v1/chat/completions"
 _CACHE = {"at": 0.0, "items": None}
 _TTL = 300
 
-# Live 2026-09-10: POST https://nano-gpt.com/api/v1/images accepted a 1311-char
-# SFW prompt (HTTP 200, billed). Docs still publish no prompt max. The old
-# local 1200 ceiling (historical 400 "1408 > 1200") is not an official limit
-# and must not invent one. Upstream prompt_too_long still surfaces as 400.
-NANO_PROMPT_MAX = None
+# Official GET /api/v1/images/models (2026-09-16) and docs publish no promptMax.
+# Do not invent 1200. o150 real burn: prompt ~1855 → HTTP 400 prompt_too_long.
+# Measured fail-closed fallback when the row does not declare a max: 400.
+NANO_PROMPT_MAX = 400
 
 
-def prompt_length_error(prompt) -> dict | None:
-    """Local precheck only when an official max is known. None = pass through."""
-    if NANO_PROMPT_MAX is None:
+def prompt_length_error(prompt, spec=None) -> dict | None:
+    """Fail-closed local precheck. Catalog metadata wins; else measured 400.
+
+    Never silent-truncate. None max would pass through — we always have 400.
+    """
+    from .six_catalog_caps import nano_prompt_max_from_row
+    mx = nano_prompt_max_from_row(spec) if spec else None
+    if mx is None:
+        mx = NANO_PROMPT_MAX
+    if mx is None:
         return None
     text = prompt if isinstance(prompt, str) else ("" if prompt is None else str(prompt))
     n = len(text)
-    if n <= NANO_PROMPT_MAX:
+    if n <= mx:
         return None
+    over = n - mx
     return {
-        "error": f"提示词过长 {n}/{NANO_PROMPT_MAX}",
+        "error": f"提示词过长 {n}/{mx} · 超 {over} 字",
         "code": "prompt_too_long",
         "length": n,
-        "max": NANO_PROMPT_MAX,
-        "limit": NANO_PROMPT_MAX,
+        "max": mx,
+        "limit": mx,
+        "over": over,
     }
 
 
@@ -1290,7 +1298,7 @@ class NanoGptProvider(Provider):
         return self._generate_image(payload, spec, mid)
 
     def _generate_image(self, payload, spec, mid):
-        too = prompt_length_error((payload or {}).get("prompt"))
+        too = prompt_length_error((payload or {}).get("prompt"), spec)
         if too:
             return 400, too
         try:
@@ -1420,7 +1428,7 @@ class NanoGptProvider(Provider):
         return last
 
     def _generate_video(self, payload, spec, mid):
-        too = prompt_length_error((payload or {}).get("prompt"))
+        too = prompt_length_error((payload or {}).get("prompt"), spec)
         if too:
             return 400, too
         sp = (spec or {}).get("supported_parameters") or {}

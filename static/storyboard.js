@@ -40,6 +40,7 @@
   // v0821o147-house-first-after-import o147house 20260916-o147: 先认家 — lock selected house on import; civitai post never flashes fal/schnell; match only in-house
   // v0821o148-magao-cn-catalog-tongyi o148magao 20260916-o148: Magao CN pin-first catalog + never invent Krea-2-Turbo; house-first afterImport mounts Tongyi for zimage
   // v0821o149b-magao-seed-warn-not-block o149bseed 20260916-o149b: Magao over-int32 keeps digits +「超魔搭区间」warn-only (not send-gate); outbound omit
+  // v0821o150-nano-prompt-limit-warn o150nano 20260916-o150: Nano live counter 上限/剩余/超N字; over blocks ↑; never silent truncate; measured 400
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -5308,6 +5309,34 @@
   function isNanogptBe() {
     return currentBackend() === "nano-gpt";
   }
+  // o150: official catalog/docs have no promptMax. Do not invent 1200.
+  // Measured HTTP 400 prompt_too_long ≈ 400 chars (burn ~1855). Catalog metadata wins.
+  const NANO_PROMPT_MAX_MEASURED = 400;
+  function nanoPromptMax() {
+    const caps = (typeof catalogCaps === "function") ? catalogCaps() : {};
+    const meta = caps && caps.promptMax;
+    if (meta != null && Number(meta) > 0) return Number(meta);
+    if (typeof isNanogptBe === "function" && isNanogptBe()) return NANO_PROMPT_MAX_MEASURED;
+    return null;
+  }
+  function nanoPromptCountLabel(n, max) {
+    n = Number(n) || 0;
+    max = Number(max);
+    if (!Number.isFinite(max) || max <= 0) return n + " 字";
+    if (n > max) return "提示词 " + n + "/" + max + " · 超 " + (n - max) + " 字";
+    return "提示词 " + n + "/" + max + " · 剩余 " + (max - n) + " 字";
+  }
+  function syncNanoPromptCount() {
+    const el = $("nanoPromptCount");
+    if (!el) return;
+    const nano = typeof isNanogptBe === "function" && isNanogptBe();
+    const max = nanoPromptMax();
+    const n = (($("prompt") && $("prompt").value) || "").length;
+    el.hidden = !nano;
+    if (!nano) { el.textContent = ""; return; }
+    el.textContent = nanoPromptCountLabel(n, max);
+    el.classList.toggle("is-over", !!(max && n > max));
+  }
   function clampLoraScale(v, fallback) {
     if (v == null || v === "") return (fallback === undefined ? null : fallback);
     const n = parseFloat(v);
@@ -6003,9 +6032,13 @@
     if (capMsg) msgs.push(capMsg);
     const promptEl = $("prompt");
     const prompt = promptEl ? String(promptEl.value || "") : "";
-    const pmax = caps.promptMax;
+    // o150: Nano uses catalog promptMax if present, else measured 400. Never silent truncate.
+    let pmax = caps.promptMax;
+    if ((pmax == null || !(Number(pmax) > 0)) && isNanogptBe()) pmax = NANO_PROMPT_MAX_MEASURED;
+    if (typeof syncNanoPromptCount === "function") syncNanoPromptCount();
     if (pmax != null && Number(pmax) > 0 && prompt.length > Number(pmax)) {
-      msgs.push("提示词 " + prompt.length + "/" + pmax + " · 超过上限，请缩短后再生成");
+      const overN = prompt.length - Number(pmax);
+      msgs.push("提示词 " + prompt.length + "/" + pmax + " · 超 " + overN + " 字，请缩短后再生成");
       markOver(promptEl, true);
     } else {
       markOver(promptEl, false);
@@ -9196,6 +9229,14 @@
         const magaoOut = beOut === "modelscope-ai" || beOut === "modelscope-cn"
           || (typeof isModelscopeBe === "function" && isModelscopeBe());
         if (magaoOut && seedNum > 2147483647) delete payload.seed;
+      }
+    }
+    // o150: Nano over-limit must fail closed with a visible block — never slice outbound prompt.
+    if (payload && isNanogptBe()) {
+      const fullPrompt = String(payload.prompt == null ? "" : payload.prompt);
+      const maxOut = nanoPromptMax();
+      if (maxOut && fullPrompt.length > maxOut) {
+        return fail("提示词 " + fullPrompt.length + "/" + maxOut + " · 超 " + (fullPrompt.length - maxOut) + " 字，请缩短后再生成", "blocked");
       }
     }
     setShotBusy(shot, true);

@@ -530,7 +530,7 @@ console.log('PASS hubUtilityBlob sd35');
     assert "loadCatalog" in sr
     assert "window.loadCatalog = loadCatalog" in html
     assert "当前配方无匹配模型，请搜索或切换供应商" in html
-    assert 'title="v0776"' in html
+    assert 'title="v0776' in html  # v0776 or successor v0776o145
     assert 'aria-label="生成"' in html
     assert 'aria-label="v0772"' not in html
     # v0768: setRecipe locked during goBusy/generateLockId
@@ -586,7 +586,7 @@ console.log('PASS isMusePublicQwenImageCousin');
 
 
     # v0770: always re-resolve Civitai LoRA B2 at Nano generate; stale B2 alone fails
-    assert 'title="v0776"' in html
+    assert 'title="v0776' in html  # v0776 or successor v0776o145
     assert '无直链' in html
     assert 'loraHasDirectPath' in html
     assert 'lora-miss-chip' in html
@@ -699,16 +699,24 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert nano_src.count("resolve_nano_loras") >= 2  # image + video
     assert "video path also runs resolve_nano_loras" in nano_src
 
-    # Live 2026-09-10: official Nano Image API accepted 1311 chars. Local 1200
-    # was a stale historical 400, not a documented max — do not invent one.
+    # o150: official catalog/docs have no promptMax. Do not invent 1200.
+    # Measured HTTP 400 prompt_too_long ≈ 400 chars; fail-closed, never silent truncate.
     from providers.nanogpt import prompt_length_error, NANO_PROMPT_MAX, NanoGptProvider
-    assert NANO_PROMPT_MAX is None
-    assert prompt_length_error("x" * 1200) is None
+    assert NANO_PROMPT_MAX == 400
     assert prompt_length_error("ok") is None
     assert prompt_length_error("") is None
     assert prompt_length_error(None) is None
-    assert prompt_length_error("y" * 1311) is None
-    assert prompt_length_error("y" * 1408) is None
+    assert prompt_length_error("x" * 400) is None
+    too = prompt_length_error("y" * 401)
+    assert too and too["code"] == "prompt_too_long" and too["max"] == 400
+    assert "超 1 字" in too["error"]
+    too1855 = prompt_length_error("z" * 1855)
+    assert too1855 and too1855["over"] == 1455
+    # catalog metadata wins over measured 400
+    spec512 = {"supported_parameters": {"max_chars": 512}, "description": ""}
+    assert prompt_length_error("a" * 512, spec512) is None
+    too512 = prompt_length_error("a" * 513, spec512)
+    assert too512 and too512["max"] == 512
     prov = NanoGptProvider()
     import unittest.mock as mock
     with mock.patch("providers.nanogpt.nano_key", return_value="test-key"):
@@ -721,22 +729,22 @@ console.log('PASS isMusePublicQwenImageCousin');
             with mock.patch("providers.nanogpt.json_call", return_value=(502, {"error": "offline"})) as jc:
                 code, body = prov.generate({
                     "serviceId": "krea-v2/turbo-lora",
-                    "prompt": "z" * 1311,
+                    "prompt": "z" * 1855,
                     "resolution": "1k",
                 })
-                assert jc.called, "1311-char prompt must reach Nano, not a local 1200 gate"
-                assert body.get("code") != "prompt_too_long", body
-    # index.html still has the old truncate UI (out of storyboard scope)
-    assert "NANO_PROMPT_MAX = 1200" in html
-    assert "提示词过长" in html
+                assert not jc.called, "over-limit must fail closed locally, never silent-truncate outbound"
+                assert code == 400 and body.get("code") == "prompt_too_long", body
+                assert "1855/400" in body.get("error", "")
+    assert "NANO_PROMPT_MAX = 400" in html
     assert "nPrompt > NANO_PROMPT_MAX" in html
-    assert "截断到 1200" in html
-    assert "truncateNanoPrompt" in html
+    assert "截断到 1200" not in html
+    assert "truncateNanoPrompt" not in html
     assert "syncNanoPromptHint" in html
     assert "nanoPromptHint" in html
-    assert 'title="v0776"' in html
+    assert 'title="v0776' in html  # v0776 or successor v0776o145
     assert "prompt_length_error" in nano_src
-    assert "NANO_PROMPT_MAX = None" in nano_src
+    assert "NANO_PROMPT_MAX = 400" in nano_src
+    assert "NANO_PROMPT_MAX = 1200" not in nano_src
 
 
     # v0773: seed sync after generate; fixed-seed warn; Nano prefers response seed
@@ -751,7 +759,7 @@ console.log('PASS isMusePublicQwenImageCousin');
     assert "固定种子会复现同一张图；要新图请清空种子" in html
     assert "seedRaw === '' ? null" in html or "seedRaw === \'\' ? null" in html
     assert "seedHint" in html
-    assert 'title="v0776"' in html
+    assert 'title="v0776' in html  # v0776 or successor v0776o145
     from providers.nanogpt import _response_seed, _clamp_seed as _ns, _seed_clamp_meta
     # lead 裁决: 官方无上限, 超大 seed 透传且不报 clamped
     assert _ns(891104780613135) == 891104780613135

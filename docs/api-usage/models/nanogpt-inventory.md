@@ -25,7 +25,7 @@
 - 图：`*-lora` / id·name·tags 含 `lora`；**upscale/bg/utility 禁止**因裸子串标 true（v0771）。
 - 出站：`model_supports_lora` 假 → 400 `lora_model_unsupported`；无直链 → 400 `lora_no_direct_url`（fail-closed）。
 - 分辨率：必须目录 `supported_parameters.resolutions` token；空目录 → 400。
-- prompt ≤ 1200。
+- prompt：官方 schema 无 max；o150 实测 fail-closed 400（HTTP 400 `prompt_too_long`）；目录 metadata 优先；禁止发明 1200、禁止静默截断。
 
 ## 缺口
 

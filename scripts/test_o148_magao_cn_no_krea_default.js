@@ -15,8 +15,8 @@ const Fam = require(path.join(root, "static/smart-family-match.js"));
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o148-magao-cn-catalog-tongyi"), "js stamp");
-assert.ok(html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao"), "html stamp");
-assert.ok(/storyboard\.js\?v=o148magao/.test(html), "cache bust o148");
+assert.ok(html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("o150nano"), "html stamp o148 or successor");
+assert.ok(/storyboard\.js\?v=o148magao|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano/.test(html), "cache bust o148 or successor");
 
 // --- no Krea invent as Magao SMART_PREF / pin default ---
 assert.ok(source.includes('const MS_T2I_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo"'), "Tongyi pref const");

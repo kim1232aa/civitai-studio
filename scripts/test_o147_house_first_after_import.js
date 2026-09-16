@@ -15,8 +15,8 @@ const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
 // --- stamp + cache bust ---
 assert.ok(source.includes("v0821o147-house-first-after-import"), "js stamp");
-assert.ok(html.includes("v0821o147-house-first-after-import") || html.includes("o147house") || html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao"), "html stamp");
-assert.ok(/storyboard\.js\?v=o147house|storyboard\.js\?v=o148magao/.test(html), "cache bust o147+");
+assert.ok(html.includes("v0821o147-house-first-after-import") || html.includes("o147house") || html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao") || html.includes("v0821o150-nano-prompt-limit-warn") || html.includes("o150nano"), "html stamp o147 or successor");
+assert.ok(/storyboard\.js\?v=o147house|storyboard\.js\?v=o148magao|storyboard\.js\?v=o149bseed|storyboard\.js\?v=o150nano/.test(html), "cache bust o147+");
 
 // --- source contracts ---
 assert.ok(source.includes("function resolveImportHouse("), "resolveImportHouse helper");

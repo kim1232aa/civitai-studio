@@ -1,6 +1,6 @@
 # NanoGPT API 用法
 
-适配器：`providers/nanogpt.py`。capabilities：`lora=path`，`loraPath=civitai_download`，`resolution=catalog_token`，`promptMax=None`（**无公布上限**），`seed` clamp=`none`（**禁止 mod int32**），`progress=none`，`cancel=False`，`estimate=catalog_price`，`i2i=input_references`，`i2v=image_url`，`maxRefs=5`，`refImagesField=input_references`，`videoDuration=string_seconds`。
+适配器：`providers/nanogpt.py`。capabilities：`lora=path`，`loraPath=civitai_download`，`resolution=catalog_token`，`promptMax=None`（**无公布上限**；o150 实测 fail-closed 400，目录 metadata 优先，禁止发明 1200），`seed` clamp=`none`（**禁止 mod int32**），`progress=none`，`cancel=False`，`estimate=catalog_price`，`i2i=input_references`，`i2v=image_url`，`maxRefs=5`，`refImagesField=input_references`，`videoDuration=string_seconds`。
 
 ## Auth
 
@@ -40,7 +40,7 @@
 | Studio | Vendor | 必填? | 备注 |
 | --- | --- | --- | --- |
 | `serviceId` | `model` | 是 | Civitai id→400；无 resolutions 列表→400 |
-| `prompt` | `prompt` | 是 | **无官方 max**；`NANO_PROMPT_MAX=None`，禁止本地 1200 门闹。上游 `prompt_too_long` 仍按 400 出面 |
+| `prompt` | `prompt` | 是 | **无官方 schema max**；catalog metadata 优先，否则实测 `NANO_PROMPT_MAX=400`（HTTP 400 `prompt_too_long`）。禁止发明 1200；禁止静默截断 |
 | `negativePrompt` | `negative_prompt` + `negativePrompt` | 否 | |
 | `resolution` / WxH 参考 | `resolution` + `size`（**同一 token**） | 是 | `pick_resolution`；**禁止**自由 width/height 出站 |
 | `width`/`height` | 仅算 `aspect_ratio` | — | `_core_image_body` / `sanitize_submitted_for_persist` **pop 掉** |
@@ -84,7 +84,7 @@
 
 | 动作 | 行 |
 | --- | --- |
-| TOKEN / endpoints / `NANO_PROMPT_MAX=None` | `nanogpt.py:18-55` |
+| TOKEN / endpoints / `NANO_PROMPT_MAX=400`（实测 fallback） | `nanogpt.py:18-72` |
 | `pick_resolution` | `:174-244` |
 | B2 resolve / sanitize | `:349-448` |
 | `resolve_nano_loras` | `:474-598` |
@@ -137,6 +137,6 @@ Civitai API key **永不**发给 Nano、永不进 URL query。
 - 目录：`GET /api/v1/images/models`、`GET /api/v1/video-models`（勿硬编能力表）
 - 出图优先 `POST /api/v1/images`，失败再试 `/v1/images/generations`
 - 官方请求键：`model, prompt, n, resolution, aspect_ratio, quality, output_format, seed, input_references`
-- **没有** prompt 字符上限；**没有** seed int32；**没有** 官方 `loras[]` 键
+- **官方 schema 没有** prompt 字符上限（o150 实测 fallback 400，目录 description/`max_chars` 优先）；**没有** seed int32；**没有** 官方 `loras[]` 键
 - 视频：`POST /api/generate-video` + `GET /api/video/status?requestId=`
 - 改 `nanogpt.py` 后必须 `python3 scripts/restart.py && ./run.sh`

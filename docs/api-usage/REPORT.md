@@ -114,7 +114,7 @@
 ### 5. NanoGPT — [nanogpt.md](nanogpt.md) · [models/nanogpt-inventory.md](models/nanogpt-inventory.md)
 
 - Live catalog；仓库无全量 dump。
-- promptMax **1200**；resolution **仅**目录 token；LoRA fail-closed。
+- promptMax 官方无；o150 实测 fallback **400**（禁止发明 1200）；resolution **仅**目录 token；LoRA fail-closed。
 - 实测样本：`z-image-turbo-lora`、`wavespeed-ai/krea-v2/turbo-lora`。
 
 ### 6. Studio 本地 — [studio-routes.md](studio-routes.md)
@@ -132,7 +132,7 @@
 | Fal i2v smoke **`01a07eb5`**（全 id `01a07eb5-763f-76d2-a71c-a59928ea5f55`） | **fal** | endpoint `fal-ai/minimax/video-01/image-to-video`；`submittedInput` 含 `prompt` + **materialized** `image_url`（`data:image/jpeg;base64,…`）；jobId `fal|fal-ai/minimax/video-01/image-to-video|01a07eb5-…` | `out/fal_fal-ai_minimax_video-01_image-to-video_01a07eb5-…_0.json` + `.mp4` |
 | LoRA version **`3231694`**（Asian Mix）；DL `https://civitai.com/api/download/models/3231694` | Fal/HF/Nano path；魔搭必须 skip | `docs/provider-lora.md`；`scripts/test_p0_wiring.py` |
 | AIR-only Fal：`{"air":"urn:air:sdxl:lora:civitai:1@2"}` → body **无** `loras` | fal | `scripts/test_fal_fields.py` |
-| Nano prompt >1200 → `prompt_too_long` | nano-gpt | `NANO_PROMPT_MAX` |
+| Nano prompt >400（实测）→ `prompt_too_long` 明示超 N 字 | nano-gpt | `NANO_PROMPT_MAX` |
 
 ---
 

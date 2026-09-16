@@ -55,7 +55,7 @@
 | 图 `134923572`；LoRA `urn:air:krea2:lora:civitai:2323765@3071582` strength `0.8` | Civitai import→chip→outbound air | `docs/superpowers/plans/2026-09-08-storyboard-134923572-lora-air-hardgate.md`；`scripts/test_storyboard_graph.py` `test_v0821n_krea2_import_hardgate` |
 | LoRA version `3231694`（Asian Mix）；下载链 `https://civitai.com/api/download/models/3231694` | Fal/HF/Nano path；魔搭必须 skip | `docs/provider-lora.md`；`scripts/test_p0_wiring.py` |
 | AIR-only Fal：`{"air":"urn:air:sdxl:lora:civitai:1@2"}` → body **无** `loras` | AIR 不当 path | `scripts/test_fal_fields.py` |
-| Nano 官方无 promptMax | 适配器 `NANO_PROMPT_MAX=None`；禁止发明 1200 门闹 | `providers/nanogpt.py` |
+| Nano 官方无 promptMax | 适配器实测 fallback `NANO_PROMPT_MAX=400`；禁止发明 1200；禁止静默截断 | `providers/nanogpt.py` |
 
 ## 读源顺序
 

@@ -862,7 +862,6 @@
       <textarea id="prompt" placeholder="描述画面、主体、风格、光线与镜头…"></textarea>
       <div id="nanoPromptHint" class="hidden" style="margin-top:6px;font-size:12px;align-items:center;gap:8px;flex-wrap:wrap">
         <span id="nanoPromptCount" class="warn"></span>
-        <button type="button" class="ghost" id="nanoPromptTruncate" style="padding:2px 8px;font-size:12px">截断到 1200</button>
       </div>
       <label class="lbl" for="negative">负面提示</label>
       <textarea id="negative" class="neg" placeholder="不想出现的内容，可空"></textarea>
@@ -1148,8 +1147,8 @@ function isNanogpt(b) {
   b = b || backend;
   return b === 'nano-gpt' || b === 'nanogpt' || b === 'nano';
 }
-// v0772: Nano API prompt_too_long threshold (server NANO_PROMPT_MAX).
-const NANO_PROMPT_MAX = 1200;
+// o150: measured HTTP 400 prompt_too_long ≈ 400 chars. Do not invent 1200. Never silent-truncate.
+const NANO_PROMPT_MAX = 400;
 function nanoPromptLen() {
   return (($('prompt') && $('prompt').value) || '').length;
 }
@@ -1158,30 +1157,21 @@ function syncNanoPromptHint(opts) {
   const row = $('nanoPromptHint');
   const n = nanoPromptLen();
   const over = n > NANO_PROMPT_MAX;
-  const show = isNanogpt() && over;
+  const show = isNanogpt();
   if (row) {
     row.classList.toggle('hidden', !show);
-    // .hidden uses display:none !important; clear inline flex conflict when hidden
     if (show) row.style.display = 'flex';
     else row.style.display = '';
   }
   const cnt = $('nanoPromptCount');
-  if (cnt) cnt.textContent = '提示词过长 ' + n + '/' + NANO_PROMPT_MAX;
-  if (opts.warnDock && show) {
-    setDock('提示词过长 ' + n + '/' + NANO_PROMPT_MAX + '（Nano 上限）', 'warn');
+  if (cnt) {
+    if (over) cnt.textContent = '提示词 ' + n + '/' + NANO_PROMPT_MAX + ' · 超 ' + (n - NANO_PROMPT_MAX) + ' 字';
+    else cnt.textContent = '提示词 ' + n + '/' + NANO_PROMPT_MAX + ' · 剩余 ' + (NANO_PROMPT_MAX - n) + ' 字';
+  }
+  if (opts.warnDock && show && over) {
+    setDock('提示词 ' + n + '/' + NANO_PROMPT_MAX + ' · 超 ' + (n - NANO_PROMPT_MAX) + ' 字（Nano 上限）', 'warn');
   }
   return over && isNanogpt();
-}
-function truncateNanoPrompt() {
-  const pr = $('prompt');
-  if (!pr) return;
-  const n = (pr.value || '').length;
-  if (n > NANO_PROMPT_MAX) {
-    pr.value = pr.value.slice(0, NANO_PROMPT_MAX);
-    setDock('已截断到 ' + NANO_PROMPT_MAX + '（原 ' + n + '）', 'warn');
-  }
-  syncNanoPromptHint();
-  syncGo();
 }
 function isKnownBackend(h) {
   return /^(civitai|fal|huggingface|modelscope-ai|modelscope-cn|nano-gpt)$/.test(h || '');
@@ -3495,7 +3485,7 @@ async function runGenerate() {
       const nPrompt = nanoPromptLen();
       if (nPrompt > NANO_PROMPT_MAX) {
         syncNanoPromptHint();
-        fail('提示词过长 ' + nPrompt + '/' + NANO_PROMPT_MAX);
+        fail('提示词 ' + nPrompt + '/' + NANO_PROMPT_MAX + ' · 超 ' + (nPrompt - NANO_PROMPT_MAX) + ' 字');
         return;
       }
     }
@@ -3808,7 +3798,6 @@ if ($('galRefresh')) $('galRefresh').onclick = () => { loadOuts(); };
     syncNanoPromptHint();
     syncGo();
   });
-  if ($('nanoPromptTruncate')) $('nanoPromptTruncate').onclick = () => truncateNanoPrompt();
   syncGo();
   let catalogSeq = 0;
   async function loadCatalog(q) {
