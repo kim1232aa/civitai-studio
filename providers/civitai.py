@@ -1873,20 +1873,38 @@ def fetch_model_version_by_hash(h: str):
 
 
 def _wait_snapshot(data: dict) -> dict:
-    """Flatten real Civitai progress fields. Do not invent percent/ETA."""
+    """Flatten real Civitai progress fields. Do not invent percent/ETA.
+
+    Official workflows may expose:
+      - step.jobs[].queuePosition (legacy)
+      - step.queuePosition (current) with estimatedCompleteAt / precedingJobs
+      - step.preparation as a *list* of resource downloads (not a progress dict)
+    Never assume preparation is a dict — list.shape must not 500 the poll.
+    """
     steps = data.get("steps") or []
     step = steps[0] if steps else {}
-    jobs = (step.get("jobs") or []) if isinstance(step, dict) else []
-    job = jobs[0] if jobs else {}
-    q = (job.get("queuePosition") or {}) if isinstance(job, dict) else {}
-    prep = (step.get("preparation") or {}) if isinstance(step, dict) else {}
+    if not isinstance(step, dict):
+        step = {}
+    jobs = step.get("jobs") or []
+    job = jobs[0] if isinstance(jobs, list) and jobs else {}
+    if not isinstance(job, dict):
+        job = {}
+    q = job.get("queuePosition") or {}
+    if not isinstance(q, dict):
+        q = {}
+    # Prefer job queuePosition; fall back to step.queuePosition (sdcpp preparing shape)
+    if not q:
+        sq = step.get("queuePosition") or {}
+        q = sq if isinstance(sq, dict) else {}
+    prep_raw = step.get("preparation")
+    prep = prep_raw if isinstance(prep_raw, dict) else {}
     rate = job.get("estimatedProgressRate")
     if rate is None:
         rate = step.get("estimatedProgressRate")
     if rate is None and prep.get("progress") is not None:
         rate = prep.get("progress")
     eta = prep.get("etaSeconds")
-    complete_at = q.get("completeAt")
+    complete_at = q.get("completeAt") or q.get("estimatedCompleteAt")
     if eta is None and complete_at:
         try:
             ts = str(complete_at).replace("Z", "+00:00")
