@@ -320,6 +320,46 @@ def _task(payload, spec):
     return "image-to-image" if has_image else "text-to-image"
 
 
+_HF_IMAGE_FIELDS = (
+    "image_url", "image_urls", "image", "images", "firstFrame", "sourceImage",
+    "startImage", "imageUrl", "imageDataUrl", "referenceImages", "input_references",
+)
+
+
+def _router_attempt_url(provider, provider_id, task):
+    """Return the exact HF Router URL used for a provider attempt."""
+    url = f"{ROUTER}/{provider}/{provider_id}"
+    if provider == "fal-ai" and task in ("image-to-image", "text-to-video", "image-to-video"):
+        url += "?_subdomain=queue"
+    return url
+
+
+def _submitted_evidence(endpoint, task, submitted, payload):
+    """Describe a submission without putting image/data URL contents in errors."""
+    submitted = submitted if isinstance(submitted, dict) else {}
+    image_fields = sorted(str(k) for k in submitted if str(k) in _HF_IMAGE_FIELDS)
+    if not image_fields:
+        image_fields = sorted(str(k) for k in (payload or {}) if str(k) in _HF_IMAGE_FIELDS)
+    lengths = {}
+    for key, value in submitted.items():
+        name = str(key)
+        if isinstance(value, str):
+            lengths[name] = len(value)
+        elif isinstance(value, (list, dict, tuple)):
+            lengths[name] = len(value)
+        elif value is None:
+            lengths[name] = 0
+        else:
+            lengths[name] = None
+    return {
+        "endpoint": endpoint,
+        "task": task,
+        "keys": sorted(str(k) for k in submitted),
+        "imageFields": image_fields,
+        "lengths": lengths,
+    }
+
+
 def _references(payload):
     from .fal import materialize_fal_media
     values = []
@@ -1323,11 +1363,40 @@ class HuggingFaceProvider(Provider):
         }
 
     def generate(self, payload: dict):
+        endpoint_tried = []
+        last_submitted = None
+        last_endpoint = None
+        last_task = None
+        sid = ""
+
+        def record_endpoint(url):
+            if isinstance(url, str) and url and url not in endpoint_tried:
+                endpoint_tried.append(url)
+
+        def finish(code, data, *, submitted=None, endpoint=None, task=None):
+            nonlocal last_submitted, last_endpoint, last_task
+            out = dict(data) if isinstance(data, dict) else {"error": str(data)}
+            submitted = submitted if submitted is not None else last_submitted
+            endpoint = endpoint or last_endpoint
+            task = task or last_task or _task(payload if isinstance(payload, dict) else {}, {})
+            if submitted is None:
+                submitted = _submitted_evidence(endpoint, task, {}, payload if isinstance(payload, dict) else {})
+            if code >= 400:
+                out["submittedInput"] = _submitted_evidence(endpoint, task, submitted, payload if isinstance(payload, dict) else {})
+            else:
+                out.setdefault("submittedInput", submitted)
+            out["endpointTried"] = list(endpoint_tried)
+            if sid:
+                out.setdefault("endpoint", sid)
+            if task:
+                out.setdefault("task", task)
+            return code, out
+
         if not isinstance(payload, dict) or not isinstance(payload.get("serviceId", ""), str):
-            return 400, {"error": "请求必须是对象，serviceId 必须是文本", "backend": self.id}
+            return finish(400, {"error": "请求必须是对象，serviceId 必须是文本", "backend": self.id})
         sid = (payload or {}).get("serviceId") or ""
         if looks_like_civitai_service(sid):
-            return 400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"}
+            return finish(400, {"error": "当前选中的是 Civitai 服务，不能发给 Hugging Face。请选 FLUX.1-schnell 等 Hub 模型。"})
         # v0821o31: official Fal LoRA endpoints (flux-lora / */lora) may appear when chips present.
         # v0821o32: those endpoints are NOT on HF Router (catalog rejects).
         # v0821o33: Path A does NOT score HF — default refuse「请换家 Fal」; debug HF_ALLOW_FAL_TRANSPORT=1 only.
@@ -1339,16 +1408,16 @@ class HuggingFaceProvider(Provider):
             if _has_loras(payload) and fal_supports_lora(fal_find_model(eid) or {"id": eid}):
                 direct_fal_lora = eid
             else:
-                return 400, {
+                return finish(400, {
                     "error": "当前选中的是不接受 LoRA 的 Fal 服务，不能发给 Hugging Face。"
                     "有 LoRA 时请换家 Fal；无 LoRA 时请选 Hub 模型（FLUX.1-dev/schnell 等）。",
                     "backend": self.id,
                     "serviceId": sid,
                     "scoresAsHfClosedLoop": False,
-                }
+                })
         if direct_fal_lora and _needs_fal_lora_transport(direct_fal_lora):
             if not _allow_fal_transport_debug():
-                return 400, {
+                return finish(400, {
                     "error": HF_ROUTER_FAL_LORA_MSG,
                     "backend": self.id,
                     "serviceId": direct_fal_lora,
@@ -1356,11 +1425,18 @@ class HuggingFaceProvider(Provider):
                     "scoresAsHfClosedLoop": False,
                     "hint": "换 backend=fal 使用同一端点；或选 Hub mid 走 Router（无 Civitai Fal-/lora）。"
                     "调试可设 HF_ALLOW_FAL_TRANSPORT=1（仍不计 HF 闭环分）。",
-                }
-            return _submit_hf_fal_lora_via_fal(direct_fal_lora, payload or {})
+                }, endpoint=_router_attempt_url("fal-ai", direct_fal_lora, "text-to-image"), task="text-to-image")
+            direct_endpoint = f"https://queue.fal.run/fal-ai/{direct_fal_lora}"
+            record_endpoint(direct_endpoint)
+            code, data = _submit_hf_fal_lora_via_fal(direct_fal_lora, payload or {})
+            return finish(
+                code, data,
+                endpoint=direct_endpoint,
+                task=_task(payload, {}),
+            )
         keys = hf_keys()
         if not keys:
-            return 401, {"error": "没有 Hugging Face API Key"}
+            return finish(401, {"error": "没有 Hugging Face API Key"})
         if direct_fal_lora:
             # Defensive: non-transport Fal id with loras (should not reach here for */lora).
             mid = direct_fal_lora
@@ -1370,7 +1446,7 @@ class HuggingFaceProvider(Provider):
         else:
             mid = model_id(sid)
             if not mid:
-                return 400, {"error": "缺少 Hugging Face 模型 id"}
+                return finish(400, {"error": "缺少 Hugging Face 模型 id"})
             spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
             mapping = inference_mapping(mid)
             candidates = _provider_candidates(mapping, mid, spec, payload)
@@ -1378,14 +1454,14 @@ class HuggingFaceProvider(Provider):
             if _has_loras(payload) and candidates:
                 prov, pid, style = candidates[0]
                 if style == "fal" and not fal_supports_lora(fal_find_model(pid) or {"id": pid}):
-                    return 400, {
+                    return finish(400, {
                         "error": f"HF 映射端点 {pid} 不接受 LoRA，不能静默换 sibling；"
                         f"{HF_ROUTER_FAL_LORA_MSG}",
                         "backend": self.id,
                         "serviceId": mid,
                         "mapped": pid,
                         "scoresAsHfClosedLoop": False,
-                    }
+                    }, endpoint=_router_attempt_url(prov, pid, (mapping.get(prov) or {}).get("task") or _task(payload, spec)), task=(mapping.get(prov) or {}).get("task") or _task(payload, spec))
         last = (502, {"error": "没有可用的 Hugging Face 推理通道"})
         timeout = 300
         # One click authorizes one route. Extra keys are only for HTTP 402 credits,
@@ -1397,6 +1473,17 @@ class HuggingFaceProvider(Provider):
                     continue
                 jid = f"hf|sync|{uuid.uuid4().hex[:12]}"
                 submitted = {"model": mid, "provider": provider}
+                attempt_task = (mapping.get(provider) or {}).get("task") or _task(payload, spec)
+                if style == "bytes":
+                    attempt_endpoint = f"{LEGACY}/{mid}"
+                elif style == "fal":
+                    attempt_endpoint = _router_attempt_url(provider, pid, attempt_task)
+                else:
+                    attempt_endpoint = f"{ROUTER}/{provider}/v1/images/generations"
+                record_endpoint(attempt_endpoint)
+                last_endpoint = attempt_endpoint
+                last_task = attempt_task
+                last_submitted = submitted
                 saved = []
                 meta = {
                     "backend": "huggingface",
@@ -1425,6 +1512,7 @@ class HuggingFaceProvider(Provider):
                     if style == "bytes":
                         code, data, raw, ctype, submitted = _call_bytes(mid, payload or {}, spec, key, timeout)
                         meta["submittedInput"] = submitted
+                        last_submitted = submitted
                         if code == 503:
                             last = (503, {"error": "模型正在加载，请稍后再试"})
                             continue
@@ -1462,6 +1550,7 @@ class HuggingFaceProvider(Provider):
                             provider, pid, routed_payload, key, timeout, **extra
                         )
                         meta["submittedInput"] = submitted
+                        last_submitted = submitted
                         if code >= 400 or data.get("error"):
                             if isinstance(data, dict):
                                 data.setdefault("error", extract_error(data, f"HTTP {code}"))
@@ -1471,25 +1560,26 @@ class HuggingFaceProvider(Provider):
                                 break
                             # v0821o5: do not continue to wavespeed and overwrite the fal-ai error
                             if _fal_ai_error_is_final(provider, mid, mapping):
-                                return last
+                                return finish(*last)
                             continue
                         if data.get("request_id"):
                             try:
                                 result_url = _queue_url(data.get("response_url"))
                                 status_url = _queue_url(data["status_url"]) if data.get("status_url") else result_url.replace("?_subdomain=queue", "/status?_subdomain=queue")
                             except ValueError as exc:
-                                return 502, {"error": str(exc), "backend": self.id, "provider": provider}
+                                return finish(502, {"error": str(exc), "backend": self.id, "provider": provider}, submitted=submitted, endpoint=attempt_endpoint, task=attempt_task)
                             jid = jid.replace("|sync|", "|queue|")
                             meta.update(jobId=jid, queueResultUrl=result_url, queueStatusUrl=status_url, provider=provider)
                             remember_job(jid, meta)
-                            return 200, {
+                            return finish(200, {
                                 "id": jid, "status": "pending", "backend": self.id, "endpoint": mid,
                                 "provider": provider, "submittedInput": submitted,
-                            }
+                            }, submitted=submitted, endpoint=attempt_endpoint, task=attempt_task)
                         saved = _save_json_images(data, jid, meta=meta)
                     else:
                         code, data, submitted = _call_openai(provider, pid, payload or {}, key, timeout)
                         meta["submittedInput"] = submitted
+                        last_submitted = submitted
                         err_txt = extract_error(data, f"HTTP {code}") if isinstance(data, dict) else str(data)
                         if code >= 400 or data.get("error") or (isinstance(err_txt, str) and "Not allowed to POST" in err_txt):
                             if isinstance(data, dict):
@@ -1501,11 +1591,11 @@ class HuggingFaceProvider(Provider):
                             continue
                         saved = _save_json_images(data, jid, meta=meta)
                 except ValueError as e:
-                    return 400, {"error": str(e), "backend": self.id, "provider": provider}
+                    return finish(400, {"error": str(e), "backend": self.id, "provider": provider}, submitted=submitted, endpoint=attempt_endpoint, task=attempt_task)
                 except Exception as e:
                     last = (502, {"error": "Hugging Face 请求失败", "detail": str(e), "provider": provider})
                     if _fal_ai_error_is_final(provider, mid, mapping):
-                        return last
+                        return finish(*last)
                     continue
                 if saved:
                     out = {
@@ -1524,16 +1614,16 @@ class HuggingFaceProvider(Provider):
                             "上游是否加载未证实（路由没有 /lora sibling）"
                         )
                     remember_job(jid, {**meta, "result": out})
-                    return 200, out
+                    return finish(200, out, submitted=submitted, endpoint=attempt_endpoint, task=attempt_task)
                 last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
                 if _fal_ai_error_is_final(provider, mid, mapping):
-                    return last
+                    return finish(*last)
                 if credit_retry:
                     break
             if credit_retry:
                 continue
-            return last
-        return last
+            return finish(*last)
+        return finish(*last)
 
     def job_status(self, job_id: str):
         meta = job_meta(job_id)

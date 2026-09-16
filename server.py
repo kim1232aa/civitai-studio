@@ -1265,6 +1265,34 @@ class Handler(BaseHTTPRequestHandler):
         except CanvasStoreError as exc:
             return self._canvas_error(exc)
 
+    def _audit_submitted_input(self, submitted):
+        """Return submitted-input keys and lengths without copying media bytes."""
+        if not isinstance(submitted, dict):
+            return None
+        lengths = {}
+        for key, value in submitted.items():
+            name = str(key)
+            if isinstance(value, str):
+                lengths[name] = len(value)
+            elif isinstance(value, (list, dict, tuple)):
+                lengths[name] = len(value)
+            elif value is None:
+                lengths[name] = 0
+            else:
+                lengths[name] = None
+        out = {
+            "keys": sorted(str(k) for k in submitted.keys()),
+            "lengths": lengths,
+        }
+        # These are field names/route metadata, never media payload values.
+        if isinstance(submitted.get("endpoint"), str):
+            out["endpoint"] = submitted["endpoint"]
+        if isinstance(submitted.get("task"), str):
+            out["task"] = submitted["task"]
+        if isinstance(submitted.get("imageFields"), list):
+            out["imageFields"] = sorted(str(x) for x in submitted["imageFields"] if isinstance(x, str))
+        return out
+
     def _audit_generate(self, payload, prov, code, data):
         """Record real POST /api/generate — keys only, no tokens, no image bytes."""
         payload = payload if isinstance(payload, dict) else {}
@@ -1284,6 +1312,7 @@ class Handler(BaseHTTPRequestHandler):
             "keys": sorted(str(k) for k in payload.keys()),
             "nLoras": len(payload["loras"]) if isinstance(payload.get("loras"), list) else 0,
             "nRefs": n_refs,
+            "submittedInput": self._audit_submitted_input(data.get("submittedInput")),
             "endpointTried": data.get("endpointTried"),
             "code": code,
             "jobId": data.get("id") or data.get("jobId") or data.get("workflowId"),

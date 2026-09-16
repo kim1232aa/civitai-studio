@@ -89,6 +89,31 @@ class HFContract(unittest.TestCase):
         auths = [c.kwargs.get("headers", {}).get("Authorization") for c in self.transport.call_args_list]
         self.assertEqual(auths, ["Bearer key-dead", "Bearer key-live"])
 
+    def test_402_response_carries_safe_submission_evidence_and_endpoint(self):
+        mapping = {
+            "fal-ai": {
+                "status": "live", "providerId": "fal-ai/wan-i2v",
+                "task": "image-to-video",
+            },
+        }
+        submitted = {
+            "prompt": "x",
+            "image_url": "data:image/png;base64,never-log-this",
+        }
+        with patch.object(hf, "inference_mapping", return_value=mapping), \
+                patch.object(hf, "_call_fal", return_value=(402, {"error": "depleted"}, submitted)):
+            code, data = hf.HuggingFaceProvider().generate({
+                "serviceId": "org/video", "prompt": "x", "kind": "video",
+                "sourceImage": "data:image/png;base64,never-log-this",
+            })
+        endpoint = "https://router.huggingface.co/fal-ai/fal-ai/wan-i2v?_subdomain=queue"
+        self.assertEqual(code, 402)
+        self.assertEqual(data["endpointTried"], [endpoint])
+        self.assertEqual(data["submittedInput"]["endpoint"], endpoint)
+        self.assertEqual(data["submittedInput"]["task"], "image-to-video")
+        self.assertEqual(data["submittedInput"]["imageFields"], ["image_url"])
+        self.assertNotIn("never-log-this", str(data["submittedInput"]))
+
     def test_422_does_not_burn_a_second_hf_key(self):
         mapping = {"fal-ai": {"status": "live", "providerId": "fal-ai/flux/dev", "task": "text-to-image"}}
         self.transport.return_value = (422, {"error": "HTTP 422"})
