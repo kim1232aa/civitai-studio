@@ -35,6 +35,7 @@
   // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
+  // v0821o144: advanced params default expanded (not folded); stamp v0821o144-adv-default-open
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
@@ -9785,14 +9786,28 @@
     if (p) { try { p.focus(); } catch (_) {} }
     showAtbox("");
   };
-  if ($("advToggle")) $("advToggle").onclick = () => {
+  // o144: advanced params DEFAULT OPEN; toggle still collapses optionally.
+  function syncAdvParamsOpen() {
     const p = $("advParams");
-    if (!p) return;
-    p.hidden = !p.hidden;
-    $("advToggle").setAttribute("aria-expanded", p.hidden ? "false" : "true");
-    $("advToggle").textContent = p.hidden ? "高级参数 ▾" : "高级参数 ▴";
-    requestAnimationFrame(positionDock);
-  };
+    const t = $("advToggle");
+    if (!p || !t) return;
+    const open = !p.hidden;
+    t.setAttribute("aria-expanded", open ? "true" : "false");
+    t.textContent = open ? "高级参数 ▴" : "高级参数 ▾";
+  }
+  if ($("advToggle")) {
+    $("advToggle").onclick = () => {
+      const p = $("advParams");
+      if (!p) return;
+      p.hidden = !p.hidden;
+      syncAdvParamsOpen();
+      requestAnimationFrame(positionDock);
+    };
+    // Boot: HTML defaults open (no hidden); sync label/aria once.
+    const p0 = $("advParams");
+    if (p0) p0.hidden = false;
+    syncAdvParamsOpen();
+  }
   const sekoRow = $("sekoRow");
   if (sekoRow) {
     sekoRow.addEventListener("change", (e) => {

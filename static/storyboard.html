@@ -7,7 +7,7 @@
 <title>画布 · Night Lab</title>
 
 <link rel="stylesheet" href="/static/storyboard-ui-base.css?v=o132">
-<link rel="stylesheet" href="/static/storyboard-ui.css?v=o143burn">
+<link rel="stylesheet" href="/static/storyboard-ui.css?v=o144adv">
 <link rel="stylesheet" href="/static/composer-field-adapt.css?v=o132" />
 <link rel="stylesheet" href="/static/o76-dock-right.css?v=o132" />
 <link rel="stylesheet" href="/static/o97-dock-pin.css?v=o132" />
@@ -31,7 +31,7 @@
       <button type="button" id="btnHistoryTop" class="tool-mini" title="生成历史 · 所有画布生成内容">🕘 生成历史</button>
       <a href="/index.html">配方台</a>
       <a href="/litegraph">LiteGraph</a>
-      <span class="stamp" hidden aria-hidden="true">v0821o143-magao-burn-ui</span>
+      <span class="stamp" hidden aria-hidden="true">v0821o144-adv-default-open</span>
     </div>
   </header>
   <div id="canvasManager" class="canvas-manager" aria-label="项目与画布管理"></div>
@@ -246,14 +246,14 @@
           <span class="grow"></span>
           <button type="button" class="send" id="send" title="生成" data-testid="composer-send">↑</button>
         </div>
-        <button type="button" id="advToggle" class="adv-toggle" aria-expanded="false" aria-controls="advParams">高级参数 ▾</button>
-        <div class="adv-params" id="advParams" hidden>
+        <button type="button" id="advToggle" class="adv-toggle" aria-expanded="true" aria-controls="advParams">高级参数 ▴</button>
+        <div class="adv-params" id="advParams">
           <span class="param-group" id="falParams">
             <label class="param-field"><span>时长</span><select id="duration">
               <option selected>5s</option><option>12s</option><option>16s</option>
             </select></label>
           </span>
-          <span class="param-group hidden" id="comfyParams">
+          <span class="param-group" id="comfyParams">
             <label class="param-field" for="width"><span>宽</span><input id="width" type="number" min="64" max="2048" step="8" title="宽" placeholder="宽" /></label>
             <label class="param-field" for="height"><span>高</span><input id="height" type="number" min="64" max="2048" step="8" title="高" placeholder="高" /></label>
             <label class="param-field" for="steps"><span>步数</span><input id="steps" type="number" min="1" max="150" title="步数" placeholder="steps" /></label>
@@ -314,7 +314,7 @@
 </div>
 
 <div class="ghost" id="ghost" aria-hidden="true"></div>
-<!-- v0821o49b-hydrate-fresh-empty-url o49bhydratefreshemptyurl 20260911-o49bhydratefreshemptyurl storyboard.js?v=20260911-o49bhydratefreshemptyurl storyboard-ui.css?v=o143burn composer-field-adapt.js?v=20260911-o49bhydratefreshemptyurl -->
+<!-- v0821o49b-hydrate-fresh-empty-url o49bhydratefreshemptyurl 20260911-o49bhydratefreshemptyurl storyboard.js?v=20260911-o49bhydratefreshemptyurl storyboard-ui.css?v=o144adv composer-field-adapt.js?v=20260911-o49bhydratefreshemptyurl -->
 <!-- v0821o91-seko-tools o91sekotools v0821o92-seko-fill o92sekofill v0821o93-search-match o93searchmatch v0821o95-stage-first o95stagefirst v0821o96-expand-clean o96expandclean v0821o98-capsule-fit o98capsulefit v0821o99-capsule-row o99capsulerow v0821o100-desk o100desk v0821o101-shell o101shell v0821o102-seko o102seko v0821o103-wide-desk o103wide v0821o104-seko-attach o104attach v0821o105-adapt o105adapt v0821o106-drag o106drag v0821o107-wires o107wires v0821o110-ws o110ws v0821o124-fields o124fields v0821o133-family o133fam v0821o90-cross-lora-search o90crosslora v0821o54b-lora-roster-rematch o54blorarosterrematch v0821o52-import-pending-survive-i2i 20260911-o52importpendingsurvivei2i v0821o53d-capacity-rematch-roster o53dcapacityrematchroster o112attach -->
 <!-- v0821o136-prompt-bible o136prompt storyboard.js?v=o135fix prompt-bible.js?v=o136prompt -->
 <script src="/static/lora-capability-hints.js?v=o70lora"></script>
@@ -322,9 +322,9 @@
 <script src="/static/o61-group-hide.js?v=o75seko"></script>
 <script src="/static/smart-family-match.js?v=o133fam"></script>
 <script src="/static/prompt-bible.js?v=o136prompt"></script>
-<script src="/static/storyboard.js?v=o143burn"></script>
+<script src="/static/storyboard.js?v=o144adv"></script>
 <script src="/static/o133-smart-match-hook.js?v=o133"></script>
-<script src="/static/o68-capability-hide.js?v=o143"></script>
+<script src="/static/o68-capability-hide.js?v=o144"></script>
 <script src="/static/o75-catalog-busy.js?v=o98busy"></script>
 <script src="/static/o76-model-fields.js?v=o76fields"></script>
 <script src="/static/o67-human-copy.js?v=o132pin"></script>

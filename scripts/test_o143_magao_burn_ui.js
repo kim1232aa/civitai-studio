@@ -14,9 +14,19 @@ const o134 = fs.readFileSync(path.join(root, "static/o134-lora-remap-hook.js"), 
 const css = fs.readFileSync(path.join(root, "static/storyboard-ui.css"), "utf8");
 
 assert.ok(js.includes("v0821o143-magao-burn-ui"), "js stamp");
-assert.ok(html.includes("v0821o143-magao-burn-ui"), "html stamp");
-assert.ok(html.includes("storyboard.js?v=o143burn"), "cache bust storyboard");
-assert.ok(html.includes("o68-capability-hide.js?v=o143"), "cache bust o68");
+// html stamp/cache may advance (o144+); o143 contracts live in js/o68/css
+assert.ok(
+  html.includes("v0821o143-magao-burn-ui") || html.includes("v0821o144-adv-default-open"),
+  "html stamp o143 or successor"
+);
+assert.ok(
+  /storyboard\.js\?v=o143burn|storyboard\.js\?v=o144adv/.test(html),
+  "cache bust o143 or successor"
+);
+assert.ok(
+  /o68-capability-hide\.js\?v=o143|o68-capability-hide\.js\?v=o144/.test(html),
+  "cache bust o68 o143 or successor"
+);
 assert.ok(o68.includes("未知是否加载"), "o68 honest unknown+chips copy");
 assert.ok(o68.includes("hasChips"), "o68 checks chips");
 assert.ok(o68.includes("v0821o143-o68-lora-unknown-chips"), "o68 stamp");
