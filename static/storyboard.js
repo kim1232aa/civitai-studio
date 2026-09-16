@@ -35,6 +35,7 @@
   // o53b: Fal empty imageFields→eats=false; editSibling +/image-to-image; link refuse over-cap; N=1 prefer */image-to-image
   // v0821o52: re-inject _pendingService after i2i catalog filter so import mounts t2i; stamp v0821o52-import-pending-survive-i2i
   // v0821o51: remove duplicate const expanded in positionDock (SyntaxError killed whole storyboard.js); stamp v0821o51-fix-expanded-redeclare
+  // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
   // v0821o49b: hydrate freshness + empty-url merge + pending retire; stamp v0821o49b-hydrate-fresh-empty-url
   // v0821o50: nano LoRA omit null scale (never invent 1.0); tip with o49b
   // v0821o49: harness stamp align (persist/restore + graph); stamp v0821o49-harness-stamp-o48
@@ -1668,7 +1669,11 @@
   let _didFirstSeed = false;
   let _canvasSaveTimer = 0;
   function isMainHouseGraph() {
-    return (state.nodes || []).some(function (n) { return n && n.id === "shot-civitai"; });
+    // o120: blank canvases skip shared PUT (canvas PATCH only).
+    // o142: house anchor is shot-1 (storyboard_graph.json); shot-civitai kept for harness/legacy.
+    return (state.nodes || []).some(function (n) {
+      return n && (n.id === "shot-1" || n.id === "shot-civitai");
+    });
   }
   function persistActiveCanvasSoon() {
     try { clearTimeout(_canvasSaveTimer); } catch (_) {}
@@ -1809,6 +1814,38 @@
     m.style.left = Math.max(12, r.left) + "px";
     m.style.top = (r.bottom + 8) + "px";
   }
+  function mergeAdoptShotUrls(canvasNodes) {
+    // o142: stale canvas PATCH must not clobber fresher in-memory/LS shot.url (writeback→hard refresh).
+    const prevById = {};
+    for (let i = 0; i < (state.nodes || []).length; i++) {
+      const n = state.nodes[i];
+      if (n && n.id && n.kind === "shot") prevById[n.id] = n;
+    }
+    return (canvasNodes || []).map(function (n) {
+      if (!n || n.kind !== "shot" || !n.id) return n;
+      const prev = prevById[n.id];
+      if (!prev) return n;
+      const canvasUrl = n.url != null ? String(n.url).trim() : "";
+      const prevUrl = prev.url != null ? String(prev.url).trim() : "";
+      if (!prevUrl) return n;
+      if (!canvasUrl) {
+        const out = Object.assign({}, n, { url: prev.url });
+        if (prev._urlUpdatedAt != null) out._urlUpdatedAt = prev._urlUpdatedAt;
+        if (prev.urlUpdatedAt != null) out.urlUpdatedAt = prev.urlUpdatedAt;
+        return out;
+      }
+      if (prevUrl === canvasUrl) return n;
+      const prevTs = shotUrlMtime(prev);
+      const canvasTs = shotUrlMtime(n);
+      if (prevTs > canvasTs || (prevTs > 0 && canvasTs === 0)) {
+        const out = Object.assign({}, n, { url: prev.url });
+        const ts = prev._urlUpdatedAt != null ? prev._urlUpdatedAt : prev.urlUpdatedAt;
+        if (ts != null) { out._urlUpdatedAt = ts; out.urlUpdatedAt = ts; }
+        return out;
+      }
+      return n;
+    });
+  }
   function adoptCanvas(project, canvasId, fresh) {
     _canvasAdopted = true;
     const id = canvasId || (project && project.activeCanvasId) || "";
@@ -1822,9 +1859,10 @@
       setMsg("已新建空白画布 · " + ((canvas && canvas.name) || "画布"), "ok");
       return;
     }
-    const nodes = (canvas && canvas.nodes) || [];
+    let nodes = (canvas && canvas.nodes) || [];
     if (nodes.length) {
       _canvasAdopted = true;
+      nodes = mergeAdoptShotUrls(nodes);
       const vp = (canvas && canvas.viewport) || {};
       applyGraph({
         nodes: nodes,
@@ -1834,6 +1872,13 @@
       renderCards(); drawWires(); renderDock();
       if (typeof renderWorkspace === "function") renderWorkspace();
       persist();
+      // o142: after canvas adopt, re-hydrate so server shot.url (PUT) can win over stale canvas
+      try {
+        hydrateFromServer().then(function (changed) {
+          if (!changed) return;
+          try { renderCards(); drawWires(); renderDock(); persist(); } catch (_) {}
+        }).catch(function () {});
+      } catch (_) {}
       if (typeof fitShotsInView === "function") fitShotsInView();
       closeSpace();
       return;
@@ -9087,6 +9132,14 @@
             || stStatus === "PREPARING" || stStatus === "PREPARED" || stStatus === "QUEUED"
             || stStatus === "SCHEDULED";
           if ((st.error || st.status === "failed") && !inFlight) {
+            // o142/o46b: Magao may flip to failed ("invalid response format") after /out exists —
+            // poll debt: prefer saved[] / pendingWriteback / localOutResume over throw.
+            const failSaved = (st && st.pendingWriteback && st.pendingWriteback.url)
+              || pickSavedUrl(st);
+            if (failSaved) {
+              j = st;
+              break;
+            }
             // Throw raw so fail() → formatErrInfo keeps English in excerpt.
             throw (st.error || (st.wait && st.wait.log) || st.message || "任务失败");
           }
@@ -12375,6 +12428,18 @@
       smartMatch: function () {
         return smartMatchService({ announce: true });
       },
+      // o142 harness: session writeback → persistServer PUT (shot-1 house)
+      writebackShot: function (id, url) {
+        const shot = nodeById(id);
+        if (!shot || shot.kind !== "shot" || !url) return false;
+        writebackResult(shot, url);
+        return true;
+      },
+      shotUrl: function (id) {
+        const shot = nodeById(id);
+        return shot && shot.url ? String(shot.url) : "";
+      },
+      isMainHouse: function () { return isMainHouseGraph(); },
     };
   }
   window.__sekoDeleteNode = deleteNode;
