@@ -8338,6 +8338,18 @@
         genParams.resolution = res;
         genParams.aspectRatio = aspect;
       }
+      // o140: UI duration must enter page↑ payload for nano video
+      // (providers/nanogpt._video_body already reads payload.duration).
+      if (op === "i2v" || op === "t2v" || state.mode === "video") {
+        const pc = (typeof catalogCaps === "function") ? catalogCaps() : {};
+        const durEl = $("duration");
+        const falBox = $("falParams");
+        const groupHidden = !!(falBox && falBox.classList && falBox.classList.contains("hidden"));
+        if (pc.videoDuration && durEl && !durEl.classList.contains("hidden") && !groupHidden && !durationGateMessage()) {
+          const durN = parseDurationSeconds(durEl.value);
+          if (Number.isFinite(durN)) genParams.duration = durN;
+        }
+      }
     } else {
       // v0821o136seko-falschema: 发送边界同步判定——CSS 标记有异步时序，
       // 官方 schema 字段表（official_fields）在 payload 边界再拦一次，杜绝竞赛漏发 steps/aspect。
