@@ -41,6 +41,8 @@
   // v0821o148-magao-cn-catalog-tongyi o148magao 20260916-o148: Magao CN pin-first catalog + never invent Krea-2-Turbo; house-first afterImport mounts Tongyi for zimage
   // v0821o149b-magao-seed-warn-not-block o149bseed 20260916-o149b: Magao over-int32 keeps digits +「超魔搭区间」warn-only (not send-gate); outbound omit
   // v0821o150-nano-prompt-limit-warn o150nano 20260916-o150: Nano live counter 上限/剩余/超N字; over blocks ↑; never silent truncate; measured 400
+  // v0821o151-fal-schnell-steps-honest o151fal 20260916-o151: Fal schnell steps max 12 — update #steps + hint「schnell 上限 12，已从原帖 20→12」; never silent clamp
+  // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -5924,6 +5926,74 @@
     }
     return merged;
   }
+  // o151: official OpenAPI steps max from catalog stamp (schnell=12). Never invent.
+  function falStepsMax() {
+    const caps = (typeof catalogCaps === "function") ? catalogCaps() : {};
+    if (caps && caps.stepsMax != null && Number.isFinite(Number(caps.stepsMax))) {
+      return Number(caps.stepsMax);
+    }
+    const it = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+    if (it && it.stepsMax != null && Number.isFinite(Number(it.stepsMax))) {
+      return Number(it.stepsMax);
+    }
+    const sid = String(($("service") && $("service").value) || "");
+    // Official Fal OpenAPI maximum for fal-ai/flux/schnell (verified 2026-09-16).
+    if (/flux\/schnell/i.test(sid) || sid === "fal-ai/flux/schnell") return 12;
+    return null;
+  }
+  // o151: when steps > OpenAPI max, update #steps AND show visible hint — never silent outbound-only clamp.
+  function honestFalSchnellStepsClamp() {
+    if ((typeof currentBackend === "function" ? currentBackend() : "") !== "fal") return "";
+    const mx = falStepsMax();
+    if (mx == null) return "";
+    const el = $("steps");
+    if (!el || el.value === "") return "";
+    const n = parseInt(el.value, 10);
+    if (!Number.isFinite(n) || n <= mx) return "";
+    const orig = n;
+    el.value = String(mx);
+    const sid = String(($("service") && $("service").value) || "");
+    const label = /schnell/i.test(sid) ? "schnell" : "Fal";
+    const hint = label + " 上限 " + mx + "，已从原帖 " + orig + "→" + mx;
+    try { setParamWarn(hint, true); } catch (_) {}
+    return hint;
+  }
+  // o152: parse Nano catalog size token → {w,h} or null (never invent).
+  function parseNanoSizeToken(token) {
+    const s = String(token || "").trim().toLowerCase().replace(/×/g, "x").replace(/\*/g, "x").replace(/\s+/g, "");
+    const m = /^(\d+)x(\d+)$/.exec(s);
+    if (!m) return null;
+    return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
+  }
+  // o152: prefer exact WxH catalog token for #nanoRes when UI has width×height.
+  function syncNanoResFromSize() {
+    if (typeof isNanogptBe === "function" ? !isNanogptBe() : (($("backend") && $("backend").value) !== "nano-gpt")) return;
+    const sel = $("nanoRes");
+    if (!sel) return;
+    const w = $("width") ? parseInt($("width").value, 10) : NaN;
+    const h = $("height") ? parseInt($("height").value, 10) : NaN;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+    const caps = (typeof catalogCaps === "function") ? catalogCaps() : {};
+    const tokens = [].concat(caps.resolutionTokens || caps.resolutions || []);
+    if (!tokens.length) return;
+    const want = (w + "x" + h);
+    let hit = null;
+    tokens.forEach(function (t) {
+      const n = String(t).toLowerCase().replace(/×/g, "x").replace(/\*/g, "x").replace(/\s+/g, "");
+      if (n === want) hit = t;
+    });
+    if (hit) {
+      ensureSelectOpt(sel, hit);
+      sel.value = String(hit);
+    }
+    if (typeof syncAspectFromSize === "function") syncAspectFromSize(w, h);
+  }
+  function syncAspectFromNanoToken() {
+    const token = $("nanoRes") && $("nanoRes").value;
+    const wh = parseNanoSizeToken(token);
+    if (wh && typeof syncAspectFromSize === "function") syncAspectFromSize(wh.w, wh.h);
+  }
+
   function capabilityForCatalogItem(item) {
     const list = state._capabilities || [];
     if (!item) return null;
@@ -6135,7 +6205,10 @@
         if (w) adaptWarn = w;
       }
     } catch (_) {}
-    setParamWarn(msgs[0] || magaoSeedWarn || adaptWarn || "", !!(msgs.length || magaoSeedWarn || adaptWarn));
+    // o151: surface schnell steps clamp hint (warn-only; value already written to #steps).
+    let falStepsHint = "";
+    try { falStepsHint = honestFalSchnellStepsClamp() || ""; } catch (_) {}
+    setParamWarn(msgs[0] || magaoSeedWarn || falStepsHint || adaptWarn || "", !!(msgs.length || magaoSeedWarn || falStepsHint || adaptWarn));
     return msgs[0] || "";
   }
   function fillNanoResOptions() {
@@ -6188,6 +6261,10 @@
     syncParamSurface();
   }
   function applyServiceConstraints() {
+    // o151: Fal schnell steps over OpenAPI max → UI update + visible hint (never silent).
+    try { honestFalSchnellStepsClamp(); } catch (_) {}
+    // o152: Nano size token ↔ aspect / exact WxH when possible.
+    try { syncNanoResFromSize(); syncAspectFromNanoToken(); } catch (_) {}
     // v0821o53: over-cap → try rematch from catalog (never silent unlink).
     if (typeof tryCapacityRematchAfterServiceChange === "function") {
       try {
@@ -8511,12 +8588,13 @@
       genParams.resolution = ($("res") && $("res").value) || "720P";
       genParams.aspectRatio = aspect;
     } else if (be === "nano-gpt") {
+      // o152: keep size token + aspect consistent with UI; never omit aspect so BE invents 1:1.
+      try { syncNanoResFromSize(); syncAspectFromNanoToken(); } catch (_) {}
       const token = ($("nanoRes") && $("nanoRes").value) || "";
+      const aspectNow = ($("aspect") && $("aspect").value) || aspect;
       if (token) genParams.resolution = token;
-      else {
-        genParams.resolution = res;
-        genParams.aspectRatio = aspect;
-      }
+      else genParams.resolution = res;
+      if (aspectNow) genParams.aspectRatio = aspectNow;
       // o140: UI duration must enter page↑ payload for nano video
       // (providers/nanogpt._video_body already reads payload.duration).
       if (op === "i2v" || op === "t2v" || state.mode === "video") {
@@ -11887,6 +11965,10 @@
 
     applyComfyParamsToUi(j);
     if ($("width") && $("height")) syncAspectFromSize(Number($("width").value), Number($("height").value));
+    // o151: import steps=20 + fal/schnell → UI 12 + visible hint (never silent outbound clamp).
+    try { honestFalSchnellStepsClamp(); } catch (_) {}
+    // o152: after import WxH, pick exact nano token when listed; sync aspect.
+    try { syncNanoResFromSize(); syncAspectFromNanoToken(); } catch (_) {}
     if (shot) {
       ["width", "height", "steps", "sampler", "scheduler", "seed"].forEach(function (k) {
         if (j[k] != null) shot[k] = j[k];
@@ -12498,7 +12580,10 @@
     $("prompt").addEventListener("input", function () { paramGateMessage(); });
   }
   if ($("nanoRes")) {
-    $("nanoRes").addEventListener("change", function () { persist(); paramGateMessage(); });
+    $("nanoRes").addEventListener("change", function () {
+      try { syncAspectFromNanoToken(); } catch (_) {}
+      persist(); paramGateMessage();
+    });
   }
   // v0821o26: rebuild #backend from /api/providers — every registered provider, honest labels.
   // Never filter to hasKey-only (铁律: 禁止隐藏 API 已支持能力 / 禁止单家盯梢).

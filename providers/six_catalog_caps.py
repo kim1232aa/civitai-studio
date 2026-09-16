@@ -130,6 +130,16 @@ def overlay_fal_catalog_item(row: dict | None) -> dict:
     if isinstance(fields, list):
         caps["imageFields"] = fields
 
+    # o151: official OpenAPI steps max (schnell=12) — never invent.
+    try:
+        from .fal import fal_openapi_steps_max
+        sm = fal_openapi_steps_max(sid)
+        if sm is not None:
+            caps["stepsMax"] = int(sm)
+            row["stepsMax"] = int(sm)
+    except Exception:
+        pass
+
     row["capabilities"] = caps
     if "supportsLora" in caps:
         row["supportsLora"] = caps["supportsLora"]

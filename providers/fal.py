@@ -62,6 +62,23 @@ def fal_openapi_max_refs(endpoint_id: str | None) -> int | None:
     return None
 
 
+# Official Fal OpenAPI num_inference_steps.maximum (verified 2026-09-16 queue OpenAPI).
+# fal-ai/flux/schnell: maximum=12, minimum=1, default=4. Never invent lower/higher.
+FAL_OPENAPI_STEPS_MAX: dict[str, int] = {
+    "fal-ai/flux/schnell": 12,
+}
+
+
+def fal_openapi_steps_max(endpoint_id: str | None) -> int | None:
+    """Return official OpenAPI steps max when known; else None (do not invent)."""
+    e = (endpoint_id or "").strip()
+    if not e:
+        return None
+    if e in FAL_OPENAPI_STEPS_MAX:
+        return int(FAL_OPENAPI_STEPS_MAX[e])
+    return None
+
+
 def fal_key() -> str:
     try:
         return TOKEN_PATH.read_text().strip()
@@ -315,6 +332,11 @@ def overlay_image_fields(item: dict) -> dict:
     caps["refImagesField"] = out.get("refImagesField") or caps.get("refImagesField")
     if official is not None:
         caps["max_input_images"] = int(out["maxRefs"])
+    # o151: stamp official num_inference_steps.maximum (schnell=12). Never invent.
+    steps_max = fal_openapi_steps_max(eid)
+    if steps_max is not None:
+        caps["stepsMax"] = int(steps_max)
+        out["stepsMax"] = int(steps_max)
     if "supportsI2v" in out:
         caps["supportsI2v"] = bool(out["supportsI2v"])
     elif is_video:
@@ -789,6 +811,16 @@ def build_fal_input(payload: dict) -> dict:
                 "（仅 quantity=1 可省略）"
             )
     apply_fal_loras(inp, payload, spec, eid)
+    # o151: never silent-clamp over OpenAPI maximum (schnell max 12).
+    # After LoRA gate so unsupported-LoRA errors stay primary when both apply.
+    if "num_inference_steps" in inp:
+        steps_max = fal_openapi_steps_max(eid)
+        n_steps = inp["num_inference_steps"]
+        if steps_max is not None and isinstance(n_steps, int) and n_steps > steps_max:
+            raise ValueError(
+                f"端点 {eid} 官方 num_inference_steps 上限 {steps_max}，收到 {n_steps}，"
+                f"拒绝静默截断（请在 UI 改为 ≤{steps_max}）"
+            )
     # Keep empty-string prompt: Fal minimax i2v 422s with "body.prompt: Field required"
     # if the key is omitted (v0821k / job 01a07e75). Other empty strings still drop.
     out = {}

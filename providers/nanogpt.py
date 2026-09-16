@@ -236,6 +236,20 @@ def closest_aspect(w, h) -> str:
     return best
 
 
+def _wh_from_size_token(token):
+    """Parse catalog size/resolution token like 720*1280 / 720x1280 → (w,h).
+
+    Non-pixel tokens (1k/auto/square_hd) → (None, None). Never invent pixels.
+    """
+    if token in (None, ""):
+        return None, None
+    s = str(token).strip().lower().replace("×", "x").replace("*", "x").replace(" ", "")
+    m = re.fullmatch(r"(\d+)x(\d+)", s)
+    if not m:
+        return None, None
+    return int(m.group(1)), int(m.group(2))
+
+
 def _parameter_options(spec, name):
     sp = (spec or {}).get("supported_parameters") or {}
     param = (sp.get("parameters") or sp).get(name) or {}
@@ -940,7 +954,20 @@ def _image_body(payload: dict, spec: dict) -> dict:
         body["size"] = res
     # width/height are only for picking the catalog token / aspect — never POST or persist them
     # (FE hint: 导入尺寸仅参考，不进 POST).
-    ar = closest_aspect(w or 1024, h or 1024)
+    # o152: never invent aspect_ratio=1:1 from missing w/h (was closest_aspect(1024,1024)).
+    # Prefer payload aspect; else derive from w/h; else from size/resolution WxH token.
+    ar = payload.get("aspect_ratio") or payload.get("aspectRatio")
+    if not ar:
+        ww = hh = None
+        try:
+            ww = int(w) if w not in (None, "") else None
+            hh = int(h) if h not in (None, "") else None
+        except (TypeError, ValueError):
+            ww = hh = None
+        if not (ww and hh) and res:
+            ww, hh = _wh_from_size_token(res)
+        if ww and hh:
+            ar = closest_aspect(ww, hh)
     if ar:
         body["aspect_ratio"] = ar
     seed = _clamp_seed(payload.get("seed"))
