@@ -15,7 +15,7 @@ const recipe = fs.readFileSync(path.join(root, "static/index.html"), "utf8");
 const Fam = require(path.join(root, "static/smart-family-match.js"));
 
 // --- cache bust ---
-assert.ok(/storyboard\.js\?v=o14[5-7]/.test(html), "storyboard.js cache bust o145");
+assert.ok(/storyboard\.js\?v=o14[5-8]/.test(html), "storyboard.js cache bust o145+");
 
 // --- source contracts (canvas) ---
 assert.ok(source.includes("import posts (checkpoint/diffusion on shot) never fall through"), "no SMART_PREF on import");

@@ -11,8 +11,8 @@ const js = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
 assert.ok(js.includes("v0821o146-canvas-hydrate-scope"), "js stamp");
-assert.ok(html.includes("v0821o146-canvas-hydrate-scope") || html.includes("o146canvas") || html.includes("v0821o147-house-first-after-import") || html.includes("o147house"), "html stamp");
-assert.ok(/storyboard\.js\?v=o146canvas|storyboard\.js\?v=o147house/.test(html), "cache bust o146");
+assert.ok(html.includes("v0821o146-canvas-hydrate-scope") || html.includes("o146canvas") || html.includes("v0821o147-house-first-after-import") || html.includes("o147house") || html.includes("v0821o148-magao-cn-catalog-tongyi") || html.includes("o148magao"), "html stamp");
+assert.ok(/storyboard\.js\?v=o146canvas|storyboard\.js\?v=o147house|storyboard\.js\?v=o148magao/.test(html), "cache bust o146+");
 assert.ok(js.includes("canvasScoped"), "canvasScoped guard");
 assert.ok(js.includes("never replace the whole board with"), "comment explains Magao revive");
 

@@ -8,6 +8,7 @@ import socket
 from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 from urllib.parse import urlparse, quote
 
 from .base import Provider
@@ -346,6 +347,8 @@ HUB_TASKS = (
 )
 _HUB_CACHE = {"at": 0.0, "items": None, "totals": {}}
 _HUB_TTL = 300
+_HUB_LOCK = threading.RLock()
+_HUB_BG = {"thread": None}  # single shared background Hub refresh
 # Official OpenAPI: page_size maximum 50; page_number * page_size <= 3000.
 _HUB_PAGE = 50
 _HUB_OPENAPI_OFFSET_MAX = 3000
@@ -743,6 +746,54 @@ def _ingest_aigc_template(items, seen, totals):
     return added
 
 
+
+def _read_hub_cache():
+    with _HUB_LOCK:
+        items = _HUB_CACHE.get("items")
+        totals = dict(_HUB_CACHE.get("totals") or {})
+        at = float(_HUB_CACHE.get("at") or 0.0)
+        return (list(items) if items is not None else None), totals, at
+
+
+def _store_hub_cache(items, totals):
+    with _HUB_LOCK:
+        _HUB_CACHE["items"] = list(items or [])
+        _HUB_CACHE["at"] = time.time()
+        _HUB_CACHE["totals"] = dict(totals or {})
+
+
+def _refresh_hub_sync():
+    """Fetch AIGC Checkpoint list once and store. Used by shared background refresh."""
+    hub, totals = fetch_hub(search="")
+    if hub:
+        _store_hub_cache(hub, totals)
+        return hub, totals
+    prev, prev_tot, _ = _read_hub_cache()
+    if prev is not None:
+        return prev, prev_tot or totals
+    # Keep cache empty so next request still pin-first; do not store a hollow list.
+    return [], totals
+
+
+def _kick_hub_refresh():
+    """Ensure at most one Hub crawl is in flight (no stampede / Broken-pipe pile-up)."""
+    with _HUB_LOCK:
+        th = _HUB_BG.get("thread")
+        if th is not None and th.is_alive():
+            return th
+
+        def run():
+            try:
+                _refresh_hub_sync()
+            except Exception as exc:
+                print("[modelscope] hub refresh", exc, flush=True)
+
+        th = threading.Thread(target=run, name="ms-hub-refresh", daemon=True)
+        _HUB_BG["thread"] = th
+        th.start()
+        return th
+
+
 def fetch_hub(search=""):
     if (search or "").strip():
         return fetch_hub_search(search)
@@ -914,33 +965,33 @@ class ModelScopeProvider(Provider):
         qn = (q or "").strip()
         now = time.time()
         totals = {}
-        cached = _HUB_CACHE["items"] is not None and (now - (_HUB_CACHE.get("at") or 0)) < _HUB_TTL
         pins = load_disk()
+        cached_items, cached_totals, cached_at = _read_hub_cache()
+        cached = cached_items is not None and (now - cached_at) < _HUB_TTL
         if cached:
-            items = _promote_pins(list(_HUB_CACHE["items"]), pins)
-            totals = dict(_HUB_CACHE.get("totals") or {})
+            items = _promote_pins(list(cached_items), pins)
+            totals = dict(cached_totals or {})
         else:
-            # Rematch search must not wait on a Hub crawl. Pref ids live on the pin list.
+            # o148 pin-first: never block the request on a Hub crawl (cold crawl ~30s+
+            # caused client Abort → Broken pipe logged as catalog 500). Tongyi and other
+            # CN pins must appear on page 1 immediately; Hub fills in via shared refresh.
+            _kick_hub_refresh()
             if qn:
-                hub, totals = [], {"pinSearch": True, "complete": False}
+                hub, totals = [], {"pinSearch": True, "complete": False, "pinFirst": True}
+            elif cached_items is not None:
+                # Stale but present — serve while background refresh runs.
+                hub, totals = list(cached_items), dict(cached_totals or {})
+                totals["staleWhileRefresh"] = True
+                totals["complete"] = bool(totals.get("complete"))
             else:
-                hub, totals = fetch_hub(search="")
+                hub, totals = [], {
+                    "complete": False,
+                    "pinFirst": True,
+                    "pinFallback": True,
+                    "source": "pins-first (hub refreshing in background)",
+                    "error": "AIGC Checkpoint 目录后台刷新中，先返回 pin 短名单（含 Tongyi-MAI/Z-Image-Turbo）",
+                }
             items = _promote_pins(hub, pins)
-            if not hub:
-                totals = dict(totals or {})
-                totals["complete"] = False
-                if qn:
-                    totals["pinSearch"] = True
-                else:
-                    totals["pinFallback"] = True
-                    totals.setdefault(
-                        "error",
-                        "AIGC Checkpoint 目录拉取失败，已回退 pin 短名单；不是官网只有这些",
-                    )
-            if not qn:
-                _HUB_CACHE["items"] = list(items)
-                _HUB_CACHE["at"] = now
-                _HUB_CACHE["totals"] = totals
         qnl = qn.lower()
         items = [_apply_upscale_category(dict(x)) for x in items]
         if category:
@@ -1004,8 +1055,9 @@ class ModelScopeProvider(Provider):
         if sid.startswith(prefixes):
             return True
         ids = {x.get("id") for x in load_disk()}
-        if _HUB_CACHE.get("items"):
-            ids |= {x.get("id") for x in _HUB_CACHE["items"]}
+        hub_items, _, _ = _read_hub_cache()
+        if hub_items:
+            ids |= {x.get("id") for x in hub_items}
         return sid in ids
 
     def owns_job(self, job_id: str) -> bool:

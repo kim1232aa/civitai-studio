@@ -38,6 +38,7 @@
   // v0821o144: advanced params default expanded (not folded); stamp v0821o144-adv-default-open
   // v0821o146-canvas-hydrate-scope o146canvas 20260916-o146: canvas-scoped boards never applyGraph(house) — stops Magao dirty revive on blank/burn canvases
   // v0821o147-house-first-after-import o147house 20260916-o147: 先认家 — lock selected house on import; civitai post never flashes fal/schnell; match only in-house
+  // v0821o148-magao-cn-catalog-tongyi o148magao 20260916-o148: Magao CN pin-first catalog + never invent Krea-2-Turbo; house-first afterImport mounts Tongyi for zimage
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -139,6 +140,8 @@
     krea: FAL_LORA_PREF_SERVICE
   };
 
+  // o148: Magao house default is Tongyi (zimage). Krea stays a selectable pin for krea2 family only — never invent as CN default.
+  const MS_T2I_PREF_SERVICE = "Tongyi-MAI/Z-Image-Turbo";
   const MS_LORA_PREF_SERVICE = "krea/Krea-2-Turbo";
   const COMFY_PARAM_IDS = ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"];
   const FAL_PARAM_IDS = ["duration", "aspect", "res"];
@@ -6667,7 +6670,8 @@
     const pinId = be === "huggingface"
       ? (state._pinHfLoraService || (selectedShotWantsI2i() ? HF_I2I_PREF_SERVICE : HF_LORA_PREF_SERVICE))
       : (be === "modelscope-ai" || be === "modelscope-cn")
-        ? (state._pinMsLoraService || MS_LORA_PREF_SERVICE)
+        // o148: promote Tongyi (or import pin), never invent Krea as Magao page-1 default
+        ? (state._pinMsLoraService || MS_T2I_PREF_SERVICE)
         : "";
     const list = Array.isArray(items) ? items : [];
     if (!pinId) return list;
@@ -7057,7 +7061,8 @@
     },
     // 魔搭 API-Inference 无视频：i2v/t2v pref 留空，勿把 Hub 视频钉当可发送默认
     "modelscope-ai": {
-      t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
+      // o148: never invent Krea as Magao default — Tongyi first; unmatched stays empty
+      t2i: ["Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
       i2v: [],
       t2v: [],
@@ -7065,7 +7070,8 @@
       inpaint: []
     },
     "modelscope-cn": {
-      t2i: ["krea/Krea-2-Turbo", "Tongyi-MAI/Z-Image-Turbo"],
+      // o148 FORBIDDEN default was Krea-2-Turbo — house-first Tongyi only
+      t2i: ["Tongyi-MAI/Z-Image-Turbo"],
       i2i: ["MusePublic/Qwen-Image-Edit", "Qwen/Qwen-Image-Edit"],
       i2v: [],
       t2v: [],
@@ -8402,7 +8408,7 @@
         serviceId = "";
       } else {
         serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op))
-          || (op === "t2i" ? MS_LORA_PREF_SERVICE : "");
+          || (op === "t2i" ? (MS_T2I_PREF_SERVICE || "") : "");
       }
     } else if (!serviceId && be === "nano-gpt") {
       serviceId = (typeof pickSmartServiceId === "function" && pickSmartServiceId(op)) || "";
@@ -11223,8 +11229,10 @@
       }
       return s;
     }
-    if (s && !looksFalServiceId(s) && !looksCivitaiServiceId(s)) return s;
-    return MS_LORA_PREF_SERVICE;
+    // o148: keep a real Magao id; never invent Krea-2-Turbo when empty / foreign.
+    if (s && !looksFalServiceId(s) && !looksCivitaiServiceId(s) && s !== MS_LORA_PREF_SERVICE) return s;
+    if (s === MS_LORA_PREF_SERVICE && state._importFamily === "krea2") return s;
+    return "";
   }
   function msLoraOptionLabel(want, currentText) {
     const id = String(want || "").trim();
@@ -11241,6 +11249,11 @@
     const sel = $("service");
     if (!sel) return;
     const want = pinMsLoraServiceId(sel.value || state._pinMsLoraService || "", typeof currentGraphOp === "function" ? currentGraphOp() : "t2i");
+    // o148: unmatched → leave empty (clear message via smartMatch); do not invent Krea.
+    if (!want) {
+      if (sel.value === MS_LORA_PREF_SERVICE && state._importFamily !== "krea2") sel.value = "";
+      return;
+    }
     if (want) ensureSelectOpt(sel, want);
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
@@ -11736,7 +11749,7 @@
       // v0821o135: 认不出帖子底模家族时不许套 Krea-2 写死默认；sid 留空，收尾统一清空模型框+警告。
       if (state._importFamily === "sdxl" || state._importFamily === "pony" || state._importFamily === "sd15") sid = "";
       if (looksCivitaiServiceId(sid) || looksFalServiceId(sid)) {
-        hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 krea/Krea-2-Turbo）";
+        hardErr = "魔搭 导入拒绝 Fal/Civitai serviceId " + sid + "（请选 Tongyi-MAI/Z-Image-Turbo 或本家模型；不会默认 Krea）";
         sid = "";
         state._pinMsLoraService = "";
       }
@@ -12230,11 +12243,13 @@
       }
       const needMsPin = (mode !== "video" && (be === "modelscope-ai" || be === "modelscope-cn") && (
         (Array.isArray(state.loras) && state.loras.length)
+        || pinWant === MS_T2I_PREF_SERVICE
         || pinWant === MS_LORA_PREF_SERVICE
         || state._pinMsLoraService
       ));
       if (needMsPin) {
-        const pinId = state._pinMsLoraService || MS_LORA_PREF_SERVICE;
+        // o148: promote Tongyi (or import pin), never invent Krea as Magao default pin
+        const pinId = state._pinMsLoraService || MS_T2I_PREF_SERVICE;
         const pinItem = items.find(function (it) { return (it.id || it.name) === pinId; });
         if (pinItem) {
           items = [pinItem].concat(items.filter(function (it) { return (it.id || it.name) !== pinId; }));

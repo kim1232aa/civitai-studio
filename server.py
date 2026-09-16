@@ -1090,12 +1090,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, code, obj):
         data = json.dumps(obj, ensure_ascii=False).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as e:
+            # Client aborted (catalog timeout / navigation). Not an application 500.
+            print("[web] client disconnect on write", e, flush=True)
+            return
 
     def _bytes(self, code, data, ctype):
         self.send_response(code)
@@ -1342,6 +1347,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             return self._handle_get()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as e:
+            # Aborted catalog/hub writes used to surface as intermittent /api/catalog 500.
+            print("[web] GET client disconnect", e, flush=True)
+            return
         except Exception as e:
             print("[web] GET", e, flush=True)
             try:
@@ -1671,6 +1680,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             return self._handle_post()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as e:
+            print("[web] POST client disconnect", e, flush=True)
+            return
         except Exception as e:
             print("[web] POST", e, flush=True)
             try:
