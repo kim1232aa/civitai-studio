@@ -206,8 +206,8 @@ class HFContract(unittest.TestCase):
             code, data = hf.HuggingFaceProvider().generate({"serviceId": "org/adapter", "prompt": "x"})
         self.assertEqual(code, 200, data)
         self.assertEqual(data["submittedInput"]["loras"], [{
-            "path": "https://huggingface.co/org/adapter/resolve/main/weights/adapter.safetensors", "scale": 1.0,
-        }])
+            "path": "https://huggingface.co/org/adapter/resolve/main/weights/adapter.safetensors",
+        }])  # mapped adapter omits scale — never invent 1.0
 
     def test_trusted_mapping_keeps_reference_support_for_an_opaque_endpoint(self):
         mapping = {"fal-ai": {
@@ -248,7 +248,7 @@ class HFContract(unittest.TestCase):
         self.assertEqual(sent, {
             "prompt": " keep spaces ", "image_size": {"width": 960, "height": 1440}, "guidance_scale": 0,
             "loras": [
-                {"path": "https://huggingface.co/org/adapter/resolve/main/weights/adapter.safetensors", "scale": 1.0},
+                {"path": "https://huggingface.co/org/adapter/resolve/main/weights/adapter.safetensors"},
                 {"path": "https://example.invalid/extra.safetensors", "scale": -0.25},
             ],
         })

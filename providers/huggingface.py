@@ -1384,9 +1384,9 @@ class HuggingFaceProvider(Provider):
                         loras = payload.get("loras") or []
                         if not isinstance(loras, list):
                             raise ValueError("HF LoRA 必须是数组")
+                        # Omit scale — vendor default. Never invent 1.0 for mapped adapter.
                         routed_payload["loras"] = [{
                             "path": f"https://huggingface.co/{quote(mid, safe='/')}/resolve/main/{quote(adapter_path, safe='/')}",
-                            "scale": 1.0,
                         }, *loras]
                         if pid == "fal-ai/lora":
                             # The HF official Fal helper specifies this base for SDXL adapters.

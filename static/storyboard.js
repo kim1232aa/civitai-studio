@@ -7080,12 +7080,18 @@
     civitai: "Civitai", fal: "Fal", "nano-gpt": "Nano",
     huggingface: "HF", "modelscope-ai": "魔搭AI", "modelscope-cn": "魔搭CN",
   };
-  function smartSearchQuery(op) {
-    const names = (state.loras || []).map(function (l) {
-      return String((l && (l.name || l.path)) || "").trim();
-    }).filter(Boolean);
+  function smartSearchQuery(op, family) {
+    // House-first smart match: base-model family is the primary key.
+    // Never lead with LoRA name + text-to-image/edit (boss: search by family).
+    const fam = String(family || state._importFamily || "").trim();
     const opQ = ({ t2i: "text-to-image", i2i: "edit", i2v: "image-to-video", t2v: "text-to-video", upscale: "upscale", inpaint: "inpaint" })[op] || "";
-    return (names.slice(0, 2).join(" ") + " " + opQ).trim();
+    const famQ = ({
+      sdxl: "sdxl", pony: "pony", sd15: "sd1.5", flux: "flux", flux2: "flux2",
+      krea2: "krea", zimage: "z-image", qwen: "qwen", wan: "wan",
+      hunyuan: "hunyuan", klein: "klein", minimax: "minimax", kling: "kling", ltx: "ltx", sd3: "sd3"
+    })[fam] || fam;
+    if (famQ) return (famQ + (opQ ? (" " + opQ) : "")).trim();
+    return opQ;
   }
   function loraSourceHouses() {
     const out = [];
@@ -7095,8 +7101,9 @@
     });
     return out;
   }
-  async function searchModelsForOp(be, op, cross) {
-    const q = smartSearchQuery(op);
+  async function searchModelsForOp(be, op, cross, family) {
+    // cross must stay false for smart-match — never switch house on import/rematch.
+    const q = smartSearchQuery(op, family);
     const cat = (op === "i2v" || op === "t2v") ? "video" : "image";
     const params = new URLSearchParams({
       type: "MODEL",
@@ -7104,7 +7111,7 @@
       op: op || "",
       category: cat,
       q: q,
-      cross: cross ? "1" : "0",
+      cross: "0",
     });
     const r = await fetch("/api/search?" + params.toString());
     if (!r.ok) return [];
@@ -7114,16 +7121,16 @@
     return items;
   }
   function pickFitFromSearch(items, op, preferBe) {
+    // House-first: NEVER return a foreign-house hit. Cross-house rematch is forbidden.
     const list = Array.isArray(items) ? items : [];
-    function ok(it) { return it && serviceFitsOp(it, op); }
-    if (preferBe) {
-      for (let i = 0; i < list.length; i++) {
-        const it = list[i];
-        const id = String((it && (it.id || it.name)) || "");
-        const hb = String((it && (it.backend || it.source)) || "");
-        if (hb && hb !== preferBe && !serviceBelongsToBackend(id, preferBe)) continue;
-        if (ok(it)) return it;
-      }
+    const be = String(preferBe || "").trim();
+    function ok(it) {
+      if (!it || !serviceFitsOp(it, op)) return false;
+      const id = String((it && (it.id || it.name)) || "");
+      if (!be) return true;
+      const hb = String((it && (it.backend || it.source)) || "").trim();
+      if (hb && hb !== be) return false;
+      return serviceBelongsToBackend(id, be);
     }
     for (let i = 0; i < list.length; i++) {
       if (ok(list[i])) return list[i];
@@ -7191,31 +7198,59 @@
       try {
         if (gen !== smartMatchService._gen) return false;
         let row = null;
+        // crossHit kept for o93 stamp string only — smart-match never switches house.
         let crossHit = false;
         const fam2 = state._importFamily
           || ((typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.familyFromShot)
             ? SmartFamilyMatch.familyFromShot(shot, "")
             : "");
-        if (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.pickByFamily && fam2) {
+        function poolArrOf() {
           const poolObj = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-          const poolArr = Array.isArray(poolObj) ? poolObj : Object.keys(poolObj).map(function (k) { return poolObj[k]; });
-          const picked = SmartFamilyMatch.pickByFamily({
-            backend: be, op: op, family: fam2, pool: poolArr,
+          return {
+            obj: poolObj,
+            arr: Array.isArray(poolObj) ? poolObj : Object.keys(poolObj).map(function (k) { return poolObj[k]; })
+          };
+        }
+        if (typeof SmartFamilyMatch !== "undefined" && SmartFamilyMatch.pickByFamily && fam2) {
+          // Family known (import post): match ONLY inside current house by base family.
+          // Never fall through to SMART_PREF Krea2 when post is flux/sdxl/pony.
+          let pack = poolArrOf();
+          let picked = SmartFamilyMatch.pickByFamily({
+            backend: be, op: op, family: fam2, pool: pack.arr,
             fits: serviceFitsOp, belongs: serviceBelongsToBackend
           });
+          if (!picked) {
+            try {
+              await searchModelsForOp(be, op, false, fam2);
+            } catch (_) {}
+            pack = poolArrOf();
+            picked = SmartFamilyMatch.pickByFamily({
+              backend: be, op: op, family: fam2, pool: pack.arr,
+              fits: serviceFitsOp, belongs: serviceBelongsToBackend
+            });
+          }
           if (picked) {
-            row = poolObj[picked] || (state.catalogById && state.catalogById[picked]) || { id: picked, name: picked, backend: be };
+            row = pack.obj[picked] || (state.catalogById && state.catalogById[picked]) || { id: picked, name: picked, backend: be };
+            // Guard: refuse wrong-family / foreign-house row even if pool was polluted.
+            if (!serviceBelongsToBackend(String(row.id || picked), be)) row = null;
+            else if (typeof SmartFamilyMatch.familyCompatible === "function") {
+              const got = SmartFamilyMatch.itemFamily(row) || SmartFamilyMatch.inferModelFamily(picked);
+              if (!SmartFamilyMatch.familyCompatible(fam2, got)) row = null;
+            }
           }
         } else {
           try {
-            const local = await searchModelsForOp(be, op, false);
+            const local = await searchModelsForOp(be, op, false, fam2);
             row = pickFitFromSearch(local, op, be);
           } catch (_) {}
           if (!row) {
+            // No import family: generic rematch may use SMART_PREF — but never when
+            // a known non-krea2 family was requested (belt for stale fam2 empty string).
             const wantPref = (await ensureSmartPrefInPool(op)) || pickSmartServiceId(op);
             if (wantPref) {
               const pool = (typeof rematchCandidatePool === "function") ? rematchCandidatePool() : (state.catalogById || {});
-              row = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+              const cand = pool[wantPref] || (state.catalogById && state.catalogById[wantPref]) || null;
+              if (cand && serviceBelongsToBackend(wantPref, be)) row = cand;
             }
           }
         }
@@ -7231,14 +7266,25 @@
           writeSmartMatchToShot(shot, "");
           if (typeof syncOpChip === "function") syncOpChip();
           if (opts.announce !== false) {
-            try { setMsg("搜索没有可匹配的" + (labels[op] || op) + "模型，请换关键词或换家", "warn"); } catch (_) {}
+            const miss = fam2
+              ? ("这家没有可匹配的" + (labels[op] || op) + "模型（" + fam2 + "），请换模型或换家")
+              : ("搜索没有可匹配的" + (labels[op] || op) + "模型，请换关键词或换家");
+            try { setMsg(miss, "warn"); } catch (_) {}
           }
           try { if (typeof renderDock === "function") renderDock(); } catch (_) {}
           return false;
         }
         const want = String(row.id || row.name || "");
-        const rowBe = String(row.backend || row.source || be);
+        const rowBe = String(be); // never adopt row.backend — house-first, no cross-house switch
         if (!want) return false;
+        if (!serviceBelongsToBackend(want, be)) {
+          sel.value = "";
+          writeSmartMatchToShot(shot, "");
+          if (opts.announce !== false) {
+            try { setMsg("这家没有可匹配的" + (labels[op] || op) + "模型" + (fam2 ? ("（" + fam2 + "）") : "") + "，请换模型或换家", "warn"); } catch (_) {}
+          }
+          return false;
+        }
         // v0821o136seko-uservspick: 异步搜索期间用户可能已显式改选——应用前再判一次：
         // 当前值较起跑时有变化、适配 op、不跨家 → 保留用户选择，放弃本次重匹配（不许偷换）。
         const nowId = String(sel.value || "").trim();
@@ -7257,8 +7303,9 @@
         if (typeof syncOpChip === "function") syncOpChip();
         if (opts.announce !== false) {
           const house = HOUSE_LABEL[rowBe] || rowBe;
-          const head = crossHit ? ("跨家搜到 " + house + " · ") : "已搜索匹配";
-          try { setMsg(head + (labels[op] || op) + " · " + ((row && row.name) || want) + " · 确认后点 ↑", "ok"); } catch (_) {}
+          // Stamp "跨家搜到" kept in source for o93; runtime never sets crossHit (house-first).
+          const head = crossHit ? ("跨家搜到 " + house + " · ") : (fam2 ? ("已智能匹配") : "已搜索匹配");
+          try { setMsg(head + (labels[op] || op) + (fam2 ? (" · " + fam2) : "") + " · " + ((row && row.name) || want) + " · 确认后点 ↑", "ok"); } catch (_) {}
         }
         try { if (typeof syncParamChrome === "function") syncParamChrome(); } catch (_) {}
         try { if (typeof renderDock === "function") renderDock(); } catch (_) {}

@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "static/storyboard.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "static/storyboard.html"), "utf8");
 
-assert.ok(html.includes("storyboard.js?v=o136seko"), "html cache bust o136seko");
+assert.ok(/storyboard\.js\?v=o13[67]/.test(html), "html cache bust o136+/o137");
 assert.ok(!source.includes("pageSize: '100'"), "fetchCatalogId must not send pageSize 100");
 assert.ok(!source.includes("!serviceId && be !== \"civitai\""), "Fal catch-all gone");
 assert.ok(/!serviceId && be === "nano-gpt"/.test(source), "nano-gpt empty branch");

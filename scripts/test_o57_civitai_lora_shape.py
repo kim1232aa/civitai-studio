@@ -73,6 +73,24 @@ def main():
     })
     check(comfy_wf["steps"][0]["input"]["loras"] == MAP, comfy_wf)
 
+
+    # null / missing strength → omit, never invent 1.0
+    omitted = official_lora_payload(
+        [{"air": AIR, "strength": None}, {"air": AIR + ":x", "strength": 0.7}],
+        engine="comfy", model="turbo", ecosystem="krea2",
+    )
+    check(omitted == {AIR + ":x": 0.7}, omitted)
+    omitted2 = official_lora_payload(
+        {AIR: None, AIR + ":y": 0.5},
+        engine="comfy", model="turbo", ecosystem="krea2",
+    )
+    check(omitted2 == {AIR + ":y": 0.5}, omitted2)
+    omitted3 = official_lora_payload(
+        [{"air": AIR}],
+        engine="flux2", model="dev",
+    )
+    check(omitted3 is None, "missing strength list → empty → None")
+
     print("PASS o57_civitai_lora_shape")
     return 0
 

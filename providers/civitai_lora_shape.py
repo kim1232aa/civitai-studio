@@ -26,6 +26,7 @@ def _norm(v: Any) -> str:
 
 
 def _as_map(loras: Any) -> dict[str, float]:
+    """Pack known strengths only. null/missing strength → omit (never invent 1.0)."""
     out: dict[str, float] = {}
     if not loras:
         return out
@@ -34,10 +35,12 @@ def _as_map(loras: Any) -> dict[str, float]:
             key = str(air or "").strip()
             if not key:
                 continue
+            if strength is None:
+                continue
             try:
                 out[key] = float(strength)
-            except (TypeError, ValueError):
-                out[key] = 1.0
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"LoRA strength 无法解析（不发明 1.0）: {air!r}={strength!r}") from e
         return out
     if isinstance(loras, list):
         for row in loras:
@@ -46,11 +49,18 @@ def _as_map(loras: Any) -> dict[str, float]:
             air = str(row.get("air") or "").strip()
             if not air:
                 continue
-            raw = row.get("strength", row.get("scale", 1.0))
+            if "strength" in row:
+                raw = row.get("strength")
+            elif "scale" in row:
+                raw = row.get("scale")
+            else:
+                continue  # omit — do not invent 1.0
+            if raw is None:
+                continue
             try:
                 out[air] = float(raw)
-            except (TypeError, ValueError):
-                out[air] = 1.0
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"LoRA strength 无法解析（不发明 1.0）: {air!r}={raw!r}") from e
     return out
 
 
