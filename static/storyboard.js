@@ -39,7 +39,7 @@
   // v0821o146-canvas-hydrate-scope o146canvas 20260916-o146: canvas-scoped boards never applyGraph(house) — stops Magao dirty revive on blank/burn canvases
   // v0821o147-house-first-after-import o147house 20260916-o147: 先认家 — lock selected house on import; civitai post never flashes fal/schnell; match only in-house
   // v0821o148-magao-cn-catalog-tongyi o148magao 20260916-o148: Magao CN pin-first catalog + never invent Krea-2-Turbo; house-first afterImport mounts Tongyi for zimage
-  // v0821o149-magao-seed-over-int32-warn o149seed 20260916-o149: Magao over-int32 seed keeps real value +「超魔搭区间」; outbound omit (no silent -1 / no wrap)
+  // v0821o149b-magao-seed-warn-not-block o149bseed 20260916-o149b: Magao over-int32 keeps digits +「超魔搭区间」warn-only (not send-gate); outbound omit
   // v0821o145-smart-match o145match 20260916-o145: no SMART_PREF on import; ensureHf/Ms skip SDXL miss; recipe no Krea auto-pick after import
   // v0821o143: Magao burn UI — LoRA unknown+chips honesty, t2i unused refs, orphan empty shells, import still on same shot; stamp v0821o143-magao-burn-ui
   // v0821o142: house PUT shot-1 + adopt merge + Magao failed+saved writeback; stamp v0821o142-house-put-adopt-poll
@@ -6020,16 +6020,20 @@
         return b === "modelscope-ai" || b === "modelscope-cn";
       })();
     const MAGAO_SEED_MAX = 2147483647;
+    let magaoSeedWarn = "";
     if (seedRaw && seedRaw !== "random") {
       const n = Number(seedRaw);
       if (Number.isFinite(n)) {
         let over = false;
         let note = "";
         if (magaoSeed) {
-          // Official Magao send range [0, int32]; -1/random = omit. Over-int32 must warn explicitly.
+          // Official Magao send range [0, int32]; -1/random = omit. Over-int32 must WARN explicitly
+          // but MUST NOT block ↑ — outbound omits seed (o149). Putting「超魔搭区间」in msgs would
+          // failUi(gate) and never POST /api/generate (eggbot burn stuck).
           if (n !== -1 && (n < -1 || n > MAGAO_SEED_MAX)) {
             over = true;
             note = "超魔搭区间";
+            magaoSeedWarn = note;
           }
         } else if (seedSpec && (seedSpec.min != null || seedSpec.max != null)) {
           const lo = seedSpec.min;
@@ -6040,7 +6044,8 @@
           }
         }
         markOver(seedEl, over);
-        if (over && note) msgs.push(note);
+        // Magao over-int32: warn-only via magaoSeedWarn (not msgs). Other houses still gate.
+        if (over && note && !magaoSeed) msgs.push(note);
         // Never rewrite the input to -1 when over Magao int32 — keep original digits.
         if (seedEl && seedEl.value !== seedRaw) seedEl.value = seedRaw;
       } else {
@@ -6097,7 +6102,7 @@
         if (w) adaptWarn = w;
       }
     } catch (_) {}
-    setParamWarn(msgs[0] || adaptWarn || "", !!(msgs.length || adaptWarn));
+    setParamWarn(msgs[0] || magaoSeedWarn || adaptWarn || "", !!(msgs.length || magaoSeedWarn || adaptWarn));
     return msgs[0] || "";
   }
   function fillNanoResOptions() {

@@ -14,12 +14,16 @@ const seedPy = fs.readFileSync(path.join(root, "providers/modelscope_seed.py"), 
 const msPy = fs.readFileSync(path.join(root, "providers/modelscope.py"), "utf8");
 
 // --- stamp + cache bust ---
-assert.ok(source.includes("v0821o149-magao-seed-over-int32-warn"), "js stamp");
-assert.ok(html.includes("v0821o149-magao-seed-over-int32-warn"), "html stamp");
-assert.ok(/storyboard\.js\?v=o149seed/.test(html), "cache bust o149seed");
+assert.ok(source.includes("v0821o149b-magao-seed-warn-not-block"), "js stamp");
+assert.ok(html.includes("v0821o149b-magao-seed-warn-not-block"), "html stamp");
+assert.ok(/storyboard\.js\?v=o149bseed/.test(html), "cache bust o149bseed");
 
 // --- UI must explicitly show 超魔搭区间; never silent -1 rewrite ---
 assert.ok(source.includes("超魔搭区间"), "UI note 超魔搭区间");
+assert.ok(source.includes("magaoSeedWarn"), "magaoSeedWarn warn-only path");
+assert.ok(source.includes("MUST NOT block"), "documents warn-not-block");
+assert.ok(source.includes("if (over && note && !magaoSeed) msgs.push(note)"), "Magao over not msgs.push");
+
 assert.ok(source.includes("Never rewrite the input to -1") || source.includes("never silent -1"),
   "documents no silent -1 rewrite");
 assert.ok(source.includes("MAGAO_SEED_MAX = 2147483647"), "Magao int32 max const");
