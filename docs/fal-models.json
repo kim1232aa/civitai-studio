@@ -4071,8 +4071,32 @@
       "promptField": "prompt",
       "durationField": null,
       "aspectRatioField": null,
-      "required": [],
-      "optional": []
+      "required": [
+        "prompt"
+      ],
+      "optional": [
+        "num_images",
+        "image_size",
+        "enable_prompt_expansion",
+        "sync_mode",
+        "output_format",
+        "seed",
+        "enable_safety_checker",
+        "acceleration"
+      ],
+      "supported_parameters": {
+        "official_fields": [
+          "prompt",
+          "num_images",
+          "image_size",
+          "enable_prompt_expansion",
+          "sync_mode",
+          "output_format",
+          "seed",
+          "enable_safety_checker",
+          "acceleration"
+        ]
+      }
     },
     {
       "id": "fal-ai/flux-2/flash/edit",
@@ -6067,8 +6091,35 @@
       "promptField": "prompt",
       "durationField": null,
       "aspectRatioField": null,
-      "required": [],
-      "optional": []
+      "required": [
+        "prompt"
+      ],
+      "optional": [
+        "num_images",
+        "image_size",
+        "enable_prompt_expansion",
+        "loras",
+        "sync_mode",
+        "output_format",
+        "seed",
+        "enable_safety_checker",
+        "acceleration"
+      ],
+      "supportsLora": true,
+      "supported_parameters": {
+        "official_fields": [
+          "prompt",
+          "num_images",
+          "image_size",
+          "enable_prompt_expansion",
+          "loras",
+          "sync_mode",
+          "output_format",
+          "seed",
+          "enable_safety_checker",
+          "acceleration"
+        ]
+      }
     },
     {
       "id": "fal-ai/kokoro/american-english",

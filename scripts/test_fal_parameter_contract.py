@@ -291,8 +291,22 @@ class FalContract(unittest.TestCase):
         self.assertEqual(inp["num_images"], 2)
         self.assertEqual(inp["loras"], [{"path": LORA_PATH, "scale": 0.8}])
 
-        krea = fal.build_fal_input(dict(payload, serviceId=KREA_LORA))
+        # o155: krea-2/turbo/lora now has official schema — CFG/steps must reject, not open-schema invent
+        with self.assertRaises(ValueError):
+            fal.build_fal_input(dict(payload, serviceId=KREA_LORA))
+        krea_ok = {
+            "serviceId": KREA_LORA,
+            "prompt": PROMPT,
+            "seed": 11,
+            "width": 960,
+            "height": 1440,
+            "quantity": 2,
+            "loras": [{"path": LORA_PATH, "strength": 0.8}],
+        }
+        krea = fal.build_fal_input(krea_ok)
         self.assertEqual(krea["loras"], [{"path": LORA_PATH, "scale": 0.8}])
+        self.assertNotIn("guidance_scale", krea)
+        self.assertNotIn("num_inference_steps", krea)
 
     def test_krea_turbo_loras_are_not_rewritten_to_lora_sibling(self):
         payload = flux_lora_payload(serviceId=KREA_TURBO)
@@ -358,13 +372,12 @@ class FalContract(unittest.TestCase):
         self.assertTrue(url.endswith("/" + Z_TURBO), url)
 
     def test_krea_turbo_lora_sample_keeps_endpoint_and_sends_loras(self):
+        # o155: official OpenAPI has no guidance_scale / num_inference_steps
         payload = {
             "serviceId": KREA_LORA,
             "prompt": PROMPT,
             "width": 944,
             "height": 1672,
-            "steps": 8,
-            "cfgScale": 1,
             "seed": 467475143677094,
             "quantity": 1,
             "loras": [{"path": LORA_PATH, "strength": 0.8}],
@@ -372,8 +385,8 @@ class FalContract(unittest.TestCase):
         inp = fal.build_fal_input(payload)
         self.assertEqual(inp["prompt"], PROMPT)
         self.assertEqual(inp["image_size"], {"width": 944, "height": 1672})
-        self.assertEqual(inp["num_inference_steps"], 8)
-        self.assertEqual(inp["guidance_scale"], 1)
+        self.assertNotIn("num_inference_steps", inp)
+        self.assertNotIn("guidance_scale", inp)
         self.assertEqual(inp["seed"], 467475143677094)
         self.assertEqual(inp["num_images"], 1)
         self.assertEqual(inp["loras"], [{"path": LORA_PATH, "scale": 0.8}])
@@ -383,9 +396,14 @@ class FalContract(unittest.TestCase):
         self.assertTrue(url.endswith("/" + KREA_LORA), url)
         self.assertEqual(body["loras"], [{"path": LORA_PATH, "scale": 0.8}])
         self.assertEqual(body["image_size"], {"width": 944, "height": 1672})
+        self.assertNotIn("guidance_scale", body)
+        self.assertNotIn("num_inference_steps", body)
         self.assertEqual(data.get("endpoint"), KREA_LORA)
         self.assertNotIn("z-image", url)
         self.assertNotIn("trainer", url)
+
+        with self.assertRaises(ValueError):
+            fal.build_fal_input(dict(payload, steps=8, cfgScale=1))
 
         null_scale = dict(payload, loras=[{"path": LORA_PATH, "scale": None}])
         self.transport.reset_mock()
@@ -409,10 +427,9 @@ class FalContract(unittest.TestCase):
         self.assertNotIn("scale", body["loras"][0])
 
         with_aspect = dict(payload, aspectRatio="9:16")
-        ar = fal.build_fal_input(with_aspect)
-        self.assertEqual(ar["aspect_ratio"], "9:16")
-        self.assertEqual(ar["loras"], [{"path": LORA_PATH, "scale": 0.8}])
-        self.assertEqual(ar["image_size"], {"width": 944, "height": 1672})
+        with self.assertRaises(ValueError) as raised:
+            fal.build_fal_input(with_aspect)
+        self.assertIn("aspect_ratio", str(raised.exception))
 
     def test_imagen4_unverified_does_not_invent_fields(self):
         eid = "fal-ai/imagen4/preview"

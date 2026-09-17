@@ -5348,6 +5348,55 @@
       "schemaSource": "post-body",
       "durationField": null,
       "aspectRatioField": null
+    },
+    {
+      "id": "fal-ai/krea-2/turbo/lora",
+      "category": "image",
+      "title": "Krea 2 Text to Image Turbo LoRA",
+      "endpoint_queue": "https://queue.fal.run/fal-ai/krea-2/turbo/lora",
+      "endpoint_sync": "https://fal.run/fal-ai/krea-2/turbo/lora",
+      "openapi": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/krea-2/turbo/lora",
+      "required": [
+        "prompt"
+      ],
+      "optional": [
+        "num_images",
+        "image_size",
+        "enable_prompt_expansion",
+        "loras",
+        "sync_mode",
+        "output_format",
+        "seed",
+        "enable_safety_checker",
+        "acceleration"
+      ],
+      "imageFields": [],
+      "promptField": "prompt",
+      "notes": "o155: live OpenAPI 2026-09-17 — no guidance_scale / num_inference_steps"
+    },
+    {
+      "id": "fal-ai/krea-2/turbo",
+      "category": "image",
+      "title": "Krea 2 Turbo",
+      "endpoint_queue": "https://queue.fal.run/fal-ai/krea-2/turbo",
+      "endpoint_sync": "https://fal.run/fal-ai/krea-2/turbo",
+      "openapi": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/krea-2/turbo",
+      "required": [
+        "prompt"
+      ],
+      "optional": [
+        "num_images",
+        "image_size",
+        "enable_prompt_expansion",
+        "sync_mode",
+        "output_format",
+        "seed",
+        "enable_safety_checker",
+        "acceleration"
+      ],
+      "imageFields": [],
+      "promptField": "prompt",
+      "notes": "o155: live OpenAPI 2026-09-17 — no guidance_scale / num_inference_steps"
     }
   ],
   "civitaiGaps": {

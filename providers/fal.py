@@ -121,13 +121,21 @@ def load_openapi_overlay():
 
 
 def find_model(endpoint_id: str):
+    """Catalog first; if required/optional empty, merge OpenAPI overlay fields (o155)."""
+    cat = None
     for it in load_catalog():
         if it.get("id") == endpoint_id:
-            return it
+            cat = dict(it)
+            break
+    ov = None
     for it in load_openapi_overlay():
         if it.get("id") == endpoint_id:
-            return it
-    return None
+            ov = it
+            break
+    if cat and ov and not (cat.get("required") or cat.get("optional")):
+        cat["required"] = list(ov.get("required") or [])
+        cat["optional"] = list(ov.get("optional") or [])
+    return cat or (dict(ov) if ov else None)
 
 
 def infer_image_fields(eid: str) -> list:
@@ -1382,9 +1390,16 @@ class FalProvider(Provider):
         # 把字段表并进 supported_parameters.official_fields，让 Composer 能把
         # 「官方不收的参数」（如 kling i2v 无 num_inference_steps）标成不支持——
         # 否则默认值随表单静默上船，被服务端诚实硬门 400 挡下（实测 round2 fal-i2v）。
+        # o155: one overlay map — fill empty catalog schema without N× find_model
+        _ov_by = {it.get("id"): it for it in load_openapi_overlay() if it.get("id")}
         for x in items:
             # 行内自带 required/optional（catalog json 即注册表）——O(n) 直读，
             # 不许逐项 find_model（每项都重读 1492 行目录文件，实测 /api/catalog 18s）。
+            if not (x.get("required") or x.get("optional")):
+                ov = _ov_by.get(x.get("id"))
+                if ov and (ov.get("required") or ov.get("optional")):
+                    x["required"] = list(ov.get("required") or [])
+                    x["optional"] = list(ov.get("optional") or [])
             req0 = x.get("required")
             opt0 = x.get("optional")
             if req0 or opt0:
