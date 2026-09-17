@@ -4764,6 +4764,13 @@ def test_v0821o29_fal_lora_base():
     assert_true("want === FAL_ZIMAGE_BASE_LORA_SERVICE" in pin, "pin has z-image/base sibling branch")
     assert_true("v0822o158-fal-zimagebase-lora" in js, "o158 stamp")
 
+    # o159: burn-pack still junk out of 生成历史; keep tip mp4
+    assert_true("v0822o159-outs-filter-burn-still" in js, "o159 stamp")
+    assert_true("-still[._]" in js or "/-still[._]/i.test" in js, "still junk pattern -still")
+    assert_true("_still_" in js, "still junk pattern _still_")
+    junk = js[js.find("function isJunkRailItem"):js.find("function isJunkRailItem") + 1200]
+    assert_true("burn-pack still" in junk or "-still" in junk, "isJunkRailItem filters burn still")
+
 
     # Fixture acceptance path unchanged (not swapped to flux)
     fi = js.find("function falLoraFixtureImport")

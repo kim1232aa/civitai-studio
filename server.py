@@ -1480,9 +1480,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, data)
         if path == "/api/outs":
             from providers.http import is_blank_image
+            def _is_burn_still_out(name: str) -> bool:
+                # o159: burn-pack still copies (*-still.* / *_still_* / still.jpg) — not real generate tip
+                n = (name or "").lower()
+                if "-still." in n or "-still_" in n or "_still_" in n:
+                    return True
+                base = n.rsplit("/", 1)[-1]
+                if base in ("still.jpg", "still.jpeg", "still.png", "still.webp"):
+                    return True
+                return False
             items = []
             for fp in sorted(OUT.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
                 if not fp.is_file():
+                    continue
+                if _is_burn_still_out(fp.name):
                     continue
                 ext = fp.suffix.lower()
                 if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".wav", ".mp3"):
@@ -1510,6 +1521,17 @@ class Handler(BaseHTTPRequestHandler):
                     "bytes": size,
                     "kind": "video" if ext in (".mp4", ".webm") else ("audio" if ext in (".wav", ".mp3") else "image"),
                 })
+            # o159 prefer video / job-named generate ahead of leftover image noise (mtime already desc)
+            def _out_rank(it):
+                kind = it.get("kind") or ""
+                name = str(it.get("file") or "").lower()
+                score = 0
+                if kind == "video" or name.endswith((".mp4", ".webm")):
+                    score += 100
+                if re.search(r"_0\.(jpg|jpeg|png|webp|mp4|webm)$", name):
+                    score += 40
+                return -score  # sort ascending → higher score first; tie keeps prior mtime order via stable sort
+            items.sort(key=_out_rank)
             return self._json(200, {"items": items[:60]})
         if path == "/api/jobs":
             code, data = civitai(f"{ORCH}/v2/consumer/workflows")

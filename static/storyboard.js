@@ -45,6 +45,7 @@
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
+  // v0822o159-outs-filter-burn-still o159outsfilterburnstill 20260917-o159: 生成历史 drop burn-pack -still/_still_/still.jpg; prefer job /out mp4
   // v0822o158-fal-zimagebase-lora o158falzimagebase 20260917-o158: map zimagebase AIR → fal-ai/z-image/base/lora (official; not turbo); no cross-house steal
   // v0822o157-fal-zimageturbo-lora o157falzimageturbo 20260917-o157: map zimageturbo AIR → fal-ai/z-image/turbo/lora; empty-sid skips catalog-miss; no krea sibling steal
   // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
@@ -417,6 +418,9 @@
     if (/(^|\/)artifact\.(jpe?g|png|webp)(\?|$)/i.test(url)) return true;
     if (/无图占位|尚未生成/.test(title)) return true;
     if (/\/static\/light-preset/i.test(url)) return true;
+    // o159: burn-pack still copies flood 生成历史 — keep real generate /out (jobId mp4/jpg)
+    // Patterns: foo-still.jpg, foo-still_TS_hash.png, bare still.jpg import first-frame
+    if (/-still[._]/i.test(key) || /_still_/i.test(key) || /(^|\/|\s)still\.jpe?g(\?|$)/i.test(key)) return true;
     return false;
   }
   function assets() { return state.nodes.filter((n) => n.kind !== "shot" && n.kind !== "text"); }
@@ -12829,6 +12833,21 @@
         const k = it.kind || mediaKindOf(u);
         if (!(k === "image" || k === "video")) return false;
         return !isJunkRailItem({ url: u, title: it.file || it.name, bytes: it.bytes });
+      });
+      // o159: after junk filter, prefer real generate落盘 (video / jobId-ish) over leftover still-adjacent noise
+      items.sort(function (a, b) {
+        function score(it) {
+          const u = String(it.url || it.path || it.file || "").toLowerCase();
+          const k = it.kind || mediaKindOf(u);
+          let s = 0;
+          if (k === "video" || /\.(mp4|webm)(\?|$)/i.test(u)) s += 100;
+          // jobId / provider generate naming (not burn still)
+          if (/_0\.(jpg|jpeg|png|webp|mp4|webm)(\?|$)/i.test(u)) s += 40;
+          if (/(^|\/)(fal_|nano-gpt_|civitai_|hf_|ms_|modelscope_)/i.test(u)) s += 20;
+          if (/\d{10,}/.test(u)) s += 10; // long numeric job/timestamp ids
+          return s;
+        }
+        return score(b) - score(a);
       });
       state.history = items.slice(0, 24).map((it) => ({
         url: it.url || it.path,
