@@ -46,6 +46,7 @@
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
   // v0822o159-outs-filter-burn-still o159outsfilterburnstill 20260917-o159: 生成历史 drop burn-pack -still/_still_/still.jpg; prefer job /out mp4
+  // v0822o160-composer-mode-tabs o160composermodetabs 20260917-o160: Composer mode tabs honesty by house caps (grey+未接; Magao video stub)
   // v0822o158-fal-zimagebase-lora o158falzimagebase 20260917-o158: map zimagebase AIR → fal-ai/z-image/base/lora (official; not turbo); no cross-house steal
   // v0822o157-fal-zimageturbo-lora o157falzimageturbo 20260917-o157: map zimageturbo AIR → fal-ai/z-image/turbo/lora; empty-sid skips catalog-miss; no krea sibling steal
   // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
@@ -1210,7 +1211,78 @@
     }
     return "";
   }
-  function isStubMode() { return state.mode === "text" || state.mode === "audio"; }
+  // o160: house video caps mirror providers/capabilities.py (catalog may filter Magao rows; house video=false is authority)
+  var HOUSE_VIDEO_OK = {
+    "civitai": true,
+    "fal": true,
+    "huggingface": true,
+    "nano-gpt": true,
+    "modelscope-ai": false,
+    "modelscope-cn": false
+  };
+  function houseSupportsVideo(be) {
+    var b = (be == null || be === "") ? ((typeof currentBackend === "function") ? currentBackend() : (($("backend") && $("backend").value) || "")) : String(be);
+    if (!b) return true;
+    if (Object.prototype.hasOwnProperty.call(HOUSE_VIDEO_OK, b)) return !!HOUSE_VIDEO_OK[b];
+    return true;
+  }
+  function modeAvailability(be) {
+    var videoOk = houseSupportsVideo(be);
+    return {
+      text: false,
+      image: true,
+      video: videoOk,
+      audio: false,
+      reasons: {
+        text: "本版未接",
+        image: "",
+        video: videoOk ? "" : "未接（魔搭 API-Inference 无视频）",
+        audio: "本版未接"
+      }
+    };
+  }
+  function isStubMode() {
+    if (state.mode === "text" || state.mode === "audio") return true;
+    if (state.mode === "video" && !houseSupportsVideo()) return true;
+    return false;
+  }
+  function stubModeMessage() {
+    if (state.mode === "text") return "文本生成 · 本版未接";
+    if (state.mode === "audio") return "音频生成 · 本版未接";
+    if (state.mode === "video" && !houseSupportsVideo()) {
+      var be = (typeof currentBackend === "function") ? currentBackend() : "";
+      if (be === "modelscope-ai" || be === "modelscope-cn") {
+        return "视频生成 · 未接（魔搭 API-Inference 无视频）";
+      }
+      return "视频生成 · 未接";
+    }
+    return (typeof modeLabelOf === "function" ? modeLabelOf(state.mode) : "当前模式") + " · 本版未接";
+  }
+  function syncModeTabs() {
+    var avail = modeAvailability();
+    var map = { text: "modeText", image: "modeImg", video: "modeVid", audio: "modeAud" };
+    ["text", "image", "video", "audio"].forEach(function (m) {
+      var el = $(map[m]);
+      if (!el) return;
+      var ok = !!avail[m];
+      var selected = state.mode === m;
+      el.classList.toggle("on", selected);
+      el.classList.toggle("mode-unavail", !ok);
+      el.classList.toggle("stub", !ok);
+      var reason = (avail.reasons && avail.reasons[m]) || (!ok ? "未接" : "");
+      var baseTitle = m === "text" ? "文本生成" : m === "image" ? "图片生成" : m === "video" ? "视频生成" : "音频生成";
+      if (!ok) {
+        el.setAttribute("title", baseTitle + " · " + (reason.indexOf("未接") >= 0 ? reason : ("未接" + (reason ? " · " + reason : ""))));
+        el.setAttribute("aria-disabled", "true");
+        el.setAttribute("data-unavail", "未接");
+      } else {
+        el.setAttribute("title", baseTitle);
+        el.removeAttribute("aria-disabled");
+        el.removeAttribute("data-unavail");
+      }
+    });
+  }
+
 
   function isMulti(id) { return state.multi.indexOf(id) >= 0; }
   function setMulti(ids) {
@@ -3035,7 +3107,7 @@
       ).join("");
     }
     if (copyEl) {
-      if (stub) copyEl.textContent = ml + " · 本版未接";
+      if (stub) copyEl.textContent = (typeof stubModeMessage === "function") ? stubModeMessage() : (ml + " · 本版未接");
       else if (needFrame) copyEl.textContent = "缺首帧：切到图片生成，或上传/选择首帧";
       else copyEl.textContent = "选分镜 → " + ml + " → 选服务 → 胶囊 ↑";
     }
@@ -3136,10 +3208,7 @@
     syncParamSurface._skipDock = true;
     try { syncParamSurface(); }
     finally { syncParamSurface._skipDock = false; }
-    ["text", "image", "video", "audio"].forEach((m) => {
-      const el = $("mode" + (m === "image" ? "Img" : m === "video" ? "Vid" : m === "text" ? "Text" : "Aud"));
-      if (el) el.classList.toggle("on", state.mode === m);
-    });
+    try { syncModeTabs(); } catch (_) {}
     // v0916-stub-hide-model-row: 文本/音频为本版未接的 stub 模式，目录本来返回空——
     // 把整个模型行（后端/搜索/模型下拉）与 LoRA 行视觉隐藏，只留下方状态文案
     // 「文本生成 · 本版未接」，避免空「选择模型」下拉被误读成模型被砍。
@@ -3157,7 +3226,7 @@
     const keepSmart = liveMsg.indexOf("已智能匹配") >= 0;
     syncSendGate(needFrame, stub);
     if (stub) {
-      setMsg((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "warn");
+      setMsg((typeof stubModeMessage === "function") ? stubModeMessage() : ((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接"), "warn");
     } else if (needFrame) {
       // v0821g/o17: missing-frame is hard stop (red); offer 图片生成 or attach frame
       if (!keepSmart) setMsg("缺首帧 · 切到图片生成，或先上传/选择首帧", "bad");
@@ -5068,7 +5137,9 @@
   });
 
   function setMode(mode) {
+    // o160: unavailable modes (text/audio always; Magao video) enter as stub — honest UI, not silent ignore
     state.mode = mode;
+    try { syncModeTabs(); } catch (_) {}
     // video→image/text/audio: withdraw leftover 缺首帧 (renderDock would otherwise keep it).
     if (mode !== "video") {
       const msgEl = $("msg");
@@ -6342,6 +6413,7 @@
       } catch (_) {}
     }
     syncParamChrome();
+    try { syncModeTabs(); } catch (_) {}
     try { renderDock(); } catch (_) {}
   }
   function readComfyParamsFromUi() {
@@ -9436,7 +9508,7 @@
       return fail(dependency, "blocked");
     }
     if (isStubMode()) {
-      return fail((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接", "blocked", "warn");
+      return fail((typeof stubModeMessage === "function") ? stubModeMessage() : ((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接"), "blocked", "warn");
     }
     if (state.mode === "video") {
       const opVid = (typeof currentGraphOp === "function") ? currentGraphOp() : "i2v";
@@ -9945,7 +10017,7 @@
       else setMsg(err, "bad");
     };
     if (isStubMode()) {
-      failUi((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接");
+      failUi((typeof stubModeMessage === "function") ? stubModeMessage() : ((state.mode === "text" ? "文本生成" : "音频生成") + " · 本版未接"));
       return;
     }
     if (state.mode === "video" && (typeof currentGraphOp !== "function" || currentGraphOp() !== "t2v") && !frameAsset(n)) {

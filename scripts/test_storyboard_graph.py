@@ -5463,6 +5463,7 @@ def main():
         test_o39_refs_fill_smart_match_static,
         test_o40_fill_exact_cap_static,
         test_o41_fill_real_fixtures_static,
+        test_o160_composer_mode_tabs_honesty,
         test_v0821o30_send_gate,
         test_import_19201654_original_params,
         # test_import_142210587_original_params  # optional fixture; NOT acceptance
@@ -5532,6 +5533,42 @@ def test_o41_fill_real_fixtures_static():
         assert_true(fp.is_file() and fp.stat().st_size > 0, f"fixture exists {fp.name}")
     assert_true("/out/fill-cap-" in js, "client fill-cap urls")
     assert_true("/out/o40-fill-" not in js, "no phantom")
+
+
+
+def test_o160_composer_mode_tabs_honesty():
+    """o160: Composer mode tabs reflect house caps — Magao video grey+未接; text/audio stub."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    css_shell = (ROOT / "static" / "storyboard-shell.css").read_text(encoding="utf-8")
+    css_ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0822o160-composer-mode-tabs" in js, "js stamp o160")
+    assert_true("o160composermodetabs" in html, "html cache-bust o160")
+    assert_true("v0822o160-composer-mode-tabs" in html, "html stamp o160")
+    assert_true("function houseSupportsVideo" in js, "houseSupportsVideo")
+    assert_true("function modeAvailability" in js, "modeAvailability")
+    assert_true("function syncModeTabs" in js, "syncModeTabs")
+    assert_true("HOUSE_VIDEO_OK" in js, "HOUSE_VIDEO_OK map")
+    assert_true('"modelscope-ai": false' in js, "Magao AI video false")
+    assert_true('"modelscope-cn": false' in js, "Magao CN video false")
+    for house in ("civitai", "fal", "huggingface", "nano-gpt"):
+        assert_true('"%s": true' % house in js, house + " video true")
+    stub = js[js.find("function isStubMode"):js.find("function isStubMode") + 400]
+    assert_true('state.mode === "video"' in stub and "houseSupportsVideo" in stub,
+                "isStubMode includes video when house no video")
+    assert_true("function stubModeMessage" in js, "stubModeMessage")
+    assert_true("魔搭 API-Inference 无视频" in js, "Magao video stub copy")
+    assert_true("mode-unavail" in js and "data-unavail" in js, "mode-unavail attrs")
+    assert_true("mode-unavail" in css_shell or "mode-unavail" in css_ui, "CSS mode-unavail")
+    assert_true("未接" in css_shell or "未接" in css_ui, "CSS 未接 chip")
+    sm = js[js.find("function setMode"):js.find("function setMode") + 900]
+    assert_true("syncModeTabs" in sm, "setMode calls syncModeTabs")
+    assert_true("enter as stub" in sm or "unavailable modes" in sm, "setMode stub-enter comment")
+    rd = js[js.find("function renderDock"):js.find("function renderDock") + 4000]
+    assert_true("syncModeTabs" in rd, "renderDock syncModeTabs")
+    asc = js[js.find("function applyServiceConstraints"):js.find("function applyServiceConstraints") + 1200]
+    assert_true("syncModeTabs" in asc, "applyServiceConstraints syncModeTabs")
+
 
 
 if __name__ == "__main__":

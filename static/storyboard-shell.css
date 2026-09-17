@@ -381,6 +381,36 @@ svg.wires path.edge {
   white-space: nowrap;
 }
 .dock.show .modes button.on { background: #2a2a32; color: #ececef; }
+/* o160: unavailable Composer modes — muted grey + 「未接」chip; never equal-green peer of .on */
+.dock.show .modes button.mode-unavail,
+.dock.show .modes button.stub {
+  color: #6a6a73;
+  background: transparent;
+  opacity: 0.72;
+  cursor: default;
+}
+.dock.show .modes button.mode-unavail.on,
+.dock.show .modes button.stub.on {
+  background: transparent;
+  color: #6a6a73;
+}
+.dock.show .modes button.mode-unavail::after,
+.dock.show .modes button.stub[data-unavail]::after {
+  content: attr(data-unavail);
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #9a9aa3;
+  background: #1e1e24;
+  vertical-align: middle;
+}
+.dock.show .modes button.mode-unavail[data-unavail=""]::after,
+.dock.show .modes button.mode-unavail:not([data-unavail])::after {
+  content: "未接";
+}
 .dock.show .refs,
 .dock.show #refs,
 .dock.show.collapsed .refs,

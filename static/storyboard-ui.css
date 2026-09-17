@@ -831,3 +831,25 @@ header .title:hover { color: #fff; }
 /* o150: Nano prompt live counter — 上限/剩余/超 N 字 */
 .nano-prompt-count { margin: 4px 0 0; font-size: 12px; color: #a0a0a8; }
 .nano-prompt-count.is-over { color: #e8b4b4; font-weight: 600; }
+
+/* o160 composer mode tabs honesty */
+.modes button.mode-unavail,
+.modes button.stub {
+  color: #6a6a73 !important;
+  opacity: 0.72;
+}
+.modes button.mode-unavail.on,
+.modes button.stub.on {
+  background: transparent !important;
+  color: #6a6a73 !important;
+}
+.modes button.mode-unavail::after,
+.modes button[data-unavail]::after {
+  content: attr(data-unavail);
+  margin-left: 4px;
+  font-size: 10px;
+  color: #9a9aa3;
+}
+.modes button.mode-unavail:not([data-unavail])::after {
+  content: "未接";
+}
