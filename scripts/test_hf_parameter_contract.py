@@ -277,7 +277,13 @@ class HFContract(unittest.TestCase):
                 {"path": "https://example.invalid/extra.safetensors", "scale": -0.25},
             ],
         })
-        self.assertEqual(data["submittedInput"], sent)
+        # Hub LoRA-as-model may attach evidence keys; POST body itself must match.
+        self.assertEqual(self.transport.call_args.kwargs["body"], sent)
+        submitted = data["submittedInput"]
+        for k, v in sent.items():
+            self.assertEqual(submitted.get(k), v, k)
+        self.assertTrue(submitted.get("hubLoraAsModel"))
+        self.assertEqual(submitted.get("model"), "org/adapter")
 
     def test_upstream_json_error_is_not_a_success(self):
         for route in ("fal-ai", "nscale", "together", "hf-inference"):
@@ -314,13 +320,14 @@ class HFContract(unittest.TestCase):
 
         with patch.object(hf, "_hf_list_page", side_effect=one_page):
             items, stats = hf._fetch_hf_catalog("krea")
-        self.assertEqual(len(calls), 1)
-        self.assertIn("search=krea", calls[0])
-        self.assertIn("inference_provider=all", calls[0])
-        self.assertIn("limit=50", calls[0])
-        self.assertNotIn("limit=1000", calls[0])
+        # Search page + official filter=lora discoverability page (o162).
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(any("search=krea" in u and "filter=lora" not in u for u in calls))
+        self.assertTrue(any("filter=lora" in u for u in calls))
+        self.assertTrue(all("inference_provider=all" in u for u in calls))
+        self.assertTrue(all("limit=1000" not in u for u in calls))
         self.assertEqual([x["id"] for x in items], ["org/a", "org/b"])
-        self.assertEqual(stats["pages"], 1)
+        self.assertEqual(stats["pages"], 2)
         self.assertTrue(stats["hasMore"])
         self.assertEqual(stats["nextPage"], 2)
         self.assertFalse(stats["complete"])

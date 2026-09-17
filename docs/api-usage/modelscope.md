@@ -121,3 +121,10 @@ Hub（AI/CN **共用**搜目录，**不**共用生成 base）：`GET https://www
 - seed **[0, 2^31-1]**，禁 wrap；Studio -1=随机 → 省略。
 - LoRA：单条 `"owner/repo"`；多条 `{repo:weight}` 且和为 1.0，最多 6。
 - 能力表：`maxRefs=3`（不是 1），`refImagesField=image_url`。
+
+
+## v0822o162 Magao Hub LoRA search miss
+
+- `_modelscope_loras` shape unchanged（单条 string / 多条 dict sum=1；拒 http/AIR；拒单条 weight）。
+- `supportsLora`：仅 image Infer 行；video / unsendable → False。Magao AI krea 仍靠 o156 目录过滤。
+- Exact `owner/repo` 搜不到 → `miss=true` + 人话 note；禁止近似顶替。

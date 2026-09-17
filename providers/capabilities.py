@@ -443,12 +443,20 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
     # o57: official AIGC image keys include loras
     # https://www.modelscope.cn/docs/model-service/API-Inference/intro
     # Video adapter does not wire loras. Unknown mid does not invent supportsLora.
+    # IRON §5 / o162: supportsLora only on Infer image rows. Magao AI krea/* is
+    # filtered at catalog (o156) — shared overlay must not mark CN krea False.
     cat = str(row.get("category") or "").strip().lower()
     if cat == "video" or task in ("text-to-video", "image-to-video") or "t2v" in tags or "i2v" in tags:
-        caps.setdefault("supportsLora", False)
+        caps["supportsLora"] = False
         caps.setdefault("loraShape", "hub_repo")
-        caps.setdefault("loraSource", "official-aigc-image-keys-not-wired-for-video")
-    elif cat == "image" or task in ("text-to-image", "image-to-image") or "t2i" in tags or "i2i" in tags:
+        caps["loraSource"] = "official-aigc-image-keys-not-wired-for-video"
+        caps["loraConfidence"] = "none"
+    elif row.get("unsendable") or row.get("sendable") is False:
+        caps["supportsLora"] = False
+        caps.setdefault("loraShape", "hub_repo")
+        caps["loraSource"] = "unsendable-row"
+        caps["loraConfidence"] = "none"
+    elif cat == "image" or task in ("text-to-image", "image-to-image", "text-to-image-synthesis") or "t2i" in tags or "i2i" in tags:
         caps.setdefault("supportsLora", True)
         caps.setdefault("loraShape", "hub_repo")
         caps.setdefault("loraConfidence", "official")
@@ -456,6 +464,7 @@ def overlay_modelscope_catalog_item(row: dict | None) -> dict:
     else:
         caps.setdefault("loraShape", "hub_repo")
         caps.setdefault("loraSource", "unknown")
+        # Unknown task/category: do not invent supportsLora=True
     if "supportsLora" in caps and row.get("supportsLora") is None:
         row["supportsLora"] = caps["supportsLora"]
 

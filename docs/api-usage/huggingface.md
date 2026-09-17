@@ -20,7 +20,7 @@
 | OpenAI 风格 | `POST {ROUTER}/{provider}/v1/images/generations` |
 | Bytes / hf-inference | `POST {ROUTER}/hf-inference/models/{mid}` |
 
-Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-inference`。**跳过** `replicate` POST。
+Provider 偏好：`fal-ai` → `nscale` → `together` → `hf-inference`。**跳过** `replicate` 的 OpenAI 风格 POST（Hub LoRA 官方 SDK 可用 replicate；Studio 可验证出站以 Router fal-ai 为准）。
 
 ## Catalog
 
@@ -63,13 +63,29 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 
 `{inputs: prompt, parameters: {negative_prompt, num_inference_steps, …}}` — **不带 LoRA**。
 
-## LoRA / 静默丢 / 假信心
+## LoRA / Hub-LoRA-as-model / 静默丢 / 假信心
+
+### 官方路径 A — Hub LoRA 当 model（huggingface_hub ≥0.31）
+
+```python
+InferenceClient(provider="fal-ai").text_to_image(..., model="<hub-lora-id>")
+# 或 provider="replicate"
+```
+
+- 条件：Hub `inferenceProviderMapping` live 且带 `adapter=lora` / `adapterWeightsPath`。
+- Studio：`serviceId=<hub-lora-id>` → Router `fal-ai` + 把 adapter 权重 URL 写入 `loras[{path}]`（**不 invent scale**；IRON §5）。
+- Catalog：`hubLoraAsModel=true`，`loraChannel=hub-lora-as-model`，`loraConfidence=official`（仅此路径）。
+- 搜：`filter=lora` + exact `owner/repo`；匹配不上如实 miss，**禁止发明 Hub id**。
+- **replicate**：官方 SDK 支持；Studio Router 的 OpenAI 风格 POST 仍跳过 replicate（与底模相同）。无 fal-ai 映射 → 诚实 400，不假装已发。
+- 例（官方 release 样例，非发明）：`openfree/flux-chatgpt-ghibli-lora`。
+
+### 路径 B — 底模 mapped fal 通道附 `loras[]`（仍 unverified）
 
 - 发出去 ≠ 上游加载。`warning`：「已把 loras[] 附在 mapped 端点…路由没有 /lora sibling」。
 - UI **禁止**把 `loraConfidence=unverified` 当绿勾「已加载」。
 - `_maybe_lora_pid`：**不**改成 `…/turbo/lora`（Router「Model not supported」）。
 - AIR 经 `_fal_lora_path` 丢弃；无 path 则该条不进。
-- 官方 Inference Providers 请求表 **没有 loras**。
+- **禁止**把 `fal-ai/flux-lora` 等当成 HF `serviceId`（o33：换家 Fal 或选 Hub mid）。
 
 夹具 path：`https://civitai.com/api/download/models/3231694`。
 
@@ -99,14 +115,15 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 
 `test_p0_wiring`：`_maybe_lora_pid` 保持 turbo；`_force_loras` 塞 3231694。
 
-## 官方对照（2026-09-11，Inference Providers）
+## 官方对照（2026-09-17，Inference Providers + Hub LoRA）
 
-来源：https://huggingface.co/docs/inference-providers/guides/first-api-call
+来源：https://huggingface.co/docs/inference-providers/guides/first-api-call ；huggingface_hub v0.31 release（LoRAs with fal.ai and Replicate）。
 
-- SDK：`huggingface_hub.InferenceClient` / `@huggingface/inference`；`api_key` = `HF_TOKEN`。
+- SDK：`huggingface_hub.InferenceClient`；`api_key` = `HF_TOKEN`。
 - 图：`text_to_image(prompt, model=…)`；可选 `provider="auto"|"fal-ai"|"replicate"|…`。
+- **Hub LoRA-as-model**：`model="<hub-lora-id>"` + `provider="fal-ai"|"replicate"`（映射带 `adapterWeightsPath`）。
 - 常见参数：`negative_prompt`、`num_inference_steps`、`guidance_scale`、`target_size`、`seed`（integer，**无公布 max**）。
-- Studio 走 **Router**（`router.huggingface.co`）映射通道，不是裸 Hub widget；`loraConfidence=unverified` 仍成立。
+- Studio 走 **Router**（`router.huggingface.co`）；Hub LoRA-as-model → `loraConfidence=official`；底模附 `loras[]` → 仍 `unverified`。
 
 ## v0821o33 HF score honesty
 
@@ -114,3 +131,10 @@ Provider 偏好：`fal-ai` → `nscale` → `wavespeed` → `together` → `hf-i
 - Default: `backend=huggingface` + those sids → **400** `HF Router 不托管该 Fal LoRA 端点，请换家 Fal`；`scoresAsHfClosedLoop=false`；chips kept in Composer.
 - Debug only: `HF_ALLOW_FAL_TRANSPORT=1` re-enables o32 Path A (Fal key → `queue.fal.run`); still `transport=fal` / **not** HF closed-loop score.
 - Real HF outbound: Hub mid → `router.huggingface.co` + HF token；`submittedInput` must **not** carry `transport=fal`.
+
+
+## v0822o162 HF Hub-LoRA-as-model
+
+- Catalog/search：Hub LoRA（mapping adapter）可发现；`hubLoraAsModel` 诚实戳。
+- Outbound：`serviceId=<hub-lora-id>` → Router fal-ai + adapter path；不 invent scale / Hub id。
+- 禁止：Midjourney 顶替、静默换家、curl `/api/generate` 当验收。

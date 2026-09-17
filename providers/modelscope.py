@@ -921,11 +921,41 @@ def fetch_hub(search=""):
 
 
 def search_loras(q: str, limit: int = 8):
-    """ModelScope Hub search. Official loras field wants owner/repo."""
+    """ModelScope Hub search. Official loras field wants owner/repo.
+
+    Exact owner/repo is preferred (IRON §5: no approximate remap). Miss = empty
+    items + clear note — never invent a Hub id or Midjourney substitute.
+    """
     q = (q or "").strip()
     items, seen = [], set()
     if not q:
-        return 200, {"items": [], "backend": "modelscope"}
+        return 200, {"items": [], "backend": "modelscope", "note": "请输入 Hub owner/repo 或关键词"}
+    # Exact owner/repo: one Hub lookup, no fuzzy substitute.
+    if q.count("/") == 1 and " " not in q and _hub_lora_repo(q):
+        rows, _ = fetch_hub_search(q)
+        for row in rows or []:
+            mid = (row.get("id") or "").strip()
+            if mid == q or mid.lower() == q.lower():
+                items.append({
+                    "id": mid,
+                    "name": row.get("name") or mid,
+                    "path": mid,
+                    "type": "LORA",
+                    "source": "modelscope",
+                    "versions": [{"id": mid, "name": row.get("task") or "lora"}],
+                })
+                seen.add(mid)
+                break
+        if not items:
+            # Honest miss — do not invent Civitai→Hub or cross-house remap.
+            return 200, {
+                "items": [],
+                "backend": "modelscope",
+                "query": q,
+                "miss": True,
+                "note": f"魔搭 Hub 未找到 LoRA `{q}`（需要 owner/repo）。不会近似顶替或发明 Hub id。",
+            }
+        return 200, {"items": items[:limit], "backend": "modelscope", "query": q}
     rows, _ = fetch_hub_search(q)
     extra, _ = fetch_hub_search(q + " lora")
     for row in list(rows) + list(extra):
@@ -943,7 +973,14 @@ def search_loras(q: str, limit: int = 8):
         })
         if len(items) >= limit:
             break
-    return 200, {"items": items, "backend": "modelscope"}
+    out = {"items": items, "backend": "modelscope", "query": q}
+    if not items:
+        out["miss"] = True
+        out["note"] = (
+            f"魔搭 Hub 未搜到与 `{q}` 匹配的 owner/repo LoRA。"
+            "匹配不上就如实说；不会静默换家或发明 id。"
+        )
+    return 200, out
 
 
 def is_edit(mid: str) -> bool:

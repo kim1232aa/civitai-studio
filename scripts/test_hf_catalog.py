@@ -137,7 +137,7 @@ class HFCatalogTests(unittest.TestCase):
 
     def test_search_is_one_page_plus_pins(self):
         body = hf.HuggingFaceProvider().catalog("krea", "image", "")
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)  # search + filter=lora (o162)
         query = parse_qs(urlsplit(self.calls[0]).query)
         self.assertEqual(query.get("search"), ["krea"])
         self.assertEqual(query.get("inference_provider"), ["all"])

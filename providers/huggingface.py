@@ -53,6 +53,23 @@ def _mapping_as_dict(raw):
     return out
 
 
+def mapping_is_hub_lora(mapping) -> bool:
+    """Hub LoRA-as-model: live inferenceProviderMapping with adapter=lora or adapterWeightsPath.
+
+    Official: huggingface_hub v0.31 InferenceClient(provider="fal-ai"|"replicate").text_to_image(model=<hub-lora-id>).
+    """
+    from .hf_catalog_caps import mapping_is_hub_lora as _caps_is
+    return _caps_is(mapping)
+
+
+def _hub_lora_adapter_path(info) -> str | None:
+    if not isinstance(info, dict):
+        return None
+    path = info.get("adapterWeightsPath") or info.get("adapter_weights_path")
+    if isinstance(path, str) and path.strip() and not path.startswith("/") and ".." not in path.split("/"):
+        return path.strip()
+    return None
+
 def hf_keys() -> list[str]:
     """All configured HF tokens, first-file then extra lines then env. Never log values."""
     found: list[str] = []
@@ -254,7 +271,7 @@ def _provider_candidates(mapping: dict, mid: str, spec: dict, payload=None) -> l
     out = [(n, p, s) for n, p, s in ordered if not (s == "openai" and n in _SKIP_OPENAI)]
     # v0821o5: Krea / Z-Image turbo — pin fal-ai; wavespeed does not support
     # these models (and must not cover a fal-ai LoRA error).
-    if _skip_wavespeed(mid, mapping):
+    if _skip_wavespeed(mid, mapping) or mapping_is_hub_lora(mapping):
         out = [(n, p, s) for n, p, s in out if n != "wavespeed"]
         fal = [x for x in out if x[0] == "fal-ai"]
         rest = [x for x in out if x[0] != "fal-ai"]
@@ -953,6 +970,24 @@ def _hf_row(mid, name, pipe, *, raw=None, mapping=None):
             "imageFields": ["image_url"],
         }
         row["supported_parameters"] = {"max_input_images": 1}
+    # Hub LoRA-as-model: keep mapping on the row so catalog overlay stamps honestly.
+    if channels and mapping_is_hub_lora(channels):
+        row["hubLoraAsModel"] = True
+        row["inferenceProviderMapping"] = channels
+        tags = list(row.get("tags") or [])
+        if "lora" not in tags:
+            tags.append("lora")
+        if "hub-lora-as-model" not in tags:
+            tags.append("hub-lora-as-model")
+        row["tags"] = tags
+        caps = dict(row["capabilities"]) if isinstance(row.get("capabilities"), dict) else {}
+        caps["hubLoraAsModel"] = True
+        caps["loraChannel"] = "hub-lora-as-model"
+        caps["loraSource"] = "inference-provider-adapter"
+        caps["loraConfidence"] = "official"
+        caps["supportsLora"] = True
+        row["capabilities"] = caps
+        row["supportsLora"] = True
     return _apply_upscale_category(row)
 
 
@@ -1204,6 +1239,15 @@ def _fetch_hf_catalog(q="", pins=None, *, page=1, page_size=_HF_PAGE_SIZE, categ
         stats["pageSizeEach"] = each
         for pipe in pipes:
             urls.append(_hub_browse_url(q=q, category=category, page_size=each, pipeline=pipe))
+        # Hub LoRA-as-model discoverability: official filter=lora (tag ≠ schema alone;
+        # ingest still requires mapping task ∈ HF_PIPES via _pipe_from_item).
+        if q:
+            lora_limit = max(1, min(int(each), 25))
+            urls.append(
+                f"{HUB}?search={quote(q)}&filter=lora&inference_provider=all"
+                f"&limit={lora_limit}&expand[]=inferenceProviderMapping&expand[]=pipeline_tag"
+            )
+            stats.setdefault("hubLoraFilter", True)
     next_urls = []
     for url in urls:
         code, data, next_url = _hf_list_page(url)
@@ -1450,6 +1494,19 @@ class HuggingFaceProvider(Provider):
             spec = next((x for x in load_items() if x.get("id") == mid), {}) or {}
             mapping = inference_mapping(mid)
             candidates = _provider_candidates(mapping, mid, spec, payload)
+            if mapping_is_hub_lora(mapping) and not any(c[0] == "fal-ai" for c in candidates):
+                # Official SDK also lists replicate; Studio Router OpenAI-style POST skips replicate.
+                return finish(400, {
+                    "error": (
+                        f"Hub LoRA {mid} 有 Inference Provider 映射，但当前没有可经 Router fal-ai "
+                        "出站的 live 通道（replicate 的 OpenAI 通道 Studio 未接，不会假装已发）。"
+                        "请换有 fal-ai 映射的 Hub LoRA，或换家。"
+                    ),
+                    "backend": self.id,
+                    "serviceId": mid,
+                    "hubLoraAsModel": True,
+                    "scoresAsHfClosedLoop": False,
+                })
             # Hub mid mapped to a no-LoRA fal pid while loras[] present → honest 400 (UI should have pinned).
             if _has_loras(payload) and candidates:
                 prov, pid, style = candidates[0]
@@ -1495,20 +1552,38 @@ class HuggingFaceProvider(Provider):
                 }
                 try:
                     routed_payload = dict(payload, task=_task(payload, spec))
-                    adapter_path = (mapping.get(provider) or {}).get("adapterWeightsPath")
-                    if adapter_path is not None:
-                        if provider != "fal-ai" or not isinstance(adapter_path, str) or not adapter_path or adapter_path.startswith("/") or ".." in adapter_path.split("/"):
-                            raise ValueError("HF 映射的 adapterWeightsPath 无法接入，拒绝只生成底模")
+                    info = mapping.get(provider) or {}
+                    adapter_path = _hub_lora_adapter_path(info)
+                    hub_lora = mapping_is_hub_lora(mapping)
+                    if hub_lora:
+                        # Evidence on meta/response — do not mutate POST body keys.
+                        meta["hubLoraAsModel"] = True
+                        meta["hubLoraModel"] = mid
+                        submitted = dict(submitted)
+                        # Keep thin route evidence without becoming fal body fields.
+                        last_submitted = {**submitted, "hubLoraAsModel": True, "model": mid}
+                    if adapter_path is not None or (info.get("adapterWeightsPath") is not None or info.get("adapter_weights_path") is not None):
+                        # Official Hub LoRA-as-model: fal-ai (+ replicate in SDK). Studio Router
+                        # fal-ai path is the verifiable wire; do not invent Hub ids.
+                        if provider != "fal-ai" or not adapter_path:
+                            raise ValueError(
+                                "HF Hub LoRA 映射的 adapterWeightsPath 无法经 Router fal-ai 接入，"
+                                "拒绝只生成底模或静默换家"
+                            )
                         loras = payload.get("loras") or []
                         if not isinstance(loras, list):
                             raise ValueError("HF LoRA 必须是数组")
-                        # Omit scale — vendor default. Never invent 1.0 for mapped adapter.
+                        # Omit scale — vendor default. Never invent 1.0 for mapped adapter (IRON §5).
                         routed_payload["loras"] = [{
                             "path": f"https://huggingface.co/{quote(mid, safe='/')}/resolve/main/{quote(adapter_path, safe='/')}",
                         }, *loras]
                         if pid == "fal-ai/lora":
                             # The HF official Fal helper specifies this base for SDXL adapters.
                             routed_payload["model_name"] = "stabilityai/stable-diffusion-xl-base-1.0"
+                    elif hub_lora and provider == "fal-ai":
+                        raise ValueError(
+                            f"Hub LoRA {mid} 的 fal-ai 映射缺少 adapterWeightsPath，拒绝假装已挂载"
+                        )
                     if style == "bytes":
                         code, data, raw, ctype, submitted = _call_bytes(mid, payload or {}, spec, key, timeout)
                         meta["submittedInput"] = submitted
@@ -1549,7 +1624,14 @@ class HuggingFaceProvider(Provider):
                         code, data, submitted = _call_fal(
                             provider, pid, routed_payload, key, timeout, **extra
                         )
+                        post_body = submitted
+                        if hub_lora and isinstance(submitted, dict):
+                            # Response evidence keys — vendor POST body stays clean.
+                            submitted = dict(submitted)
+                            submitted["hubLoraAsModel"] = True
+                            submitted["model"] = mid
                         meta["submittedInput"] = submitted
+                        meta["postBody"] = post_body
                         last_submitted = submitted
                         if code >= 400 or data.get("error"):
                             if isinstance(data, dict):
@@ -1608,11 +1690,19 @@ class HuggingFaceProvider(Provider):
                         "submittedInput": submitted,
                     }
                     # Fake-confidence: body may carry loras[] on mapped turbo; router has no /lora sibling.
-                    if (payload or {}).get("loras") and isinstance(submitted, dict) and submitted.get("loras"):
+                    # Hub LoRA-as-model is the official adapterWeightsPath path — no unverified warning.
+                    if (
+                        not (isinstance(submitted, dict) and submitted.get("hubLoraAsModel"))
+                        and (payload or {}).get("loras")
+                        and isinstance(submitted, dict)
+                        and submitted.get("loras")
+                    ):
                         out["warning"] = (
                             "Hugging Face 已把 loras[] 附在 mapped 端点发出去；"
                             "上游是否加载未证实（路由没有 /lora sibling）"
                         )
+                    if isinstance(submitted, dict) and submitted.get("hubLoraAsModel"):
+                        out["hubLoraAsModel"] = True
                     remember_job(jid, {**meta, "result": out})
                     return finish(200, out, submitted=submitted, endpoint=attempt_endpoint, task=attempt_task)
                 last = (502, {"error": "Hugging Face 没有返回图片", "provider": provider})
