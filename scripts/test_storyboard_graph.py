@@ -5544,8 +5544,8 @@ def test_o160_composer_mode_tabs_honesty():
     css_shell = (ROOT / "static" / "storyboard-shell.css").read_text(encoding="utf-8")
     css_ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
     assert_true("v0822o160-composer-mode-tabs" in js, "js stamp o160")
-    assert_true("o160composermodetabs" in html, "html cache-bust o160")
-    assert_true("v0822o160-composer-mode-tabs" in html, "html stamp o160")
+    assert_true("o160composermodetabs" in js, "js tip token o160")
+    # html tip may advance (o161+); lineage stays in js comment
     assert_true("function houseSupportsVideo" in js, "houseSupportsVideo")
     assert_true("function modeAvailability" in js, "modeAvailability")
     assert_true("function syncModeTabs" in js, "syncModeTabs")
