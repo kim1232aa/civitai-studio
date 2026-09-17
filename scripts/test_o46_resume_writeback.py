@@ -40,9 +40,13 @@ def main():
     assert g2["nodes"][0]["url"] == "/out/new-2ad94576.png"
     assert pj.get_pending("job-abc") is None
 
+    fixture_dir = Path(td) / "out"
+    fixture_dir.mkdir()
+    opaque = "2ad94576-35b7-47c4-8765-f19f6cf1fbe2"
+    (fixture_dir / f"modelscope-ai_{opaque}_0.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     local = pj.find_local_out_saved(
-        "modelscope-ai|2ad94576-35b7-47c4-8765-f19f6cf1fbe2",
-        out_dir=ROOT / "out",
+        f"modelscope-ai|{opaque}",
+        out_dir=fixture_dir,
     )
     assert local and "/out/" in local[0]["url"] and local[0]["url"].endswith("_0.png"), local
 

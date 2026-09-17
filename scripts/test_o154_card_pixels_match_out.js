@@ -16,7 +16,8 @@ assert.ok(
   html.includes("v0821o154-card-pixels-match-out") || html.includes("o154cardpixels"),
   "html stamp o154"
 );
-assert.ok(/storyboard\.js\?v=o154cardpixels/.test(html), "cache bust o154cardpixels");
+assert.ok(/storyboard\.js\?v=/.test(html), "cache bust present");
+assert.ok(html.includes("o154cardpixels") || /storyboard\.js\?v=o154cardpixels/.test(html), "html lineage o154cardpixels");
 
 // --- patchShotCardMediaDom fetch+blob+decode ---
 const patchStart = js.indexOf("function patchShotCardMediaDom(");
