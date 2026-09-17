@@ -102,7 +102,7 @@ Header：`Authorization: Bearer {key}`；异步提交加 `X-ModelScope-Async-Mod
 
 Hub（AI/CN **共用**搜目录，**不**共用生成 base）：`GET https://www.modelscope.cn/openapi/v1/models`；slug `text-to-image-synthesis`（不是 `text-to-image`）。
 
-钉选样本（可发送图）：`Tongyi-MAI/Z-Image-Turbo`、`Qwen/Qwen-Image`、`Qwen/Qwen-Image-Edit`、`krea/Krea-2-Turbo`、`krea/Krea-2-Raw`。磁盘仍可能含 Hub 视频钉（如 `krea/krea-realtime-video`），但 **catalog 在 `i2v=none` 时过滤，不当可发送**。
+钉选样本（可发送图）：`Tongyi-MAI/Z-Image-Turbo`、`Qwen/Qwen-Image`、`Qwen/Qwen-Image-Edit`；`krea/Krea-2-Turbo` / `krea/Krea-2-Raw` **仅 CN Infer 可发**（AI Infer 报 Model not exists，**modelscope-ai catalog 不得广告为可发送**，o156）。磁盘仍可能含 Hub 视频钉（如 `krea/krea-realtime-video`），但 **catalog 在 `i2v=none` 时过滤，不当可发送**。
 
 ## 静默丢 / drift
 

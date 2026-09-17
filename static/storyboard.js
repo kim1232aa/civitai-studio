@@ -45,6 +45,7 @@
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
+  // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
   // v0822o155b-sb-apply-import o155bapplyimport 20260917-o155b: expose window.__sbApplyImport for page↑ burns
   // v0822o155-fal-krea-schema o155falkreaschema 20260917-o155: Fal krea-2 turbo(/lora) official schema — omit CFG/steps; keep loras
   // v0821o154-card-pixels-match-out o154cardpixels 20260916-o154: paint card face from /out blob ObjectURL + decode so visible pixels match out file

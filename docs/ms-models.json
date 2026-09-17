@@ -101,7 +101,12 @@
         "maxImages": 1,
         "refImagesField": "image_url",
         "imageFields": []
-      }
+      },
+      "channelNotes": {
+        "modelscope-ai": "AI Infer rejects — not sendable; catalog filters",
+        "modelscope-cn": "CN Infer sendable"
+      },
+      "notes": "Magao AI Infer rejects (Model not exists); sendable on Magao CN only. o156 catalog filters AI."
     },
     {
       "id": "krea/Krea-2-Raw",
@@ -120,7 +125,12 @@
         "maxImages": 1,
         "refImagesField": "image_url",
         "imageFields": []
-      }
+      },
+      "channelNotes": {
+        "modelscope-ai": "AI Infer rejects — not sendable; catalog filters",
+        "modelscope-cn": "CN Infer sendable"
+      },
+      "notes": "Magao AI Infer rejects (Model not exists); sendable on Magao CN only. o156 catalog filters AI."
     },
     {
       "id": "krea/krea-realtime-video",

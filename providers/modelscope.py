@@ -235,6 +235,57 @@ def _filter_unsendable_video(items, provider_id: str):
     return [x for x in (items or []) if not _is_video_catalog_row(x)]
 
 
+# Magao AI Infer rejects these image bases ("Model not exists"); CN Infer accepts.
+# Prefer catalog filter over fake selectable rows (same honesty as video filter). o156.
+_AI_UNSENDABLE_KREA_IMAGE_IDS = frozenset({
+    "krea/Krea-2-Turbo",
+    "krea/Krea-2-Raw",
+})
+
+
+def _is_ai_unsendable_krea_image_mid(mid: str) -> bool:
+    """True for krea/* image t2i bases Magao AI Infer rejects (not video rows)."""
+    m = (mid or "").strip()
+    if not m:
+        return False
+    if m in _AI_UNSENDABLE_KREA_IMAGE_IDS:
+        return True
+    low = m.lower()
+    if not low.startswith("krea/"):
+        return False
+    # Video krea (e.g. krea-realtime-video) is handled by the video filter.
+    if "video" in low or "i2v" in low or "t2v" in low:
+        return False
+    # Same class as Turbo/Raw: other krea/ image bases.
+    return True
+
+
+def _is_ai_unsendable_krea_image_row(row) -> bool:
+    if not isinstance(row, dict):
+        return False
+    if _is_video_catalog_row(row):
+        return False
+    mid = str(row.get("id") or "").strip()
+    if _is_ai_unsendable_krea_image_mid(mid):
+        return True
+    # Pin/hub row with krea id + image/t2i task
+    cat = str(row.get("category") or "").strip().lower()
+    task = str(row.get("task") or row.get("hubTask") or "").strip().lower()
+    if mid.lower().startswith("krea/") and (
+        cat == "image"
+        or task in ("text-to-image", "text-to-image-synthesis", "image-to-image")
+    ):
+        return True
+    return False
+
+
+def _filter_unsendable_ai_krea(items, provider_id: str):
+    """modelscope-ai only: drop krea image bases Magao AI Infer rejects; keep for modelscope-cn."""
+    if provider_id != "modelscope-ai":
+        return list(items or [])
+    return [x for x in (items or []) if not _is_ai_unsendable_krea_image_row(x)]
+
+
 def _wants_video(payload, mid=""):
     blob = " ".join([
         str((payload or {}).get("kind") or ""),
@@ -1012,6 +1063,9 @@ class ModelScopeProvider(Provider):
         # Honesty: Hub video task ≠ API-Inference video API. When i2v=none, do not
         # present video models as sendable (prefer filter over fake selectable rows).
         items = _filter_unsendable_video(items, self.id)
+        # o156: Magao AI Infer rejects krea/* image bases (Model not exists); CN keeps them.
+        # Prefer filter over fake selectable rows — never silent-swap AI→CN.
+        items = _filter_unsendable_ai_krea(items, self.id)
         tagged = []
         from .capabilities import overlay_modelscope_catalog_item
         for x in items:
@@ -1107,6 +1161,16 @@ class ModelScopeProvider(Provider):
                     f"{self.label} 官方没有视频生成 API，"
                     "拒绝拿 /images/generations 图片端点冒充图生视频/文生视频。"
                     "请改用 Civitai / Fal / NanoGPT 的视频服务。"
+                ),
+                "backend": self.id,
+            }
+        # o156: Magao AI Infer rejects krea image bases — fail closed, no AI→CN rewrite.
+        if self.id == "modelscope-ai" and _is_ai_unsendable_krea_image_mid(mid):
+            return 400, {
+                "error": (
+                    f"{self.label} Infer 不支持模型 {mid}（AI Infer 报 Model not exists）；"
+                    "不会改走 Magao CN，也不会替换底模。"
+                    "请换可用底模，或改用 modelscope-cn（CN Infer 可发 krea Turbo/Raw）。"
                 ),
                 "backend": self.id,
             }
