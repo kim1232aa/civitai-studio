@@ -1,0 +1,68 @@
+{
+  "fal-ai/krea-2/turbo/lora": {
+    "id": "fal-ai/krea-2/turbo/lora",
+    "category": "image",
+    "title": "Krea2TurboLoraInput",
+    "required": [
+      "prompt"
+    ],
+    "optional": [
+      "num_images",
+      "image_size",
+      "enable_prompt_expansion",
+      "loras",
+      "sync_mode",
+      "output_format",
+      "seed",
+      "enable_safety_checker",
+      "acceleration"
+    ],
+    "imageFields": [],
+    "promptField": "prompt",
+    "supportsLora": true,
+    "openapiProps": [
+      "num_images",
+      "prompt",
+      "image_size",
+      "enable_prompt_expansion",
+      "loras",
+      "sync_mode",
+      "output_format",
+      "seed",
+      "enable_safety_checker",
+      "acceleration"
+    ]
+  },
+  "fal-ai/krea-2/turbo": {
+    "id": "fal-ai/krea-2/turbo",
+    "category": "image",
+    "title": "Krea2TurboInput",
+    "required": [
+      "prompt"
+    ],
+    "optional": [
+      "num_images",
+      "image_size",
+      "enable_prompt_expansion",
+      "sync_mode",
+      "output_format",
+      "seed",
+      "enable_safety_checker",
+      "acceleration"
+    ],
+    "imageFields": [],
+    "promptField": "prompt",
+    "supportsLora": false,
+    "openapiProps": [
+      "num_images",
+      "prompt",
+      "image_size",
+      "enable_prompt_expansion",
+      "sync_mode",
+      "output_format",
+      "seed",
+      "enable_safety_checker",
+      "acceleration"
+    ]
+  }
+}
