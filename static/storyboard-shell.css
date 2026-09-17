@@ -206,7 +206,6 @@ svg.wires path.edge {
 
 /* JS pins left/top to the selected shot. One box, content fully visible. */
 .dock.show,
-.dock.show.collapsed,
 .dock.show.expanded {
   display: flex !important;
   flex-direction: column !important;
@@ -225,6 +224,25 @@ svg.wires path.edge {
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
+}
+.dock.show.collapsed {
+  display: flex !important;
+  flex-direction: column !important;
+  position: absolute !important;
+  right: auto !important;
+  width: min(360px, calc(100% - 72px)) !important;
+  min-width: 220px !important;
+  max-width: 420px !important;
+  transform: none !important;
+  z-index: 32 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: #16161af5 !important;
+  border: 1px solid #2a2a32;
+  box-shadow: 0 8px 24px #0006;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 120px !important;
 }
 
 .dock.show .dock-hd {
@@ -435,21 +453,43 @@ svg.wires path.edge {
   align-items: center;
   flex: 0 0 auto;
 }
-.dock.show .dock-prompt,
-.dock.show.collapsed .dock-prompt {
+.dock.show .dock-prompt {
   display: flex !important;
   flex: 0 0 auto;
   min-height: 52px !important;
   max-height: 64px !important;
   padding: 0;
 }
-.dock.show #prompt,
-.dock.show.collapsed #prompt {
+.dock.show #prompt {
   min-height: 52px !important;
   max-height: 64px !important;
   height: 52px !important;
   padding: 8px 10px;
   resize: none;
+}
+/* o165: 点节点 = 贴节点能力条，不要把写字台 prompt/LoRA 压在卡上 */
+.dock.show.collapsed .dock-prompt,
+.dock.show.collapsed #prompt,
+.dock.show.collapsed #negative,
+.dock.show.collapsed .lora-block,
+.dock.show.collapsed .composer-acts,
+.dock.show.collapsed .refs,
+.dock.show.collapsed .bar .param-group,
+.dock.show.collapsed #paramWarn,
+.dock.show.collapsed #paramSupportStrip {
+  display: none !important;
+}
+.dock.show.collapsed .modes {
+  display: flex !important;
+  flex: 1 1 auto !important;
+}
+.dock.show.collapsed .dock-scroll,
+.dock.show.collapsed #dockScroll {
+  flex-wrap: nowrap !important;
+  max-height: 40px !important;
+}
+.dock.show.collapsed .dock-foot {
+  display: none !important;
 }
 .dock.show #send { display: none !important; }
 .dock.show .dock-prompt { flex-wrap: wrap !important; }

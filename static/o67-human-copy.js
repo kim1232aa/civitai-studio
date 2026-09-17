@@ -162,7 +162,8 @@
     css.textContent = [
       ".chip{width:44px !important;height:44px !important;overflow:hidden !important}",
       ".chip img,.chip video{width:44px !important;height:44px !important;object-fit:cover !important}",
-      ".dock.show,.dock.show.collapsed,.dock.show.expanded{right:auto !important;width:min(640px,calc(100% - 72px)) !important;min-width:min(560px,calc(100% - 72px)) !important;max-width:min(720px,calc(100% - 72px)) !important;transform:none !important;height:auto !important;max-height:none !important;overflow:visible !important;z-index:32 !important}",
+      ".dock.show.expanded{right:auto !important;width:min(640px,calc(100% - 72px)) !important;min-width:min(560px,calc(100% - 72px)) !important;max-width:min(720px,calc(100% - 72px)) !important;transform:none !important;height:auto !important;max-height:none !important;overflow:visible !important;z-index:32 !important}",
+      ".dock.show.collapsed{right:auto !important;width:min(360px,calc(100% - 72px)) !important;min-width:220px !important;max-width:420px !important;transform:none !important;height:auto !important;max-height:120px !important;overflow:hidden !important;z-index:32 !important}",
     ].join("");
     document.head.appendChild(css);
   }

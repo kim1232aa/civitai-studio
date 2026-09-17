@@ -4,6 +4,7 @@
   // v0821o136: structured reverse prompt + text↔shot sync; no invented character library
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o165: 点节点出贴节点能力条（collapsed）；大写字台只在编辑/↑展开
   // v0821o123: 故事推演沿用原分镜的家，不再误匹配 qwen2+steps
   // v0821o122: 我的空间画廊；stamp v0821o122-space
   // v0821o117: 九宫格多机位真生成，故事推演出下一镜；stamp v0821o117-nine
@@ -2817,8 +2818,7 @@
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(reset);
   }
   function setDockMode(mode) {
-    if (mode === "collapsed") mode = "expanded";
-    if (mode !== "expanded" && mode !== "closed") mode = "expanded";
+    if (mode !== "expanded" && mode !== "collapsed" && mode !== "closed") mode = "collapsed";
     state.dockMode = mode;
     renderDock();
     if (mode === "expanded") {
@@ -2919,9 +2919,12 @@
       return nearest;
     }
 
-    // 一个框贴在分镜下，高度跟内容走，不裁切
-    const maxW = Math.min(720, Math.max(560, sr.width - 72));
-    const dw = Math.min(640, maxW);
+    // o165: collapsed = 贴节点窄条（跟卡宽）；expanded = 写字台。
+    const collapsed = state.dockMode === "collapsed";
+    const maxW = collapsed
+      ? Math.min(Math.max(cw, 280), Math.min(420, sr.width - 72))
+      : Math.min(720, Math.max(560, sr.width - 72));
+    const dw = collapsed ? maxW : Math.min(640, maxW);
     let left = cx + (cw - dw) / 2;
     const rail = $("assetRail");
     const railRight = (rail && rail.getBoundingClientRect().width > 40) ? 72 + 248 + 8 : 72;
@@ -2929,11 +2932,11 @@
 
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
-    dock.style.setProperty("min-width", Math.min(560, dw) + "px", "important");
+    dock.style.setProperty("min-width", (collapsed ? Math.min(220, dw) : Math.min(560, dw)) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
-    dock.style.setProperty("max-height", "none", "important");
-    dock.style.setProperty("overflow", "visible", "important");
-    const naturalH = Math.max(180, dock.offsetHeight || 220);
+    dock.style.setProperty("max-height", collapsed ? "120px" : "none", "important");
+    dock.style.setProperty("overflow", collapsed ? "hidden" : "visible", "important");
+    const naturalH = Math.max(collapsed ? 72 : 180, dock.offsetHeight || (collapsed ? 88 : 220));
     // v0821o136-seko: 底部居中的缩放底栏约占 56px，Composer 不压上去
     const bottomReserve = 56;
     const spaceBelow = sr.height - (cy + ch + gap) - bottomReserve;
@@ -2972,12 +2975,12 @@
     dock.style.setProperty("bottom", "auto", "important");
     dock.style.setProperty("width", dw + "px", "important");
     dock.style.setProperty("max-width", dw + "px", "important");
-    dock.style.setProperty("min-width", Math.min(560, dw) + "px", "important");
+    dock.style.setProperty("min-width", (collapsed ? Math.min(220, dw) : Math.min(560, dw)) + "px", "important");
     dock.style.setProperty("height", "auto", "important");
     dock.style.setProperty("min-height", "0", "important");
-    dock.style.setProperty("max-height", "none", "important");
+    dock.style.setProperty("max-height", collapsed ? "120px" : "none", "important");
     dock.style.setProperty("transform", "none", "important");
-    dock.style.setProperty("overflow", "visible", "important");
+    dock.style.setProperty("overflow", collapsed ? "hidden" : "visible", "important");
     dock.style.visibility = "";
     dock.classList.add("near");
     dock.dataset.attach = attach;
@@ -3216,7 +3219,6 @@
       requestAnimationFrame(positionDock);
       return;
     }
-    if (state.dockMode === "collapsed") state.dockMode = "expanded";
     const expanded = state.dockMode === "expanded";
     dock.classList.add("show");
     dock.classList.toggle("collapsed", !expanded);
@@ -3415,11 +3417,15 @@
         constrainCameraToShots(n);
         applyCam();
       }
-      // v0821o103-wide-desk: large screen always writes on the desk; no toy collapsed bar.
+      // o165: 点节点 = 贴节点能力条（collapsed），不要压画布大写字台。
       if (opts.keepClosed) {
         /* leave dockMode (closed/chip path) */
-      } else {
+      } else if (opts.expand) {
         state.dockMode = "expanded";
+      } else if (state.dockMode === "closed") {
+        state.dockMode = "collapsed";
+      } else if (state.dockMode !== "expanded") {
+        state.dockMode = "collapsed";
       }
     }
     renderCards();
@@ -4664,7 +4670,7 @@
     renderCards();
     drawWires();
     selectNode(id, { preserveLayout: true });
-    state.dockMode = "expanded";
+    state.dockMode = "collapsed";
     renderDock();
     persist();
     setMsg("已创建 " + shot.title + " · 在 Composer 写提示词后点 ↑", "ok");

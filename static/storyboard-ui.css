@@ -523,13 +523,12 @@ header .title:hover { color: #fff; }
   border-radius: 16px;
   overflow: hidden;
 }
-.dock.collapsed .dock-scroll,
 .dock.collapsed .dock-prompt,
-.dock.collapsed .modes,
 .dock.collapsed .refs,
 .dock.collapsed .composer-acts,
 .dock.collapsed .lora-block { display: none !important; }
 .dock.collapsed .param-group { display: none !important; }
+.dock.collapsed .modes { display: flex !important; }
 .dock.collapsed .dock-body { overflow: hidden; max-height: none; }
 .dock.collapsed .dock-foot { padding: 0 10px 8px; }
 .dock.collapsed .bar { margin: 0; flex-wrap: nowrap; }
