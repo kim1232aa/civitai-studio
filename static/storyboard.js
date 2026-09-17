@@ -4,6 +4,7 @@
   // v0821o136: structured reverse prompt + text↔shot sync; no invented character library
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o167: 故事推演面板对齐源站（滑条±5s + 比例 + 本镜模型 + 生成）；不编专业/通用
   // v0821o166: 故事推演沿用原家原模型，故事边不当参考图，禁止队列偷换成 krea2
   // v0821o165: 点节点出贴节点能力条（collapsed）；大写字台只在编辑/↑展开
   // v0821o123: 故事推演沿用原分镜的家，不再误匹配 qwen2+steps
@@ -362,7 +363,7 @@
   }
   function nodeById(id) { return state.nodes.find((n) => n.id === id); }
   const SHOT_BOX_LONG = 640;
-  const ASPECT_CHOICES = [["1:1", 1], ["9:16", 9 / 16], ["21:9", 21 / 9], ["16:9", 16 / 9]];
+  const ASPECT_CHOICES = [["1:1", 1], ["9:16", 9 / 16], ["3:4", 3 / 4], ["4:3", 4 / 3], ["21:9", 21 / 9], ["16:9", 16 / 9]];
   function scaleShotBox(pw, ph) {
     let w = Number(pw), h = Number(ph);
     if (!Number.isFinite(w) || w <= 0) w = 16;
@@ -8605,6 +8606,8 @@
     const a = String(aspect || "16:9").replace(/\s/g, "");
     if (a === "1:1") return p1080 ? { width: 1080, height: 1080 } : { width: 720, height: 720 };
     if (a === "9:16") return p1080 ? { width: 1080, height: 1920 } : { width: 720, height: 1280 };
+    if (a === "3:4") return p1080 ? { width: 1080, height: 1440 } : { width: 720, height: 960 };
+    if (a === "4:3") return p1080 ? { width: 1440, height: 1080 } : { width: 960, height: 720 };
     if (a === "21:9") return p1080 ? { width: 2016, height: 864 } : { width: 1680, height: 720 };
     return p1080 ? { width: 1920, height: 1080 } : { width: 1280, height: 720 };
   }
@@ -10727,16 +10730,19 @@
       : "拍这一动作的下一拍，人物承接上一镜的姿态继续，不要另起一场";
     return "【故事推演 · " + when + "】" + action + "。同一角色、同一服装、同一场景、同一光线；空间连续，不要跳切、不要换人、不要换装。";
   }
-  function storyAdvanceFromShot(shot, seconds, dir) {
+  function storyAdvanceFromShot(shot, seconds, dir, opts) {
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
+    opts = opts || {};
+    seconds = Math.abs(Number(seconds) || 0);
+    if (!(seconds > 0)) { setMsg("先把滑条拨离 0（向后或向前）再生成", "warn"); return; }
     dir = dir || "next";
     const goingBack = dir === "back";
     const video = shot.mode === "video";
     const base = stripStoryBeats(shot.prompt || "");
     const beat = storyBeatLine(seconds, dir);
     const node = spawnLinkedShot(shot, {
-      titleSuffix: goingBack ? (" · -" + seconds + "s") : (" · +" + seconds + "s"),
+      title: "故事推演-" + (goingBack ? "向后推演 " : "向前推演 ") + seconds + " 帧",
       prompt: (base + (base ? "\n" : "") + beat).trim(),
       mode: video ? "video" : "image",
       firstFrameFromSource: video && !!shot.url,
@@ -10744,13 +10750,26 @@
       skipSelect: true,
       storyAdvance: true,
     });
+    if (node && opts.aspect) {
+      node.aspect = opts.aspect;
+      const res = shot.res || ($("res") && $("res").value) || "720P";
+      const size = sizeFromAspectRes(opts.aspect, res);
+      node.width = size.width;
+      node.height = size.height;
+      if (node.composer) {
+        node.composer.fields = node.composer.fields || {};
+        node.composer.fields.aspect = opts.aspect;
+        node.composer.fields.width = size.width;
+        node.composer.fields.height = size.height;
+      }
+    }
     renderCards(); drawWires();
     if (node) {
       node.storyAdvance = true;
       selectNode(node.id, { preserveLayout: true });
       panTo(node);
     }
-    setMsg((goingBack ? "往前 " : "往后 ") + seconds + " 秒已出分镜 · 沿用原家原模型", "ok");
+    setMsg("故事推演任务已提交 · " + (goingBack ? "向后" : "向前") + " " + seconds + " 帧 · 沿用原家原模型", "ok");
     if (node) generateShotQueue([node], "故事推演");
   }
   function generateShotQueue(nodes, label) {
@@ -10947,7 +10966,7 @@
     const node = {
       id: id,
       kind: "shot",
-      title: (source.title || "分镜") + (opts.titleSuffix || ""),
+      title: opts.title || ((source.title || "分镜") + (opts.titleSuffix || "")),
       x: source.x + box(source).w + 48,
       y: source.y + (opts.yOff || 0),
       url: "",
@@ -11169,28 +11188,110 @@
         : '<button type="button" disabled>画布上还没有别的成片</button>');
     placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnLast"]') || $("btnLast"));
   }
+  function storyShotAspect(shot) {
+    if (!shot) return "16:9";
+    const hit = closestAspectChoice(shot.width, shot.height);
+    // 源站面板本次实测默认 16:9（人像卡仍开 16:9），不按卡面强行继承。
+    const a = String(shot.aspect || (shot.composer && shot.composer.fields && shot.composer.fields.aspect) || "").replace(/\s/g, "");
+    if (/^(9:16|16:9|3:4|4:3)$/.test(a)) return a;
+    return "16:9";
+  }
+  function storyModelLabel(shot) {
+    const be = (shot && (shot.backend || (shot.composer && shot.composer.backend))) || "";
+    const sid = (shot && (shot.serviceId || (shot.composer && shot.composer.service))) || "";
+    const houses = {
+      civitai: "Civitai", fal: "Fal", huggingface: "Hugging Face",
+      "modelscope-ai": "魔搭 AI", "modelscope-cn": "魔搭 CN", "nano-gpt": "NanoGPT",
+    };
+    const house = houses[be] || be || "未选家";
+    if (!sid) return house + " · 未选模型（不编专业/通用）";
+    const parts = String(sid).split("/");
+    const short = parts.length > 2 ? parts.slice(-2).join("/") : sid;
+    return house + " · " + short;
+  }
+  function storyPopState(pop) {
+    const slider = pop && pop.querySelector("[data-story-slider]");
+    const v = slider ? Number(slider.value) : 0;
+    const aspectBtn = pop && pop.querySelector("[data-story-aspect].on");
+    return {
+      seconds: Math.abs(v),
+      dir: v < 0 ? "back" : "next",
+      aspect: (aspectBtn && aspectBtn.getAttribute("data-story-aspect")) || "16:9",
+    };
+  }
+  function syncStorySlider(pop, value) {
+    const slider = pop.querySelector("[data-story-slider]");
+    if (slider) slider.value = String(value);
+    pop.querySelectorAll("[data-story-sec]").forEach(function (b) {
+      b.classList.toggle("on", Number(b.getAttribute("data-story-sec")) === Number(value));
+    });
+    const go = pop.querySelector("[data-story-go]");
+    if (go) go.disabled = !(Math.abs(Number(value)) > 0);
+  }
+  function fillStoryPop(pop, shot) {
+    const aspect = storyShotAspect(shot);
+    const model = storyModelLabel(shot);
+    pop.innerHTML =
+      '<div class="story-panel">' +
+        '<div class="story-dir"><span>向后推演</span><span>向前推演</span></div>' +
+        '<input type="range" min="-5" max="5" step="1" value="0" data-story-slider>' +
+        '<div class="story-ticks">' +
+          '<button type="button" data-story-sec="-5">5s</button>' +
+          '<button type="button" data-story-sec="-3">3s</button>' +
+          '<button type="button" data-story-sec="0">0</button>' +
+          '<button type="button" data-story-sec="3">3s</button>' +
+          '<button type="button" data-story-sec="5">5s</button>' +
+        '</div>' +
+        '<div class="story-label">画面比例</div>' +
+        '<div class="story-aspects">' +
+          ['9:16', '16:9', '3:4', '4:3'].map(function (a) {
+            return '<button type="button" data-story-aspect="' + a + '"' + (a === aspect ? ' class="on"' : '') + '>' + a + "</button>";
+          }).join("") +
+        "</div>" +
+        '<div class="story-label">图片模型</div>' +
+        '<div class="story-model" title="' + esc(shot && (shot.serviceId || "") || "") + '">' + esc(model) + "</div>" +
+        '<button type="button" class="story-go" data-story-go="1" disabled>生成</button>' +
+      "</div>";
+    syncStorySlider(pop, 0);
+  }
   function showStoryPop(anchor) {
-    if (!selectedShot()) { setMsg("先点一个分镜", "warn"); return; }
+    const shot = selectedShot();
+    if (!shot) { setMsg("先点一个分镜", "warn"); return; }
     let pop = $("storyPop");
     if (!pop) {
       pop = document.createElement("div");
       pop.id = "storyPop";
-      pop.className = "story-pop";
+      pop.className = "story-pop story-pop-seko";
       pop.hidden = true;
-      pop.innerHTML = '<button type="button" data-story="3" data-dir="next">往后 3 秒</button>' +
-        '<button type="button" data-story="5" data-dir="next">往后 5 秒</button>' +
-        '<button type="button" data-story="3" data-dir="back">往前 3 秒</button>' +
-        '<button type="button" data-story="5" data-dir="back">往前 5 秒</button>';
       document.body.appendChild(pop);
       pop.addEventListener("click", function (ev) {
-        const b = ev.target.closest("[data-story]");
-        if (!b) return;
+        ev.stopPropagation();
+        const tick = ev.target.closest("[data-story-sec]");
+        if (tick) {
+          syncStorySlider(pop, Number(tick.getAttribute("data-story-sec")) || 0);
+          return;
+        }
+        const asp = ev.target.closest("[data-story-aspect]");
+        if (asp) {
+          pop.querySelectorAll("[data-story-aspect]").forEach(function (b) { b.classList.remove("on"); });
+          asp.classList.add("on");
+          return;
+        }
+        if (!ev.target.closest("[data-story-go]")) return;
+        const st = storyPopState(pop);
+        if (!(st.seconds > 0)) { setMsg("先把滑条拨离 0（向后或向前）再生成", "warn"); return; }
         pop.hidden = true;
-        storyAdvanceFromShot(selectedShot(), Number(b.dataset.story) || 3, b.getAttribute("data-dir") || "next");
+        pop.style.display = "none";
+        storyAdvanceFromShot(selectedShot(), st.seconds, st.dir, { aspect: st.aspect });
+      });
+      pop.addEventListener("input", function (ev) {
+        if (!ev.target || !ev.target.matches("[data-story-slider]")) return;
+        syncStorySlider(pop, Number(ev.target.value) || 0);
       });
     }
-    if (!pop.hidden) { pop.hidden = true; return; }
+    if (!pop.hidden) { pop.hidden = true; pop.style.display = "none"; return; }
     hideToolPops();
+    fillStoryPop(pop, shot);
     placePop(pop, anchor || document.querySelector('#shotBar [data-shot-tool="btnStory"]') || $("btnStory"));
   }
   function runShotTool(id, anchor) {
