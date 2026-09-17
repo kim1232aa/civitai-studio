@@ -1,8 +1,8 @@
 /* v0821o69-group-hide — load AFTER composer-field-adapt.js
  * Civitai image must not keep #falParams visible.
  * Fal T2I uses comfy group (w/h/seed); video duration group only when mode=video.
- * Unsupported fields hide. LoRA only when supportsLora===true,
- * except Civitai AIR which always shows LoRA after a model is selected.
+ * Unsupported fields hide via resolveFieldSupport (per endpoint), not by house.
+ * LoRA: Civitai AIR shows after a model is selected; others follow supportsLora.
  */
 (function () {
   function hide(el) {
@@ -61,11 +61,6 @@
         else show(wrap);
       });
 
-      if (be !== "civitai") {
-        hide(wrapOf(ctx.$("sampler")));
-        hide(wrapOf(ctx.$("scheduler")));
-      }
-
       var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
       var loraBlock = ctx.$("loraBlock") || (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
       var hasModel = !!(item.id || ctx.serviceId);
@@ -86,7 +81,7 @@
     };
     api._o61 = true;
     api._o69 = true;
-    api.STAMP = "v0821o69-group-hide";
+    api.STAMP = "v0821o163-no-house-cut";
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
   else install();

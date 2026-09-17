@@ -8,7 +8,7 @@ def main():
     assert "天花板 **3**" in board or "天花板 3" in board
     assert "Edit-2509=3" in board
     js = (ROOT / "static/composer-field-adapt.js").read_text()
-    assert 'STAMP = "v0821o57-item-match"' in js
+    assert 'STAMP = "v0821o163-schema-fields"' in js or 'STAMP = "v0821o57-item-match"' in js
     assert "禁止 mod int32" in js
     assert "reject[-1,2147483647]" in js
     assert "_hasI2vInput" in js

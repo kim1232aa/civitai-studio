@@ -4688,9 +4688,10 @@ def test_v0821o28_composer_adaptive():
     adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
     assert_true("v0821o49b-hydrate-fresh-empty-url" in html, "html tip stamp o30")
     # 裁决: adapt 模块戳已推进到 v0821o57-item-match(o47→o57 线), 行为契约不变
-    assert_true("v0821o57-item-match" in adapt
+    assert_true("v0821o163-schema-fields" in adapt
+                or "v0821o57-item-match" in adapt
                 or "v0821o47-composer-board-sync" in adapt
-                or "v0821o28-composer-adaptive" in adapt, "adapt module stamp o57/o47/o28")
+                or "v0821o28-composer-adaptive" in adapt, "adapt module stamp o163/o57/o47/o28")
     assert_true("composer-field-adapt.js" in html, "adapt script included")
     assert_true("composer-field-adapt.css" in html, "adapt css included")
     assert_true("paramSupportStrip" in html, "support strip mounted")

@@ -41,11 +41,6 @@
         else show(wrap);
       });
 
-      if (be !== "civitai") {
-        hide(wrapOf(ctx.$("sampler")));
-        hide(wrapOf(ctx.$("scheduler")));
-      }
-
       var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
       var loraBlock = ctx.$("loraBlock") || (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || document.getElementById("loraBlock");
       var svcEl = ctx.$("service");
@@ -100,7 +95,7 @@
       }
     };
     api._o68 = true;
-    api.STAMP = "v0821o143-o68-lora-unknown-chips";
+    api.STAMP = "v0821o163-no-house-cut";
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install);
   else install();

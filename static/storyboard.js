@@ -6497,41 +6497,34 @@
       $("seed").title = String(src.seed);
     }
   }
-  // Pack UI params onto generate payload — never silently drop. Civitai keeps
-  // sampler/steps/cfg; other backends still ship seed / size / token.
+  // Pack UI params onto generate payload — never silently drop by house.
+  // Per-endpoint official_fields: false → omit; null/true → keep. Provider schema-checks.
   function packComfyParamsForPayload(shotOpt) {
     const p = readComfyParamsFromUi();
     const be = currentBackend();
-    const sid = String(($("service") && $("service").value) || (shotOpt && (shotOpt.serviceId || (shotOpt.composer && shotOpt.composer.service))) || "");
-    const falSid = be === "fal" || /\/fal\//.test(sid) || /^fal[-.]/i.test(sid);
+    const _ofItem = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+    const _ofAllow = function (f) {
+      const A = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+      if (!A || typeof A.officialFieldAllowed !== "function") return null;
+      return A.officialFieldAllowed(_ofItem, f);
+    };
+    const dropOfficialNo = function (field, keys) {
+      if (_ofAllow(field) !== false) return;
+      (keys || [field]).forEach(function (k) { delete p[k]; });
+    };
     if (be === "nano-gpt") {
       delete p.width;
       delete p.height;
       const token = $("nanoRes") && $("nanoRes").value;
       if (token) p.resolution = token;
-    } else if (falSid) {
-      delete p.sampler;
-      delete p.scheduler;
-      delete p.steps;
-      delete p.cfg;
-      delete p.cfgScale;
-      delete p.width;
-      delete p.height;
-    } else if (be === "fal") {
-      delete p.sampler;
-      delete p.scheduler;
-      delete p.steps;
-      delete p.cfg;
-      delete p.cfgScale;
-      delete p.width;
-      delete p.height;
-    } else if (be !== "civitai") {
-      delete p.sampler;
-      delete p.scheduler;
-      delete p.steps;
-      delete p.cfg;
-      delete p.cfgScale;
+    } else {
+      dropOfficialNo("width", ["width"]);
+      dropOfficialNo("height", ["height"]);
     }
+    dropOfficialNo("steps", ["steps"]);
+    dropOfficialNo("cfg", ["cfg", "cfgScale"]);
+    dropOfficialNo("sampler", ["sampler"]);
+    dropOfficialNo("scheduler", ["scheduler"]);
     // v0821o22: civitai checkpoint AIR from imported shot (fresh hinablue) — never invent default AIR.
     // v0821o38: prefer generate shot (runShotStepWork) over selected/lastComposerShot — selected can be wrong/empty.
     if (be === "civitai") {
@@ -8734,13 +8727,22 @@
     const genParams = {
       serviceId: serviceId,
     };
+    const _ofItemG = (typeof catalogItemForService === "function") ? catalogItemForService() : null;
+    const _ofAllowG = function (f) {
+      const A = (typeof window !== "undefined") ? window.ComposerFieldAdapt : null;
+      if (!A || typeof A.officialFieldAllowed !== "function") return null;
+      return A.officialFieldAllowed(_ofItemG, f);
+    };
+    const _keepG = function (f) { return _ofAllowG(f) !== false; };
     if (be === "civitai" && !/\/fal\//.test(String(serviceId || ""))) {
       // width/height/steps/cfgScale/sampler/scheduler — seed packed in runShotStep (wire-only compile rule)
       ["width", "height", "steps", "cfgScale", "cfg", "sampler", "scheduler"].forEach(function (k) {
+        const field = (k === "cfgScale" || k === "cfg") ? "cfg" : k;
+        if (!_keepG(field)) return;
         if (comfy[k] != null) genParams[k] = comfy[k];
       });
-      if (genParams.width == null) genParams.width = w;
-      if (genParams.height == null) genParams.height = h;
+      if (_keepG("width") && genParams.width == null) genParams.width = w;
+      if (_keepG("height") && genParams.height == null) genParams.height = h;
     } else if (be === "civitai") {
       // v0821o136seko-civrestoken: Civitai /fal/ videoGen 配方（wan 家族）的 resolution
       // 是档位枚举（480p/580p/720p），不是像素 WxH——发像素会撞「不在允许列表」诚实硬门。
@@ -8780,11 +8782,10 @@
       // Image APIs take width/height. Do not pack canvas duration/aspect/resolution
       // into Fal/HF/MS t2i — those keys 400 when the endpoint schema has no such field.
       if (be === "modelscope-ai" || be === "modelscope-cn" || be === "fal" || be === "huggingface") {
-        genParams.width = w;
-        genParams.height = h;
-        // stage3 fix: user-filled steps/cfg/sampler/scheduler must reach the
-        // request when the field is usable for this backend (provider does
-        // schema-checked forwarding / honest reject). Silent UI omission = 摆设.
+        if (_keepG("width")) genParams.width = w;
+        if (_keepG("height")) genParams.height = h;
+        // Per-endpoint official_fields: ship user-filled params the schema lists.
+        // House-wide strip of steps/cfg/sampler is forbidden (o163).
         const _usable = function (id) {
           const el = $(id);
           if (!el || el.disabled) return false;
