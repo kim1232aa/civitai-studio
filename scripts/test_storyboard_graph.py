@@ -4734,6 +4734,30 @@ def test_v0821o29_fal_lora_base():
     assert_true('return falHasLoras() ? FAL_LORA_PREF_SERVICE' not in pin,
                 "no one-shot all LoRAs to krea-2")
 
+
+    # o157: zimageturbo AIR → fal-ai/z-image/turbo/lora; pin not krea sibling; empty-sid honesty
+    assert_true('FAL_ZIMAGE_LORA_SERVICE = "fal-ai/z-image/turbo/lora"' in js, "FAL_ZIMAGE_LORA_SERVICE")
+    assert_true("zimageturbo" in board and "FAL_ZIMAGE_LORA_SERVICE" in board, "zimageturbo map")
+    assert_true("zimage" in board and "FAL_ZIMAGE_LORA_SERVICE" in board, "zimage alias map")
+    assert_true("fal-ai/z-image/turbo/lora" in js, "z-image/turbo/lora endpoint literal")
+    assert_true("want === FAL_ZIMAGE_LORA_SERVICE" in pin, "pin has z-image sibling branch")
+    krea_pin_lines = [ln for ln in pin.splitlines() if "want === FAL_LORA_PREF_SERVICE" in ln]
+    assert_true(krea_pin_lines and all("z-image" not in ln for ln in krea_pin_lines),
+                "pinFalLoraServiceId does not treat z-image as krea sibling")
+    # applyImport Fal path: sid && !importServiceAvailable(sid) (not bare !importServiceAvailable(sid))
+    ai = js.find("async function applyImport")
+    assert_true(ai >= 0, "applyImport")
+    # Fal house branch unique marker
+    fal_pin = js.find("state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid", ai)
+    assert_true(fal_pin >= 0, "fal applyImport pin")
+    fal_chunk = js[fal_pin:fal_pin + 900]
+    assert_true("sid && !importServiceAvailable(sid)" in fal_chunk, "empty-sid skips catalog-miss")
+    assert_true("if (!importServiceAvailable(sid)) return false;" not in fal_chunk,
+                "no bare !importServiceAvailable(sid) on Fal branch")
+    assert_true("本家无可用 LoRA 端点" in js, "honest no-map reason")
+    assert_true("v0822o157-fal-zimageturbo-lora" in js, "o157 stamp")
+
+
     # Fixture acceptance path unchanged (not swapped to flux)
     fi = js.find("function falLoraFixtureImport")
     fj = js.find("async function mountFalLoraFixture", fi)

@@ -45,6 +45,7 @@
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
+  // v0822o157-fal-zimageturbo-lora o157falzimageturbo 20260917-o157: map zimageturbo AIR → fal-ai/z-image/turbo/lora; empty-sid skips catalog-miss; no krea sibling steal
   // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
   // v0822o155b-sb-apply-import o155bapplyimport 20260917-o155b: expose window.__sbApplyImport for page↑ burns
   // v0822o155-fal-krea-schema o155falkreaschema 20260917-o155: Fal krea-2 turbo(/lora) official schema — omit CFG/steps; keep loras
@@ -129,13 +130,16 @@
   const FAL_I2V_DEFAULT = "fal-ai/minimax/video-01/image-to-video";
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora";
+  const FAL_ZIMAGE_LORA_SERVICE = "fal-ai/z-image/turbo/lora";
   // Official Fal LoRA family by Civitai AIR base (urn:air:{base}:lora:…). Never one-shot all chips to krea-2.
   const FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora";
   const FAL_LORA_BY_BASE = {
     flux1: FAL_FLUX_LORA_SERVICE,
     flux: FAL_FLUX_LORA_SERVICE,
     krea2: FAL_LORA_PREF_SERVICE,
-    krea: FAL_LORA_PREF_SERVICE
+    krea: FAL_LORA_PREF_SERVICE,
+    zimageturbo: FAL_ZIMAGE_LORA_SERVICE,
+    zimage: FAL_ZIMAGE_LORA_SERVICE
   };
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
@@ -11789,6 +11793,7 @@
   function falLoraEndpointLabel(ep) {
     if (ep === FAL_FLUX_LORA_SERVICE) return "Flux LoRA · " + ep;
     if (ep === FAL_LORA_PREF_SERVICE) return "Krea 2 Turbo LoRA · " + ep;
+    if (ep === FAL_ZIMAGE_LORA_SERVICE) return "Z-Image Turbo LoRA · " + ep;
     return ep;
   }
   /** @returns {{endpoint:string, reason:string}} */
@@ -11812,7 +11817,7 @@
     if (!ep) {
       return {
         endpoint: "",
-        reason: "LoRA base=" + base + " 无官方 Fal LoRA 端点 · 不支持（不硬钉错误家族）"
+        reason: "本家无可用 LoRA 端点（FAL_LORA_BY_BASE 无 map）· base=" + base + " · 不跨家偷换"
       };
     }
     return { endpoint: ep, reason: "" };
@@ -11843,7 +11848,10 @@
     // Foreign / empty / t2i drift → official LoRA family for this AIR base.
     if (!s || looksCivitaiServiceId(s) || looksHfServiceId(s) || isFalFluxLoraDrift(s)) return want;
     // Same-family turbo sibling → /lora
-    if (want === FAL_LORA_PREF_SERVICE && (s === "fal-ai/krea-2/turbo" || s === "fal-ai/z-image/turbo" || s === "fal-ai/z-image/turbo/lora")) {
+    if (want === FAL_LORA_PREF_SERVICE && (s === "fal-ai/krea-2/turbo" || s === FAL_LORA_PREF_SERVICE)) {
+      return want;
+    }
+    if (want === FAL_ZIMAGE_LORA_SERVICE && (s === "fal-ai/z-image/turbo" || s === FAL_ZIMAGE_LORA_SERVICE || s === "fal-ai/z-image/turbo/lora")) {
       return want;
     }
     if (want === FAL_FLUX_LORA_SERVICE && (s === FAL_FLUX_LORA_SERVICE || s.indexOf("flux-lora") >= 0)) {
@@ -11890,7 +11898,7 @@
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === want) {
         const t = sel.options[i].textContent || "";
-        if (!t || t === want || t === "默认模型" || t.indexOf("Krea 2 Turbo LoRA") === 0 || t.indexOf("Flux LoRA") === 0) {
+        if (!t || t === want || t === "默认模型" || t.indexOf("Krea 2 Turbo LoRA") === 0 || t.indexOf("Flux LoRA") === 0 || t.indexOf("Z-Image Turbo LoRA") === 0) {
           sel.options[i].textContent = falLoraEndpointLabel(want);
         }
         break;
@@ -12171,26 +12179,32 @@
         state._pendingService = sid;
         state._pinFalLoraService = (Array.isArray(j.loras) && j.loras.length) ? sid : (state._pinFalLoraService || "");
         if (!await loadCatalog() || importToken !== _importToken) return false;
-        if (!importServiceAvailable(sid)) return false;
-        ensureSelectOpt($("service"), sid);
-        if ($("service")) {
-          // Clear visible label for pinned turbo/lora
-          for (let oi = 0; oi < $("service").options.length; oi++) {
-            if ($("service").options[oi].value === sid) {
-              $("service").options[oi].textContent = (j.serviceName || sid) + " · " + sid;
-              break;
+        // o157: empty sid after LoRA resolve failure must NOT call importServiceAvailable("")
+        // (catalog-miss would overwrite hardErr / return before honest reason surfaces).
+        if (sid && !importServiceAvailable(sid)) return false;
+        if (sid) {
+          ensureSelectOpt($("service"), sid);
+          if ($("service")) {
+            // Clear visible label for pinned turbo/lora
+            for (let oi = 0; oi < $("service").options.length; oi++) {
+              if ($("service").options[oi].value === sid) {
+                $("service").options[oi].textContent = (j.serviceName || sid) + " · " + sid;
+                break;
+              }
             }
+            $("service").value = sid;
           }
-          $("service").value = sid;
+          if (!$("service") || $("service").value !== sid) {
+            hardErr = "无法挂载 Fal 服务 " + sid;
+          }
+          if (!state.catalogById) state.catalogById = {};
+          if (!state.catalogById[sid]) {
+            state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
+          }
+          ensureFalLoraServiceSelected();
+        } else if ($("service")) {
+          $("service").value = "";
         }
-        if (!$("service") || $("service").value !== sid) {
-          hardErr = "无法挂载 Fal 服务 " + sid;
-        }
-        if (!state.catalogById) state.catalogById = {};
-        if (!state.catalogById[sid]) {
-          state.catalogById[sid] = { id: sid, name: j.serviceName || sid };
-        }
-        ensureFalLoraServiceSelected();
       }
     } else if (wantHf) {
       if ($("backend")) $("backend").value = "huggingface";
