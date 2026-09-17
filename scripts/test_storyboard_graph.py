@@ -4757,6 +4757,13 @@ def test_v0821o29_fal_lora_base():
     assert_true("本家无可用 LoRA 端点" in js, "honest no-map reason")
     assert_true("v0822o157-fal-zimageturbo-lora" in js, "o157 stamp")
 
+    # o158: zimagebase AIR → fal-ai/z-image/base/lora (official; not turbo steal)
+    assert_true('FAL_ZIMAGE_BASE_LORA_SERVICE = "fal-ai/z-image/base/lora"' in js, "FAL_ZIMAGE_BASE_LORA_SERVICE")
+    assert_true("zimagebase" in board and "FAL_ZIMAGE_BASE_LORA_SERVICE" in board, "zimagebase map")
+    assert_true("fal-ai/z-image/base/lora" in js, "z-image/base/lora endpoint literal")
+    assert_true("want === FAL_ZIMAGE_BASE_LORA_SERVICE" in pin, "pin has z-image/base sibling branch")
+    assert_true("v0822o158-fal-zimagebase-lora" in js, "o158 stamp")
+
 
     # Fixture acceptance path unchanged (not swapped to flux)
     fi = js.find("function falLoraFixtureImport")

@@ -45,6 +45,7 @@
   // v0821o152-nano-aspect-matches-size o152nano 20260916-o152: Nano aspect_ratio aligns with size/UI w×h; never invent 1:1 when w/h omitted
   // v0821o153-result-writeback-original-card o153writeback 20260916-o153: poll/save /out → original shot+card DOM; import still reference-only; afterSrc from real card DOM
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
+  // v0822o158-fal-zimagebase-lora o158falzimagebase 20260917-o158: map zimagebase AIR → fal-ai/z-image/base/lora (official; not turbo); no cross-house steal
   // v0822o157-fal-zimageturbo-lora o157falzimageturbo 20260917-o157: map zimageturbo AIR → fal-ai/z-image/turbo/lora; empty-sid skips catalog-miss; no krea sibling steal
   // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
   // v0822o155b-sb-apply-import o155bapplyimport 20260917-o155b: expose window.__sbApplyImport for page↑ burns
@@ -131,6 +132,7 @@
   const FAL_T2I_DEFAULT = "fal-ai/flux/schnell";
   const FAL_LORA_PREF_SERVICE = "fal-ai/krea-2/turbo/lora";
   const FAL_ZIMAGE_LORA_SERVICE = "fal-ai/z-image/turbo/lora";
+  const FAL_ZIMAGE_BASE_LORA_SERVICE = "fal-ai/z-image/base/lora";
   // Official Fal LoRA family by Civitai AIR base (urn:air:{base}:lora:…). Never one-shot all chips to krea-2.
   const FAL_FLUX_LORA_SERVICE = "fal-ai/flux-lora";
   const FAL_LORA_BY_BASE = {
@@ -139,7 +141,8 @@
     krea2: FAL_LORA_PREF_SERVICE,
     krea: FAL_LORA_PREF_SERVICE,
     zimageturbo: FAL_ZIMAGE_LORA_SERVICE,
-    zimage: FAL_ZIMAGE_LORA_SERVICE
+    zimage: FAL_ZIMAGE_LORA_SERVICE,
+    zimagebase: FAL_ZIMAGE_BASE_LORA_SERVICE
   };
   const FAL_LORA_FIXTURE_VERSION = "3231694";
   const FAL_LORA_FIXTURE_PATH = "https://civitai.com/api/download/models/3231694";
@@ -11794,6 +11797,7 @@
     if (ep === FAL_FLUX_LORA_SERVICE) return "Flux LoRA · " + ep;
     if (ep === FAL_LORA_PREF_SERVICE) return "Krea 2 Turbo LoRA · " + ep;
     if (ep === FAL_ZIMAGE_LORA_SERVICE) return "Z-Image Turbo LoRA · " + ep;
+    if (ep === FAL_ZIMAGE_BASE_LORA_SERVICE) return "Z-Image Base LoRA · " + ep;
     return ep;
   }
   /** @returns {{endpoint:string, reason:string}} */
@@ -11852,6 +11856,9 @@
       return want;
     }
     if (want === FAL_ZIMAGE_LORA_SERVICE && (s === "fal-ai/z-image/turbo" || s === FAL_ZIMAGE_LORA_SERVICE || s === "fal-ai/z-image/turbo/lora")) {
+      return want;
+    }
+    if (want === FAL_ZIMAGE_BASE_LORA_SERVICE && (s === "fal-ai/z-image/base" || s === FAL_ZIMAGE_BASE_LORA_SERVICE || s === "fal-ai/z-image/base/lora")) {
       return want;
     }
     if (want === FAL_FLUX_LORA_SERVICE && (s === FAL_FLUX_LORA_SERVICE || s.indexOf("flux-lora") >= 0)) {
@@ -12169,7 +12176,7 @@
             state._pinFalLoraService = "";
           } else if (resolved.endpoint) {
             if (!sid || isFalFluxLoraDrift(sid) || looksCivitaiServiceId(sid) || looksHfServiceId(sid)
-                || sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo") {
+                || sid === "fal-ai/krea-2/turbo" || sid === "fal-ai/z-image/turbo" || sid === "fal-ai/z-image/base") {
               sid = resolved.endpoint;
             }
             // Wrong family vs AIR base → correct (never keep krea for flux1).
