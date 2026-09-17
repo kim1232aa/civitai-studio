@@ -4,6 +4,7 @@
   // v0821o136: structured reverse prompt + text↔shot sync; no invented character library
   const STORE_OLDS = ["nl-storyboard-v0821o16", "nl-storyboard-v0821o15", "nl-storyboard-v0821o14", "nl-storyboard-v0821o13", "nl-storyboard-v0821o12", "nl-storyboard-v0821o7", "nl-storyboard-v0821o6b", "nl-storyboard-v0821o6", "nl-storyboard-v0821o5", "nl-storyboard-v0821o4", "nl-storyboard-v0821o3", "nl-storyboard-v0821o2", "nl-storyboard-v0821o", "nl-storyboard-v0821n5", "nl-storyboard-v0821n4", "nl-storyboard-v0821n3", "nl-storyboard-v0821n2", "nl-storyboard-v0821n", "nl-storyboard-v0821m2", "nl-storyboard-v0821m", "nl-storyboard-v0821l", "nl-storyboard-v0821k", "nl-storyboard-v0821j", "nl-storyboard-v0821i", "nl-storyboard-v0821h", "nl-storyboard-v0821g", "nl-storyboard-v0821f", "nl-storyboard-v0821e", "nl-storyboard-v0821d", "nl-storyboard-v0821c", "nl-storyboard-v0821b", "nl-storyboard-v0821", "nl-storyboard-v0820c", "nl-storyboard-v0820b", "nl-storyboard-v0820", "nl-storyboard-v0819b", "nl-storyboard-v0819", "nl-storyboard-v0818", "nl-storyboard-v0817c", "nl-storyboard-v0817b", "nl-storyboard-v0817", "nl-storyboard-v0816b", "nl-storyboard-v0816", "nl-storyboard-v0815c", "nl-storyboard-v0815b", "nl-storyboard-v0815", "nl-storyboard-v0814", "nl-storyboard-v0813", "nl-storyboard-v0812", "nl-storyboard-v0811", "nl-storyboard-v0810", "nl-storyboard-v0809", "nl-storyboard-v0808", "nl-storyboard-v0807", "nl-storyboard-v0806", "nl-storyboard-v0805", "nl-storyboard-v0804", "nl-storyboard-v0803", "nl-storyboard-v0802", "nl-storyboard-v0798", "nl-storyboard-v0797", "nl-storyboard-v0796", "nl-storyboard-v0793", "nl-storyboard-v0791", "nl-storyboard-v0790"];
   const CIVITAI_PREF_SERVICE = "image/comfy/krea2/turbo/createImage";
+  // v0821o166: 故事推演沿用原家原模型，故事边不当参考图，禁止队列偷换成 krea2
   // v0821o165: 点节点出贴节点能力条（collapsed）；大写字台只在编辑/↑展开
   // v0821o123: 故事推演沿用原分镜的家，不再误匹配 qwen2+steps
   // v0821o122: 我的空间画廊；stamp v0821o122-space
@@ -965,7 +966,8 @@
     });
   }
   function connectedNodes(shotId) {
-    return state.edges.filter((e) => e.to === shotId).map((e) => nodeById(e.from)).filter(Boolean);
+    // 故事推演边只画时间线，不当图生图参考（否则 t2i 会 unused-ref / 被队列偷换成 krea2）。
+    return state.edges.filter((e) => e.to === shotId && e.role !== "story").map((e) => nodeById(e.from)).filter(Boolean);
   }
   function connectedAssets(shotId) {
     return connectedNodes(shotId).filter(isImageSource);
@@ -987,6 +989,9 @@
     if (!shot.firstFrameId) return null;
     const hit = linked.find((a) => a.id === shot.firstFrameId);
     if (hit) return hit;
+    // 故事边不当参考，但视频推演仍认 firstFrameId 指向的上一镜成片。
+    const named = nodeById(shot.firstFrameId);
+    if (named && named.url && !isVideoUrl(named.url)) return named;
     // v0821o136seko-healframe: 孤儿 firstFrameId（资产已删）愈合成当前连入的首张图——
     // 连线即引用；只有完全没连图时才清空并交给缺首帧硬门（fail-closed 不变）。
     if (linked.length) { shot.firstFrameId = linked[0].id; return linked[0]; }
@@ -10707,23 +10712,45 @@
       setMsg("切分失败：" + ((e && e.message) || e), "bad");
     }
   }
+  function stripStoryBeats(text) {
+    return String(text || "")
+      .replace(/\n?【故事推演 · [^\n]*】[^\n]*/g, "")
+      .replace(/\n?(?:上一镜|下一镜)，时间往[回后] \d+ 秒。[^\n]*/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  function storyBeatLine(seconds, dir) {
+    const goingBack = dir === "back";
+    const when = goingBack ? ("时间回退 " + seconds + " 秒") : ("时间前进 " + seconds + " 秒");
+    const action = goingBack
+      ? "拍这一动作开始之前的那一拍，人物仍在同一位置附近，刚要做这个动作"
+      : "拍这一动作的下一拍，人物承接上一镜的姿态继续，不要另起一场";
+    return "【故事推演 · " + when + "】" + action + "。同一角色、同一服装、同一场景、同一光线；空间连续，不要跳切、不要换人、不要换装。";
+  }
   function storyAdvanceFromShot(shot, seconds, dir) {
     shot = shot || selectedShot();
     if (!shot) { setMsg("先点一个分镜", "warn"); return; }
     dir = dir || "next";
     const goingBack = dir === "back";
-    const beat = goingBack
-      ? ("上一镜，时间往回 " + seconds + " 秒。同一角色同一场，拍这一动作开始之前的那一拍，空间和光线连续，不要跳切。")
-      : ("下一镜，时间往后 " + seconds + " 秒。同一角色同一场，拍这一动作的下一拍，空间和光线连续，不要跳切。");
+    const video = shot.mode === "video";
+    const base = stripStoryBeats(shot.prompt || "");
+    const beat = storyBeatLine(seconds, dir);
     const node = spawnLinkedShot(shot, {
       titleSuffix: goingBack ? (" · -" + seconds + "s") : (" · +" + seconds + "s"),
-      prompt: ((shot.prompt || "").trim() + "\n" + beat).trim(),
-      mode: "image",
-      firstFrameFromSource: !!shot.url,
+      prompt: (base + (base ? "\n" : "") + beat).trim(),
+      mode: video ? "video" : "image",
+      firstFrameFromSource: video && !!shot.url,
+      linkRole: "story",
+      skipSelect: true,
+      storyAdvance: true,
     });
     renderCards(); drawWires();
-    if (node) panTo(node);
-    setMsg((goingBack ? "往前 " : "往后 ") + seconds + " 秒已出分镜 · 正在生成", "ok");
+    if (node) {
+      node.storyAdvance = true;
+      selectNode(node.id, { preserveLayout: true });
+      panTo(node);
+    }
+    setMsg((goingBack ? "往前 " : "往后 ") + seconds + " 秒已出分镜 · 沿用原家原模型", "ok");
     if (node) generateShotQueue([node], "故事推演");
   }
   function generateShotQueue(nodes, label) {
@@ -10740,7 +10767,8 @@
         if (!n || !n.id) continue;
         setMsg((label || "生成") + " " + (i + 1) + "/" + list.length + " · " + (n.title || ""), "ok");
         try {
-          selectNode(n.id, { expand: true, preserveLayout: true });
+          // 推演贴节点能力条，不撑开写字台。九宫/打光仍展开核对参数。
+          selectNode(n.id, { expand: !n.storyAdvance, preserveLayout: true });
           const refs = (typeof connectedAssets === "function") ? connectedAssets(n.id) : [];
           let op = "t2i";
           if (n.wantUpscale) op = "upscale";
@@ -10756,10 +10784,11 @@
             if (n.backend && $("backend")) $("backend").value = n.backend;
             const sid0 = n.serviceId || (n.composer && n.composer.service) || "";
             let sid = sid0;
-            if (refs.length && (n.backend === "civitai" || /^image\//.test(sid)) && !/editimage|createvariant/i.test(sid)) {
+            // 推演禁止偷换成 krea2/edit。其它工具仍走原队列（不在这刀改 API）。
+            if (!n.storyAdvance && refs.length && (n.backend === "civitai" || /^image\//.test(sid)) && !/editimage|createvariant/i.test(sid)) {
               sid = "image/comfy/krea2/edit/editImage";
               op = "i2i";
-            } else if (sid === "image/textToImage") {
+            } else if (!n.storyAdvance && sid === "image/textToImage") {
               sid = CIVITAI_PREF_SERVICE;
             }
             if (sid && $("service")) {
@@ -10770,6 +10799,8 @@
             }
             if (n.composer && Array.isArray(n.composer.loras)) {
               state.loras = JSON.parse(JSON.stringify(n.composer.loras));
+            } else if (Array.isArray(n.loras)) {
+              state.loras = JSON.parse(JSON.stringify(n.loras));
             }
           } else {
             await rematchAfterSpawn(n, op);
@@ -10932,14 +10963,35 @@
     if (Array.isArray(source.loras)) {
       try { node.loras = JSON.parse(JSON.stringify(source.loras)); } catch (_) {}
     }
+    ["width", "height", "steps", "cfg", "cfgScale", "seed", "sampler", "scheduler", "diffusionModel", "checkpointName"].forEach(function (k) {
+      if (source[k] != null && source[k] !== "") node[k] = source[k];
+    });
     if (opts.firstFrameFromSource && source.url && (opts.mode || "image") === "video") node.firstFrameId = source.id;
     if (opts.wantT2v) node.wantT2v = true;
     if (opts.wantUpscale) node.wantUpscale = true;
     if (opts.wantInpaint) node.wantInpaint = true;
     if (opts.maskUrl) node.maskUrl = opts.maskUrl;
     if (opts.lastFrameId) node.lastFrameId = opts.lastFrameId;
+    if (opts.storyAdvance) node.storyAdvance = true;
     state.nodes.push(node);
-    state.edges.push({ from: source.id, to: id });
+    const edge = { from: source.id, to: id };
+    if (opts.linkRole) edge.role = opts.linkRole;
+    state.edges.push(edge);
+    if (opts.storyAdvance) {
+      // 图生图/视频才把角色参考跟到下一镜。文生图下一镜只改提示词，避免 unused-ref。
+      const sid = String(node.serviceId || "").toLowerCase();
+      const eats = node.mode === "video" || /editimage|createvariant|image-to-image|image-to-video/.test(sid);
+      if (eats) {
+        state.edges.filter(function (e) { return e.to === source.id && e.role !== "story"; }).forEach(function (e) {
+          const from = nodeById(e.from);
+          if (!from || from.kind === "shot" || from.kind === "text") return;
+          if (state.edges.some(function (x) { return x.from === e.from && x.to === id; })) return;
+          const copied = { from: e.from, to: id };
+          if (e.role) copied.role = e.role;
+          state.edges.push(copied);
+        });
+      }
+    }
     if (opts.maskAssetId) state.edges.push({ from: opts.maskAssetId, to: id });
     ensureWorkspaceModel();
     const scene = sceneById(source.sceneId) || (state.script && state.script.scenes[0]);
