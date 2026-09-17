@@ -27,6 +27,19 @@ assert.ok(pack.includes("nano-gpt") && pack.includes("resolution"), "nano token 
 
 assert.ok(adapt.includes('width: ["width", "image_size"]'), "width maps to image_size");
 assert.ok(adapt.includes('height: ["height", "image_size"]'), "height maps to image_size");
+assert.ok(!/showComfyGroup = !textish && !nano/.test(adapt),
+  "adapt must not hide whole #comfyParams because nano-gpt");
+assert.ok(!/showComfy = !textish && !nano/.test(o61),
+  "o61 must not hide whole #comfyParams because nano-gpt");
+assert.ok(o61.includes("unknownLora"), "o61 shows LoRA when supportsLora unknown");
+assert.ok(!/hasModel && supportsLora === true\);/.test(o61.replace(/\s+/g, " ")),
+  "o61 must not require supportsLora===true to show LoRA");
+
+const load = js.slice(js.indexOf("async function loadComfyDefaults"), js.indexOf("function packLoraRow"));
+assert.ok(!/if \(\$\("steps"\) && !\$\("steps"\)\.value\) \$\("steps"\)\.value = 8/.test(load),
+  "must not invent steps=8 on catch for every house");
+assert.ok(load.includes('currentBackend() === "civitai"'),
+  "Civitai /api/defaults only fill empty steps/cfg on civitai");
 
 const ctx = {
   window: {},

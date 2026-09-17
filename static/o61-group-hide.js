@@ -33,11 +33,9 @@
       var ic = typeof api.itemCaps === "function" ? api.itemCaps(ctx) : {};
       var hasDurationEnum = Array.isArray(ic.durationEnum) && ic.durationEnum.length > 0;
       var showFal = !textish && vid && (be === "fal" || hasDurationEnum);
-      var showComfy = !textish && !nano && (
-        be === "civitai" || be === "huggingface" ||
-        be === "modelscope-ai" || be === "modelscope-cn" ||
-        (be === "fal" && !vid)
-      );
+      var showComfy = !textish && ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"].some(function (f) {
+        return typeof api.resolveFieldSupport !== "function" || api.resolveFieldSupport(f, ctx) !== "unsupported";
+      });
       var showNano = nano;
       var fal = ctx.$("falParams");
       var comfy = ctx.$("comfyParams");
@@ -64,7 +62,16 @@
       var loraBox = ctx.$("loraBox") || ctx.$("loraParams") || ctx.$("loras");
       var loraBlock = ctx.$("loraBlock") || (loraBox && loraBox.closest && loraBox.closest(".lora-block")) || loraBox;
       var hasModel = !!(item.id || ctx.serviceId);
-      var showLora = be === "civitai" ? hasModel : (hasModel && supportsLora === true);
+      var unknownLora = (supportsLora !== true && supportsLora !== false);
+      var hasChips = false;
+      try {
+        if (ctx && Array.isArray(ctx.loras) && ctx.loras.length) hasChips = true;
+        else if (typeof window !== "undefined" && window.state && Array.isArray(window.state.loras) && window.state.loras.length) hasChips = true;
+      } catch (_) {}
+      var showLora = (be === "civitai" && hasModel)
+        || (hasModel && supportsLora === true)
+        || (hasModel && be !== "civitai" && unknownLora)
+        || hasChips;
       if (showLora) {
         show(loraBlock);
         if (loraBlock && loraBlock.classList) loraBlock.classList.remove("param-lora-off");

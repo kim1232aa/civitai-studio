@@ -6545,21 +6545,22 @@
       const r = await fetch("/api/defaults");
       const j = await r.json();
       const d = j.defaults || {};
-      fillSelectOpts($("sampler"), j.samplers || [], ($("sampler") && $("sampler").value) || d.sampler || "er_sde");
-      fillSelectOpts($("scheduler"), j.schedulers || [], ($("scheduler") && $("scheduler").value) || d.scheduler || "sgm_uniform");
-      // Width/height follow #aspect/#res. Never fill Civitai 960×1440 into empty boxes.
-      if ($("steps") && !$("steps").value && d.steps != null) $("steps").value = d.steps;
-      if ($("cfg") && !$("cfg").value && d.cfgScale != null) $("cfg").value = d.cfgScale;
-      if (d.sampler && $("sampler") && !$("sampler").value) ensureSelectOpt($("sampler"), d.sampler);
-      if (d.scheduler && $("scheduler") && !$("scheduler").value) ensureSelectOpt($("scheduler"), d.scheduler);
+      fillSelectOpts($("sampler"), j.samplers || [], ($("sampler") && $("sampler").value) || "");
+      fillSelectOpts($("scheduler"), j.schedulers || [], ($("scheduler") && $("scheduler").value) || "");
+      // Width/height follow #aspect/#res. Never fill Civitai 960×1440 / steps=8 / cfg=1
+      // into empty boxes for other houses (o163). Empty = omit outbound.
+      if (currentBackend() === "civitai") {
+        if ($("steps") && !$("steps").value && d.steps != null) $("steps").value = d.steps;
+        if ($("cfg") && !$("cfg").value && d.cfgScale != null) $("cfg").value = d.cfgScale;
+        if (d.sampler && $("sampler") && !$("sampler").value) ensureSelectOpt($("sampler"), d.sampler);
+        if (d.scheduler && $("scheduler") && !$("scheduler").value) ensureSelectOpt($("scheduler"), d.scheduler);
+      }
       // Catalog ordering hint only — never soft-fill into generate/buildGraph.
       state._civitaiDefaultService = (d.serviceId || CIVITAI_PREF_SERVICE);
     } catch (_) {
-      fillSelectOpts($("sampler"), ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], "er_sde");
-      fillSelectOpts($("scheduler"), ["sgm_uniform", "simple", "normal", "karras", "exponential", "ddim_uniform", "beta"], "sgm_uniform");
-      if ($("steps") && !$("steps").value) $("steps").value = 8;
-      if ($("cfg") && !$("cfg").value) $("cfg").value = 1;
-      // Catalog ordering hint only — never soft-fill into generate/buildGraph.
+      fillSelectOpts($("sampler"), ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "ddim"], ($("sampler") && $("sampler").value) || "");
+      fillSelectOpts($("scheduler"), ["sgm_uniform", "simple", "normal", "karras", "exponential", "ddim_uniform", "beta"], ($("scheduler") && $("scheduler").value) || "");
+      // Catalog ordering hint only — never invent steps=8 / cfg=1.
       state._civitaiDefaultService = CIVITAI_PREF_SERVICE;
     }
     syncParamSurface();

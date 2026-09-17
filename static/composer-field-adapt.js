@@ -533,10 +533,13 @@
     const icSurf = itemCaps(ctx);
     const hasDurationEnum = Array.isArray(icSurf.durationEnum) && icSurf.durationEnum.length > 0;
     const showFalGroup = !textish && (be === "fal" || (vid && hasDurationEnum));
-    const showComfyGroup = !textish && !nano && (
-      be === "civitai" || be === "huggingface" ||
-      be === "modelscope-ai" || be === "modelscope-cn" ||
-      resolveFieldSupport("width", ctx) !== "unsupported"
+    // o163: never hide the whole #comfyParams by house. Nano steps/cfg/seed
+    // are board-supported; Fal video may still have seed/cfg/steps per schema.
+    // Per-field hide is resolveFieldSupport === unsupported.
+    const showComfyGroup = !textish && (
+      ["width", "height", "steps", "cfg", "sampler", "scheduler", "seed"].some(function (f) {
+        return resolveFieldSupport(f, ctx) !== "unsupported";
+      })
     );
     const showNanoGroup = nano;
     if (falBox) falBox.classList.toggle("hidden", !showFalGroup);
