@@ -451,8 +451,9 @@
     return "未填";
   }
 
+  // o161: human LoRA strength tip (no test-speak 出站/strength)
   function strengthTitle() {
-    return "strength 未填：出站省略数值（不写 1.0/0.8）";
+    return "权重未填则按服务商默认，不自动填 1.0";
   }
 
   function filledUnsupportedWarnings(ctx) {

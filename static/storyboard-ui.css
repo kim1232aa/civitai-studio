@@ -853,3 +853,15 @@ header .title:hover { color: #fff; }
 .modes button.mode-unavail:not([data-unavail])::after {
   content: "未接";
 }
+
+/* o161 history video ▶ badge */
+.rail .rail-item .rail-thumb { position: relative; width: 36px; height: 36px; flex: 0 0 36px; }
+.rail .rail-item .rail-thumb img,
+.rail .rail-item .rail-thumb video { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; display: block; }
+.rail .rail-item .rail-vid-badge {
+  position: absolute; right: 1px; bottom: 1px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(0,0,0,.72); color: #fff;
+  font-size: 8px; font-style: normal; line-height: 14px; text-align: center;
+  pointer-events: none;
+}

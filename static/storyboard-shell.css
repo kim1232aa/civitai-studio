@@ -1514,3 +1514,34 @@ button.seko-cell:hover { border-color: rgba(94,224,197,.45); color: #dffcf5; }
 .import-ft .grow { flex: 1 1 auto; }
 .import-ft .primary:disabled { opacity: .45; cursor: not-allowed; }
 .import-body { min-height: 120px; }
+
+/* o161: history video thumb corner badge (▶) — video ≠ still */
+.rail-item .rail-thumb {
+  position: relative;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+.rail-item .rail-thumb img,
+.rail-item .rail-thumb video {
+  width: 40px !important;
+  height: 40px !important;
+  display: block;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.rail-item .rail-vid-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}

@@ -5464,6 +5464,7 @@ def main():
         test_o40_fill_exact_cap_static,
         test_o41_fill_real_fixtures_static,
         test_o160_composer_mode_tabs_honesty,
+        test_o161_human_rail_labels,
         test_v0821o30_send_gate,
         test_import_19201654_original_params,
         # test_import_142210587_original_params  # optional fixture; NOT acceptance
@@ -5568,6 +5569,39 @@ def test_o160_composer_mode_tabs_honesty():
     assert_true("syncModeTabs" in rd, "renderDock syncModeTabs")
     asc = js[js.find("function applyServiceConstraints"):js.find("function applyServiceConstraints") + 1200]
     assert_true("syncModeTabs" in asc, "applyServiceConstraints syncModeTabs")
+
+
+
+
+def test_o161_human_rail_labels():
+    """o161: human history titles + ▶ video badge; LoRA tip / 无法发送人话."""
+    js = (ROOT / "static" / "storyboard.js").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "storyboard.html").read_text(encoding="utf-8")
+    adapt = (ROOT / "static" / "composer-field-adapt.js").read_text(encoding="utf-8")
+    css_shell = (ROOT / "static" / "storyboard-shell.css").read_text(encoding="utf-8")
+    css_ui = (ROOT / "static" / "storyboard-ui.css").read_text(encoding="utf-8")
+    assert_true("v0822o161-human-rail-labels" in js, "js stamp o161")
+    assert_true("o161humanraillabels" in html, "html cache-bust o161")
+    assert_true("function humanOutTitle" in js, "humanOutTitle")
+    # loadOuts uses helper
+    lo = js[js.find("async function loadOuts"):js.find("async function loadOuts") + 4500]
+    assert_true("humanOutTitle" in lo, "loadOuts uses humanOutTitle")
+    assert_true('title: String(it.file || it.name || "历史成片").replace' not in lo, "loadOuts no raw filename title")
+    # house labels present in helper
+    hot = js[js.find("function humanOutTitle"):js.find("function humanOutTitle") + 1600]
+    for lab in ("Nano", "Fal", "Civitai", "魔搭", "成片"):
+        assert_true(lab in hot, "humanOutTitle has " + lab)
+    assert_true('media + "成片"' in hot or "视频成片" in hot, "generic 成片 label")
+    # no raw fal_ as title pattern in loadOuts path
+    assert_true("rail-vid-badge" in js, "▶ badge markup")
+    assert_true("▶" in js, "play glyph")
+    assert_true("rail-vid-badge" in css_shell or "rail-vid-badge" in css_ui, "badge CSS")
+    assert_true("权重未填则按服务商默认，不自动填 1.0" in adapt, "strengthTitle human")
+    assert_true("权重未填则按服务商默认，不自动填 1.0" in js, "storyboard fallback human")
+    assert_true("出站省略数值" not in adapt, "no test-speak in strengthTitle")
+    assert_true("无法发送" in js, "无法发送 copy")
+    # user-visible LoRA status / gate should not keep 无法出站
+    assert_true("无法出站" not in js, "no 无法出站 in storyboard.js")
 
 
 

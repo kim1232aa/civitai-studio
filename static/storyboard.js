@@ -47,6 +47,7 @@
   // v0821o153b-card-pixels-show-out o153bcardpixels 20260916-o153b: hard reset face pixels to /out after writeback; late renderCards cannot leave import paint
   // v0822o159-outs-filter-burn-still o159outsfilterburnstill 20260917-o159: 生成历史 drop burn-pack -still/_still_/still.jpg; prefer job /out mp4
   // v0822o160-composer-mode-tabs o160composermodetabs 20260917-o160: Composer mode tabs honesty by house caps (grey+未接; Magao video stub)
+  // v0822o161-human-rail-labels o161humanraillabels 20260917-o161: human history titles + ▶ video badge; LoRA/无法发送人话
   // v0822o158-fal-zimagebase-lora o158falzimagebase 20260917-o158: map zimagebase AIR → fal-ai/z-image/base/lora (official; not turbo); no cross-house steal
   // v0822o157-fal-zimageturbo-lora o157falzimageturbo 20260917-o157: map zimageturbo AIR → fal-ai/z-image/turbo/lora; empty-sid skips catalog-miss; no krea sibling steal
   // v0822o156-magao-ai-krea-not-sendable o156magaoaikrea 20260917-o156: Magao AI catalog drops krea Turbo/Raw (AI Infer rejects); CN keeps; no AI→CN swap
@@ -438,6 +439,27 @@
       out.push({ id: s.id, kind: "shot", url: s.url, title: (s.title || "成片") });
     });
     return out;
+  }
+  function humanOutTitle(file, kind) {
+    // o161: user-visible history title — never raw nano-gpt_vid_… / fal_fal-ai_wan_… filenames
+    var raw = String(file == null ? "" : file).trim();
+    var base = raw.replace(/\\.[^.\\/]+$/, "").replace(/^.*[\\/]/, "");
+    var k = String(kind || "").toLowerCase();
+    var blob = (raw + " " + base).toLowerCase();
+    if (!k) {
+      if (/\\.(mp4|webm|mov)(\\?|$)/i.test(raw) || /(?:^|[_\-\s])vid(?:eo)?(?:[_\-\s]|$)/i.test(base)) k = "video";
+      else k = "image";
+    }
+    if (k !== "video" && k !== "image") k = (/video|vid|mp4|webm/.test(blob) ? "video" : "image");
+    var house = "";
+    if (/nano[-_]?gpt|nanogpt/.test(blob)) house = "Nano";
+    else if (/modelscope[-_]?(?:ai|cn)|魔搭|magao/.test(blob)) house = "魔搭";
+    else if (/huggingface|hf[-_]|hugging/.test(blob)) house = "HF";
+    else if (/(?:^|[_\-\/])fal(?:[_\-\/]|$)|fal-ai/.test(blob)) house = "Fal";
+    else if (/civitai/.test(blob)) house = "Civitai";
+    var media = (k === "video") ? "视频" : "图片";
+    if (house) return house + " " + media;
+    return media + "成片";
   }
   function railHistory() { return (state.history || []).filter((h) => !isJunkRailItem(h)); }
   function shots() { return state.nodes.filter((n) => n.kind === "shot"); }
@@ -3042,11 +3064,17 @@
       const list = railHistory();
       body = '<div class="rail-h">生成历史 · 拖到画布</div>' +
         (list.length ? list.map((it, i) => {
-          const name = String(it.title || "");
-          const thumb = it.url
-            ? (isVideoUrl(it.url)
+          const kind = it.kind || mediaKindOf(it.url || "");
+          const name = String(it.title || (typeof humanOutTitle === "function" ? humanOutTitle(it.url, kind) : "") || (kind === "video" ? "视频成片" : "图片成片"));
+          const isVid = kind === "video" || isVideoUrl(it.url || "");
+          const media = it.url
+            ? (isVid
                 ? '<video src="' + esc(it.url) + '" muted playsinline preload="metadata"></video>'
                 : '<img src="' + esc(it.url) + '" alt="">')
+            : "";
+          const thumb = media
+            ? ('<div class="rail-thumb' + (isVid ? " is-video" : "") + '">' + media +
+               (isVid ? '<i class="rail-vid-badge" aria-hidden="true">▶</i>' : "") + "</div>")
             : "";
           const pin = (canPin && it.url)
             ? '<button class="pin" type="button" data-hist-pin="' + i + '" title="接到此镜">接到此镜</button>'
@@ -5773,7 +5801,7 @@
           '" data-lora-str="' + i + '" title="' +
           ((typeof window !== "undefined" && window.ComposerFieldAdapt &&
             typeof window.ComposerFieldAdapt.strengthTitle === "function")
-            ? window.ComposerFieldAdapt.strengthTitle() : "strength 未填：出站省略数值（不写 1.0/0.8）") +
+            ? window.ComposerFieldAdapt.strengthTitle() : "权重未填则按服务商默认，不自动填 1.0") +
           '" aria-label="strength">' +
         '<button type="button" class="lora-del" data-lora-del="' + i + '">删</button>' +
         '</div></div>';
@@ -6624,12 +6652,12 @@
     const mapped = list.map(packLoraRow);
     const bad = mapped.filter(function (row) { return !loraRowCanOutbound(row, be); });
     if (bad.length && bad.length < mapped.length) {
-      return "有 " + bad.length + " 条 LoRA 缺 air/modelId/versionId/strength 或无法出站，不能只带走其余条";
+      return "有 " + bad.length + " 条 LoRA 缺 air/modelId/versionId/strength 或无法发送，不能只带走其余条";
     }
     if (be === "civitai" && bad.length) {
       const missStr = bad.some(function (row) { return row.strengthMissing || row.strength == null || row.strength === ""; });
-      if (missStr) return "LoRA 缺 strength，无法出站（不发明 1.0）";
-      return "LoRA 缺 air/modelId/versionId，无法出站";
+      if (missStr) return "LoRA 缺 strength，无法发送（不发明 1.0）";
+      return "LoRA 缺 air/modelId/versionId，无法发送";
     }
     if (be === "modelscope-ai" || be === "modelscope-cn") {
       return "魔搭 LoRA 只要 Hub owner/repo，Civitai 下载链不能用";
@@ -6637,10 +6665,10 @@
     if (be === "fal") {
       const baseMsg = falLoraUnsupportedMsg();
       if (baseMsg) return baseMsg;
-      return "LoRA 缺 http path，无法出站";
+      return "LoRA 缺 http path，无法发送";
     }
-    if (be === "huggingface") return "LoRA 缺 http path，无法出站";
-    return "LoRA 缺 air，无法出站";
+    if (be === "huggingface") return "LoRA 缺 http path，无法发送";
+    return "LoRA 缺 air，无法发送";
   }
   function revalidateLorasForService() {
     const list = Array.isArray(state.loras) ? state.loras : [];
@@ -6672,9 +6700,9 @@
     let bad = 0;
     list.forEach(function (l) {
       if (!loraRowCanOutbound(packLoraRow(l), be)) {
-        if (l.status !== "无直链") l.status = "无法出站";
+        if (l.status !== "无直链") l.status = "无法发送";
         bad += 1;
-      } else if (l.status === "当前模型不支持" || l.status === "无法出站") {
+      } else if (l.status === "当前模型不支持" || l.status === "无法发送") {
         l.status = "";
       }
     });
@@ -8811,10 +8839,17 @@
 
   function pushHistoryItem(url, title) {
     if (!url) return;
+    const kind = mediaKindOf(url);
+    let label = title;
+    // If caller passed a raw out filename, humanize; keep already-human labels.
+    if (label && /^(?:nano-gpt|fal_|civitai|huggingface|modelscope|hf_)/i.test(String(label).replace(/^.*[\/]/, ""))) {
+      label = humanOutTitle(label, kind);
+    }
+    if (!label) label = humanOutTitle(url, kind);
     const item = {
       url: url,
-      title: title || (isVideoUrl(url) ? "视频成片" : "历史成片"),
-      kind: mediaKindOf(url),
+      title: label,
+      kind: kind,
     };
     if (isJunkRailItem(item)) return;
     state.history = [item].concat((state.history || []).filter((h) => h && h.url !== url && !isJunkRailItem(h))).slice(0, 24);
@@ -12921,11 +12956,18 @@
         }
         return score(b) - score(a);
       });
-      state.history = items.slice(0, 24).map((it) => ({
-        url: it.url || it.path,
-        title: String(it.file || it.name || "历史成片").replace(/\.[^.]+$/, ""),
-        kind: it.kind || mediaKindOf(it.url || it.path || ""),
-      })).filter((it) => it.url && !isJunkRailItem(it));
+      state.history = items.slice(0, 24).map((it) => {
+        const u = it.url || it.path;
+        const kind = it.kind || mediaKindOf(u || "");
+        const file = it.file || it.name || "";
+        return {
+          url: u,
+          title: (typeof humanOutTitle === "function")
+            ? humanOutTitle(file || u, kind)
+            : String(file || "历史成片").replace(/\.[^.]+$/, ""),
+          kind: kind,
+        };
+      }).filter((it) => it.url && !isJunkRailItem(it));
       renderRail();
     } catch (_) {}
   }
